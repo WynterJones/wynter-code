@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { ChevronDown, ChevronRight, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useProjectStore } from "@/stores/projectStore";
 import { SubscriptionCard } from "./SubscriptionCard";
 
 interface SubscriptionDropdownProps {
@@ -13,24 +13,13 @@ export function SubscriptionDropdown({
   onClose: _onClose,
   onOpenManage,
 }: SubscriptionDropdownProps) {
-  const { getGroupedSubscriptions, calculateSummary, subscriptions } =
-    useSubscriptionStore();
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const { getSubscriptionsByProject, calculateSummary } = useSubscriptionStore();
+  const { activeProjectId } = useProjectStore();
 
-  const groupedSubs = getGroupedSubscriptions();
-  const summary = calculateSummary();
-
-  const toggleGroup = (groupId: string) => {
-    setCollapsedGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupId)) {
-        next.delete(groupId);
-      } else {
-        next.add(groupId);
-      }
-      return next;
-    });
-  };
+  const projectSubscriptions = activeProjectId
+    ? getSubscriptionsByProject(activeProjectId).filter(s => s.isActive)
+    : [];
+  const summary = calculateSummary(activeProjectId ?? undefined);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -40,7 +29,7 @@ export function SubscriptionDropdown({
     }).format(amount);
   };
 
-  const isEmpty = subscriptions.length === 0;
+  const isEmpty = projectSubscriptions.length === 0;
 
   return (
     <div className="absolute right-0 mt-1 w-80 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 overflow-hidden">
@@ -52,65 +41,31 @@ export function SubscriptionDropdown({
         </span>
       </div>
 
-      {/* Content */}
+      {/* Content - flat list of subscriptions for current project */}
       <div className="max-h-[320px] overflow-y-auto">
         {isEmpty ? (
           <div className="px-4 py-8 text-center">
-            <p className="text-sm text-text-secondary mb-3">No subscriptions yet</p>
-            <button
-              onClick={onOpenManage}
-              className="text-sm text-accent hover:underline"
-            >
-              Add your first subscription
-            </button>
+            <p className="text-sm text-text-secondary mb-3">
+              {activeProjectId ? "No subscriptions for this project" : "No project selected"}
+            </p>
+            {activeProjectId && (
+              <button
+                onClick={onOpenManage}
+                className="text-sm text-accent hover:underline"
+              >
+                Add your first subscription
+              </button>
+            )}
           </div>
         ) : (
           <div className="py-1">
-            {groupedSubs.map((grouped) => {
-              const groupKey = grouped.group?.id || "ungrouped";
-              const isCollapsed = collapsedGroups.has(groupKey);
-
-              return (
-                <div key={groupKey}>
-                  {/* Group Header */}
-                  <button
-                    onClick={() => toggleGroup(groupKey)}
-                    className="w-full flex items-center gap-2 px-3 py-2 hover:bg-bg-hover transition-colors"
-                  >
-                    {isCollapsed ? (
-                      <ChevronRight className="w-3.5 h-3.5 text-text-secondary" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5 text-text-secondary" />
-                    )}
-                    {grouped.group?.color && (
-                      <div
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: grouped.group.color }}
-                      />
-                    )}
-                    <span className="flex-1 text-xs font-medium text-text-secondary text-left">
-                      {grouped.group?.name || "Ungrouped"}
-                    </span>
-                    <span className="text-xs font-mono text-text-secondary">
-                      {formatCurrency(grouped.totalMonthlyCost)}
-                    </span>
-                  </button>
-
-                  {/* Group Items */}
-                  {!isCollapsed && (
-                    <div className="pl-2">
-                      {grouped.subscriptions.map((sub) => (
-                        <SubscriptionCard
-                          key={sub.id}
-                          subscription={sub}
-                          variant="compact"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {projectSubscriptions.map((sub) => (
+              <SubscriptionCard
+                key={sub.id}
+                subscription={sub}
+                variant="compact"
+              />
+            ))}
           </div>
         )}
       </div>

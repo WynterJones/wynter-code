@@ -4,3 +4,7 @@ export { useSettingsStore } from "./settingsStore";
 export { useDocsStore } from "./docsStore";
 export { useMinimizedPopupsStore } from "./minimizedPopupsStore";
 export type { MinimizedPopup, PopupType } from "./minimizedPopupsStore";
+export { useOnboardingStore, ONBOARDING_STEPS, TOTAL_STEPS } from "./onboardingStore";
+export type { SystemCheckResults } from "./onboardingStore";
+export { useClaudeStore } from "./claudeStore";
+export type { ClaudeManagerTab } from "./claudeStore";

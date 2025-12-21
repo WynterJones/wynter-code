@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
-import type { Session, Message, ClaudeModel, ToolCall, StreamingStats, PermissionMode } from "@/types";
+import type { Session, Message, ClaudeModel, ToolCall, StreamingStats, PermissionMode, SessionType } from "@/types";
 
 interface StreamingState {
   isStreaming: boolean;
@@ -17,7 +17,7 @@ interface SessionStore {
   messages: Map<string, Message[]>;
   streamingState: Map<string, StreamingState>;
 
-  createSession: (projectId: string, model?: ClaudeModel) => string;
+  createSession: (projectId: string, type?: SessionType, model?: ClaudeModel) => string;
   removeSession: (projectId: string, sessionId: string) => void;
   setActiveSession: (projectId: string, sessionId: string) => void;
   getSessionsForProject: (projectId: string) => Session[];
@@ -88,13 +88,15 @@ export const useSessionStore = create<SessionStore>()(
 
       createSession: (
         projectId: string,
+        type: SessionType = "claude",
         model: ClaudeModel = "claude-sonnet-4-20250514"
       ) => {
         const sessionId = uuid();
         const session: Session = {
           id: sessionId,
           projectId,
-          name: "",
+          name: type === "terminal" ? "Terminal" : "",
+          type,
           model,
           claudeSessionId: null,
           isActive: true,
@@ -489,6 +491,7 @@ export const useSessionStore = create<SessionStore>()(
           for (const [projectId, sessions] of data.sessions) {
             const migrated = sessions.map((s) => ({
               ...s,
+              type: s.type || "claude" as const,
               permissionMode: s.permissionMode || "default" as const,
               color: s.color || undefined,
             }));

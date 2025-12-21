@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { Plus, MessageSquare, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
-import { IconButton, Tooltip } from "@/components/ui";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Plus, MessageSquare, Pencil, ChevronLeft, ChevronRight, Terminal } from "lucide-react";
+import { IconButton } from "@/components/ui";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useTerminalStore } from "@/stores/terminalStore";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 
 interface DropdownPosition {
@@ -34,6 +36,7 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
     updateSessionName,
     updateSessionColor,
   } = useSessionStore();
+  const { getSessionPtyId } = useTerminalStore();
 
   const sessions = getSessionsForProject(projectId);
   const activeId = activeSessionId.get(projectId);
@@ -44,10 +47,17 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
   const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [showNewDropdown, setShowNewDropdown] = useState(false);
+  const [newDropdownPosition, setNewDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
+  const [closeConfirmSessionId, setCloseConfirmSessionId] = useState<string | null>(null);
+  const [closeConfirmPosition, setCloseConfirmPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
 
   const colorPickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const newDropdownRef = useRef<HTMLDivElement>(null);
+  const plusButtonRef = useRef<HTMLButtonElement>(null);
+  const closeConfirmRef = useRef<HTMLDivElement>(null);
 
   const updateScrollButtons = () => {
     if (scrollContainerRef.current) {
@@ -95,6 +105,17 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
       if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
         setColorPickerSessionId(null);
       }
+      if (
+        newDropdownRef.current &&
+        !newDropdownRef.current.contains(event.target as Node) &&
+        plusButtonRef.current &&
+        !plusButtonRef.current.contains(event.target as Node)
+      ) {
+        setShowNewDropdown(false);
+      }
+      if (closeConfirmRef.current && !closeConfirmRef.current.contains(event.target as Node)) {
+        setCloseConfirmSessionId(null);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -128,6 +149,56 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
     }
   };
 
+  const handlePlusClick = (e: React.MouseEvent) => {
+    const button = e.currentTarget as HTMLElement;
+    const rect = button.getBoundingClientRect();
+    setNewDropdownPosition({
+      top: rect.bottom + 8,
+      left: rect.right - 160,
+    });
+    setShowNewDropdown(!showNewDropdown);
+  };
+
+  const handleCreateSession = (type: "claude" | "terminal") => {
+    createSession(projectId, type);
+    setShowNewDropdown(false);
+  };
+
+  const handleSessionClose = useCallback(async (e: React.MouseEvent, sessionId: string, sessionType: string) => {
+    e.stopPropagation();
+
+    // For terminal sessions, check if PTY is active
+    if (sessionType === "terminal") {
+      const ptyId = getSessionPtyId(sessionId);
+      if (ptyId) {
+        try {
+          const isActive = await invoke<boolean>("is_pty_active", { ptyId });
+          if (isActive) {
+            const button = e.currentTarget as HTMLElement;
+            const rect = button.getBoundingClientRect();
+            setCloseConfirmPosition({
+              top: rect.bottom + 8,
+              left: rect.left - 100,
+            });
+            setCloseConfirmSessionId(sessionId);
+            return;
+          }
+        } catch {
+          // If check fails, just close
+        }
+      }
+    }
+
+    removeSession(projectId, sessionId);
+  }, [getSessionPtyId, projectId, removeSession]);
+
+  const handleConfirmSessionClose = useCallback(() => {
+    if (closeConfirmSessionId) {
+      removeSession(projectId, closeConfirmSessionId);
+      setCloseConfirmSessionId(null);
+    }
+  }, [closeConfirmSessionId, projectId, removeSession]);
+
   return (
     <div className="flex items-center h-9 bg-bg-primary border-b border-border">
       {/* Session tabs container */}
@@ -151,8 +222,8 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
                 : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
             )}
           >
-            {/* Session color indicator */}
-            {session.color && (
+            {/* Session color indicator - only show when active */}
+            {activeId === session.id && session.color && (
               <div
                 className="absolute bottom-0 left-0 right-0 h-0.5"
                 style={{ backgroundColor: session.color }}
@@ -165,10 +236,17 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
                 onClick={(e) => handleIconClick(e, session.id)}
                 className="p-0.5 rounded hover:bg-bg-tertiary transition-colors"
               >
-                <MessageSquare
-                  className="w-3.5 h-3.5"
-                  style={{ color: session.color || "currentColor" }}
-                />
+                {session.type === "terminal" ? (
+                  <Terminal
+                    className="w-3.5 h-3.5"
+                    style={{ color: session.color || "currentColor" }}
+                  />
+                ) : (
+                  <MessageSquare
+                    className="w-3.5 h-3.5"
+                    style={{ color: session.color || "currentColor" }}
+                  />
+                )}
               </button>
 
               {/* Color picker dropdown - rendered in portal position */}
@@ -256,10 +334,7 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
 
             {/* Close button */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                removeSession(projectId, session.id);
-              }}
+              onClick={(e) => handleSessionClose(e, session.id, session.type)}
               className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-text-secondary hover:text-accent-red transition-opacity"
             >
               <svg
@@ -308,13 +383,67 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
         </button>
       </div>
 
-      <div className="border-l border-border px-2">
-        <Tooltip content="New Session">
-          <IconButton size="sm" onClick={() => createSession(projectId)}>
-            <Plus className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
+      <div className="border-l border-border px-2 relative">
+        <IconButton
+          ref={plusButtonRef}
+          size="sm"
+          onClick={handlePlusClick}
+        >
+          <Plus className="w-4 h-4" />
+        </IconButton>
+
+        {/* New session dropdown */}
+        {showNewDropdown && (
+          <div
+            ref={newDropdownRef}
+            className="fixed p-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[160px]"
+            style={{ top: newDropdownPosition.top, left: newDropdownPosition.left }}
+          >
+            <button
+              onClick={() => handleCreateSession("claude")}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+            >
+              <MessageSquare className="w-4 h-4" />
+              New Session
+            </button>
+            <button
+              onClick={() => handleCreateSession("terminal")}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+            >
+              <Terminal className="w-4 h-4" />
+              New Terminal
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Close confirmation dropdown */}
+      {closeConfirmSessionId && (
+        <div
+          ref={closeConfirmRef}
+          className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[200px]"
+          style={{ top: closeConfirmPosition.top, left: closeConfirmPosition.left }}
+        >
+          <div className="text-xs text-text-primary font-medium mb-2">Close Terminal?</div>
+          <p className="text-xs text-text-secondary mb-3">
+            There may be a running process. Close anyway?
+          </p>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => setCloseConfirmSessionId(null)}
+              className="px-2 py-1 text-xs rounded bg-bg-tertiary hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleConfirmSessionClose}
+              className="px-2 py-1 text-xs rounded bg-accent-red/20 hover:bg-accent-red/30 text-accent-red transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

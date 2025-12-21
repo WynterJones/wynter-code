@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip } from "@/components/ui";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useProjectStore } from "@/stores/projectStore";
 import type { Subscription, SubscriptionInput, BillingCycle, CurrencyCode } from "@/types";
 
 interface SubscriptionFormProps {
@@ -32,17 +33,20 @@ export function SubscriptionForm({
   onSave,
   onCancel,
 }: SubscriptionFormProps) {
-  const { addSubscription, updateSubscription, groups, getFaviconUrl } =
+  const { addSubscription, updateSubscription, getCategoriesForProject, getFaviconUrl } =
     useSubscriptionStore();
+  const { activeProjectId } = useProjectStore();
 
-  const [formData, setFormData] = useState<SubscriptionInput>({
+  const categories = activeProjectId ? getCategoriesForProject(activeProjectId) : [];
+
+  const [formData, setFormData] = useState<Omit<SubscriptionInput, "projectId">>({
     name: subscription?.name ?? "",
     url: subscription?.url ?? "",
     faviconUrl: subscription?.faviconUrl ?? "",
     monthlyCost: subscription?.monthlyCost ?? 0,
     billingCycle: subscription?.billingCycle ?? "monthly",
     currency: subscription?.currency ?? "USD",
-    groupId: subscription?.groupId ?? null,
+    categoryId: subscription?.categoryId ?? null,
     notes: subscription?.notes ?? "",
     isActive: subscription?.isActive ?? true,
   });
@@ -78,6 +82,10 @@ export function SubscriptionForm({
       }
     }
 
+    if (!activeProjectId && !subscription) {
+      newErrors.project = "No project selected";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -89,8 +97,11 @@ export function SubscriptionForm({
 
     if (subscription) {
       updateSubscription(subscription.id, formData);
-    } else {
-      addSubscription(formData);
+    } else if (activeProjectId) {
+      addSubscription({
+        ...formData,
+        projectId: activeProjectId,
+      });
     }
 
     onSave();
@@ -115,6 +126,12 @@ export function SubscriptionForm({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {errors.project && (
+            <div className="p-2 rounded-lg bg-accent-red/10 border border-accent-red/30">
+              <p className="text-xs text-accent-red">{errors.project}</p>
+            </div>
+          )}
+
           {/* Name */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-text-primary">
@@ -223,13 +240,13 @@ export function SubscriptionForm({
             </div>
           </div>
 
-          {/* Group */}
+          {/* Category */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium text-text-primary">Group</label>
+            <label className="text-sm font-medium text-text-primary">Category</label>
             <select
-              value={formData.groupId ?? ""}
+              value={formData.categoryId ?? ""}
               onChange={(e) =>
-                setFormData({ ...formData, groupId: e.target.value || null })
+                setFormData({ ...formData, categoryId: e.target.value || null })
               }
               className={cn(
                 "w-full px-3 py-2 rounded-lg text-sm",
@@ -237,10 +254,10 @@ export function SubscriptionForm({
                 "focus:outline-none focus:ring-2 focus:ring-accent/50"
               )}
             >
-              <option value="">No group</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.name}
+              <option value="">No category</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
                 </option>
               ))}
             </select>

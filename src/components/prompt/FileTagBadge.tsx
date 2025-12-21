@@ -39,7 +39,7 @@ export function FileTagBadge({ file, onRemove }: FileTagBadgeProps) {
         "inline-flex items-center gap-1.5 px-2 py-1",
         "rounded-md text-xs font-mono",
         "bg-accent/10 text-accent border border-accent/20",
-        "max-w-[200px]"
+        "max-w-[130px]"
       )}
       title={file.path}
     >

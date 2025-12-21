@@ -1,8 +1,9 @@
 export type BillingCycle = "monthly" | "yearly" | "quarterly" | "weekly" | "one-time";
 export type CurrencyCode = "USD" | "EUR" | "GBP" | "CAD" | "AUD";
 
-export interface SubscriptionGroup {
+export interface SubscriptionCategory {
   id: string;
+  projectId: string;
   name: string;
   color: string | null;
   sortOrder: number;
@@ -10,7 +11,8 @@ export interface SubscriptionGroup {
   updatedAt: number;
 }
 
-export interface SubscriptionGroupInput {
+export interface SubscriptionCategoryInput {
+  projectId: string;
   name: string;
   color?: string | null;
   sortOrder?: number;
@@ -18,13 +20,14 @@ export interface SubscriptionGroupInput {
 
 export interface Subscription {
   id: string;
+  projectId: string;
   name: string;
   url: string | null;
   faviconUrl: string | null;
   monthlyCost: number;
   billingCycle: BillingCycle;
   currency: CurrencyCode;
-  groupId: string | null;
+  categoryId: string | null;
   notes: string | null;
   isActive: boolean;
   sortOrder: number;
@@ -33,20 +36,21 @@ export interface Subscription {
 }
 
 export interface SubscriptionInput {
+  projectId: string;
   name: string;
   url?: string | null;
   faviconUrl?: string | null;
   monthlyCost: number;
   billingCycle?: BillingCycle;
   currency?: CurrencyCode;
-  groupId?: string | null;
+  categoryId?: string | null;
   notes?: string | null;
   isActive?: boolean;
   sortOrder?: number;
 }
 
-export interface GroupedSubscriptions {
-  group: SubscriptionGroup | null;
+export interface CategorizedSubscriptions {
+  category: SubscriptionCategory | null;
   subscriptions: Subscription[];
   totalMonthlyCost: number;
 }
@@ -57,3 +61,15 @@ export interface SubscriptionSummary {
   activeCount: number;
   inactiveCount: number;
 }
+
+export interface ShareableSubscriptionData {
+  subscriptions: Omit<Subscription, "id" | "projectId" | "createdAt" | "updatedAt" | "sortOrder">[];
+  categories: Omit<SubscriptionCategory, "id" | "projectId" | "createdAt" | "updatedAt" | "sortOrder">[];
+  exportedAt: number;
+  version: string;
+}
+
+// Legacy type aliases for migration
+export type SubscriptionGroup = SubscriptionCategory;
+export type SubscriptionGroupInput = SubscriptionCategoryInput;
+export type GroupedSubscriptions = CategorizedSubscriptions;

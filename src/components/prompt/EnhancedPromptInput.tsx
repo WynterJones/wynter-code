@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Send, StopCircle, ImagePlus } from "lucide-react";
 import { v4 as uuid } from "uuid";
+import { invoke } from "@tauri-apps/api/core";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -18,16 +19,46 @@ import { ImageThumbnails, type ImageAttachment } from "./ImageThumbnail";
 import { FileTagBadges, type FileReference } from "./FileTagBadge";
 import { FilePickerDropdown } from "./FilePickerDropdown";
 
+const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "avif"];
+
+function isImageFile(filename: string): boolean {
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
+  return IMAGE_EXTENSIONS.includes(ext);
+}
+
+function getMimeType(filename: string): string {
+  const ext = filename.split(".").pop()?.toLowerCase() || "png";
+  const mimeTypes: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    svg: "image/svg+xml",
+    ico: "image/x-icon",
+    bmp: "image/bmp",
+    tiff: "image/tiff",
+    avif: "image/avif",
+  };
+  return mimeTypes[ext] || "image/png";
+}
+
 interface EnhancedPromptInputProps {
   projectPath: string;
   sessionId?: string;
   projectFiles?: string[];
+  pendingImage?: ImageAttachment | null;
+  onImageConsumed?: () => void;
+  onRequestImageBrowser?: () => void;
 }
 
 export function EnhancedPromptInput({
   projectPath,
   sessionId,
   projectFiles = [],
+  pendingImage,
+  onImageConsumed,
+  onRequestImageBrowser,
 }: EnhancedPromptInputProps) {
   const [prompt, setPrompt] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -68,6 +99,14 @@ export function EnhancedPromptInput({
     }
   }, [isFocused]);
 
+  // Handle pending image from file browser
+  useEffect(() => {
+    if (pendingImage) {
+      setImages((prev) => [...prev, pendingImage]);
+      onImageConsumed?.();
+    }
+  }, [pendingImage, onImageConsumed]);
+
   const handlePaste = useCallback((e: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
     if (!items) return;
@@ -107,10 +146,55 @@ export function EnhancedPromptInput({
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback((e: DragEvent<HTMLDivElement>) => {
+  const handleDrop = useCallback(async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setIsDragging(false);
 
+    // Check for internal file drag from sidebar FileTree
+    const wynterData = e.dataTransfer?.getData("application/x-wynter-file");
+    if (wynterData) {
+      try {
+        const fileInfo = JSON.parse(wynterData) as { path: string; name: string; isDirectory: boolean };
+
+        if (fileInfo.isDirectory) return; // Don't handle directories
+
+        if (isImageFile(fileInfo.name)) {
+          // Read image as base64 via Tauri
+          const base64 = await invoke<string>("read_file_base64", { path: fileInfo.path });
+          const mimeType = getMimeType(fileInfo.name);
+          setImages((prev) => [
+            ...prev,
+            {
+              id: uuid(),
+              data: `data:${mimeType};base64,${base64}`,
+              mimeType,
+              name: fileInfo.name,
+            },
+          ]);
+        } else {
+          // Add as file reference with @ badge
+          const parts = fileInfo.path.split("/");
+          const displayPath =
+            parts.length > 3
+              ? `${parts[0]}/.../${parts.slice(-2).join("/")}`
+              : fileInfo.path;
+
+          setFiles((prev) => [
+            ...prev,
+            {
+              id: uuid(),
+              path: fileInfo.path,
+              displayPath,
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Error handling internal file drop:", error);
+      }
+      return;
+    }
+
+    // Handle external file drops (from OS file manager)
     const droppedFiles = e.dataTransfer?.files;
     if (!droppedFiles) return;
 
@@ -215,10 +299,27 @@ export function EnhancedPromptInput({
     }
 
     const userMessage = prompt.trim();
+    const currentImages = [...images];
+    const currentFiles = [...files];
     setPrompt("");
     setImages([]);
     setFiles([]);
     setIsFocused(false);
+
+    // Build full prompt with attachments for CLI
+    let fullPrompt = userMessage;
+
+    // Add file references as @ paths (Claude CLI reads these natively)
+    if (currentFiles.length > 0) {
+      const filePaths = currentFiles.map((f) => f.path).join(" ");
+      fullPrompt = `${filePaths}\n\n${fullPrompt}`;
+    }
+
+    // Add images as base64 data URLs
+    if (currentImages.length > 0) {
+      const imageRefs = currentImages.map((img) => img.data).join("\n");
+      fullPrompt = `${imageRefs}\n\n${fullPrompt}`;
+    }
 
     addMessage(currentSessionId, {
       sessionId: currentSessionId,
@@ -234,7 +335,7 @@ export function EnhancedPromptInput({
 
     try {
       await claudeService.startStreaming(
-        userMessage,
+        fullPrompt,
         projectPath,
         currentSessionId,
         {
@@ -346,19 +447,18 @@ export function EnhancedPromptInput({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          "relative transition-all duration-300 ease-out",
+          "relative",
           isFocused ? "z-50" : "z-10"
         )}
       >
         <div
           className={cn(
             "flex flex-col gap-3 p-4 rounded-xl",
-            "bg-bg-tertiary border",
-            "transition-all duration-300 ease-out",
+            "bg-bg-tertiary border border-solid",
             isFocused
               ? "border-accent shadow-lg shadow-accent/10"
-              : "border-border hover:border-border-hover",
-            isDragging && "border-accent border-dashed bg-accent/5"
+              : "border-border",
+            isDragging && "!border-accent !border-dashed bg-accent/5"
           )}
         >
           {hasAttachments && (
@@ -371,7 +471,7 @@ export function EnhancedPromptInput({
           <div className="flex items-start gap-3">
             <span
               className={cn(
-                "font-mono mt-1 transition-all duration-200",
+                "font-mono mt-1",
                 isFocused ? "text-accent text-lg" : "text-accent/70 text-sm"
               )}
             >
@@ -391,7 +491,7 @@ export function EnhancedPromptInput({
                 "flex-1 bg-transparent text-text-primary placeholder:text-text-secondary",
                 "font-mono resize-none outline-none",
                 "disabled:opacity-50",
-                "transition-all duration-200",
+                "transition-all duration-300 ease-out",
                 isFocused ? "text-base leading-relaxed" : "text-sm"
               )}
               style={{
@@ -403,42 +503,12 @@ export function EnhancedPromptInput({
             <div className="flex items-center gap-1">
               <IconButton
                 size="sm"
-                onClick={() => document.getElementById("image-upload")?.click()}
+                onClick={() => onRequestImageBrowser?.()}
                 className="text-text-secondary hover:text-accent"
                 disabled={isStreaming}
               >
                 <ImagePlus className="w-4 h-4" />
               </IconButton>
-              <input
-                id="image-upload"
-                type="file"
-                accept="image/*"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  const uploadedFiles = e.target.files;
-                  if (!uploadedFiles) return;
-                  for (const file of uploadedFiles) {
-                    if (file.type.startsWith("image/")) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        const data = event.target?.result as string;
-                        setImages((prev) => [
-                          ...prev,
-                          {
-                            id: uuid(),
-                            data,
-                            mimeType: file.type,
-                            name: file.name,
-                          },
-                        ]);
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }
-                  e.target.value = "";
-                }}
-              />
 
               {isStreaming ? (
                 <IconButton

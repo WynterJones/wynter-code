@@ -71,7 +71,7 @@ export function Modal({
         )}
       >
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
             {title && (
               <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
             )}
@@ -82,7 +82,7 @@ export function Modal({
             )}
           </div>
         )}
-        <div className="overflow-hidden">{children}</div>
+        <div className="overflow-hidden flex-1 min-h-0 flex flex-col">{children}</div>
       </div>
     </div>,
     document.body

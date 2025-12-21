@@ -1,9 +1,12 @@
 export type ClaudeModel = "claude-sonnet-4-20250514" | "claude-opus-4-20250514" | "claude-haiku-3-5-20241022";
 
+export type SessionType = "claude" | "terminal";
+
 export interface Session {
   id: string;
   projectId: string;
   name: string;
+  type: SessionType;
   model: ClaudeModel;
   claudeSessionId: string | null;
   isActive: boolean;

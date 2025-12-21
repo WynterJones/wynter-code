@@ -108,10 +108,6 @@ fn read_directory(
         let file_path = entry.path();
         let file_name = entry.file_name().to_string_lossy().to_string();
 
-        // Skip hidden files (but not .gitignore-ignored files, we show those dimmed)
-        if file_name.starts_with('.') {
-            continue;
-        }
 
         let is_dir = file_path.is_dir();
         let metadata = fs::metadata(&file_path).ok();
@@ -160,6 +156,13 @@ pub fn read_file_content(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn read_file_base64(path: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    Ok(STANDARD.encode(&bytes))
+}
+
+#[tauri::command]
 pub fn write_file_content(path: String, content: String) -> Result<(), String> {
     fs::write(&path, content).map_err(|e| e.to_string())
 }
@@ -176,7 +179,7 @@ pub fn find_markdown_files(project_path: String) -> Result<Vec<MarkdownFile>, St
 
     // Use WalkBuilder which respects .gitignore automatically
     let walker = WalkBuilder::new(&project_path)
-        .hidden(true)           // Skip hidden files/dirs
+        .hidden(false)          // Include hidden files/dirs
         .git_ignore(true)       // Respect .gitignore
         .git_global(true)       // Respect global gitignore
         .git_exclude(true)      // Respect .git/info/exclude
@@ -868,6 +871,13 @@ pub fn delete_to_trash(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn get_home_dir() -> Result<String, String> {
+    dirs::home_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .ok_or_else(|| "Could not determine home directory".to_string())
+}
+
+#[tauri::command]
 pub fn check_node_modules_exists(project_path: String) -> bool {
     Path::new(&project_path).join("node_modules").exists()
 }
@@ -941,10 +951,6 @@ pub fn get_directory_stats(project_path: String) -> Result<DirectoryStats, Strin
             let entry_path = entry.path();
             let file_name = entry.file_name().to_string_lossy().to_string();
 
-            // Skip hidden files/folders
-            if file_name.starts_with('.') {
-                continue;
-            }
 
             let is_dir = entry_path.is_dir();
 
@@ -997,6 +1003,367 @@ pub fn get_directory_stats(project_path: String) -> Result<DirectoryStats, Strin
     walk_dir(project_path_obj, &mut stats, &code_extensions, &skip_dirs);
 
     Ok(stats)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SystemCheckResults {
+    pub node: Option<String>,
+    pub npm: Option<String>,
+    pub git: Option<String>,
+    pub claude: Option<String>,
+}
+
+fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
+    let output = Command::new(cmd)
+        .args(args)
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let version = stdout.trim().to_string();
+
+    // Clean up version strings
+    let version = if version.starts_with('v') {
+        version[1..].to_string()
+    } else if version.contains(' ') {
+        // Handle "git version 2.42.0" format
+        version.split_whitespace()
+            .last()
+            .unwrap_or(&version)
+            .to_string()
+    } else {
+        version
+    };
+
+    if version.is_empty() {
+        None
+    } else {
+        Some(version)
+    }
+}
+
+#[tauri::command]
+pub fn check_system_requirements() -> SystemCheckResults {
+    SystemCheckResults {
+        node: get_command_version("node", &["--version"]),
+        npm: get_command_version("npm", &["--version"]),
+        git: get_command_version("git", &["--version"]),
+        claude: get_command_version("claude", &["--version"]),
+    }
+}
+
+// Claude Code Manager types and commands
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeFile {
+    pub name: String,
+    pub path: String,
+    pub scope: String,       // "user" or "project"
+    pub file_type: String,   // "command", "skill", or "subagent"
+    pub frontmatter: serde_json::Value,
+    pub content: String,
+    pub raw_content: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeVersionInfo {
+    pub current: String,
+    pub latest: Option<String>,
+    pub update_available: bool,
+    pub last_checked: Option<i64>,
+}
+
+fn parse_frontmatter(content: &str) -> (serde_json::Value, String) {
+    let trimmed = content.trim();
+
+    if !trimmed.starts_with("---") {
+        return (serde_json::json!({}), content.to_string());
+    }
+
+    // Find the closing ---
+    if let Some(end_idx) = trimmed[3..].find("\n---") {
+        let yaml_content = &trimmed[3..3 + end_idx].trim();
+        let body = trimmed[3 + end_idx + 4..].trim().to_string();
+
+        // Parse YAML to JSON
+        let frontmatter: serde_json::Value = serde_yaml::from_str(yaml_content)
+            .unwrap_or(serde_json::json!({}));
+
+        return (frontmatter, body);
+    }
+
+    (serde_json::json!({}), content.to_string())
+}
+
+#[tauri::command]
+pub fn get_claude_files(
+    scope: String,
+    file_type: String,
+    project_path: Option<String>,
+) -> Result<Vec<ClaudeFile>, String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let base_path = match scope.as_str() {
+        "user" => home_dir.join(".claude"),
+        "project" => {
+            let project = project_path.ok_or("Project path required for project scope")?;
+            Path::new(&project).join(".claude")
+        }
+        _ => return Err(format!("Invalid scope: {}", scope)),
+    };
+
+    let subdir = match file_type.as_str() {
+        "command" => "commands",
+        "skill" => "skills",
+        "subagent" => "agents",
+        _ => return Err(format!("Invalid file type: {}", file_type)),
+    };
+
+    let dir_path = base_path.join(subdir);
+
+    if !dir_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut files: Vec<ClaudeFile> = Vec::new();
+
+    let entries = fs::read_dir(&dir_path).map_err(|e| e.to_string())?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        if !path.is_file() {
+            continue;
+        }
+
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        if ext != "md" {
+            continue;
+        }
+
+        let name = path.file_stem()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        let raw_content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let (frontmatter, content) = parse_frontmatter(&raw_content);
+
+        files.push(ClaudeFile {
+            name,
+            path: path.to_string_lossy().to_string(),
+            scope: scope.clone(),
+            file_type: file_type.clone(),
+            frontmatter,
+            content,
+            raw_content,
+        });
+    }
+
+    files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(files)
+}
+
+#[tauri::command]
+pub fn write_claude_file(
+    path: String,
+    content: String,
+) -> Result<(), String> {
+    // Ensure parent directory exists
+    let file_path = Path::new(&path);
+    if let Some(parent) = file_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+pub fn delete_claude_file(path: String) -> Result<(), String> {
+    let file_path = Path::new(&path);
+
+    if !file_path.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+
+    fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))
+}
+
+#[tauri::command]
+pub fn get_claude_settings(
+    scope: String,
+    project_path: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let settings_path = match scope.as_str() {
+        "user" => home_dir.join(".claude").join("settings.json"),
+        "project" => {
+            let project = project_path.ok_or("Project path required for project scope")?;
+            Path::new(&project).join(".claude").join("settings.json")
+        }
+        "local" => {
+            let project = project_path.ok_or("Project path required for local scope")?;
+            Path::new(&project).join(".claude").join("settings.local.json")
+        }
+        _ => return Err(format!("Invalid scope: {}", scope)),
+    };
+
+    if !settings_path.exists() {
+        return Ok(serde_json::json!({}));
+    }
+
+    let content = fs::read_to_string(&settings_path).map_err(|e| e.to_string())?;
+    let settings: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse settings: {}", e))?;
+
+    Ok(settings)
+}
+
+#[tauri::command]
+pub fn write_claude_settings(
+    scope: String,
+    project_path: Option<String>,
+    settings: serde_json::Value,
+) -> Result<(), String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let settings_path = match scope.as_str() {
+        "user" => home_dir.join(".claude").join("settings.json"),
+        "project" => {
+            let project = project_path.ok_or("Project path required for project scope")?;
+            Path::new(&project).join(".claude").join("settings.json")
+        }
+        "local" => {
+            let project = project_path.ok_or("Project path required for local scope")?;
+            Path::new(&project).join(".claude").join("settings.local.json")
+        }
+        _ => return Err(format!("Invalid scope: {}", scope)),
+    };
+
+    // Ensure directory exists
+    if let Some(parent) = settings_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let content = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+
+    fs::write(&settings_path, content).map_err(|e| format!("Failed to write settings: {}", e))
+}
+
+#[tauri::command]
+pub async fn get_claude_version() -> Result<ClaudeVersionInfo, String> {
+    let current = get_command_version("claude", &["--version"])
+        .unwrap_or_else(|| "unknown".to_string());
+
+    Ok(ClaudeVersionInfo {
+        current,
+        latest: None,
+        update_available: false,
+        last_checked: None,
+    })
+}
+
+#[tauri::command]
+pub async fn check_claude_update() -> Result<ClaudeVersionInfo, String> {
+    let current = get_command_version("claude", &["--version"])
+        .unwrap_or_else(|| "unknown".to_string());
+
+    // Check npm registry for latest version
+    let output = Command::new("npm")
+        .args(["view", "@anthropic-ai/claude-code", "version"])
+        .output()
+        .map_err(|e| format!("Failed to check npm: {}", e))?;
+
+    let latest = if output.status.success() {
+        Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    } else {
+        None
+    };
+
+    let update_available = match (&current, &latest) {
+        (curr, Some(lat)) if curr != "unknown" => curr != lat,
+        _ => false,
+    };
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .ok();
+
+    Ok(ClaudeVersionInfo {
+        current,
+        latest,
+        update_available,
+        last_checked: now,
+    })
+}
+
+#[tauri::command]
+pub fn create_claude_file(
+    scope: String,
+    file_type: String,
+    name: String,
+    project_path: Option<String>,
+) -> Result<String, String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let base_path = match scope.as_str() {
+        "user" => home_dir.join(".claude"),
+        "project" => {
+            let project = project_path.ok_or("Project path required for project scope")?;
+            Path::new(&project).join(".claude")
+        }
+        _ => return Err(format!("Invalid scope: {}", scope)),
+    };
+
+    let subdir = match file_type.as_str() {
+        "command" => "commands",
+        "skill" => "skills",
+        "subagent" => "agents",
+        _ => return Err(format!("Invalid file type: {}", file_type)),
+    };
+
+    let dir_path = base_path.join(subdir);
+    fs::create_dir_all(&dir_path).map_err(|e| format!("Failed to create directory: {}", e))?;
+
+    let file_path = dir_path.join(format!("{}.md", name));
+
+    if file_path.exists() {
+        return Err(format!("File already exists: {}", name));
+    }
+
+    // Create template content based on file type
+    let template = match file_type.as_str() {
+        "command" => format!(
+            "---\ndescription: Description of what this command does\n---\n\n# {}\n\nYour command prompt here.\n",
+            name
+        ),
+        "skill" => format!(
+            "---\nname: {}\ndescription: Description of when this skill should be used\n---\n\nYour skill instructions here.\n",
+            name
+        ),
+        "subagent" => format!(
+            "---\nname: {}\ndescription: Description of when this subagent should be invoked\ntools: Read, Grep, Glob\nmodel: inherit\n---\n\nYou are a specialized agent for...\n\nWhen invoked:\n1. First step\n2. Second step\n3. Third step\n",
+            name
+        ),
+        _ => String::new(),
+    };
+
+    fs::write(&file_path, template).map_err(|e| format!("Failed to create file: {}", e))?;
+
+    Ok(file_path.to_string_lossy().to_string())
 }
 
 pub fn get_migrations() -> Vec<Migration> {

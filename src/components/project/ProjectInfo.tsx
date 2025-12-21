@@ -7,7 +7,7 @@ import {
   HardDrive,
   FileCode,
   Calendar,
-  Star,
+  Palette,
   Package,
   RefreshCw,
 } from "lucide-react";
@@ -96,10 +96,10 @@ export function ProjectInfo({ project }: ProjectInfoProps) {
               </div>
             </div>
 
-            {project.isFavorite && (
+            {project.color && (
               <div className="flex items-center gap-2">
-                <Star className="w-4 h-4 text-accent-yellow" fill="currentColor" />
-                <span className="text-xs text-text-secondary">Favorite</span>
+                <Palette className="w-4 h-4" style={{ color: project.color }} />
+                <span className="text-xs text-text-secondary">Color assigned</span>
               </div>
             )}
 

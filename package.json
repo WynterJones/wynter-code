@@ -7,15 +7,22 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "version:patch": "node scripts/bump-version.js patch",
+    "version:minor": "node scripts/bump-version.js minor",
+    "version:major": "node scripts/bump-version.js major"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.4.2",
     "@tauri-apps/plugin-fs": "^2.0.3",
+    "@tauri-apps/plugin-updater": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.0.2",
     "@tauri-apps/plugin-sql": "^2.0.2",
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/addon-web-links": "^0.11.0",
+    "@xterm/xterm": "^5.5.0",
     "clsx": "^2.1.1",
     "highlight.js": "^11.11.1",
     "lucide-react": "^0.468.0",

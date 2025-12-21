@@ -13,6 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "Wynter Code",
         "width": 1400,
         "height": 900,
@@ -41,6 +42,12 @@
     },
     "shell": {
       "open": true
+    },
+    "updater": {
+      "endpoints": [
+        "https://github.com/WynterJones/wynter-code/releases/latest/download/latest.json"
+      ],
+      "pubkey": ""
     }
   },
   "bundle": {

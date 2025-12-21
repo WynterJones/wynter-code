@@ -1,4 +1,4 @@
-import { X, Code, Info } from "lucide-react";
+import { X, Code, Info, FolderOpen } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip } from "@/components/ui";
@@ -13,12 +13,12 @@ interface SettingsPopupProps {
   onClose: () => void;
 }
 
-type SettingsTab = "editor" | "about";
+type SettingsTab = "general" | "editor" | "about";
 
 const APP_VERSION = "1.0.0";
 
 export function SettingsPopup({ onClose }: SettingsPopupProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("editor");
+  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -40,14 +40,17 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     editorWordWrap,
     editorMinimap,
     markdownDefaultView,
+    defaultBrowsePath,
     setEditorTheme,
     setEditorFontSize,
     setEditorWordWrap,
     setEditorMinimap,
     setMarkdownDefaultView,
+    setDefaultBrowsePath,
   } = useSettingsStore();
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
+    { id: "general", label: "General", icon: FolderOpen },
     { id: "editor", label: "Editor", icon: Code },
     { id: "about", label: "About", icon: Info },
   ];
@@ -87,6 +90,12 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
 
           {/* Content */}
           <div className="flex-1 p-6 overflow-auto">
+            {activeTab === "general" && (
+              <GeneralSettings
+                defaultBrowsePath={defaultBrowsePath}
+                onDefaultBrowsePathChange={setDefaultBrowsePath}
+              />
+            )}
             {activeTab === "editor" && (
               <EditorSettings
                 theme={editorTheme}
@@ -282,13 +291,60 @@ function EditorSettings({
   );
 }
 
+interface GeneralSettingsProps {
+  defaultBrowsePath: string;
+  onDefaultBrowsePathChange: (path: string) => void;
+}
+
+function GeneralSettings({
+  defaultBrowsePath,
+  onDefaultBrowsePathChange,
+}: GeneralSettingsProps) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-lg font-medium text-text-primary mb-4">
+        General Settings
+      </h2>
+
+      {/* Default Browse Path */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-text-primary">
+          Default Browse Path
+        </label>
+        <p className="text-xs text-text-secondary mb-2">
+          Set a default starting directory for the file browser. Leave empty to use the home directory.
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={defaultBrowsePath}
+            onChange={(e) => onDefaultBrowsePathChange(e.target.value)}
+            placeholder="e.g., /Users/you/Projects"
+            className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-secondary text-sm focus:outline-none focus:border-accent"
+          />
+          {defaultBrowsePath && (
+            <button
+              onClick={() => onDefaultBrowsePathChange("")}
+              className="px-3 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover text-sm transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AboutSection() {
   return (
     <div className="space-y-6">
       <div className="text-center py-8">
-        <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-accent to-accent-blue flex items-center justify-center">
-          <Code className="w-10 h-10 text-white" />
-        </div>
+        <img
+          src="/icons/icon1.png"
+          alt="Wynter Code"
+          className="w-20 h-20 mx-auto mb-4 rounded-2xl"
+        />
         <h1 className="text-2xl font-bold text-text-primary mb-1">
           Wynter Code
         </h1>

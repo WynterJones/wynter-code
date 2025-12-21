@@ -1,31 +1,36 @@
-import { useState, useEffect, useCallback } from "react";
-import { X, CreditCard, FolderOpen, Plus, Search } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { X, CreditCard, Tag, Plus, Search, Download, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip } from "@/components/ui";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
+import { useProjectStore } from "@/stores/projectStore";
 import { SubscriptionCard } from "./SubscriptionCard";
 import { SubscriptionForm } from "./SubscriptionForm";
-import { GroupManager } from "./GroupManager";
-import type { Subscription } from "@/types";
+import { CategoryManager } from "./CategoryManager";
+import type { Subscription, ShareableSubscriptionData } from "@/types";
 
 interface SubscriptionPopupProps {
   onClose: () => void;
 }
 
-type PopupTab = "subscriptions" | "groups";
+type PopupTab = "subscriptions" | "categories";
 
 export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
   const [activeTab, setActiveTab] = useState<PopupTab>("subscriptions");
   const [searchQuery, setSearchQuery] = useState("");
   const [editingSubscription, setEditingSubscription] = useState<Subscription | null>(null);
   const [isAddingSubscription, setIsAddingSubscription] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { activeProjectId } = useProjectStore();
   const {
-    subscriptions,
-    getGroupedSubscriptions,
+    getSubscriptionsByProject,
+    getCategorizedSubscriptions,
     calculateSummary,
     deleteSubscription,
     toggleSubscriptionActive,
+    exportSubscriptions,
+    importSubscriptions,
   } = useSubscriptionStore();
 
   const handleKeyDown = useCallback(
@@ -47,12 +52,13 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const summary = calculateSummary();
-  const groupedSubs = getGroupedSubscriptions();
+  const summary = calculateSummary(activeProjectId ?? undefined);
+  const projectSubscriptions = activeProjectId ? getSubscriptionsByProject(activeProjectId) : [];
+  const categorizedSubs = activeProjectId ? getCategorizedSubscriptions(activeProjectId) : [];
 
   // Filter subscriptions by search query
-  const filteredGroupedSubs = searchQuery
-    ? groupedSubs
+  const filteredCategorizedSubs = searchQuery
+    ? categorizedSubs
         .map((g) => ({
           ...g,
           subscriptions: g.subscriptions.filter((s) =>
@@ -62,10 +68,10 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
           ),
         }))
         .filter((g) => g.subscriptions.length > 0)
-    : groupedSubs;
+    : categorizedSubs;
 
-  // Also include inactive subscriptions in the main list
-  const inactiveSubscriptions = subscriptions.filter((s) => !s.isActive);
+  // Inactive subscriptions for current project
+  const inactiveSubscriptions = projectSubscriptions.filter((s) => !s.isActive);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -81,10 +87,71 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
     }
   };
 
+  const handleExport = () => {
+    if (!activeProjectId) return;
+
+    const data = exportSubscriptions(activeProjectId);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `subscriptions-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !activeProjectId) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string) as ShareableSubscriptionData;
+        if (data.subscriptions && data.version) {
+          importSubscriptions(activeProjectId, data);
+        } else {
+          alert("Invalid subscription file format");
+        }
+      } catch {
+        alert("Failed to parse subscription file");
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const tabs: { id: PopupTab; label: string; icon: typeof CreditCard }[] = [
     { id: "subscriptions", label: "All Subscriptions", icon: CreditCard },
-    { id: "groups", label: "Groups", icon: FolderOpen },
+    { id: "categories", label: "Categories", icon: Tag },
   ];
+
+  if (!activeProjectId) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
+        <div className="w-full max-w-md bg-bg-primary rounded-xl border border-border shadow-2xl p-8 text-center">
+          <CreditCard className="w-12 h-12 mx-auto mb-4 text-text-secondary opacity-50" />
+          <h2 className="text-lg font-medium text-text-primary mb-2">No Project Selected</h2>
+          <p className="text-sm text-text-secondary mb-4">
+            Select or create a project to manage subscriptions.
+          </p>
+          <button
+            onClick={onClose}
+            className={cn(
+              "px-4 py-2 rounded-lg text-sm",
+              "bg-accent text-white hover:bg-accent/90 transition-colors"
+            )}
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -119,6 +186,37 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
                     {tab.label}
                   </button>
                 ))}
+              </div>
+
+              {/* Import/Export */}
+              <div className="mt-4 pt-4 border-t border-border space-y-1">
+                <button
+                  onClick={handleExport}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                    "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
+                  )}
+                >
+                  <Download className="w-4 h-4" />
+                  Export
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                    "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
+                  )}
+                >
+                  <Upload className="w-4 h-4" />
+                  Import
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImport}
+                  className="hidden"
+                />
               </div>
 
               {/* Summary stats at bottom of sidebar */}
@@ -179,7 +277,7 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
 
                   {/* Subscription List */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {filteredGroupedSubs.length === 0 && inactiveSubscriptions.length === 0 ? (
+                    {filteredCategorizedSubs.length === 0 && inactiveSubscriptions.length === 0 ? (
                       <div className="text-center py-12">
                         <CreditCard className="w-12 h-12 mx-auto mb-4 text-text-secondary opacity-50" />
                         <p className="text-text-secondary mb-2">
@@ -196,24 +294,24 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
                       </div>
                     ) : (
                       <>
-                        {filteredGroupedSubs.map((grouped) => (
-                          <div key={grouped.group?.id || "ungrouped"}>
+                        {filteredCategorizedSubs.map((categorized) => (
+                          <div key={categorized.category?.id || "uncategorized"}>
                             <div className="flex items-center gap-2 mb-2">
-                              {grouped.group?.color && (
+                              {categorized.category?.color && (
                                 <div
                                   className="w-2.5 h-2.5 rounded-full"
-                                  style={{ backgroundColor: grouped.group.color }}
+                                  style={{ backgroundColor: categorized.category.color }}
                                 />
                               )}
                               <h3 className="text-sm font-medium text-text-secondary">
-                                {grouped.group?.name || "Ungrouped"}
+                                {categorized.category?.name || "Uncategorized"}
                               </h3>
                               <span className="text-xs text-text-secondary font-mono">
-                                {formatCurrency(grouped.totalMonthlyCost)}/mo
+                                {formatCurrency(categorized.totalMonthlyCost)}/mo
                               </span>
                             </div>
                             <div className="space-y-2">
-                              {grouped.subscriptions.map((sub) => (
+                              {categorized.subscriptions.map((sub) => (
                                 <SubscriptionCard
                                   key={sub.id}
                                   subscription={sub}
@@ -253,9 +351,9 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
                 </>
               )}
 
-              {activeTab === "groups" && (
+              {activeTab === "categories" && (
                 <div className="flex-1 overflow-y-auto p-4">
-                  <GroupManager />
+                  <CategoryManager />
                 </div>
               )}
             </div>

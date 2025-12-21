@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { FileEdit, Plus, Minus, Eye } from "lucide-react";
+import { FileEdit } from "lucide-react";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { FileChangeItem } from "./FileChangeItem";
 import { DiffViewer } from "./DiffViewer";
 import { DiffPopup } from "./DiffPopup";
-import { IconButton } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { gitService, type GitFile } from "@/services/git";
 
 interface ChangesSectionProps {
@@ -106,35 +106,35 @@ export function ChangesSection({
       iconColor="text-accent-yellow"
       count={totalChanges}
       actions={
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-1.5">
           {allDiffableFiles.length > 0 && (
-            <IconButton
+            <Button
+              variant="default"
               size="sm"
               onClick={() => handleOpenDiffPopup()}
-              title="View all diffs"
             >
-              <Eye className="w-3.5 h-3.5" />
-            </IconButton>
+              View Diff
+            </Button>
           )}
           {unstaged.length > 0 && (
-            <IconButton
+            <Button
+              variant="default"
               size="sm"
               onClick={handleStageAll}
               disabled={isStageAllLoading}
-              title="Stage all changes"
             >
-              <Plus className="w-3.5 h-3.5" />
-            </IconButton>
+              Stage All
+            </Button>
           )}
           {staged.length > 0 && (
-            <IconButton
+            <Button
+              variant="default"
               size="sm"
               onClick={handleUnstageAll}
               disabled={isUnstageAllLoading}
-              title="Unstage all"
             >
-              <Minus className="w-3.5 h-3.5" />
-            </IconButton>
+              Unstage All
+            </Button>
           )}
         </div>
       }

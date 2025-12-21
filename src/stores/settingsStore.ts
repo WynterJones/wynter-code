@@ -29,6 +29,7 @@ interface SettingsStore {
   editorWordWrap: boolean;
   editorMinimap: boolean;
   markdownDefaultView: MarkdownViewMode;
+  defaultBrowsePath: string;
 
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
@@ -38,6 +39,7 @@ interface SettingsStore {
   setEditorWordWrap: (wrap: boolean) => void;
   setEditorMinimap: (show: boolean) => void;
   setMarkdownDefaultView: (mode: MarkdownViewMode) => void;
+  setDefaultBrowsePath: (path: string) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -52,6 +54,7 @@ export const useSettingsStore = create<SettingsStore>()(
       editorWordWrap: true,
       editorMinimap: true,
       markdownDefaultView: "preview",
+      defaultBrowsePath: "",
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -83,6 +86,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setMarkdownDefaultView: (markdownDefaultView: MarkdownViewMode) => {
         set({ markdownDefaultView });
+      },
+
+      setDefaultBrowsePath: (defaultBrowsePath: string) => {
+        set({ defaultBrowsePath });
       },
     }),
     {

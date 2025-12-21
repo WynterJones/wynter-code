@@ -35,3 +35,4 @@ src-tauri/icons/
 
 # Testing
 coverage/
+public/audio/meditation

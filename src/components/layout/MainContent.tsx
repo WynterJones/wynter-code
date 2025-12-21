@@ -1,24 +1,33 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { GripHorizontal, FolderOpen } from "lucide-react";
+import { GripHorizontal, FolderOpen, Terminal as TerminalIcon } from "lucide-react";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
 import { StreamingToolbar } from "@/components/output/StreamingToolbar";
+import { TerminalPanel } from "@/components/terminal/TerminalPanel";
+import { Terminal } from "@/components/terminal/Terminal";
+import { ClaudeDropdown, ClaudePopup } from "@/components/claude";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useTerminalStore } from "@/stores/terminalStore";
 import { cn } from "@/lib/utils";
 import type { Project } from "@/types";
+import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 interface MainContentProps {
   project: Project;
+  pendingImage?: ImageAttachment | null;
+  onImageConsumed?: () => void;
+  onRequestImageBrowser?: () => void;
 }
 
 const MIN_ACTIVITY_HEIGHT = 100;
 const MAX_ACTIVITY_HEIGHT = 400;
 const DEFAULT_ACTIVITY_HEIGHT = 180;
 
-export function MainContent({ project }: MainContentProps) {
+export function MainContent({ project, pendingImage, onImageConsumed, onRequestImageBrowser }: MainContentProps) {
   const { activeSessionId, getSessionsForProject, getMessages, getStreamingState, updateToolCallStatus } =
     useSessionStore();
+  const { toggleTerminal, getSessionPtyId, setSessionPtyId } = useTerminalStore();
 
   const sessions = getSessionsForProject(project.id);
   const currentSessionId = activeSessionId.get(project.id);
@@ -87,86 +96,127 @@ export function MainContent({ project }: MainContentProps) {
   }, [isResizing]);
 
   const isStreaming = streamingState?.isStreaming || false;
+  const isTerminalSession = currentSession?.type === "terminal";
+
+  const handleTerminalPtyCreated = (ptyId: string) => {
+    if (currentSessionId) {
+      setSessionPtyId(currentSessionId, ptyId);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
-      <div className="h-[45px] px-4 flex items-center border-b border-border bg-bg-secondary">
+      <div className="h-[45px] px-4 flex items-center justify-between border-b border-border bg-bg-secondary">
         <div className="flex items-center gap-2 text-sm text-text-secondary">
           <FolderOpen className="w-4 h-4 text-text-secondary flex-shrink-0" />
           <span className="font-mono truncate">{project.path}</span>
         </div>
+        <div className="flex items-center gap-1">
+          <ClaudeDropdown projectPath={project.path} />
+          {!isTerminalSession && (
+            <button
+              onClick={() => toggleTerminal(project.id)}
+              className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+              title="Toggle terminal"
+            >
+              <TerminalIcon className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="px-4 pt-3">
-        <EnhancedPromptInput
-          projectPath={project.path}
-          sessionId={currentSession?.id}
-          projectFiles={[]}
-        />
-      </div>
-
-      <div className="flex-1 flex flex-col overflow-hidden p-4">
-        {!currentSessionId ? (
-          <div className="flex-1 flex items-center justify-center text-text-secondary">
-            <div className="text-center">
-              <p className="text-sm">No session selected</p>
-              <p className="text-xs mt-1">Select or create a session to get started</p>
-            </div>
+      {isTerminalSession && currentSessionId ? (
+        <div className="flex-1 overflow-hidden">
+          <Terminal
+            key={currentSessionId}
+            projectPath={project.path}
+            ptyId={getSessionPtyId(currentSessionId)}
+            onPtyCreated={handleTerminalPtyCreated}
+          />
+        </div>
+      ) : (
+        <>
+          <div className="px-4 pt-3">
+            <EnhancedPromptInput
+              projectPath={project.path}
+              sessionId={currentSession?.id}
+              projectFiles={[]}
+              pendingImage={pendingImage}
+              onImageConsumed={onImageConsumed}
+              onRequestImageBrowser={onRequestImageBrowser}
+            />
           </div>
-        ) : (
-          <>
-            <div
-              className="flex-1 overflow-hidden rounded-lg border border-border bg-bg-secondary"
-              style={{ marginBottom: activityHeight > MIN_ACTIVITY_HEIGHT ? 0 : undefined }}
-            >
-              <ResponseCarousel
-                messages={messages}
-                streamingText={streamingState?.streamingText || ""}
-                thinkingText={streamingState?.thinkingText || ""}
-                pendingToolCalls={streamingState?.pendingToolCalls || []}
-                isStreaming={isStreaming}
-                onApprove={handleApprove}
-                onReject={handleReject}
-              />
-            </div>
 
-            <div
-              ref={resizeRef}
-              className={cn(
-                "flex items-center justify-center h-3 cursor-row-resize",
-                "hover:bg-accent/10 transition-colors",
-                isResizing && "bg-accent/20"
-              )}
-              onMouseDown={handleMouseDown}
-            >
-              <GripHorizontal className="w-4 h-4 text-text-secondary" />
-            </div>
+          <div className="flex-1 flex flex-col overflow-hidden p-4">
+            {!currentSessionId ? (
+              <div className="flex-1 flex items-center justify-center text-text-secondary">
+                <div className="text-center">
+                  <p className="text-sm">No session selected</p>
+                  <p className="text-xs mt-1">Select or create a session to get started</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div
+                  className="flex-1 overflow-hidden rounded-lg border border-border bg-bg-secondary"
+                  style={{ marginBottom: activityHeight > MIN_ACTIVITY_HEIGHT ? 0 : undefined }}
+                >
+                  <ResponseCarousel
+                    messages={messages}
+                    streamingText={streamingState?.streamingText || ""}
+                    thinkingText={streamingState?.thinkingText || ""}
+                    pendingToolCalls={streamingState?.pendingToolCalls || []}
+                    isStreaming={isStreaming}
+                    onApprove={handleApprove}
+                    onReject={handleReject}
+                  />
+                </div>
 
-            <div
-              className="flex-shrink-0 rounded-lg border border-border bg-bg-secondary overflow-hidden"
-              style={{ height: activityHeight }}
-            >
-              <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-bg-tertiary/50">
-                <span className="text-xs font-medium text-text-secondary">Activity</span>
-                <span className="text-xs text-text-secondary/60">
-                  {allToolCalls.length} tool call{allToolCalls.length !== 1 ? "s" : ""}
-                </span>
-              </div>
-              <div style={{ height: activityHeight - 32 }}>
-                <ActivityFeed
-                  toolCalls={allToolCalls}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                />
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+                <div
+                  ref={resizeRef}
+                  className={cn(
+                    "flex items-center justify-center h-3 cursor-row-resize",
+                    "hover:bg-accent/10 transition-colors",
+                    isResizing && "bg-accent/20"
+                  )}
+                  onMouseDown={handleMouseDown}
+                >
+                  <GripHorizontal className="w-4 h-4 text-text-secondary" />
+                </div>
+
+                <div
+                  className="flex-shrink-0 rounded-lg border border-border bg-bg-secondary overflow-hidden"
+                  style={{ height: activityHeight }}
+                >
+                  <div className="flex items-center justify-between px-3 py-1.5 border-b border-border/50 bg-bg-tertiary/50">
+                    <span className="text-xs font-medium text-text-secondary">Activity</span>
+                    <span className="text-xs text-text-secondary/60">
+                      {allToolCalls.length} tool call{allToolCalls.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div style={{ height: activityHeight - 32 }}>
+                    <ActivityFeed
+                      toolCalls={allToolCalls}
+                      onApprove={handleApprove}
+                      onReject={handleReject}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      {!isTerminalSession && (
+        <TerminalPanel projectId={project.id} projectPath={project.path} />
+      )}
 
       {isStreaming && streamingState && (
         <StreamingToolbar isStreaming={isStreaming} stats={streamingState.stats} />
       )}
+
+      <ClaudePopup projectPath={project.path} />
     </div>
   );
 }

@@ -25,6 +25,7 @@ interface SidebarProps {
   project: Project;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  width?: number;
 }
 
 type FileViewerType = "editor" | "image" | "markdown" | "video" | "pdf" | "audio" | "font" | null;
@@ -47,7 +48,7 @@ function getFileViewerType(path: string): FileViewerType {
   return "editor";
 }
 
-export function Sidebar({ project, isCollapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ project, isCollapsed, onToggleCollapse, width = 400 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("files");
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
   const [fileViewerType, setFileViewerType] = useState<FileViewerType>(null);
@@ -148,10 +149,11 @@ export function Sidebar({ project, isCollapsed, onToggleCollapse }: SidebarProps
     <div
       className={cn(
         "flex flex-col bg-bg-secondary border-l border-border transition-all duration-200 ease-in-out",
-        isCollapsed ? "w-0 overflow-hidden border-l-0" : "w-[400px]"
+        isCollapsed && "w-0 overflow-hidden border-l-0"
       )}
+      style={!isCollapsed ? { width } : undefined}
     >
-      <div className="flex items-center py-2 border-b border-border min-w-[400px]">
+      <div className="flex items-center py-2 border-b border-border" style={{ minWidth: width }}>
         <div className="flex items-center justify-evenly flex-1">
           {tabs.map((tab) => (
             <Tooltip key={tab.id} content={tab.label} side="bottom">
@@ -182,7 +184,7 @@ export function Sidebar({ project, isCollapsed, onToggleCollapse }: SidebarProps
         </Tooltip>
       </div>
 
-      <div className="flex-1 overflow-hidden min-w-[400px]">
+      <div className="flex-1 overflow-hidden" style={{ minWidth: width }}>
         {activeTab === "files" && (
           <FileTree
             projectPath={project.path}

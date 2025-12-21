@@ -3,5 +3,5 @@ export { SubscriptionCard } from "./SubscriptionCard";
 export { SubscriptionButton } from "./SubscriptionButton";
 export { SubscriptionDropdown } from "./SubscriptionDropdown";
 export { SubscriptionForm } from "./SubscriptionForm";
-export { GroupManager } from "./GroupManager";
+export { CategoryManager } from "./CategoryManager";
 export { SubscriptionPopup } from "./SubscriptionPopup";

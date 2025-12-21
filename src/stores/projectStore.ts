@@ -10,7 +10,7 @@ interface ProjectStore {
   addProject: (path: string) => void;
   removeProject: (id: string) => void;
   setActiveProject: (id: string) => void;
-  toggleFavorite: (id: string) => void;
+  updateProjectColor: (id: string, color: string) => void;
   getProject: (id: string) => Project | undefined;
 }
 
@@ -32,7 +32,6 @@ export const useProjectStore = create<ProjectStore>()(
           id: uuid(),
           name,
           path,
-          isFavorite: false,
           lastOpenedAt: new Date(),
           createdAt: new Date(),
         };
@@ -67,10 +66,10 @@ export const useProjectStore = create<ProjectStore>()(
         }));
       },
 
-      toggleFavorite: (id: string) => {
+      updateProjectColor: (id: string, color: string) => {
         set((state) => ({
           projects: state.projects.map((p) =>
-            p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
+            p.id === id ? { ...p, color: color || undefined } : p
           ),
         }));
       },

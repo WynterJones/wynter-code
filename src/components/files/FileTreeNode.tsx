@@ -39,11 +39,23 @@ export function FileTreeNode({
     onContextMenu?.(e, node);
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.stopPropagation();
+    e.dataTransfer.setData("application/x-wynter-file", JSON.stringify({
+      path: node.path,
+      name: node.name,
+      isDirectory: node.isDirectory
+    }));
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
   return (
     <div>
       <div
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        draggable={!node.isDirectory}
+        onDragStart={handleDragStart}
         className={cn(
           "flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-bg-hover transition-colors",
           "text-sm text-text-primary",

@@ -2,7 +2,7 @@ export interface Project {
   id: string;
   name: string;
   path: string;
-  isFavorite: boolean;
+  color?: string;
   lastOpenedAt: Date | null;
   createdAt: Date;
 }

@@ -1,28 +1,58 @@
 import { useState, useRef, useEffect } from "react";
-import { Plus, Star, X, Settings, ChevronLeft, ChevronRight } from "lucide-react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { Plus, X, Settings, ChevronLeft, ChevronRight, FolderOpen, Moon, FolderSearch } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { IconButton, Tooltip } from "@/components/ui";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle } from "@/components/session";
 import { SubscriptionButton } from "@/components/subscriptions";
+import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
 import { cn } from "@/lib/utils";
+import { useMeditationStore } from "@/stores/meditationStore";
 import type { PermissionMode } from "@/types";
+
+const PROJECT_COLORS = [
+  "#cba6f7", // Purple
+  "#89b4fa", // Blue
+  "#a6e3a1", // Green
+  "#f9e2af", // Yellow
+  "#fab387", // Orange
+  "#f38ba8", // Red/Pink
+  "#94e2d5", // Teal
+  "#cdd6f4", // White-ish
+];
+
+interface DropdownPosition {
+  top: number;
+  left: number;
+}
 
 interface ProjectTabBarProps {
   onOpenSettings?: () => void;
   onOpenSubscriptions?: () => void;
+  onSendToPrompt?: (image: ImageAttachment) => void;
+  requestImageBrowser?: boolean;
+  onImageBrowserOpened?: () => void;
 }
 
-export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTabBarProps) {
+export function ProjectTabBar({
+  onOpenSettings,
+  onOpenSubscriptions,
+  onSendToPrompt,
+  requestImageBrowser,
+  onImageBrowserOpened,
+}: ProjectTabBarProps) {
   const {
     projects,
     activeProjectId,
     setActiveProject,
     removeProject,
     addProject,
+    updateProjectColor,
+    getProject,
   } = useProjectStore();
 
   const {
@@ -34,9 +64,22 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
   const activeId = activeProjectId ? activeSessionId.get(activeProjectId) : undefined;
   const activeSession = activeId ? getSession(activeId) : undefined;
 
+  const isMeditating = useMeditationStore((s) => s.isActive);
+  const setMeditationActive = useMeditationStore((s) => s.setActive);
+
+  const defaultBrowsePath = useSettingsStore((s) => s.defaultBrowsePath);
+
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [colorPickerProjectId, setColorPickerProjectId] = useState<string | null>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [fileBrowserMode, setFileBrowserMode] = useState<"selectProject" | "browse">("selectProject");
+  const [fileBrowserInitialPath, setFileBrowserInitialPath] = useState<string | undefined>(undefined);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
+
+  const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
 
   const updateScrollButtons = () => {
     if (scrollContainerRef.current) {
@@ -59,6 +102,39 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
       };
     }
   }, [projects]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+        setColorPickerProjectId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle external request to open file browser for images
+  useEffect(() => {
+    if (requestImageBrowser) {
+      handleBrowseFiles();
+      onImageBrowserOpened?.();
+    }
+  }, [requestImageBrowser]);
+
+  const handleIconClick = (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation();
+    if (colorPickerProjectId === projectId) {
+      setColorPickerProjectId(null);
+    } else {
+      const button = e.currentTarget as HTMLElement;
+      const rect = button.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8,
+        left: rect.left,
+      });
+      setColorPickerProjectId(projectId);
+    }
+  };
 
   const scrollLeft = () => {
     if (scrollContainerRef.current) {
@@ -89,19 +165,42 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
   };
 
   const handleOpenProject = async () => {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        title: "Open Project Folder",
-      });
-
-      if (selected && typeof selected === "string") {
-        addProject(selected);
+    setFileBrowserMode("selectProject");
+    // For opening projects: use default path if set, else home directory
+    if (defaultBrowsePath) {
+      setFileBrowserInitialPath(defaultBrowsePath);
+    } else {
+      try {
+        const homeDir = await invoke<string>("get_home_dir");
+        setFileBrowserInitialPath(homeDir);
+      } catch {
+        setFileBrowserInitialPath(undefined);
       }
-    } catch (error) {
-      console.error("Failed to open folder dialog:", error);
     }
+    setShowFileBrowser(true);
+  };
+
+  const handleBrowseFiles = async () => {
+    setFileBrowserMode("browse");
+    // For browsing: use current project if available, else default path, else home
+    if (activeProject?.path) {
+      setFileBrowserInitialPath(activeProject.path);
+    } else if (defaultBrowsePath) {
+      setFileBrowserInitialPath(defaultBrowsePath);
+    } else {
+      try {
+        const homeDir = await invoke<string>("get_home_dir");
+        setFileBrowserInitialPath(homeDir);
+      } catch {
+        setFileBrowserInitialPath(undefined);
+      }
+    }
+    setShowFileBrowser(true);
+  };
+
+  const handleSelectProject = (path: string) => {
+    addProject(path);
+    setShowFileBrowser(false);
   };
 
   return (
@@ -129,7 +228,10 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
           return (
             <div
               key={project.id}
-              onClick={() => setActiveProject(project.id)}
+              onClick={() => {
+                setActiveProject(project.id);
+                setMeditationActive(false);
+              }}
               className={cn(
                 "group relative flex items-center gap-2 px-4 h-full cursor-pointer transition-colors min-w-0 flex-shrink-0",
                 "border-r border-border/50",
@@ -138,13 +240,67 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
                   : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50"
               )}
             >
-              {/* Favorite indicator */}
-              {project.isFavorite && (
-                <Star
-                  className="w-3 h-3 text-accent-yellow flex-shrink-0"
-                  fill="currentColor"
+              {/* Project color indicator - only show when active */}
+              {isActive && project.color && (
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-0.5"
+                  style={{ backgroundColor: project.color }}
                 />
               )}
+
+              {/* Project icon with color picker */}
+              <div className="relative" ref={colorPickerProjectId === project.id ? colorPickerRef : null}>
+                <button
+                  onClick={(e) => handleIconClick(e, project.id)}
+                  className="p-0.5 rounded hover:bg-bg-tertiary transition-colors"
+                >
+                  <FolderOpen
+                    className="w-3.5 h-3.5"
+                    style={{ color: project.color || "currentColor" }}
+                  />
+                </button>
+
+                {/* Color picker dropdown */}
+                {colorPickerProjectId === project.id && (
+                  <div
+                    className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[140px]"
+                    style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+                  >
+                    <div className="text-xs text-text-secondary mb-2 font-medium">Project Color</div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {PROJECT_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateProjectColor(project.id, color);
+                            setColorPickerProjectId(null);
+                          }}
+                          className={cn(
+                            "w-7 h-7 rounded-full border-2 transition-all hover:scale-110",
+                            project.color === color
+                              ? "border-white ring-2 ring-accent/50"
+                              : "border-transparent hover:border-white/50"
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                    {project.color && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateProjectColor(project.id, "");
+                          setColorPickerProjectId(null);
+                        }}
+                        className="w-full mt-2 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+                      >
+                        Remove color
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <span className="truncate text-sm max-w-[140px]">{project.name}</span>
 
@@ -162,11 +318,6 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
               >
                 <X className="w-3.5 h-3.5" />
               </button>
-
-              {/* Active indicator line */}
-              {isActive && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent" />
-              )}
             </div>
           );
         })}
@@ -209,10 +360,37 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
         </Tooltip>
       </div>
 
+      {/* Meditation Mode */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content={isMeditating ? "Exit Meditation" : "Meditation Mode"}>
+          <IconButton
+            size="sm"
+            onClick={() => setMeditationActive(!isMeditating)}
+            className={cn(
+              isMeditating && "text-accent bg-accent/10"
+            )}
+          >
+            <Moon className={cn("w-4 h-4", isMeditating && "fill-accent")} />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Browse Files */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Browse Files">
+          <IconButton size="sm" onClick={handleBrowseFiles}>
+            <FolderSearch className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
       {/* Right side controls */}
       <div
         data-tauri-drag-region
-        className="flex items-center gap-2 px-3 h-full border-l border-border"
+        className={cn(
+          "flex items-center gap-2 px-3 h-full border-l border-border transition-opacity duration-500",
+          isMeditating && "opacity-30 hover:opacity-100"
+        )}
       >
         <ModelSelector />
         {onOpenSubscriptions && (
@@ -230,6 +408,16 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
           </IconButton>
         </Tooltip>
       </div>
+
+      {/* File Browser Popup */}
+      <FileBrowserPopup
+        isOpen={showFileBrowser}
+        onClose={() => setShowFileBrowser(false)}
+        initialPath={fileBrowserInitialPath}
+        mode={fileBrowserMode}
+        onSelectProject={handleSelectProject}
+        onSendToPrompt={onSendToPrompt}
+      />
     </div>
   );
 }
