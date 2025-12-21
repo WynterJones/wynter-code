@@ -1,0 +1,86 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { v4 as uuid } from "uuid";
+import type { Project } from "@/types";
+
+interface ProjectStore {
+  projects: Project[];
+  activeProjectId: string | null;
+
+  addProject: (path: string) => void;
+  removeProject: (id: string) => void;
+  setActiveProject: (id: string) => void;
+  toggleFavorite: (id: string) => void;
+  getProject: (id: string) => Project | undefined;
+}
+
+export const useProjectStore = create<ProjectStore>()(
+  persist(
+    (set, get) => ({
+      projects: [],
+      activeProjectId: null,
+
+      addProject: (path: string) => {
+        const existing = get().projects.find((p) => p.path === path);
+        if (existing) {
+          set({ activeProjectId: existing.id });
+          return;
+        }
+
+        const name = path.split("/").pop() || "Project";
+        const project: Project = {
+          id: uuid(),
+          name,
+          path,
+          isFavorite: false,
+          lastOpenedAt: new Date(),
+          createdAt: new Date(),
+        };
+
+        set((state) => ({
+          projects: [...state.projects, project],
+          activeProjectId: project.id,
+        }));
+      },
+
+      removeProject: (id: string) => {
+        set((state) => {
+          const newProjects = state.projects.filter((p) => p.id !== id);
+          const newActiveId =
+            state.activeProjectId === id
+              ? newProjects[0]?.id || null
+              : state.activeProjectId;
+
+          return {
+            projects: newProjects,
+            activeProjectId: newActiveId,
+          };
+        });
+      },
+
+      setActiveProject: (id: string) => {
+        set((state) => ({
+          activeProjectId: id,
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, lastOpenedAt: new Date() } : p
+          ),
+        }));
+      },
+
+      toggleFavorite: (id: string) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, isFavorite: !p.isFavorite } : p
+          ),
+        }));
+      },
+
+      getProject: (id: string) => {
+        return get().projects.find((p) => p.id === id);
+      },
+    }),
+    {
+      name: "wynter-code-projects",
+    }
+  )
+);
