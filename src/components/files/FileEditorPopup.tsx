@@ -56,7 +56,8 @@ export function FileEditorPopup({ filePath, onClose, onSave }: FileEditorPopupPr
   const fileName = filePath.split("/").pop() || filePath;
   const language = getLanguageFromPath(filePath);
 
-  const handleEditorMount = (_editor: unknown, monaco: Monaco) => {
+  // Define themes BEFORE mount to prevent white flash
+  const handleEditorWillMount = (monaco: Monaco) => {
     defineMonacoThemes(monaco);
   };
 
@@ -177,8 +178,13 @@ export function FileEditorPopup({ filePath, onClose, onSave }: FileEditorPopupPr
               language={language}
               value={content}
               onChange={handleContentChange}
-              theme={editorTheme}
-              onMount={handleEditorMount}
+              theme={editorTheme || "github-dark"}
+              beforeMount={handleEditorWillMount}
+              loading={
+                <div className="flex items-center justify-center h-full bg-bg-tertiary text-text-secondary">
+                  Loading editor...
+                </div>
+              }
               options={{
                 fontSize: editorFontSize,
                 fontFamily: "'JetBrains Mono', 'Fira Code', monospace",

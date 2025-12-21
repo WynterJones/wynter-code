@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -8,6 +8,23 @@ import { cn } from "@/lib/utils";
 import { IconButton, Tooltip, Badge } from "@/components/ui";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { defineMonacoThemes } from "@/hooks/useMonacoTheme";
+
+// Helper to toggle checkbox in markdown content
+function toggleCheckboxAtIndex(content: string, checkboxIndex: number): string {
+  const checkboxPattern = /- \[([ xX])\]/g;
+  let currentIndex = 0;
+
+  return content.replace(checkboxPattern, (match, checkState) => {
+    if (currentIndex === checkboxIndex) {
+      currentIndex++;
+      // Toggle: if checked (x or X), uncheck; if unchecked (space), check
+      const isChecked = checkState.toLowerCase() === 'x';
+      return isChecked ? '- [ ]' : '- [x]';
+    }
+    currentIndex++;
+    return match;
+  });
+}
 
 interface MarkdownEditorPopupProps {
   filePath: string;
@@ -35,8 +52,17 @@ export function MarkdownEditorPopup({
   const [viewMode, setViewMode] = useState<ViewMode>(markdownDefaultView);
 
   const fileName = filePath.split("/").pop() || filePath;
+  const checkboxIndexRef = useRef(0);
 
-  const handleEditorMount = (_editor: unknown, monaco: Monaco) => {
+  // Handle checkbox toggle in preview
+  const handleCheckboxToggle = useCallback((index: number) => {
+    const newContent = toggleCheckboxAtIndex(content, index);
+    setContent(newContent);
+    setHasChanges(newContent !== originalContent);
+  }, [content, originalContent]);
+
+  // Define themes BEFORE mount to prevent white flash
+  const handleEditorWillMount = (monaco: Monaco) => {
     defineMonacoThemes(monaco);
   };
 
@@ -225,8 +251,13 @@ export function MarkdownEditorPopup({
                     language="markdown"
                     value={content}
                     onChange={handleContentChange}
-                    theme={editorTheme}
-                    onMount={handleEditorMount}
+                    theme={editorTheme || "github-dark"}
+                    beforeMount={handleEditorWillMount}
+                    loading={
+                      <div className="flex items-center justify-center h-full bg-bg-tertiary text-text-secondary">
+                        Loading editor...
+                      </div>
+                    }
                     options={{
                       fontSize: editorFontSize,
                       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
@@ -253,8 +284,55 @@ export function MarkdownEditorPopup({
                   )}
                 >
                   <article className="markdown-preview max-w-[700px] mx-auto">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {content}
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        input: ({ type, checked, ...props }) => {
+                          if (type === "checkbox") {
+                            const index = checkboxIndexRef.current++;
+                            return (
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => handleCheckboxToggle(index)}
+                                className="cursor-pointer accent-accent w-4 h-4 mr-2 rounded"
+                                {...props}
+                              />
+                            );
+                          }
+                          return <input type={type} checked={checked} {...props} />;
+                        },
+                        // Reset checkbox index on each list to maintain correct ordering
+                        ul: ({ children, className }) => {
+                          // Check if this is a task list
+                          const isTaskList = className?.includes('contains-task-list');
+                          return (
+                            <ul className={cn(
+                              isTaskList ? "list-none pl-0 space-y-1" : "list-disc list-inside",
+                              "mb-3 space-y-1 text-sm text-text-primary"
+                            )}>
+                              {children}
+                            </ul>
+                          );
+                        },
+                        li: ({ children, className }) => {
+                          const isTask = className?.includes('task-list-item');
+                          return (
+                            <li className={cn(
+                              "text-sm text-text-primary",
+                              isTask && "flex items-start gap-0"
+                            )}>
+                              {children}
+                            </li>
+                          );
+                        },
+                      }}
+                    >
+                      {(() => {
+                        // Reset checkbox index before each render
+                        checkboxIndexRef.current = 0;
+                        return content;
+                      })()}
                     </ReactMarkdown>
                   </article>
                 </div>

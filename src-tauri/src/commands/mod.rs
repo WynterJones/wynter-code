@@ -42,6 +42,13 @@ pub struct NpmSearchResult {
     pub keywords: Option<Vec<String>>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MarkdownFile {
+    pub name: String,
+    pub path: String,
+    pub folder: String,
+}
+
 #[tauri::command]
 pub fn get_file_tree(path: String, depth: Option<u32>) -> Result<Vec<FileNode>, String> {
     let max_depth = depth.unwrap_or(1);
@@ -155,6 +162,95 @@ pub fn read_file_content(path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn write_file_content(path: String, content: String) -> Result<(), String> {
     fs::write(&path, content).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn find_markdown_files(project_path: String) -> Result<Vec<MarkdownFile>, String> {
+    let project_path_obj = Path::new(&project_path);
+
+    if !project_path_obj.exists() {
+        return Err(format!("Path does not exist: {}", project_path));
+    }
+
+    let mut files: Vec<MarkdownFile> = Vec::new();
+
+    // Use WalkBuilder which respects .gitignore automatically
+    let walker = WalkBuilder::new(&project_path)
+        .hidden(true)           // Skip hidden files/dirs
+        .git_ignore(true)       // Respect .gitignore
+        .git_global(true)       // Respect global gitignore
+        .git_exclude(true)      // Respect .git/info/exclude
+        .require_git(false)     // Don't require git repo
+        .build();
+
+    for entry in walker {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let path = entry.path();
+
+        // Skip directories
+        if path.is_dir() {
+            continue;
+        }
+
+        // Check if it's a markdown file
+        let ext = path.extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase());
+
+        let is_markdown = matches!(ext.as_deref(), Some("md") | Some("mdx") | Some("markdown"));
+
+        if !is_markdown {
+            continue;
+        }
+
+        // Skip files in common ignored directories (extra safety)
+        let path_str = path.to_string_lossy().to_lowercase();
+        if path_str.contains("/node_modules/")
+            || path_str.contains("/.git/")
+            || path_str.contains("/dist/")
+            || path_str.contains("/build/")
+            || path_str.contains("/.next/")
+            || path_str.contains("/target/") {
+            continue;
+        }
+
+        let name = path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        let relative_path = path.strip_prefix(&project_path)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string();
+
+        let folder = Path::new(&relative_path)
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        files.push(MarkdownFile {
+            name,
+            path: path.to_string_lossy().to_string(),
+            folder,
+        });
+    }
+
+    // Sort by folder then name
+    files.sort_by(|a, b| {
+        if a.folder != b.folder {
+            if a.folder.is_empty() { return std::cmp::Ordering::Less; }
+            if b.folder.is_empty() { return std::cmp::Ordering::Greater; }
+            return a.folder.cmp(&b.folder);
+        }
+        a.name.to_lowercase().cmp(&b.name.to_lowercase())
+    });
+
+    Ok(files)
 }
 
 #[tauri::command]
@@ -816,6 +912,41 @@ pub fn get_migrations() -> Vec<Migration> {
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
+            "#,
+            kind: tauri_plugin_sql::MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "create_subscription_tables",
+            sql: r#"
+                CREATE TABLE IF NOT EXISTS subscription_groups (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    color TEXT,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS subscriptions (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    url TEXT,
+                    favicon_url TEXT,
+                    monthly_cost REAL NOT NULL DEFAULT 0,
+                    billing_cycle TEXT DEFAULT 'monthly',
+                    currency TEXT DEFAULT 'USD',
+                    group_id TEXT,
+                    notes TEXT,
+                    is_active INTEGER DEFAULT 1,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    FOREIGN KEY (group_id) REFERENCES subscription_groups(id) ON DELETE SET NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_subscriptions_group_id ON subscriptions(group_id);
+                CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON subscriptions(is_active);
             "#,
             kind: tauri_plugin_sql::MigrationKind::Up,
         },

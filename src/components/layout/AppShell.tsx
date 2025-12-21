@@ -5,17 +5,23 @@ import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
 import { useProjectStore } from "@/stores/projectStore";
 import { SettingsPopup } from "@/components/settings";
+import { SubscriptionPopup } from "@/components/subscriptions";
 
 export function AppShell() {
   const { projects, activeProjectId } = useProjectStore();
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const [showSettings, setShowSettings] = useState(false);
+  const [showSubscriptions, setShowSubscriptions] = useState(false);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-primary overflow-hidden">
-      <ProjectTabBar onOpenSettings={() => setShowSettings(true)} />
+      <ProjectTabBar
+        onOpenSettings={() => setShowSettings(true)}
+        onOpenSubscriptions={() => setShowSubscriptions(true)}
+      />
 
       {showSettings && <SettingsPopup onClose={() => setShowSettings(false)} />}
+      {showSubscriptions && <SubscriptionPopup onClose={() => setShowSubscriptions(false)} />}
 
       {activeProject ? (
         <div className="flex-1 flex flex-col overflow-hidden">

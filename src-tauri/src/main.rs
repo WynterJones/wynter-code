@@ -16,6 +16,7 @@ fn main() {
             commands::get_file_tree,
             commands::read_file_content,
             commands::write_file_content,
+            commands::find_markdown_files,
             commands::get_node_modules,
             commands::check_outdated_packages,
             commands::npm_search,

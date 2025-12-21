@@ -6,14 +6,16 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle } from "@/components/session";
+import { SubscriptionButton } from "@/components/subscriptions";
 import { cn } from "@/lib/utils";
 import type { PermissionMode } from "@/types";
 
 interface ProjectTabBarProps {
   onOpenSettings?: () => void;
+  onOpenSubscriptions?: () => void;
 }
 
-export function ProjectTabBar({ onOpenSettings }: ProjectTabBarProps) {
+export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTabBarProps) {
   const {
     projects,
     activeProjectId,
@@ -151,6 +153,9 @@ export function ProjectTabBar({ onOpenSettings }: ProjectTabBarProps) {
         className="flex items-center gap-2 px-3 h-full border-l border-border"
       >
         <ModelSelector />
+        {onOpenSubscriptions && (
+          <SubscriptionButton onOpenManage={onOpenSubscriptions} />
+        )}
         {activeSession && (
           <PermissionModeToggle
             mode={activeSession.permissionMode || "default"}

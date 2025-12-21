@@ -2,7 +2,7 @@ import { ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "ghost" | "outline" | "danger";
+  variant?: "default" | "primary" | "ghost" | "outline" | "danger";
   size?: "sm" | "md" | "lg" | "icon";
 }
 
@@ -16,7 +16,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50",
           "disabled:pointer-events-none disabled:opacity-50",
           {
-            default: "bg-accent text-bg-primary hover:bg-accent/90",
+            default: "bg-bg-tertiary text-text-primary hover:bg-bg-hover border border-border",
+            primary: "bg-accent text-bg-primary hover:bg-accent/90",
             ghost: "hover:bg-bg-hover text-text-primary",
             outline:
               "border border-border bg-transparent hover:bg-bg-hover text-text-primary",

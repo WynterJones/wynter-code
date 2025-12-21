@@ -3,3 +3,8 @@ export { MarkdownRenderer } from "./MarkdownRenderer";
 export { CodeBlock } from "./CodeBlock";
 export { ToolCallBlock } from "./ToolCallBlock";
 export { StreamingStatus } from "./StreamingStatus";
+export { ResponseCarousel } from "./ResponseCarousel";
+export { UserMessageCard } from "./UserMessageCard";
+export { ClaudeResponseCard } from "./ClaudeResponseCard";
+export { ActivityFeed } from "./ActivityFeed";
+export { StreamingToolbar } from "./StreamingToolbar";

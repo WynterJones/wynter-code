@@ -12,12 +12,31 @@ export interface Session {
   permissionMode: PermissionMode;
 }
 
+export interface ImageAttachment {
+  id: string;
+  data: string;
+  mimeType: string;
+  name?: string;
+}
+
+export interface FileReference {
+  id: string;
+  path: string;
+  displayPath: string;
+}
+
+export interface MessageAttachments {
+  images?: ImageAttachment[];
+  files?: FileReference[];
+}
+
 export interface Message {
   id: string;
   sessionId: string;
   role: "user" | "assistant";
   content: string;
   toolCalls?: ToolCall[];
+  attachments?: MessageAttachments;
   createdAt: Date;
 }
 

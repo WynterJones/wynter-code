@@ -47,6 +47,25 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Disable text selection globally for native feel */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Re-enable text selection for editable/readable content */
+input,
+textarea,
+[contenteditable="true"],
+.monaco-editor,
+.monaco-editor *,
+.markdown-preview,
+.markdown-preview *,
+pre,
+code,
+.selectable,
+.selectable * {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 code,
@@ -55,44 +74,60 @@ pre,
   font-family: var(--font-mono);
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* Global Scrollbar Styling - Wildcard to affect ALL scrollbars */
+*,
+*::before,
+*::after {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) var(--bg-tertiary);
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 3px;
+  border-radius: 4px;
+  border: 2px solid var(--bg-tertiary);
 }
 
-::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: #585b70;
 }
 
-::-webkit-scrollbar-corner {
-  background: transparent;
+*::-webkit-scrollbar-thumb:active {
+  background: var(--accent);
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--bg-tertiary);
 }
 
 /* Hide scrollbar by default, show on hover */
 .hover-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-color: transparent var(--bg-tertiary);
 }
 
 .hover-scrollbar:hover {
-  scrollbar-color: var(--border) transparent;
+  scrollbar-color: var(--border) var(--bg-tertiary);
 }
 
 .hover-scrollbar::-webkit-scrollbar-thumb {
   background: transparent;
+  border: 2px solid transparent;
 }
 
 .hover-scrollbar:hover::-webkit-scrollbar-thumb {
   background: var(--border);
+  border: 2px solid var(--bg-tertiary);
 }
 
 ::selection {
@@ -118,7 +153,27 @@ pre,
 @layer utilities {
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--bg-secondary);
+    scrollbar-color: var(--border) var(--bg-tertiary);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+    border: 2px solid var(--bg-tertiary);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #585b70;
   }
 
   .scrollbar-none {
@@ -293,6 +348,48 @@ pre,
 .markdown-preview input[type="checkbox"] {
   margin-right: 0.5em;
   accent-color: var(--accent);
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-hover);
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  top: 2px;
+}
+
+.markdown-preview input[type="checkbox"]:checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+.markdown-preview input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--bg-primary);
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.markdown-preview input[type="checkbox"]:hover {
+  border-color: var(--accent);
+}
+
+.markdown-preview .task-list-item {
+  list-style: none;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.25em;
+}
+
+.markdown-preview .contains-task-list {
+  list-style: none;
+  padding-left: 0;
 }
 
 /* Strong and Emphasis */

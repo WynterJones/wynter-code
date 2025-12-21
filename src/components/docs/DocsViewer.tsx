@@ -16,13 +16,6 @@ interface DocsViewerProps {
   onFileOpen?: (path: string) => void;
 }
 
-interface FileNode {
-  name: string;
-  path: string;
-  is_directory: boolean;
-  children?: FileNode[];
-}
-
 type ScanState = "idle" | "scanning" | "done";
 
 export function DocsViewer({ projectPath, onFileOpen }: DocsViewerProps) {
@@ -51,28 +44,15 @@ export function DocsViewer({ projectPath, onFileOpen }: DocsViewerProps) {
         setScanState("scanning");
       }
 
-      const tree = await invoke<FileNode[]>("get_file_tree", {
-        path: projectPath,
-        depth: 10,
-      });
-
-      const markdownFiles: MarkdownFile[] = [];
-      collectMarkdownFiles(tree, projectPath, markdownFiles);
-
-      // Sort by folder then name
-      markdownFiles.sort((a, b) => {
-        if (a.folder !== b.folder) {
-          if (a.folder === "") return -1;
-          if (b.folder === "") return 1;
-          return a.folder.localeCompare(b.folder);
-        }
-        return a.name.localeCompare(b.name);
+      // Use the efficient dedicated command
+      const markdownFiles = await invoke<MarkdownFile[]>("find_markdown_files", {
+        projectPath,
       });
 
       setDocs(markdownFiles);
       cacheDocs(projectPath, markdownFiles);
 
-      // Auto-expand all folders initially
+      // Auto-expand all folders
       const folders = new Set(markdownFiles.map((f) => f.folder).filter(Boolean));
       setExpandedFolders(folders);
     } catch (error) {
@@ -81,39 +61,6 @@ export function DocsViewer({ projectPath, onFileOpen }: DocsViewerProps) {
       setScanState("done");
       setIsRefreshing(false);
     }
-  };
-
-  const collectMarkdownFiles = (
-    nodes: FileNode[],
-    basePath: string,
-    result: MarkdownFile[]
-  ) => {
-    for (const node of nodes) {
-      if (node.is_directory) {
-        const folderName = node.name.toLowerCase();
-        if (folderName === "node_modules" || folderName === ".git" || folderName === "dist" || folderName === "build") {
-          continue;
-        }
-        if (node.children) {
-          collectMarkdownFiles(node.children, basePath, result);
-        }
-      } else if (isMarkdownFile(node.name)) {
-        const relativePath = node.path.replace(basePath, "").replace(/^\//, "");
-        const parts = relativePath.split("/");
-        const folder = parts.length > 1 ? parts.slice(0, -1).join("/") : "";
-
-        result.push({
-          name: node.name,
-          path: node.path,
-          folder,
-        });
-      }
-    }
-  };
-
-  const isMarkdownFile = (name: string) => {
-    const ext = name.split(".").pop()?.toLowerCase();
-    return ext === "md" || ext === "mdx" || ext === "markdown";
   };
 
   const toggleFolder = useCallback((folder: string) => {
