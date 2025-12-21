@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { GitBranch, GitCommit as GitCommitIcon, RefreshCw, Loader2 } from "lucide-react";
-import { ScrollArea, IconButton } from "@/components/ui";
+import { GitBranch, GitCommit as GitCommitIcon, Loader2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui";
 import { gitService, type GitStatus, type GitCommit, type GitBranch as GitBranchType } from "@/services/git";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ChangesSection } from "./ChangesSection";
@@ -23,12 +23,9 @@ export function GitPanel({ projectPath }: GitPanelProps) {
   });
   const [isGitRepo, setIsGitRepo] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const loadGitData = useCallback(async (showRefreshIndicator = false) => {
-    if (showRefreshIndicator) {
-      setIsRefreshing(true);
-    } else {
+  const loadGitData = useCallback(async (isRefresh = false) => {
+    if (!isRefresh) {
       setLoading(true);
     }
 
@@ -59,7 +56,6 @@ export function GitPanel({ projectPath }: GitPanelProps) {
     }
 
     setLoading(false);
-    setIsRefreshing(false);
   }, [projectPath]);
 
   useEffect(() => {
@@ -94,24 +90,7 @@ export function GitPanel({ projectPath }: GitPanelProps) {
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-1">
-        {/* Header with Refresh */}
-        <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-          <span className="text-xs font-medium text-text-secondary uppercase">
-            Source Control
-          </span>
-          <IconButton
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            title="Refresh git status"
-          >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-            />
-          </IconButton>
-        </div>
-
+      <div className="space-y-2 p-2">
         {/* Sync Section (Branch + Push/Pull) */}
         <SyncSection
           projectPath={projectPath}
@@ -119,6 +98,13 @@ export function GitPanel({ projectPath }: GitPanelProps) {
           ahead={remoteStatus.ahead}
           behind={remoteStatus.behind}
           hasRemote={remoteStatus.hasRemote}
+          onRefresh={handleRefresh}
+        />
+
+        {/* Commit Section - Always first and expanded */}
+        <CommitSection
+          projectPath={projectPath}
+          stagedCount={status?.staged.length || 0}
           onRefresh={handleRefresh}
         />
 
@@ -132,13 +118,6 @@ export function GitPanel({ projectPath }: GitPanelProps) {
             onRefresh={handleRefresh}
           />
         )}
-
-        {/* Commit Section */}
-        <CommitSection
-          projectPath={projectPath}
-          stagedCount={status?.staged.length || 0}
-          onRefresh={handleRefresh}
-        />
 
         {/* Branches Section */}
         <BranchSection

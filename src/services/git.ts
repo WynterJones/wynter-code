@@ -177,6 +177,25 @@ class GitService {
     }
   }
 
+  async getFileDiff(cwd: string, filePath: string, isStaged: boolean): Promise<string> {
+    try {
+      const args = isStaged ? ["diff", "--cached", filePath] : ["diff", filePath];
+      const output = await runGit(args, cwd);
+      return output.stdout;
+    } catch {
+      return "";
+    }
+  }
+
+  async getUntrackedFileContent(cwd: string, filePath: string): Promise<string> {
+    try {
+      const output = await runGit(["show", `:${filePath}`], cwd);
+      return output.stdout;
+    } catch {
+      return "";
+    }
+  }
+
   // === REMOTE SYNC METHODS ===
 
   async fetch(cwd: string): Promise<GitOperationResult> {

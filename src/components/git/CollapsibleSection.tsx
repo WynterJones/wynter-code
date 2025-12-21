@@ -29,9 +29,9 @@ export function CollapsibleSection({
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className={cn("", className)}>
+    <div className={cn("rounded-lg bg-bg-secondary border border-border overflow-hidden", className)}>
       <div
-        className="flex items-center gap-1 px-2 py-1.5 cursor-pointer hover:bg-bg-hover transition-colors rounded select-none"
+        className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-bg-hover transition-colors select-none"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="w-4 h-4 flex items-center justify-center text-text-secondary">
@@ -42,10 +42,10 @@ export function CollapsibleSection({
           )}
         </span>
         <Icon className={cn("w-4 h-4", iconColor)} />
-        <span className="text-xs font-medium text-text-secondary uppercase flex-1">
+        <span className="text-xs font-medium text-text-primary flex-1">
           {title}
           {count !== undefined && count > 0 && (
-            <span className="ml-1 text-text-primary">({count})</span>
+            <span className="ml-1.5 text-text-secondary">({count})</span>
           )}
         </span>
         {badge && (
@@ -62,7 +62,7 @@ export function CollapsibleSection({
           </div>
         )}
       </div>
-      {isOpen && <div className="mt-1">{children}</div>}
+      {isOpen && <div className="border-t border-border py-2">{children}</div>}
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { GitCommit, Sparkles, Loader2, Check } from "lucide-react";
-import { CollapsibleSection } from "./CollapsibleSection";
+import { Sparkles, Loader2, Check, Send } from "lucide-react";
 import { Button } from "@/components/ui";
 import { gitService, claudeService } from "@/services";
 import { cn } from "@/lib/utils";
@@ -106,13 +105,8 @@ ${diff.slice(0, 4000)}" --print`;
   };
 
   return (
-    <CollapsibleSection
-      title="Commit"
-      icon={GitCommit}
-      iconColor="text-accent-purple"
-      defaultOpen={true}
-    >
-      <div className="px-2 space-y-2">
+    <div className="rounded-lg bg-bg-secondary border border-border overflow-hidden">
+      <div className="p-2 space-y-2">
         <div className="relative">
           <textarea
             ref={textareaRef}
@@ -165,7 +159,7 @@ ${diff.slice(0, 4000)}" --print`;
             ) : success ? (
               <Check className="w-3.5 h-3.5" />
             ) : (
-              <GitCommit className="w-3.5 h-3.5" />
+              <Send className="w-3.5 h-3.5" />
             )}
             <span className="text-xs">
               {success ? "Committed!" : `Commit${stagedCount > 0 ? ` (${stagedCount})` : ""}`}
@@ -173,6 +167,6 @@ ${diff.slice(0, 4000)}" --print`;
           </Button>
         </div>
       </div>
-    </CollapsibleSection>
+    </div>
   );
 }

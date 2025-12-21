@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FileEdit, Plus, Minus } from "lucide-react";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { FileChangeItem } from "./FileChangeItem";
+import { DiffViewer } from "./DiffViewer";
 import { IconButton } from "@/components/ui";
 import { gitService, type GitFile } from "@/services/git";
 
@@ -23,6 +24,7 @@ export function ChangesSection({
   const [loadingFiles, setLoadingFiles] = useState<Set<string>>(new Set());
   const [isStageAllLoading, setIsStageAllLoading] = useState(false);
   const [isUnstageAllLoading, setIsUnstageAllLoading] = useState(false);
+  const [viewingDiff, setViewingDiff] = useState<{ file: GitFile; isStaged: boolean } | null>(null);
 
   const unstaged = [...modified, ...untracked];
   const totalChanges = staged.length + unstaged.length;
@@ -66,6 +68,14 @@ export function ChangesSection({
   if (totalChanges === 0) {
     return null;
   }
+
+  const handleViewDiff = (file: GitFile, isStaged: boolean) => {
+    if (viewingDiff?.file.path === file.path && viewingDiff?.isStaged === isStaged) {
+      setViewingDiff(null);
+    } else {
+      setViewingDiff({ file, isStaged });
+    }
+  };
 
   return (
     <CollapsibleSection
@@ -111,7 +121,9 @@ export function ChangesSection({
                   file={file}
                   isStaged={true}
                   isLoading={loadingFiles.has(file.path)}
+                  isViewingDiff={viewingDiff?.file.path === file.path && viewingDiff?.isStaged === true}
                   onToggleStage={handleUnstageFile}
+                  onViewDiff={() => handleViewDiff(file, true)}
                 />
               ))}
             </div>
@@ -130,10 +142,24 @@ export function ChangesSection({
                   file={file}
                   isStaged={false}
                   isLoading={loadingFiles.has(file.path)}
+                  isViewingDiff={viewingDiff?.file.path === file.path && viewingDiff?.isStaged === false}
                   onToggleStage={handleStageFile}
+                  onViewDiff={() => handleViewDiff(file, false)}
                 />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Diff Viewer */}
+        {viewingDiff && (
+          <div className="px-2 pt-2">
+            <DiffViewer
+              projectPath={projectPath}
+              file={viewingDiff.file}
+              isStaged={viewingDiff.isStaged}
+              onClose={() => setViewingDiff(null)}
+            />
           </div>
         )}
       </div>
