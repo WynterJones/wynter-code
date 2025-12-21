@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Files, Package, GitBranch, Info, FileText } from "lucide-react";
+import { Files, Package, FileJson, GitBranch, Info, FileText, PanelRightOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "@/components/ui";
 import {
@@ -14,14 +14,17 @@ import {
 } from "@/components/files";
 import { ModulesViewer } from "@/components/modules/ModulesViewer";
 import { GitPanel } from "@/components/git/GitPanel";
-import { ProjectInfo } from "@/components/project/ProjectInfo";
+import { ProjectInfo, PackageInfo } from "@/components/project";
 import { DocsViewer } from "@/components/docs";
 import { useFileOperations } from "@/hooks/useFileOperations";
+import { useMinimizedPopupsStore } from "@/stores";
 import type { Project } from "@/types";
 import type { SidebarTab } from "@/types/file";
 
 interface SidebarProps {
   project: Project;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 type FileViewerType = "editor" | "image" | "markdown" | "video" | "pdf" | "audio" | "font" | null;
@@ -44,25 +47,54 @@ function getFileViewerType(path: string): FileViewerType {
   return "editor";
 }
 
-export function Sidebar({ project }: SidebarProps) {
+export function Sidebar({ project, isCollapsed, onToggleCollapse }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("files");
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
   const [fileViewerType, setFileViewerType] = useState<FileViewerType>(null);
   const [hasNodeModules, setHasNodeModules] = useState(false);
+  const [hasPackageJson, setHasPackageJson] = useState(false);
 
-  const { checkNodeModulesExists } = useFileOperations();
+  const { checkNodeModulesExists, checkFileExists } = useFileOperations();
+  const { minimize, pendingRestore, clearPendingRestore } = useMinimizedPopupsStore();
+
+  const handleMinimize = () => {
+    if (openFilePath && fileViewerType) {
+      const type = fileViewerType === "markdown" ? "markdown" : "editor";
+      minimize({
+        filePath: openFilePath,
+        type,
+        projectId: project.id,
+      });
+      setOpenFilePath(null);
+      setFileViewerType(null);
+    }
+  };
 
   useEffect(() => {
-    const checkModules = async () => {
+    if (pendingRestore && pendingRestore.projectId === project.id) {
+      const viewerType = pendingRestore.type === "markdown" ? "markdown" : "editor";
+      setOpenFilePath(pendingRestore.filePath);
+      setFileViewerType(viewerType);
+      clearPendingRestore();
+    }
+  }, [pendingRestore, project.id, clearPendingRestore]);
+
+  useEffect(() => {
+    const checkProjectFeatures = async () => {
       try {
-        const exists = await checkNodeModulesExists(project.path);
-        setHasNodeModules(exists);
+        const [modulesExist, packageExists] = await Promise.all([
+          checkNodeModulesExists(project.path),
+          checkFileExists(`${project.path}/package.json`),
+        ]);
+        setHasNodeModules(modulesExist);
+        setHasPackageJson(packageExists);
       } catch {
         setHasNodeModules(false);
+        setHasPackageJson(false);
       }
     };
-    checkModules();
-  }, [project.path, checkNodeModulesExists]);
+    checkProjectFeatures();
+  }, [project.path, checkNodeModulesExists, checkFileExists]);
 
   const tabs = useMemo(() => {
     const baseTabs: { id: SidebarTab; icon: typeof Files; label: string }[] = [
@@ -73,6 +105,10 @@ export function Sidebar({ project }: SidebarProps) {
       baseTabs.push({ id: "modules", icon: Package, label: "Modules" });
     }
 
+    if (hasPackageJson) {
+      baseTabs.push({ id: "package", icon: FileJson, label: "Package" });
+    }
+
     baseTabs.push(
       { id: "git", icon: GitBranch, label: "Git" },
       { id: "docs", icon: FileText, label: "Docs" },
@@ -80,13 +116,16 @@ export function Sidebar({ project }: SidebarProps) {
     );
 
     return baseTabs;
-  }, [hasNodeModules]);
+  }, [hasNodeModules, hasPackageJson]);
 
   useEffect(() => {
     if (activeTab === "modules" && !hasNodeModules) {
       setActiveTab("files");
     }
-  }, [activeTab, hasNodeModules]);
+    if (activeTab === "package" && !hasPackageJson) {
+      setActiveTab("files");
+    }
+  }, [activeTab, hasNodeModules, hasPackageJson]);
 
   const handleFileOpen = (path: string) => {
     const viewerType = getFileViewerType(path);
@@ -106,32 +145,44 @@ export function Sidebar({ project }: SidebarProps) {
   };
 
   return (
-    <div className="w-64 flex flex-col bg-bg-secondary border-l border-border">
-      {/* Tab Bar */}
-      <div className="flex items-center justify-evenly py-2 border-b border-border">
-        {tabs.map((tab) => (
-          <Tooltip key={tab.id} content={tab.label} side="bottom">
-            <button
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "relative p-1.5 rounded transition-colors",
-                activeTab === tab.id
-                  ? "text-text-primary"
-                  : "text-text-secondary hover:text-text-primary"
-              )}
-            >
-              <tab.icon className="w-4 h-4" />
-              {/* Active indicator */}
-              {activeTab === tab.id && (
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-accent-blue rounded-full" />
-              )}
-            </button>
-          </Tooltip>
-        ))}
+    <div
+      className={cn(
+        "flex flex-col bg-bg-secondary border-l border-border transition-all duration-200 ease-in-out",
+        isCollapsed ? "w-0 overflow-hidden border-l-0" : "w-[400px]"
+      )}
+    >
+      <div className="flex items-center py-2 border-b border-border min-w-[400px]">
+        <div className="flex items-center justify-evenly flex-1">
+          {tabs.map((tab) => (
+            <Tooltip key={tab.id} content={tab.label} side="bottom">
+              <button
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  "relative p-1.5 rounded transition-colors",
+                  activeTab === tab.id
+                    ? "text-text-primary"
+                    : "text-text-secondary hover:text-text-primary"
+                )}
+              >
+                <tab.icon className="w-4 h-4" />
+                {activeTab === tab.id && (
+                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-accent-blue rounded-full" />
+                )}
+              </button>
+            </Tooltip>
+          ))}
+        </div>
+        <Tooltip content="Hide sidebar" side="left">
+          <button
+            onClick={onToggleCollapse}
+            className="p-1.5 mr-2 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <PanelRightOpen className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
 
-      {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden min-w-[400px]">
         {activeTab === "files" && (
           <FileTree
             projectPath={project.path}
@@ -142,6 +193,9 @@ export function Sidebar({ project }: SidebarProps) {
         {activeTab === "modules" && hasNodeModules && (
           <ModulesViewer projectPath={project.path} />
         )}
+        {activeTab === "package" && hasPackageJson && (
+          <PackageInfo projectPath={project.path} />
+        )}
         {activeTab === "git" && <GitPanel projectPath={project.path} />}
         {activeTab === "docs" && (
           <DocsViewer projectPath={project.path} onFileOpen={handleFileOpen} />
@@ -149,15 +203,14 @@ export function Sidebar({ project }: SidebarProps) {
         {activeTab === "info" && <ProjectInfo project={project} />}
       </div>
 
-      {/* File viewers */}
       {openFilePath && fileViewerType === "editor" && (
-        <FileEditorPopup filePath={openFilePath} onClose={handleCloseViewer} />
+        <FileEditorPopup filePath={openFilePath} onClose={handleCloseViewer} onMinimize={handleMinimize} />
       )}
       {openFilePath && fileViewerType === "image" && (
         <ImageViewerPopup filePath={openFilePath} onClose={handleCloseViewer} />
       )}
       {openFilePath && fileViewerType === "markdown" && (
-        <MarkdownEditorPopup filePath={openFilePath} onClose={handleCloseViewer} />
+        <MarkdownEditorPopup filePath={openFilePath} onClose={handleCloseViewer} onMinimize={handleMinimize} />
       )}
       {openFilePath && fileViewerType === "video" && (
         <VideoViewerPopup filePath={openFilePath} onClose={handleCloseViewer} />

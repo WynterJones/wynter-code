@@ -30,6 +30,7 @@ fn main() {
             commands::rename_item,
             commands::delete_to_trash,
             commands::check_node_modules_exists,
+            commands::get_directory_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

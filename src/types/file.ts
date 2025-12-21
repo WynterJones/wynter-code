@@ -15,4 +15,4 @@ export interface FileIconProps {
   isExpanded?: boolean;
 }
 
-export type SidebarTab = "files" | "modules" | "git" | "docs" | "info";
+export type SidebarTab = "files" | "modules" | "package" | "git" | "docs" | "info";

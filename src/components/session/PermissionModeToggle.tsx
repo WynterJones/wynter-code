@@ -65,7 +65,7 @@ export function PermissionModeToggle({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium",
+          "flex items-center gap-2 px-3 h-8 rounded-md text-sm",
           "bg-bg-tertiary border border-border hover:bg-bg-hover transition-colors",
           currentConfig.color
         )}

@@ -1,4 +1,5 @@
-import { Plus, Star, X, Settings, ChevronDown } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Plus, Star, X, Settings, ChevronLeft, ChevronRight } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { IconButton, Tooltip } from "@/components/ui";
@@ -32,6 +33,44 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
 
   const activeId = activeProjectId ? activeSessionId.get(activeProjectId) : undefined;
   const activeSession = activeId ? getSession(activeId) : undefined;
+
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const updateScrollButtons = () => {
+    if (scrollContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
+    }
+  };
+
+  useEffect(() => {
+    updateScrollButtons();
+    const container = scrollContainerRef.current;
+    if (container) {
+      container.addEventListener("scroll", updateScrollButtons);
+      const resizeObserver = new ResizeObserver(updateScrollButtons);
+      resizeObserver.observe(container);
+      return () => {
+        container.removeEventListener("scroll", updateScrollButtons);
+        resizeObserver.disconnect();
+      };
+    }
+  }, [projects]);
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -150, behavior: "smooth" });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 150, behavior: "smooth" });
+    }
+  };
 
   const handleModeChange = (mode: PermissionMode) => {
     if (activeId) {
@@ -81,6 +120,7 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
 
       {/* Project Tabs */}
       <div
+        ref={scrollContainerRef}
         data-tauri-drag-region
         className="flex items-center flex-1 gap-0.5 overflow-x-auto scrollbar-none h-full"
       >
@@ -91,7 +131,7 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
               key={project.id}
               onClick={() => setActiveProject(project.id)}
               className={cn(
-                "group relative flex items-center gap-2 px-4 h-full cursor-pointer transition-colors min-w-0",
+                "group relative flex items-center gap-2 px-4 h-full cursor-pointer transition-colors min-w-0 flex-shrink-0",
                 "border-r border-border/50",
                 isActive
                   ? "bg-bg-secondary text-text-primary"
@@ -130,20 +170,42 @@ export function ProjectTabBar({ onOpenSettings, onOpenSubscriptions }: ProjectTa
             </div>
           );
         })}
+      </div>
 
-        {/* New Tab Button */}
-        <Tooltip content="Open Project" side="left">
-          <button
-            onClick={handleOpenProject}
-            className={cn(
-              "flex items-center gap-1 px-3 h-full",
-              "text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50",
-              "transition-colors"
-            )}
-          >
+      {/* Scroll buttons */}
+      <div className="flex items-center border-l border-border h-full">
+        <button
+          onClick={scrollLeft}
+          disabled={!canScrollLeft}
+          className={cn(
+            "p-1.5 h-full transition-colors",
+            canScrollLeft
+              ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+              : "text-text-secondary/30 cursor-not-allowed"
+          )}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <button
+          onClick={scrollRight}
+          disabled={!canScrollRight}
+          className={cn(
+            "p-1.5 h-full transition-colors",
+            canScrollRight
+              ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+              : "text-text-secondary/30 cursor-not-allowed"
+          )}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* New Project Button */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Open Project">
+          <IconButton size="sm" onClick={handleOpenProject}>
             <Plus className="w-4 h-4" />
-            <ChevronDown className="w-3 h-3" />
-          </button>
+          </IconButton>
         </Tooltip>
       </div>
 

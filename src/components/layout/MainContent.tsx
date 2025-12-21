@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { GripHorizontal } from "lucide-react";
+import { GripHorizontal, FolderOpen } from "lucide-react";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
@@ -90,10 +90,10 @@ export function MainContent({ project }: MainContentProps) {
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
-      <div className="px-4 py-2 border-b border-border">
+      <div className="h-[45px] px-4 flex items-center border-b border-border bg-bg-secondary">
         <div className="flex items-center gap-2 text-sm text-text-secondary">
-          <span className="text-accent-yellow">📁</span>
-          <span className="font-mono">{project.path}</span>
+          <FolderOpen className="w-4 h-4 text-text-secondary flex-shrink-0" />
+          <span className="font-mono truncate">{project.path}</span>
         </div>
       </div>
 
@@ -105,7 +105,7 @@ export function MainContent({ project }: MainContentProps) {
         />
       </div>
 
-      <div className="flex-1 flex flex-col overflow-hidden p-4 pb-0">
+      <div className="flex-1 flex flex-col overflow-hidden p-4">
         {!currentSessionId ? (
           <div className="flex-1 flex items-center justify-center text-text-secondary">
             <div className="text-center">

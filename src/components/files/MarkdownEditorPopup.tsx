@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { X, Save, RotateCcw, Eye, Code, Columns } from "lucide-react";
+import { X, Save, RotateCcw, Eye, Code, Columns, Minus } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip, Badge } from "@/components/ui";
@@ -30,6 +30,7 @@ interface MarkdownEditorPopupProps {
   filePath: string;
   onClose: () => void;
   onSave?: (content: string) => void;
+  onMinimize?: () => void;
 }
 
 type ViewMode = "edit" | "preview" | "split";
@@ -38,6 +39,7 @@ export function MarkdownEditorPopup({
   filePath,
   onClose,
   onSave,
+  onMinimize,
 }: MarkdownEditorPopupProps) {
   const [content, setContent] = useState<string>("");
   const [originalContent, setOriginalContent] = useState<string>("");
@@ -217,6 +219,13 @@ export function MarkdownEditorPopup({
                   </IconButton>
                 </Tooltip>
               </>
+            )}
+            {onMinimize && (
+              <Tooltip content="Minimize" side="bottom">
+                <IconButton size="sm" onClick={onMinimize}>
+                  <Minus className="w-4 h-4" />
+                </IconButton>
+              </Tooltip>
             )}
             <Tooltip content="Close (Esc)" side="bottom">
               <IconButton size="sm" onClick={onClose}>

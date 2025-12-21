@@ -21,11 +21,21 @@ export function useFileOperations() {
     return invoke<boolean>("check_node_modules_exists", { projectPath });
   };
 
+  const checkFileExists = async (path: string): Promise<boolean> => {
+    try {
+      await invoke<string>("read_file_content", { path });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   return {
     createFile,
     createFolder,
     renameItem,
     deleteToTrash,
     checkNodeModulesExists,
+    checkFileExists,
   };
 }

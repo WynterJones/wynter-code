@@ -16,3 +16,6 @@ export type { ScrollAreaProps } from "./ScrollArea";
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
 
 export { Tooltip } from "./Tooltip";
+
+export { Modal } from "./Modal";
+export type { ModalProps } from "./Modal";

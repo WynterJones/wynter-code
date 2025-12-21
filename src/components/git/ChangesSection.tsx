@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { FileEdit, Plus, Minus } from "lucide-react";
+import { useState, useMemo } from "react";
+import { FileEdit, Plus, Minus, Eye } from "lucide-react";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { FileChangeItem } from "./FileChangeItem";
 import { DiffViewer } from "./DiffViewer";
+import { DiffPopup } from "./DiffPopup";
 import { IconButton } from "@/components/ui";
 import { gitService, type GitFile } from "@/services/git";
 
@@ -25,8 +26,17 @@ export function ChangesSection({
   const [isStageAllLoading, setIsStageAllLoading] = useState(false);
   const [isUnstageAllLoading, setIsUnstageAllLoading] = useState(false);
   const [viewingDiff, setViewingDiff] = useState<{ file: GitFile; isStaged: boolean } | null>(null);
+  const [showDiffPopup, setShowDiffPopup] = useState(false);
+  const [diffPopupInitialIndex, setDiffPopupInitialIndex] = useState(0);
 
   const unstaged = [...modified, ...untracked];
+
+  const allDiffableFiles = useMemo(() => {
+    const files: { file: GitFile; isStaged: boolean }[] = [];
+    staged.filter(f => f.status !== "?").forEach(file => files.push({ file, isStaged: true }));
+    modified.forEach(file => files.push({ file, isStaged: false }));
+    return files;
+  }, [staged, modified]);
   const totalChanges = staged.length + unstaged.length;
 
   const handleStageFile = async (file: GitFile) => {
@@ -77,6 +87,18 @@ export function ChangesSection({
     }
   };
 
+  const handleOpenDiffPopup = (file?: GitFile, isStaged?: boolean) => {
+    if (file && isStaged !== undefined) {
+      const index = allDiffableFiles.findIndex(
+        f => f.file.path === file.path && f.isStaged === isStaged
+      );
+      setDiffPopupInitialIndex(index >= 0 ? index : 0);
+    } else {
+      setDiffPopupInitialIndex(0);
+    }
+    setShowDiffPopup(true);
+  };
+
   return (
     <CollapsibleSection
       title="Changes"
@@ -85,6 +107,15 @@ export function ChangesSection({
       count={totalChanges}
       actions={
         <div className="flex items-center gap-0.5">
+          {allDiffableFiles.length > 0 && (
+            <IconButton
+              size="sm"
+              onClick={() => handleOpenDiffPopup()}
+              title="View all diffs"
+            >
+              <Eye className="w-3.5 h-3.5" />
+            </IconButton>
+          )}
           {unstaged.length > 0 && (
             <IconButton
               size="sm"
@@ -162,6 +193,15 @@ export function ChangesSection({
             />
           </div>
         )}
+
+        {/* Diff Popup */}
+        <DiffPopup
+          isOpen={showDiffPopup}
+          onClose={() => setShowDiffPopup(false)}
+          projectPath={projectPath}
+          files={allDiffableFiles}
+          initialFileIndex={diffPopupInitialIndex}
+        />
       </div>
     </CollapsibleSection>
   );

@@ -74,60 +74,75 @@ pre,
   font-family: var(--font-mono);
 }
 
-/* Global Scrollbar Styling - Wildcard to affect ALL scrollbars */
-*,
-*::before,
-*::after {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) var(--bg-tertiary);
+/* OverlayScrollbars Custom Theme */
+.os-theme-custom {
+  --os-size: 10px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-border-radius: 5px;
+  --os-handle-border-radius: 5px;
+  --os-handle-bg: var(--border);
+  --os-handle-bg-hover: #585b70;
+  --os-handle-bg-active: var(--accent);
+  --os-track-bg: transparent;
+  --os-track-bg-hover: var(--bg-tertiary);
+}
+
+.os-theme-custom > .os-scrollbar {
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+}
+
+.os-theme-custom > .os-scrollbar-horizontal {
+  right: var(--os-size);
+  height: var(--os-size);
+  padding: var(--os-padding-perpendicular) var(--os-padding-axis);
+}
+
+.os-theme-custom > .os-scrollbar-vertical {
+  bottom: var(--os-size);
+  width: var(--os-size);
+  padding: var(--os-padding-axis) var(--os-padding-perpendicular);
+}
+
+.os-theme-custom > .os-scrollbar > .os-scrollbar-track {
+  background: var(--os-track-bg);
+  border-radius: var(--os-track-border-radius);
+  transition: background 0.15s ease;
+}
+
+.os-theme-custom > .os-scrollbar:hover > .os-scrollbar-track {
+  background: var(--os-track-bg-hover);
+}
+
+.os-theme-custom > .os-scrollbar > .os-scrollbar-track > .os-scrollbar-handle {
+  background: var(--os-handle-bg);
+  border-radius: var(--os-handle-border-radius);
+  transition: background 0.15s ease;
+}
+
+.os-theme-custom > .os-scrollbar > .os-scrollbar-track > .os-scrollbar-handle:hover {
+  background: var(--os-handle-bg-hover);
+}
+
+.os-theme-custom > .os-scrollbar > .os-scrollbar-track > .os-scrollbar-handle:active {
+  background: var(--os-handle-bg-active);
+}
+
+/* Corner piece */
+.os-theme-custom > .os-scrollbar-corner {
+  background: transparent;
+}
+
+/* Hide native scrollbars everywhere as fallback */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-*::-webkit-scrollbar-track {
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-}
-
-*::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-  border: 2px solid var(--bg-tertiary);
-}
-
-*::-webkit-scrollbar-thumb:hover {
-  background: #585b70;
-}
-
-*::-webkit-scrollbar-thumb:active {
-  background: var(--accent);
-}
-
-*::-webkit-scrollbar-corner {
-  background: var(--bg-tertiary);
-}
-
-/* Hide scrollbar by default, show on hover */
-.hover-scrollbar {
-  scrollbar-width: thin;
-  scrollbar-color: transparent var(--bg-tertiary);
-}
-
-.hover-scrollbar:hover {
-  scrollbar-color: var(--border) var(--bg-tertiary);
-}
-
-.hover-scrollbar::-webkit-scrollbar-thumb {
-  background: transparent;
-  border: 2px solid transparent;
-}
-
-.hover-scrollbar:hover::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border: 2px solid var(--bg-tertiary);
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 ::selection {
@@ -151,40 +166,6 @@ pre,
 }
 
 @layer utilities {
-  .scrollbar-thin {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) var(--bg-tertiary);
-  }
-
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-track {
-    background: var(--bg-tertiary);
-    border-radius: 4px;
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: var(--border);
-    border-radius: 4px;
-    border: 2px solid var(--bg-tertiary);
-  }
-
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #585b70;
-  }
-
-  .scrollbar-none {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .scrollbar-none::-webkit-scrollbar {
-    display: none;
-  }
-
   .text-balance {
     text-wrap: balance;
   }

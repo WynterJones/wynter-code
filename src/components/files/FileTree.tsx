@@ -156,39 +156,34 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
 
   if (loading) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="relative flex flex-col h-full">
+        <div className="p-4 text-text-secondary text-sm">
+          Loading files...
+        </div>
         <FileTreeToolbar
           onCreateFile={() => handleCreateFile()}
           onCreateFolder={() => handleCreateFolder()}
         />
-        <div className="p-4 text-text-secondary text-sm">
-          Loading files...
-        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col h-full">
+      <div className="relative flex flex-col h-full">
+        <div className="p-4 text-accent-red text-sm">
+          Error: {error}
+        </div>
         <FileTreeToolbar
           onCreateFile={() => handleCreateFile()}
           onCreateFolder={() => handleCreateFolder()}
         />
-        <div className="p-4 text-accent-red text-sm">
-          Error: {error}
-        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <FileTreeToolbar
-        onCreateFile={() => handleCreateFile()}
-        onCreateFolder={() => handleCreateFolder()}
-      />
-
+    <div className="relative flex flex-col h-full">
       <ScrollArea className="flex-1">
         <div className="py-2">
           {files.map((file) => (
@@ -204,6 +199,11 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
           ))}
         </div>
       </ScrollArea>
+
+      <FileTreeToolbar
+        onCreateFile={() => handleCreateFile()}
+        onCreateFolder={() => handleCreateFolder()}
+      />
 
       {contextMenu && (
         <ContextMenu

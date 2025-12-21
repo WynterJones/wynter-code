@@ -8,13 +8,13 @@ interface FileTreeToolbarProps {
 
 export function FileTreeToolbar({ onCreateFile, onCreateFolder }: FileTreeToolbarProps) {
   return (
-    <div className="flex items-center justify-end px-2 py-1.5 border-b border-border gap-1">
-      <Tooltip content="New File" side="bottom">
+    <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-bg-secondary/90 backdrop-blur-sm rounded-lg p-1 border border-border shadow-lg z-10">
+      <Tooltip content="New File" side="top">
         <IconButton size="sm" onClick={onCreateFile}>
           <FilePlus className="w-4 h-4" />
         </IconButton>
       </Tooltip>
-      <Tooltip content="New Folder" side="bottom">
+      <Tooltip content="New Folder" side="top">
         <IconButton size="sm" onClick={onCreateFolder}>
           <FolderPlus className="w-4 h-4" />
         </IconButton>

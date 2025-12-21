@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
-import { X, Save, RotateCcw } from "lucide-react";
+import { X, Save, RotateCcw, Minus } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { IconButton, Tooltip, Badge } from "@/components/ui";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -10,6 +10,7 @@ interface FileEditorPopupProps {
   filePath: string;
   onClose: () => void;
   onSave?: (content: string) => void;
+  onMinimize?: () => void;
 }
 
 function getLanguageFromPath(path: string): string {
@@ -42,7 +43,7 @@ function getLanguageFromPath(path: string): string {
   return languageMap[ext || ""] || "plaintext";
 }
 
-export function FileEditorPopup({ filePath, onClose, onSave }: FileEditorPopupProps) {
+export function FileEditorPopup({ filePath, onClose, onSave, onMinimize }: FileEditorPopupProps) {
   const [content, setContent] = useState<string>("");
   const [originalContent, setOriginalContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -153,6 +154,13 @@ export function FileEditorPopup({ filePath, onClose, onSave }: FileEditorPopupPr
                   </IconButton>
                 </Tooltip>
               </>
+            )}
+            {onMinimize && (
+              <Tooltip content="Minimize" side="bottom">
+                <IconButton size="sm" onClick={onMinimize}>
+                  <Minus className="w-4 h-4" />
+                </IconButton>
+              </Tooltip>
             )}
             <Tooltip content="Close (Esc)" side="bottom">
               <IconButton size="sm" onClick={onClose}>

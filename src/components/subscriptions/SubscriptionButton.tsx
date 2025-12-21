@@ -40,7 +40,7 @@ export function SubscriptionButton({ onOpenManage }: SubscriptionButtonProps) {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center gap-2 px-2 py-1 rounded-md text-sm",
+          "flex items-center gap-2 px-3 h-8 rounded-md text-sm",
           "bg-bg-tertiary border border-border hover:bg-bg-hover transition-colors"
         )}
       >

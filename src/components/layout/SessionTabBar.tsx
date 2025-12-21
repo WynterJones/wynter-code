@@ -135,7 +135,11 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
         ref={scrollContainerRef}
         className="flex items-center flex-1 overflow-x-auto scrollbar-none"
       >
-        {sessions.map((session, index) => (
+        {sessions.length === 0 ? (
+          <span className="px-4 text-sm text-text-secondary/50 italic">
+            Add a new session to start working...
+          </span>
+        ) : sessions.map((session, index) => (
           <div
             key={session.id}
             onClick={() => setActiveSession(projectId, session.id)}

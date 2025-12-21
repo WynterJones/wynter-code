@@ -872,6 +872,133 @@ pub fn check_node_modules_exists(project_path: String) -> bool {
     Path::new(&project_path).join("node_modules").exists()
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DirectoryStats {
+    pub file_count: u64,
+    pub folder_count: u64,
+    pub total_size: u64,
+    pub node_modules_size: u64,
+    pub lines_of_code: u64,
+    pub file_type_counts: std::collections::HashMap<String, u64>,
+}
+
+#[tauri::command]
+pub fn get_directory_stats(project_path: String) -> Result<DirectoryStats, String> {
+    use std::collections::{HashMap, HashSet};
+
+    let project_path_obj = Path::new(&project_path);
+    if !project_path_obj.exists() {
+        return Err(format!("Path does not exist: {}", project_path));
+    }
+
+    let mut stats = DirectoryStats {
+        file_count: 0,
+        folder_count: 0,
+        total_size: 0,
+        node_modules_size: 0,
+        lines_of_code: 0,
+        file_type_counts: HashMap::new(),
+    };
+
+    // Directories to skip entirely (not counted in any stats)
+    let skip_dirs: HashSet<&str> = [
+        "node_modules", "target", "dist", "build", ".next",
+        ".nuxt", ".output", "coverage", ".cache", "__pycache__",
+        "vendor", ".gradle", "out"
+    ].iter().cloned().collect();
+
+    // Code file extensions for LOC counting
+    let code_extensions: HashSet<&str> = [
+        "js", "jsx", "ts", "tsx", "vue", "svelte",
+        "py", "rb", "rs", "go", "java", "kt", "swift",
+        "c", "cpp", "h", "hpp", "cs",
+        "php", "html", "css", "scss", "sass", "less",
+        "json", "yaml", "yml", "toml", "xml",
+        "sh", "bash", "zsh", "sql", "graphql", "gql",
+        "md", "mdx"
+    ].iter().cloned().collect();
+
+    // Calculate node_modules size separately
+    let node_modules_path = project_path_obj.join("node_modules");
+    if node_modules_path.exists() {
+        stats.node_modules_size = calculate_dir_size(&node_modules_path);
+    }
+
+    // Walk the directory tree, skipping excluded directories
+    fn walk_dir(
+        path: &Path,
+        stats: &mut DirectoryStats,
+        code_extensions: &HashSet<&str>,
+        skip_dirs: &HashSet<&str>,
+    ) {
+        let entries = match fs::read_dir(path) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            let file_name = entry.file_name().to_string_lossy().to_string();
+
+            // Skip hidden files/folders
+            if file_name.starts_with('.') {
+                continue;
+            }
+
+            let is_dir = entry_path.is_dir();
+
+            if is_dir {
+                // Skip excluded directories entirely
+                if skip_dirs.contains(file_name.as_str()) {
+                    continue;
+                }
+                stats.folder_count += 1;
+                walk_dir(&entry_path, stats, code_extensions, skip_dirs);
+            } else {
+                stats.file_count += 1;
+
+                // Get file size
+                if let Ok(metadata) = fs::metadata(&entry_path) {
+                    stats.total_size += metadata.len();
+                }
+
+                // Get file extension and count by type
+                if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
+                    let ext_lower = ext.to_lowercase();
+                    *stats.file_type_counts.entry(ext_lower.clone()).or_insert(0) += 1;
+
+                    // Count lines of code for code files
+                    if code_extensions.contains(ext_lower.as_str()) {
+                        if let Ok(content) = fs::read_to_string(&entry_path) {
+                            stats.lines_of_code += content.lines().count() as u64;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn calculate_dir_size(path: &Path) -> u64 {
+        let mut size: u64 = 0;
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.flatten() {
+                let entry_path = entry.path();
+                if entry_path.is_dir() {
+                    size += calculate_dir_size(&entry_path);
+                } else if let Ok(metadata) = fs::metadata(&entry_path) {
+                    size += metadata.len();
+                }
+            }
+        }
+        size
+    }
+
+    walk_dir(project_path_obj, &mut stats, &code_extensions, &skip_dirs);
+
+    Ok(stats)
+}
+
 pub fn get_migrations() -> Vec<Migration> {
     vec![
         Migration {
