@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { ScrollArea } from "@/components/ui";
 import { FileTreeNode } from "./FileTreeNode";
 import { FileTreeToolbar } from "./FileTreeToolbar";
@@ -37,26 +38,83 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
 
   const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
+  const isRefreshing = useRef(false);
 
-  const loadFiles = useCallback(async () => {
+  const loadFiles = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
-      setError(null);
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
       const result = await invoke<FileNode[]>("get_file_tree", {
         path: projectPath,
         depth: 1,
       });
       setFiles(result);
+      if (!silent) {
+        setError(null);
+      }
     } catch (err) {
-      setError(err as string);
+      if (!silent) {
+        setError(err as string);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [projectPath]);
 
   useEffect(() => {
     loadFiles();
   }, [loadFiles]);
+
+  // File watcher for auto-refresh
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+
+    const setupWatcher = async () => {
+      try {
+        // Start the file watcher
+        await invoke("start_file_watcher", { path: projectPath });
+
+        // Listen for file system change events
+        unlisten = await listen<{ watchPath: string; changedPaths: string[] }>(
+          "fs-change",
+          async (event) => {
+            // Only respond to events for our watched path
+            if (event.payload.watchPath !== projectPath) return;
+
+            // Prevent multiple refreshes at once
+            if (isRefreshing.current) return;
+            isRefreshing.current = true;
+
+            try {
+              await loadFiles(true); // Silent refresh - no loading indicator
+              refetchGitStatus();
+            } finally {
+              // Small delay before allowing another refresh
+              setTimeout(() => {
+                isRefreshing.current = false;
+              }, 100);
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Failed to setup file watcher:", err);
+      }
+    };
+
+    setupWatcher();
+
+    return () => {
+      // Cleanup: stop watcher and unlisten
+      if (unlisten) {
+        unlisten();
+      }
+      invoke("stop_file_watcher", { path: projectPath }).catch(console.error);
+    };
+  }, [projectPath, loadFiles, refetchGitStatus]);
 
   const handleToggle = async (node: FileNode) => {
     if (!node.isDirectory) return;

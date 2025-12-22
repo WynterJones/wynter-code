@@ -1584,6 +1584,114 @@ pub fn create_claude_file(
     Ok(file_path.to_string_lossy().to_string())
 }
 
+// Port Manager Commands
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortInfo {
+    pub port: u16,
+    pub pid: u32,
+    pub process_name: String,
+    pub user: String,
+    pub protocol: String,
+}
+
+#[tauri::command]
+pub fn list_listening_ports() -> Result<Vec<PortInfo>, String> {
+    let output = Command::new("lsof")
+        .args(["-i", "-P", "-n"])
+        .output()
+        .map_err(|e| format!("Failed to run lsof: {}", e))?;
+
+    if !output.status.success() {
+        // lsof might return non-zero if no ports found, that's okay
+        return Ok(Vec::new());
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut ports: Vec<PortInfo> = Vec::new();
+    let mut seen_ports: std::collections::HashSet<u16> = std::collections::HashSet::new();
+
+    for line in stdout.lines().skip(1) {
+        // Skip header line
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 9 {
+            continue;
+        }
+
+        // Only include LISTEN state
+        let state = parts.get(9).or(parts.get(8)).unwrap_or(&"");
+        if !state.contains("LISTEN") {
+            continue;
+        }
+
+        let process_name = parts[0].to_string();
+        let pid: u32 = match parts[1].parse() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let user = parts[2].to_string();
+
+        // Parse the address:port from the NAME column (usually last or second to last)
+        let addr_col = parts.iter()
+            .find(|p| p.contains(':') && (p.contains("localhost") || p.contains("*") || p.contains("127.") || p.contains("0.0.0.0") || p.contains("[::]")))
+            .unwrap_or(&"");
+
+        if addr_col.is_empty() {
+            continue;
+        }
+
+        // Extract port number
+        let port_str = addr_col.rsplit(':').next().unwrap_or("");
+        let port: u16 = match port_str.parse() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        // Skip if we've already seen this port (avoid duplicates)
+        if seen_ports.contains(&port) {
+            continue;
+        }
+        seen_ports.insert(port);
+
+        // Determine protocol
+        let protocol = if parts.iter().any(|p| p.contains("TCP")) {
+            "TCP"
+        } else if parts.iter().any(|p| p.contains("UDP")) {
+            "UDP"
+        } else {
+            "TCP"
+        };
+
+        ports.push(PortInfo {
+            port,
+            pid,
+            process_name,
+            user,
+            protocol: protocol.to_string(),
+        });
+    }
+
+    // Sort by port number
+    ports.sort_by_key(|p| p.port);
+    Ok(ports)
+}
+
+#[tauri::command]
+pub fn kill_process(pid: u32) -> Result<(), String> {
+    let output = Command::new("kill")
+        .args(["-9", &pid.to_string()])
+        .output()
+        .map_err(|e| format!("Failed to kill process: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("Failed to kill process {}: {}", pid, stderr));
+    }
+
+    Ok(())
+}
+
 pub fn get_migrations() -> Vec<Migration> {
     vec![
         Migration {

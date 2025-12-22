@@ -2,6 +2,7 @@
 
 mod commands;
 mod terminal;
+mod watcher;
 
 use std::sync::Arc;
 use tauri::{
@@ -132,6 +133,7 @@ fn main() {
             Ok(())
         })
         .manage(Arc::new(terminal::PtyManager::new()))
+        .manage(Arc::new(watcher::FileWatcherManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -165,11 +167,15 @@ fn main() {
             commands::get_claude_version,
             commands::check_claude_update,
             commands::create_claude_file,
+            commands::list_listening_ports,
+            commands::kill_process,
             terminal::create_pty,
             terminal::write_pty,
             terminal::resize_pty,
             terminal::close_pty,
             terminal::is_pty_active,
+            watcher::start_file_watcher,
+            watcher::stop_file_watcher,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

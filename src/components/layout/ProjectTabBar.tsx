@@ -24,6 +24,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SubscriptionButton } from "@/components/subscriptions";
 import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
+import { ToolsDropdown, PortManagerPopup } from "@/components/tools";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import type { Project } from "@/types";
@@ -214,6 +215,7 @@ export function ProjectTabBar({
     projectId: null,
     activeTab: "icon",
   });
+  const [showPortManager, setShowPortManager] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
@@ -430,6 +432,11 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
+      {/* Tools Dropdown */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <ToolsDropdown onOpenPortManager={() => setShowPortManager(true)} />
+      </div>
+
       {/* Meditation Mode */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content={isMeditating ? "Exit Meditation" : "Meditation Mode"}>
@@ -577,6 +584,12 @@ export function ProjectTabBar({
         mode={fileBrowserMode}
         onSelectProject={handleSelectProject}
         onSendToPrompt={onSendToPrompt}
+      />
+
+      {/* Port Manager Popup */}
+      <PortManagerPopup
+        isOpen={showPortManager}
+        onClose={() => setShowPortManager(false)}
       />
     </div>
   );

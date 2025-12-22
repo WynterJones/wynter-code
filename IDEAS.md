@@ -16,6 +16,15 @@ A collection of feature ideas organized by where they live in the UI.
 - Drag to reorder tabs using @dnd-kit
 - Project icon and color persist across sessions
 
+### Tools Dropdown + Port Manager ✓
+- Tools dropdown menu in header bar (wrench icon)
+- Port Manager tool showing all listening localhost ports
+- Process name, PID, port number, and protocol display
+- Kill process button to stop services
+- Open in browser button for quick access
+- Auto-refresh and manual refresh options
+- Process icons based on runtime (Node, Python, Ruby, etc.)
+
 ---
 
 ## Project Tab Bar
@@ -46,14 +55,6 @@ Eyedropper tool for picking colors anywhere on screen:
 - Recent colors history
 - Color palette saver
 - Also accessible via keyboard shortcut
-
-### Port Manager
-
-See and manage localhost ports:
-- List active ports (3000, 5173, 8080, etc.)
-- Show which process uses each port
-- Kill process button
-- Quick links to open in browser
 
 ### Localhost Tunnel
 
@@ -253,8 +254,8 @@ Split view for sessions and terminals:
 
 **Quick Wins (Low Effort, High Value):**
 - ~~Enhanced Project Tabs (UI tweaks + Lucide picker)~~ ✓
-- Port Manager (uses lsof/netstat) ← **NEXT**
-- System Health Dashboard (version checks)
+- ~~Port Manager (uses lsof/netstat)~~ ✓
+- System Health Dashboard (version checks) ← **NEXT**
 - Prompt Templates (JSON storage + UI)
 
 **Medium Effort:**
