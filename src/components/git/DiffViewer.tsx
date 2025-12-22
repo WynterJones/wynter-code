@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
-import { IconButton } from "@/components/ui";
+import { IconButton, ScrollArea } from "@/components/ui";
 import { gitService, type GitFile } from "@/services/git";
 import { cn } from "@/lib/utils";
 import hljs from "highlight.js";
@@ -216,7 +216,7 @@ export function DiffViewer({ projectPath, file, isStaged, onClose }: DiffViewerP
       </div>
 
       {/* Diff Content */}
-      <div className="max-h-[400px] overflow-auto">
+      <ScrollArea className="max-h-[400px]">
         {hunks.map((hunk, hunkIndex) => (
           <div key={hunkIndex} className="border-b border-border last:border-b-0">
             {/* Hunk Header */}
@@ -305,7 +305,7 @@ export function DiffViewer({ projectPath, file, isStaged, onClose }: DiffViewerP
             )}
           </div>
         ))}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

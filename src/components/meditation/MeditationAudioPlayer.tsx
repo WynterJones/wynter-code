@@ -1,20 +1,22 @@
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { cn } from "@/lib/utils";
-import { TRACKS } from "./tracks";
 
 export function MeditationAudioPlayer() {
   const {
     currentTrack,
     isPlaying,
     volume,
+    tracks,
     nextTrack,
     prevTrack,
     togglePlay,
     setVolume,
   } = useMeditationStore();
 
-  const track = TRACKS[currentTrack];
+  const track = tracks[currentTrack] || tracks[0];
+
+  if (!track) return null;
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setVolume(parseFloat(e.target.value));

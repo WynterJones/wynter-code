@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --bg-primary: #1e1e2e;
-  --bg-secondary: #181825;
-  --bg-tertiary: #11111b;
-  --bg-hover: #313244;
+  --bg-primary: #141420;
+  --bg-secondary: #0f0f18;
+  --bg-tertiary: #0a0a10;
+  --bg-hover: #252535;
 
   --text-primary: #cdd6f4;
   --text-secondary: #a6adc8;
   --text-accent: #89b4fa;
 
-  --border: #45475a;
+  --border: #2a2a3a;
   --accent: #cba6f7;
   --accent-green: #a6e3a1;
   --accent-red: #f38ba8;
@@ -21,6 +21,7 @@
   --accent-orange: #fab387;
   --accent-cyan: #94e2d5;
 
+  --app-font: 'JetBrains Mono', monospace;
   --font-mono: "JetBrains Mono", "Fira Code", monospace;
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
 }
@@ -40,7 +41,7 @@ body,
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--app-font);
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
@@ -71,7 +72,7 @@ code,
 code,
 pre,
 .font-mono {
-  font-family: var(--font-mono);
+  font-family: var(--app-font);
 }
 
 /* OverlayScrollbars Custom Theme */
@@ -82,7 +83,7 @@ pre,
   --os-track-border-radius: 5px;
   --os-handle-border-radius: 5px;
   --os-handle-bg: var(--border);
-  --os-handle-bg-hover: #585b70;
+  --os-handle-bg-hover: #3a3a4a;
   --os-handle-bg-active: var(--accent);
   --os-track-bg: transparent;
   --os-track-bg-hover: var(--bg-tertiary);
@@ -157,7 +158,7 @@ pre,
 
   .glass {
     backdrop-filter: blur(8px);
-    background: rgba(30, 30, 46, 0.8);
+    background: rgba(20, 20, 32, 0.9);
   }
 
   .hover-highlight {
@@ -257,7 +258,7 @@ pre,
 }
 
 .markdown-preview code {
-  font-family: var(--font-mono);
+  font-family: var(--app-font);
   font-size: 0.9em;
   background: var(--bg-hover);
   padding: 0.2em 0.4em;
@@ -318,7 +319,7 @@ pre,
 }
 
 .markdown-preview tr:nth-child(even) {
-  background: rgba(49, 50, 68, 0.3);
+  background: rgba(37, 37, 53, 0.3);
 }
 
 .markdown-preview tr:hover {

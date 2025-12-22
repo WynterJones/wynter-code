@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-
 interface FocusOverlayProps {
   isActive: boolean;
   onClose: () => void;

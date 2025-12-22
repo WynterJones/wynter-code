@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { X, Type } from "lucide-react";
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { IconButton, Tooltip, Input } from "@/components/ui";
+import { IconButton, Tooltip, Input, ScrollArea } from "@/components/ui";
 
 interface FontViewerPopupProps {
   filePath: string;
@@ -62,8 +62,11 @@ export function FontViewerPopup({ filePath, onClose }: FontViewerPopupProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/90 backdrop-blur-sm">
       <div className="w-full h-full max-w-[calc(100vw-40px)] max-h-[calc(100vh-40px)] bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary">
+        {/* Header - Drags the window */}
+        <div
+          data-tauri-drag-region
+          className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary cursor-grab active:cursor-grabbing"
+        >
           <div className="flex items-center gap-2">
             <Type className="w-4 h-4 text-accent" />
             <span className="font-mono text-sm text-text-primary">{fileName}</span>
@@ -84,7 +87,8 @@ export function FontViewerPopup({ filePath, onClose }: FontViewerPopupProps) {
             Loading font...
           </div>
         ) : (
-          <div className="flex-1 overflow-auto p-6 space-y-8">
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-8">
             {/* Size selector */}
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-text-secondary">Size:</span>
@@ -151,7 +155,8 @@ export function FontViewerPopup({ filePath, onClose }: FontViewerPopupProps) {
                 ))}
               </div>
             </div>
-          </div>
+            </div>
+          </ScrollArea>
         )}
 
         {/* Footer */}

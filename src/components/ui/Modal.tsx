@@ -71,7 +71,10 @@ export function Modal({
         )}
       >
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
+          <div
+            data-tauri-drag-region
+            className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0 cursor-grab active:cursor-grabbing"
+          >
             {title && (
               <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
             )}

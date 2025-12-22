@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PanelRightClose } from "lucide-react";
+import { PanelRightClose, PanelLeftClose } from "lucide-react";
 import { ProjectTabBar } from "./ProjectTabBar";
 import { SessionTabBar } from "./SessionTabBar";
 import { Sidebar } from "./Sidebar";
@@ -8,11 +8,14 @@ import { MinimizedPopupTabs } from "./MinimizedPopupTabs";
 import { useProjectStore } from "@/stores/projectStore";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useOnboardingStore } from "@/stores";
-import { SettingsPopup } from "@/components/settings";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { SettingsPopup, KeyboardShortcutsPopup } from "@/components/settings";
 import { SubscriptionPopup } from "@/components/subscriptions";
 import { OnboardingFlow } from "@/components/onboarding";
 import { MeditationScreen, MiniMeditationPlayer, MeditationAudioController } from "@/components/meditation";
 import { Tooltip } from "@/components/ui";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useCustomMusic } from "@/hooks/useCustomMusic";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 const SIDEBAR_COLLAPSED_KEY = "wynter-code-sidebar-collapsed";
@@ -26,8 +29,10 @@ export function AppShell() {
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const isMeditating = useMeditationStore((s) => s.isActive);
   const { hasCompletedOnboarding } = useOnboardingStore();
+  const sidebarPosition = useSettingsStore((s) => s.sidebarPosition);
   const [showSettings, setShowSettings] = useState(false);
   const [showSubscriptions, setShowSubscriptions] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
     return stored === "true";
@@ -57,6 +62,9 @@ export function AppShell() {
     setRequestImageBrowser(false);
   }, []);
 
+  // Initialize custom music loading
+  useCustomMusic();
+
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizingSidebar(true);
@@ -68,7 +76,11 @@ export function AppShell() {
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!resizeRef.current) return;
-      const deltaX = resizeRef.current.startX - e.clientX;
+      // For right sidebar: dragging left increases width
+      // For left sidebar: dragging right increases width
+      const deltaX = sidebarPosition === "right"
+        ? resizeRef.current.startX - e.clientX
+        : e.clientX - resizeRef.current.startX;
       const newWidth = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, resizeRef.current.startWidth + deltaX));
       setSidebarWidth(newWidth);
     };
@@ -85,7 +97,7 @@ export function AppShell() {
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isResizingSidebar]);
+  }, [isResizingSidebar, sidebarPosition]);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
@@ -95,12 +107,35 @@ export function AppShell() {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
+  const toggleSidebar = useCallback(() => setSidebarCollapsed((prev) => !prev), []);
+
+  const handleFocusPrompt = useCallback(() => {
+    // Focus the prompt input - use a custom event that MainContent can listen to
+    window.dispatchEvent(new CustomEvent("focus-prompt"));
+  }, []);
+
+  const handleToggleFileBrowser = useCallback(() => {
+    // If sidebar is collapsed, expand it; otherwise just ensure focus
+    if (sidebarCollapsed) {
+      setSidebarCollapsed(false);
+    }
+    // Dispatch event for sidebar to switch to files tab
+    window.dispatchEvent(new CustomEvent("focus-file-browser"));
+  }, [sidebarCollapsed]);
+
+  // Register global keyboard shortcuts
+  useKeyboardShortcuts({
+    onOpenSettings: () => setShowSettings(true),
+    onToggleSidebar: toggleSidebar,
+    onToggleFileBrowser: handleToggleFileBrowser,
+    onShowShortcuts: () => setShowShortcuts(true),
+    onFocusPrompt: handleFocusPrompt,
+  });
+
   // Show onboarding if not completed
   if (!hasCompletedOnboarding) {
     return <OnboardingFlow />;
   }
-
-  const toggleSidebar = () => setSidebarCollapsed((prev) => !prev);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-primary overflow-hidden">
@@ -114,6 +149,7 @@ export function AppShell() {
 
       {showSettings && <SettingsPopup onClose={() => setShowSettings(false)} />}
       {showSubscriptions && <SubscriptionPopup onClose={() => setShowSubscriptions(false)} />}
+      {showShortcuts && <KeyboardShortcutsPopup onClose={() => setShowShortcuts(false)} />}
       {isMeditating && <MeditationScreen />}
       <MeditationAudioController />
       <MiniMeditationPlayer />
@@ -123,31 +159,45 @@ export function AppShell() {
           <SessionTabBar projectId={activeProject.id} />
 
           <div className={`flex-1 flex overflow-hidden relative ${isResizingSidebar ? "select-none" : ""}`}>
+            {sidebarPosition === "left" && (
+              <Sidebar
+                project={activeProject}
+                isCollapsed={sidebarCollapsed}
+                isResizing={isResizingSidebar}
+                onToggleCollapse={toggleSidebar}
+                onResizeStart={handleResizeStart}
+                width={sidebarWidth}
+                position="left"
+              />
+            )}
             <MainContent
               project={activeProject}
               pendingImage={pendingImage}
               onImageConsumed={handleImageConsumed}
               onRequestImageBrowser={handleRequestImageBrowser}
             />
-            {!sidebarCollapsed && (
-              <div
-                onMouseDown={handleResizeStart}
-                className={`w-1 cursor-col-resize hover:bg-accent/50 transition-colors ${isResizingSidebar ? "bg-accent/50" : ""}`}
+            {sidebarPosition === "right" && (
+              <Sidebar
+                project={activeProject}
+                isCollapsed={sidebarCollapsed}
+                isResizing={isResizingSidebar}
+                onToggleCollapse={toggleSidebar}
+                onResizeStart={handleResizeStart}
+                width={sidebarWidth}
+                position="right"
               />
             )}
-            <Sidebar
-              project={activeProject}
-              isCollapsed={sidebarCollapsed}
-              onToggleCollapse={toggleSidebar}
-              width={sidebarWidth}
-            />
             {sidebarCollapsed && (
-              <Tooltip content="Show sidebar" side="left">
+              <Tooltip content="Show sidebar" side={sidebarPosition === "right" ? "left" : "right"}>
                 <button
                   onClick={toggleSidebar}
-                  className="absolute right-2 top-2 p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors z-10"
+                  className={`absolute top-2 p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors z-30 ${sidebarPosition === "right" ? "right-2" : "left-2"}`}
                 >
-                  <PanelRightClose className="w-4 h-4" />
+                  {sidebarPosition === "right" ? (
+                    <PanelRightClose className="w-4 h-4" />
+                  ) : (
+                    <PanelLeftClose className="w-4 h-4" />
+                  )}
                 </button>
               </Tooltip>
             )}

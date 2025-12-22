@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
-import { Files, Package, FileJson, GitBranch, Info, FileText, PanelRightOpen } from "lucide-react";
+import { Files, Package, FileJson, GitBranch, Info, FileText, PanelRightOpen, PanelLeftOpen } from "lucide-react";
+import type { SidebarPosition } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "@/components/ui";
 import {
@@ -24,8 +25,11 @@ import type { SidebarTab } from "@/types/file";
 interface SidebarProps {
   project: Project;
   isCollapsed: boolean;
+  isResizing?: boolean;
   onToggleCollapse: () => void;
+  onResizeStart?: (e: React.MouseEvent) => void;
   width?: number;
+  position?: SidebarPosition;
 }
 
 type FileViewerType = "editor" | "image" | "markdown" | "video" | "pdf" | "audio" | "font" | null;
@@ -48,7 +52,7 @@ function getFileViewerType(path: string): FileViewerType {
   return "editor";
 }
 
-export function Sidebar({ project, isCollapsed, onToggleCollapse, width = 400 }: SidebarProps) {
+export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, onResizeStart, width = 400, position = "right" }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("files");
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
   const [fileViewerType, setFileViewerType] = useState<FileViewerType>(null);
@@ -96,6 +100,15 @@ export function Sidebar({ project, isCollapsed, onToggleCollapse, width = 400 }:
     };
     checkProjectFeatures();
   }, [project.path, checkNodeModulesExists, checkFileExists]);
+
+  // Listen for global focus-file-browser event (keyboard shortcut)
+  useEffect(() => {
+    const handleFocusFileBrowser = () => {
+      setActiveTab("files");
+    };
+    window.addEventListener("focus-file-browser", handleFocusFileBrowser);
+    return () => window.removeEventListener("focus-file-browser", handleFocusFileBrowser);
+  }, []);
 
   const tabs = useMemo(() => {
     const baseTabs: { id: SidebarTab; icon: typeof Files; label: string }[] = [
@@ -148,12 +161,35 @@ export function Sidebar({ project, isCollapsed, onToggleCollapse, width = 400 }:
   return (
     <div
       className={cn(
-        "flex flex-col bg-bg-secondary border-l border-border transition-all duration-200 ease-in-out",
-        isCollapsed && "w-0 overflow-hidden border-l-0"
+        "relative flex flex-col bg-bg-secondary border-border",
+        position === "right" ? "border-l" : "border-r",
+        !isResizing && "transition-[width,border] duration-200 ease-in-out",
+        isCollapsed && "w-0 overflow-hidden border-l-0 border-r-0"
       )}
       style={!isCollapsed ? { width } : undefined}
     >
+      {/* Resize handle */}
+      {!isCollapsed && onResizeStart && (
+        <div
+          onMouseDown={onResizeStart}
+          className={cn(
+            "absolute top-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-accent/50",
+            position === "right" ? "left-0" : "right-0",
+            isResizing && "bg-accent/50"
+          )}
+        />
+      )}
       <div className="flex items-center py-2 border-b border-border" style={{ minWidth: width }}>
+        {position === "left" && (
+          <Tooltip content="Hide sidebar" side="right">
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 ml-2 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        )}
         <div className="flex items-center justify-evenly flex-1">
           {tabs.map((tab) => (
             <Tooltip key={tab.id} content={tab.label} side="bottom">
@@ -174,14 +210,16 @@ export function Sidebar({ project, isCollapsed, onToggleCollapse, width = 400 }:
             </Tooltip>
           ))}
         </div>
-        <Tooltip content="Hide sidebar" side="left">
-          <button
-            onClick={onToggleCollapse}
-            className="p-1.5 mr-2 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-          >
-            <PanelRightOpen className="w-4 h-4" />
-          </button>
-        </Tooltip>
+        {position === "right" && (
+          <Tooltip content="Hide sidebar" side="left">
+            <button
+              onClick={onToggleCollapse}
+              className="p-1.5 mr-2 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+            >
+              <PanelRightOpen className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden" style={{ minWidth: width }}>

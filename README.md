@@ -125,14 +125,34 @@ The app uses a VSCode-inspired dark theme with Catppuccin Mocha colors:
 
 ## Keyboard Shortcuts
 
+### Navigation
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + 1-9` | Switch to project tab 1-9 |
+| `Cmd/Ctrl + [` | Previous session |
+| `Cmd/Ctrl + ]` | Next session |
+
+### Sessions
+| Shortcut | Action |
+|----------|--------|
+| `Cmd/Ctrl + T` | New session |
+| `Cmd/Ctrl + Shift + W` | Close current session |
+
+### Interface
 | Shortcut | Action |
 |----------|--------|
 | `Cmd/Ctrl + K` | Focus prompt input |
-| `Cmd/Ctrl + N` | New session |
-| `Cmd/Ctrl + W` | Close current tab |
-| `Cmd/Ctrl + 1-9` | Switch project tabs |
+| `Cmd/Ctrl + B` | Toggle sidebar |
+| `Cmd/Ctrl + ,` | Open settings |
+| `Cmd/Ctrl + E` | Toggle file browser |
+| `Cmd/Ctrl + /` | Show keyboard shortcuts |
+
+### Editing
+| Shortcut | Action |
+|----------|--------|
 | `Enter` | Send prompt |
 | `Shift + Enter` | New line in prompt |
+| `Escape` | Close popup / Cancel |
 
 ## Configuration
 

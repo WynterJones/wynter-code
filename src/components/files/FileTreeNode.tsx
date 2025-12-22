@@ -1,8 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
 import type { FileNode } from "@/types";
+import {
+  type GitStatusMap,
+  type GitFileStatusType,
+  getGitStatusColor,
+} from "@/hooks/useGitStatus";
 
 interface FileTreeNodeProps {
   node: FileNode;
@@ -12,6 +17,7 @@ interface FileTreeNodeProps {
   onContextMenu?: (e: React.MouseEvent, node: FileNode) => void;
   onNodeModulesClick?: () => void;
   onMoveItem?: (sourcePath: string, destinationFolder: string) => Promise<void>;
+  gitStatusMap?: GitStatusMap;
 }
 
 export function FileTreeNode({
@@ -22,8 +28,42 @@ export function FileTreeNode({
   onContextMenu,
   onNodeModulesClick,
   onMoveItem,
+  gitStatusMap,
 }: FileTreeNodeProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Compute git status for this node
+  const gitStatus = useMemo((): GitFileStatusType | undefined => {
+    if (!gitStatusMap) return undefined;
+
+    // For files, look up directly
+    if (!node.isDirectory) {
+      return gitStatusMap.get(node.path);
+    }
+
+    // For directories, check if any children have status
+    let hasModified = false;
+    let hasNew = false;
+
+    for (const [path, status] of gitStatusMap) {
+      if (path.startsWith(node.path + "/")) {
+        if (status === "conflict") return "conflict";
+        if (status === "modified" || status === "deleted" || status === "renamed") {
+          hasModified = true;
+        }
+        if (status === "untracked" || status === "new") {
+          hasNew = true;
+        }
+      }
+    }
+
+    if (hasModified) return "modified";
+    if (hasNew) return "untracked";
+    return undefined;
+  }, [gitStatusMap, node.path, node.isDirectory]);
+
+  const gitStatusColorClass = getGitStatusColor(gitStatus);
+
   const handleClick = () => {
     if (node.isDirectory) {
       // Special handling for node_modules - switch to Modules tab
@@ -155,7 +195,7 @@ export function FileTreeNode({
           isExpanded={node.isExpanded}
         />
 
-        <span className="truncate">{node.name}</span>
+        <span className={cn("truncate", gitStatusColorClass)}>{node.name}</span>
       </div>
 
       {node.isExpanded && node.children && (
@@ -170,6 +210,7 @@ export function FileTreeNode({
               onContextMenu={onContextMenu}
               onNodeModulesClick={onNodeModulesClick}
               onMoveItem={onMoveItem}
+              gitStatusMap={gitStatusMap}
             />
           ))}
         </div>

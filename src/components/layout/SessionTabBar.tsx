@@ -356,7 +356,7 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
       </div>
 
       {/* Scroll buttons */}
-      <div className="flex items-center border-l border-border">
+      <div className="flex items-center h-full border-l border-border">
         <button
           onClick={scrollLeft}
           disabled={!canScrollLeft}
@@ -383,7 +383,7 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
         </button>
       </div>
 
-      <div className="border-l border-border px-2 relative">
+      <div className="h-full flex items-center border-l border-border px-2 relative">
         <IconButton
           ref={plusButtonRef}
           size="sm"

@@ -85,8 +85,11 @@ export function ImageViewerPopup({ filePath, onClose }: ImageViewerPopupProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/90 backdrop-blur-sm">
       <div className="w-full h-full max-w-[calc(100vw-40px)] max-h-[calc(100vh-40px)] bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary">
+        {/* Header - Drags the window */}
+        <div
+          data-tauri-drag-region
+          className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary cursor-grab active:cursor-grabbing"
+        >
           <span className="font-mono text-sm text-text-primary">{fileName}</span>
           <div className="flex items-center gap-1">
             <Tooltip content="Zoom Out (-)" side="bottom">

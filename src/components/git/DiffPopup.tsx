@@ -238,7 +238,7 @@ export function DiffPopup({
         {/* File List Sidebar + Diff Content */}
         <div className="flex flex-1 overflow-hidden">
           {/* File List Sidebar */}
-          <div className="w-56 border-r border-border bg-bg-tertiary/50 overflow-y-auto">
+          <ScrollArea className="w-56 border-r border-border bg-bg-tertiary/50">
             <div className="p-2 space-y-0.5">
               {files.map((item, index) => {
                 const itemConfig = statusConfig[item.file.status] || statusConfig["M"];
@@ -264,7 +264,7 @@ export function DiffPopup({
                 );
               })}
             </div>
-          </div>
+          </ScrollArea>
 
           {/* Diff Content */}
           <ScrollArea className="flex-1 bg-bg-secondary">

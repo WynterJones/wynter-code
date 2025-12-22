@@ -9,6 +9,28 @@ use ignore::WalkBuilder;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct AudioFile {
+    pub name: String,
+    pub file: String,
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitFileStatus {
+    pub path: String,
+    pub status: String, // "new", "modified", "deleted", "renamed", "untracked"
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatusResult {
+    pub git_root: String,
+    pub files: Vec<GitFileStatus>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FileNode {
     pub name: String,
     pub path: String,
@@ -916,6 +938,161 @@ pub fn get_home_dir() -> Result<String, String> {
     dirs::home_dir()
         .map(|p| p.to_string_lossy().to_string())
         .ok_or_else(|| "Could not determine home directory".to_string())
+}
+
+#[tauri::command]
+pub fn scan_music_folder(folder_path: String) -> Result<Vec<AudioFile>, String> {
+    let folder = Path::new(&folder_path);
+
+    if !folder.exists() {
+        return Err(format!("Folder does not exist: {}", folder_path));
+    }
+
+    if !folder.is_dir() {
+        return Err(format!("Path is not a directory: {}", folder_path));
+    }
+
+    let mut files: Vec<AudioFile> = Vec::new();
+
+    let entries = fs::read_dir(folder).map_err(|e| e.to_string())?;
+
+    for entry in entries {
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let path = entry.path();
+
+        if path.is_dir() {
+            continue;
+        }
+
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_lowercase());
+
+        if ext.as_deref() != Some("mp3") {
+            continue;
+        }
+
+        let filename = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        let display_name = filename
+            .trim_end_matches(".mp3")
+            .trim_end_matches(".MP3")
+            .replace("-", " ")
+            .replace("_", " ")
+            .split_whitespace()
+            .map(|word| {
+                let mut chars = word.chars();
+                match chars.next() {
+                    Some(first) => {
+                        first.to_uppercase().collect::<String>() + chars.as_str().to_lowercase().as_str()
+                    }
+                    None => String::new(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        files.push(AudioFile {
+            name: display_name,
+            file: filename,
+            path: path.to_string_lossy().to_string(),
+        });
+    }
+
+    files.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+
+    Ok(files)
+}
+
+#[tauri::command]
+pub fn get_git_status(directory_path: String) -> Result<GitStatusResult, String> {
+    let dir_path = Path::new(&directory_path);
+
+    if !dir_path.exists() {
+        return Err(format!("Directory does not exist: {}", directory_path));
+    }
+
+    // Find git root by running git rev-parse --show-toplevel
+    let git_root_output = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .current_dir(&directory_path)
+        .output();
+
+    let git_root = match git_root_output {
+        Ok(output) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        }
+        _ => {
+            // Not a git repository
+            return Ok(GitStatusResult {
+                git_root: String::new(),
+                files: Vec::new(),
+            });
+        }
+    };
+
+    // Get git status with porcelain format
+    let status_output = Command::new("git")
+        .args(["status", "--porcelain", "-uall"])
+        .current_dir(&git_root)
+        .output()
+        .map_err(|e| format!("Failed to run git status: {}", e))?;
+
+    if !status_output.status.success() {
+        return Ok(GitStatusResult {
+            git_root,
+            files: Vec::new(),
+        });
+    }
+
+    let stdout = String::from_utf8_lossy(&status_output.stdout);
+    let mut files: Vec<GitFileStatus> = Vec::new();
+
+    for line in stdout.lines() {
+        if line.len() < 4 {
+            continue;
+        }
+
+        let status_chars = &line[0..2];
+        let file_path = &line[3..];
+
+        // Handle renamed files (format: "R  old -> new")
+        let actual_path = if file_path.contains(" -> ") {
+            file_path.split(" -> ").last().unwrap_or(file_path)
+        } else {
+            file_path
+        };
+
+        let full_path = Path::new(&git_root).join(actual_path);
+        let full_path_str = full_path.to_string_lossy().to_string();
+
+        let status = match status_chars {
+            "??" => "untracked",
+            "A " | "AM" | "AD" => "new",
+            "M " | " M" | "MM" | "MD" => "modified",
+            "D " | " D" => "deleted",
+            "R " | "RM" | "RD" => "renamed",
+            "C " | "CM" | "CD" => "copied",
+            "UU" | "AA" | "DD" | "AU" | "UA" | "DU" | "UD" => "conflict",
+            _ => "modified", // Default to modified for other statuses
+        };
+
+        files.push(GitFileStatus {
+            path: full_path_str,
+            status: status.to_string(),
+        });
+    }
+
+    Ok(GitStatusResult { git_root, files })
 }
 
 #[tauri::command]

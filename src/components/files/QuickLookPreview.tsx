@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Loader2, File } from "lucide-react";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
-import { IconButton } from "@/components/ui/IconButton";
+import { IconButton, ScrollArea } from "@/components/ui";
 import type { FileNode } from "@/types";
 
 interface QuickLookPreviewProps {
@@ -67,37 +67,39 @@ export function QuickLookPreview({ file, onClose }: QuickLookPreviewProps) {
         </IconButton>
       </div>
 
-      <div className="flex-1 overflow-auto p-3">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="w-6 h-6 text-text-secondary animate-spin" />
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center h-full text-accent-red text-sm">
-            <p>Failed to load preview</p>
-            <p className="text-xs text-text-secondary mt-1">{error}</p>
-          </div>
-        ) : previewType === "image" ? (
-          <div className="flex items-center justify-center h-full">
-            <img
-              src={convertFileSrc(file.path)}
-              alt={file.name}
-              className="max-w-full max-h-full object-contain rounded"
-              onError={() => setError("Failed to load image")}
-            />
-          </div>
-        ) : previewType === "text" && content ? (
-          <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap break-words">
-            {content}
-          </pre>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-text-secondary">
-            <File className="w-12 h-12 mb-2 opacity-50" />
-            <p className="text-sm">No preview available</p>
-            <p className="text-xs mt-1">{file.name}</p>
-          </div>
-        )}
-      </div>
+      <ScrollArea className="flex-1">
+        <div className="p-3">
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="w-6 h-6 text-text-secondary animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-full text-accent-red text-sm">
+              <p>Failed to load preview</p>
+              <p className="text-xs text-text-secondary mt-1">{error}</p>
+            </div>
+          ) : previewType === "image" ? (
+            <div className="flex items-center justify-center h-full">
+              <img
+                src={convertFileSrc(file.path)}
+                alt={file.name}
+                className="max-w-full max-h-full object-contain rounded"
+                onError={() => setError("Failed to load image")}
+              />
+            </div>
+          ) : previewType === "text" && content ? (
+            <pre className="text-xs text-text-secondary font-mono whitespace-pre-wrap break-words">
+              {content}
+            </pre>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-text-secondary">
+              <File className="w-12 h-12 mb-2 opacity-50" />
+              <p className="text-sm">No preview available</p>
+              <p className="text-xs mt-1">{file.name}</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
       <div className="px-3 py-2 border-t border-border text-xs text-text-secondary">
         <div className="truncate font-mono">{file.path}</div>

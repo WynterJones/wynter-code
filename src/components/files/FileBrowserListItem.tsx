@@ -1,6 +1,10 @@
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
 import type { FileNode } from "@/types";
+import {
+  type GitFileStatusType,
+  getGitStatusColor,
+} from "@/hooks/useGitStatus";
 
 interface FileBrowserListItemProps {
   node: FileNode;
@@ -8,6 +12,7 @@ interface FileBrowserListItemProps {
   onSelect: (node: FileNode) => void;
   onOpen: (node: FileNode) => void;
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void;
+  gitStatus?: GitFileStatusType;
 }
 
 function formatFileSize(bytes?: number): string {
@@ -23,7 +28,10 @@ export function FileBrowserListItem({
   onSelect,
   onOpen,
   onContextMenu,
+  gitStatus,
 }: FileBrowserListItemProps) {
+  const gitStatusColorClass = getGitStatusColor(gitStatus);
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSelect(node);
@@ -57,7 +65,9 @@ export function FileBrowserListItem({
         isDirectory={node.isDirectory}
         isExpanded={false}
       />
-      <span className="flex-1 truncate text-sm">{node.name}</span>
+      <span className={cn("flex-1 truncate text-sm", gitStatusColorClass)}>
+        {node.name}
+      </span>
       {node.size !== undefined && !node.isDirectory && (
         <span className="text-xs text-text-secondary">
           {formatFileSize(node.size)}

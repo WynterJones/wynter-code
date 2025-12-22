@@ -1,24 +1,61 @@
+import { useMemo } from "react";
 import { FileBrowserListItem } from "./FileBrowserListItem";
 import { Loader2 } from "lucide-react";
+import { ScrollArea } from "@/components/ui";
 import type { FileNode } from "@/types";
+import { type GitStatusMap, type GitFileStatusType } from "@/hooks/useGitStatus";
 
 interface FileBrowserListProps {
   files: FileNode[];
   selectedFile: FileNode | null;
   loading: boolean;
+  showHiddenFiles: boolean;
   onSelect: (file: FileNode) => void;
   onOpen: (file: FileNode) => void;
   onContextMenu: (e: React.MouseEvent, file: FileNode) => void;
+  gitStatusMap?: GitStatusMap;
 }
 
 export function FileBrowserList({
   files,
   selectedFile,
   loading,
+  showHiddenFiles,
   onSelect,
   onOpen,
   onContextMenu,
+  gitStatusMap,
 }: FileBrowserListProps) {
+  // Helper to get status for a node (file or directory)
+  const getNodeStatus = useMemo(() => {
+    if (!gitStatusMap) return () => undefined;
+
+    return (node: FileNode): GitFileStatusType | undefined => {
+      if (!node.isDirectory) {
+        return gitStatusMap.get(node.path);
+      }
+
+      // For directories, check children
+      let hasModified = false;
+      let hasNew = false;
+
+      for (const [path, status] of gitStatusMap) {
+        if (path.startsWith(node.path + "/")) {
+          if (status === "conflict") return "conflict";
+          if (status === "modified" || status === "deleted" || status === "renamed") {
+            hasModified = true;
+          }
+          if (status === "untracked" || status === "new") {
+            hasNew = true;
+          }
+        }
+      }
+
+      if (hasModified) return "modified";
+      if (hasNew) return "untracked";
+      return undefined;
+    };
+  }, [gitStatusMap]);
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -35,14 +72,18 @@ export function FileBrowserList({
     );
   }
 
-  const sortedFiles = [...files].sort((a, b) => {
+  const filteredFiles = showHiddenFiles
+    ? files
+    : files.filter((f) => !f.name.startsWith("."));
+
+  const sortedFiles = [...filteredFiles].sort((a, b) => {
     if (a.isDirectory && !b.isDirectory) return -1;
     if (!a.isDirectory && b.isDirectory) return 1;
     return a.name.localeCompare(b.name);
   });
 
   return (
-    <div className="flex-1 overflow-y-auto min-h-0">
+    <ScrollArea className="flex-1 min-h-0">
       <div className="pb-1">
         {sortedFiles.map((file) => (
           <FileBrowserListItem
@@ -52,9 +93,10 @@ export function FileBrowserList({
             onSelect={onSelect}
             onOpen={onOpen}
             onContextMenu={onContextMenu}
+            gitStatus={getNodeStatus(file)}
           />
         ))}
       </div>
-    </div>
+    </ScrollArea>
   );
 }

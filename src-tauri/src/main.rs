@@ -152,6 +152,8 @@ fn main() {
             commands::delete_to_trash,
             commands::move_item,
             commands::get_home_dir,
+            commands::scan_music_folder,
+            commands::get_git_status,
             commands::check_node_modules_exists,
             commands::get_directory_stats,
             commands::check_system_requirements,

@@ -5,17 +5,17 @@ export default {
     extend: {
       colors: {
         bg: {
-          primary: "#1e1e2e",
-          secondary: "#181825",
-          tertiary: "#11111b",
-          hover: "#313244",
+          primary: "#141420",
+          secondary: "#0f0f18",
+          tertiary: "#0a0a10",
+          hover: "#252535",
         },
         text: {
           primary: "#cdd6f4",
           secondary: "#a6adc8",
           accent: "#89b4fa",
         },
-        border: "#45475a",
+        border: "#2a2a3a",
         accent: {
           DEFAULT: "#cba6f7",
           purple: "#cba6f7",

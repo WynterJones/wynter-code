@@ -6,6 +6,7 @@ import { FileTreeToolbar } from "./FileTreeToolbar";
 import { ContextMenu, buildFileContextMenuItems } from "./ContextMenu";
 import { FileDialog } from "./FileDialog";
 import { useFileOperations } from "@/hooks/useFileOperations";
+import { useGitStatus } from "@/hooks/useGitStatus";
 import type { FileNode } from "@/types";
 
 interface FileTreeProps {
@@ -35,6 +36,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const [dialog, setDialog] = useState<DialogState | null>(null);
 
   const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
+  const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
 
   const loadFiles = useCallback(async () => {
     try {
@@ -111,6 +113,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     try {
       await deleteToTrash(node.path);
       await loadFiles();
+      refetchGitStatus();
     } catch (err) {
       console.error("Failed to delete:", err);
     }
@@ -120,6 +123,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     try {
       await moveItem(sourcePath, destinationFolder);
       await loadFiles();
+      refetchGitStatus();
     } catch (err) {
       console.error("Failed to move item:", err);
     }
@@ -137,6 +141,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         await createFolder(dialog.parentPath, name);
       }
       await loadFiles();
+      refetchGitStatus();
     } catch (err) {
       console.error("File operation failed:", err);
     }
@@ -205,6 +210,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
               onContextMenu={handleContextMenu}
               onNodeModulesClick={onNodeModulesClick}
               onMoveItem={handleMoveItem}
+              gitStatusMap={gitStatusMap}
             />
           ))}
         </div>

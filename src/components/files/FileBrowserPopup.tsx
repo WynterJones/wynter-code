@@ -8,6 +8,7 @@ import { QuickLookPreview } from "./QuickLookPreview";
 import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 import { FileDialog } from "./FileDialog";
 import { useFileOperations } from "@/hooks/useFileOperations";
+import { useGitStatus } from "@/hooks/useGitStatus";
 import { FilePlus, FolderPlus, FolderOpen, Copy, Eye, Pencil, Trash2, ImagePlus } from "lucide-react";
 import type { FileNode } from "@/types";
 
@@ -23,6 +24,7 @@ interface FileBrowserPopupProps {
   onClose: () => void;
   initialPath?: string;
   mode: "selectProject" | "browse";
+  selectButtonLabel?: string;
   onSelectProject?: (path: string) => void;
   onSendToPrompt?: (image: ImageAttachment) => void;
 }
@@ -53,6 +55,7 @@ export function FileBrowserPopup({
   onClose,
   initialPath,
   mode,
+  selectButtonLabel,
   onSelectProject,
   onSendToPrompt,
 }: FileBrowserPopupProps) {
@@ -63,11 +66,15 @@ export function FileBrowserPopup({
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [showQuickLook, setShowQuickLook] = useState(false);
+  const [showHiddenFiles, setShowHiddenFiles] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [homeDir, setHomeDir] = useState<string>("");
 
   const { createFile, createFolder, renameItem, deleteToTrash } = useFileOperations();
+  const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(
+    isOpen ? currentPath : undefined
+  );
 
   useEffect(() => {
     if (isOpen) {
@@ -217,6 +224,7 @@ export function FileBrowserPopup({
         await renameItem(dialog.currentPath, name);
       }
       await loadDirectory(currentPath);
+      refetchGitStatus();
     } catch (err) {
       console.error("File operation failed:", err);
     }
@@ -307,6 +315,7 @@ export function FileBrowserPopup({
         action: async () => {
           await deleteToTrash(node.path);
           await loadDirectory(currentPath);
+          refetchGitStatus();
         },
         variant: "danger",
         separator: true,
@@ -362,7 +371,10 @@ export function FileBrowserPopup({
   }, [isOpen, selectedFile, goUp, goBack, goForward, handleOpen, handleCopyPath]);
 
   const selectPrevious = () => {
-    const sortedFiles = [...files].sort((a, b) => {
+    const filteredFiles = showHiddenFiles
+      ? files
+      : files.filter((f) => !f.name.startsWith("."));
+    const sortedFiles = [...filteredFiles].sort((a, b) => {
       if (a.isDirectory && !b.isDirectory) return -1;
       if (!a.isDirectory && b.isDirectory) return 1;
       return a.name.localeCompare(b.name);
@@ -380,7 +392,10 @@ export function FileBrowserPopup({
   };
 
   const selectNext = () => {
-    const sortedFiles = [...files].sort((a, b) => {
+    const filteredFiles = showHiddenFiles
+      ? files
+      : files.filter((f) => !f.name.startsWith("."));
+    const sortedFiles = [...filteredFiles].sort((a, b) => {
       if (a.isDirectory && !b.isDirectory) return -1;
       if (!a.isDirectory && b.isDirectory) return 1;
       return a.name.localeCompare(b.name);
@@ -418,11 +433,13 @@ export function FileBrowserPopup({
           currentPath={currentPath}
           canGoBack={historyIndex > 0}
           canGoForward={historyIndex < history.length - 1}
+          showHiddenFiles={showHiddenFiles}
           onGoBack={goBack}
           onGoForward={goForward}
           onGoUp={goUp}
           onNavigateTo={navigateTo}
           onGoHome={goHome}
+          onToggleHiddenFiles={() => setShowHiddenFiles((prev) => !prev)}
         />
 
         <div className="flex-1 flex min-h-0 overflow-hidden relative">
@@ -430,9 +447,11 @@ export function FileBrowserPopup({
             files={files}
             selectedFile={selectedFile}
             loading={loading}
+            showHiddenFiles={showHiddenFiles}
             onSelect={handleSelect}
             onOpen={handleOpen}
             onContextMenu={handleContextMenu}
+            gitStatusMap={gitStatusMap}
           />
 
           {showQuickLook && selectedFile && (
@@ -447,6 +466,7 @@ export function FileBrowserPopup({
           selectedFile={selectedFile}
           mode={mode}
           showQuickLook={showQuickLook}
+          selectButtonLabel={selectButtonLabel}
           onCopyPath={handleCopyPath}
           onToggleQuickLook={() => setShowQuickLook((prev) => !prev)}
           onSendToPrompt={handleSendToPrompt}

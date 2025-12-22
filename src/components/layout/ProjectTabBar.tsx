@@ -4,15 +4,11 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { IconButton, Tooltip } from "@/components/ui";
 import { useProjectStore } from "@/stores/projectStore";
-import { useSessionStore } from "@/stores/sessionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { ModelSelector } from "@/components/model/ModelSelector";
-import { PermissionModeToggle } from "@/components/session";
 import { SubscriptionButton } from "@/components/subscriptions";
 import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
-import type { PermissionMode } from "@/types";
 
 const PROJECT_COLORS = [
   "#cba6f7", // Purple
@@ -54,15 +50,6 @@ export function ProjectTabBar({
     updateProjectColor,
     getProject,
   } = useProjectStore();
-
-  const {
-    activeSessionId,
-    getSession,
-    updateSessionPermissionMode,
-  } = useSessionStore();
-
-  const activeId = activeProjectId ? activeSessionId.get(activeProjectId) : undefined;
-  const activeSession = activeId ? getSession(activeId) : undefined;
 
   const isMeditating = useMeditationStore((s) => s.isActive);
   const setMeditationActive = useMeditationStore((s) => s.setActive);
@@ -145,12 +132,6 @@ export function ProjectTabBar({
   const scrollRight = () => {
     if (scrollContainerRef.current) {
       scrollContainerRef.current.scrollBy({ left: 150, behavior: "smooth" });
-    }
-  };
-
-  const handleModeChange = (mode: PermissionMode) => {
-    if (activeId) {
-      updateSessionPermissionMode(activeId, mode);
     }
   };
 
@@ -392,15 +373,8 @@ export function ProjectTabBar({
           isMeditating && "opacity-30 hover:opacity-100"
         )}
       >
-        <ModelSelector />
         {onOpenSubscriptions && (
           <SubscriptionButton onOpenManage={onOpenSubscriptions} />
-        )}
-        {activeSession && (
-          <PermissionModeToggle
-            mode={activeSession.permissionMode || "default"}
-            onChange={handleModeChange}
-          />
         )}
         <Tooltip content="Settings" side="bottom">
           <IconButton size="sm" onClick={onOpenSettings}>

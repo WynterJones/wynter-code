@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import { TRACK_COUNT, getRandomTrackIndex } from "@/components/meditation/tracks";
+import {
+  Track,
+  BUILT_IN_TRACKS,
+  getRandomTrackIndex,
+} from "@/components/meditation/tracks";
 
 interface MeditationState {
   isActive: boolean;
@@ -7,6 +11,8 @@ interface MeditationState {
   currentTrack: number;
   isPlaying: boolean;
   volume: number;
+  tracks: Track[];
+
   setActive: (active: boolean) => void;
   setMiniPlayerVisible: (visible: boolean) => void;
   setTrack: (track: number) => void;
@@ -16,19 +22,21 @@ interface MeditationState {
   setPlaying: (playing: boolean) => void;
   setVolume: (vol: number) => void;
   closeMiniPlayer: () => void;
+  setTracks: (tracks: Track[]) => void;
+  resetToBuiltIn: () => void;
 }
 
 export const useMeditationStore = create<MeditationState>((set, get) => ({
   isActive: false,
   miniPlayerVisible: false,
-  currentTrack: getRandomTrackIndex(),
+  currentTrack: getRandomTrackIndex(BUILT_IN_TRACKS.length),
   isPlaying: false,
   volume: 1.0,
+  tracks: BUILT_IN_TRACKS,
 
   setActive: (active) => {
     const { isPlaying } = get();
     if (!active && isPlaying) {
-      // Closing meditation while playing - show mini player
       set({ isActive: false, miniPlayerVisible: true });
     } else {
       set({ isActive: active });
@@ -41,12 +49,13 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
 
   nextTrack: () =>
     set((state) => ({
-      currentTrack: (state.currentTrack + 1) % TRACK_COUNT,
+      currentTrack: (state.currentTrack + 1) % state.tracks.length,
     })),
 
   prevTrack: () =>
     set((state) => ({
-      currentTrack: (state.currentTrack - 1 + TRACK_COUNT) % TRACK_COUNT,
+      currentTrack:
+        (state.currentTrack - 1 + state.tracks.length) % state.tracks.length,
     })),
 
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
@@ -56,4 +65,17 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
   setVolume: (vol) => set({ volume: Math.max(0, Math.min(1, vol)) }),
 
   closeMiniPlayer: () => set({ miniPlayerVisible: false, isPlaying: false }),
+
+  setTracks: (tracks) =>
+    set({
+      tracks,
+      currentTrack:
+        tracks.length > 0 ? getRandomTrackIndex(tracks.length) : 0,
+    }),
+
+  resetToBuiltIn: () =>
+    set({
+      tracks: BUILT_IN_TRACKS,
+      currentTrack: getRandomTrackIndex(BUILT_IN_TRACKS.length),
+    }),
 }));

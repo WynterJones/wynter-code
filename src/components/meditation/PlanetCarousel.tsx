@@ -8,6 +8,9 @@ import {
   Saturn,
   Uranus,
   Neptune,
+  Serenity,
+  Wisdom,
+  Harmony,
 } from "./planets";
 
 interface Planet {
@@ -24,6 +27,9 @@ const PLANETS: Planet[] = [
   { name: "Saturn", Component: Saturn },
   { name: "Uranus", Component: Uranus },
   { name: "Neptune", Component: Neptune },
+  { name: "Serenity", Component: Serenity },
+  { name: "Wisdom", Component: Wisdom },
+  { name: "Harmony", Component: Harmony },
 ];
 
 const IDLE_DURATION = 55000; // 55 seconds at center

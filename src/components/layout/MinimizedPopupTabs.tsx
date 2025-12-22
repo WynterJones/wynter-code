@@ -23,25 +23,25 @@ export function MinimizedPopupTabs({ projectId }: MinimizedPopupTabsProps) {
   };
 
   return (
-    <div className="fixed bottom-4 left-4 z-40 flex items-center gap-2">
+    <div className="fixed bottom-3 left-3 z-40 flex items-center gap-1.5">
       {minimizedPopups.map((popup) => (
         <Tooltip key={popup.id} content={popup.filePath} side="top">
           <button
             onClick={() => handleRestore(popup.id)}
             className={cn(
-              "group flex items-center gap-2 px-3 py-2 rounded-lg",
+              "group flex items-center gap-1.5 px-2 py-1 rounded",
               "bg-bg-secondary border border-border",
               "hover:bg-bg-hover hover:border-accent/50",
               "transition-all duration-150",
-              "shadow-lg"
+              "text-xs"
             )}
           >
             {popup.type === "markdown" ? (
-              <FileText className="w-4 h-4 text-accent-blue" />
+              <FileText className="w-3.5 h-3.5 text-accent-blue" />
             ) : (
-              <FileCode className="w-4 h-4 text-accent-green" />
+              <FileCode className="w-3.5 h-3.5 text-accent-green" />
             )}
-            <span className="text-sm text-text-primary max-w-[120px] truncate">
+            <span className="text-text-primary max-w-[100px] truncate">
               {popup.fileName}
             </span>
             <button
@@ -52,7 +52,7 @@ export function MinimizedPopupTabs({ projectId }: MinimizedPopupTabsProps) {
                 "transition-opacity"
               )}
             >
-              <X className="w-3 h-3" />
+              <X className="w-2.5 h-2.5" />
             </button>
           </button>
         </Tooltip>

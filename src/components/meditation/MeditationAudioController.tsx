@@ -1,6 +1,7 @@
 import { useRef, useEffect } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useMeditationStore } from "@/stores/meditationStore";
-import { TRACKS, getRandomTrackIndex } from "./tracks";
+import { getRandomTrackIndex } from "./tracks";
 
 /**
  * Persistent audio controller that lives in AppShell.
@@ -16,11 +17,17 @@ export function MeditationAudioController() {
     currentTrack,
     isPlaying,
     volume,
+    tracks,
     setPlaying,
+    setTrack,
   } = useMeditationStore();
 
-  const track = TRACKS[currentTrack];
-  const audioSrc = `/audio/meditation/${track.file}`;
+  const track = tracks[currentTrack] || tracks[0];
+
+  const audioSrc =
+    track?.isCustom && track.path
+      ? convertFileSrc(track.path)
+      : `/audio/meditation/${track?.file || ""}`;
 
   // Should audio be active at all?
   const shouldBeActive = isActive || miniPlayerVisible;
@@ -63,12 +70,12 @@ export function MeditationAudioController() {
 
   // Pick random next track when song ends
   const handleEnded = () => {
-    const next = getRandomTrackIndex(currentTrack);
-    useMeditationStore.getState().setTrack(next);
+    const next = getRandomTrackIndex(tracks.length, currentTrack);
+    setTrack(next);
   };
 
   // Only render audio element when needed
-  if (!shouldBeActive) return null;
+  if (!shouldBeActive || !track) return null;
 
   return (
     <audio

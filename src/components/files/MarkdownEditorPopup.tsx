@@ -2,10 +2,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { X, Save, RotateCcw, Eye, Code, Columns, Minus } from "lucide-react";
+import { X, Save, RotateCcw, Eye, Code, Columns, Minus, Search, ChevronUp, ChevronDown } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
-import { IconButton, Tooltip, Badge } from "@/components/ui";
+import { IconButton, Tooltip, Badge, ScrollArea } from "@/components/ui";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { defineMonacoThemes } from "@/hooks/useMonacoTheme";
 
@@ -47,6 +47,10 @@ export function MarkdownEditorPopup({
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFindBar, setShowFindBar] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
+  const [matchCount, setMatchCount] = useState(0);
 
   const { editorTheme, editorFontSize, editorWordWrap, markdownDefaultView } =
     useSettingsStore();
@@ -55,6 +59,8 @@ export function MarkdownEditorPopup({
 
   const fileName = filePath.split("/").pop() || filePath;
   const checkboxIndexRef = useRef(0);
+  const previewRef = useRef<HTMLElement>(null);
+  const findInputRef = useRef<HTMLInputElement>(null);
 
   // Handle checkbox toggle in preview
   const handleCheckboxToggle = useCallback((index: number) => {
@@ -117,10 +123,130 @@ export function MarkdownEditorPopup({
     setHasChanges(false);
   };
 
+  // Find in preview functionality
+  const highlightMatches = useCallback(() => {
+    if (!previewRef.current) return;
+
+    // Remove existing highlights
+    const existingMarks = previewRef.current.querySelectorAll("mark.search-highlight");
+    existingMarks.forEach((mark) => {
+      const parent = mark.parentNode;
+      if (parent) {
+        parent.replaceChild(document.createTextNode(mark.textContent || ""), mark);
+        parent.normalize();
+      }
+    });
+
+    if (!searchQuery.trim()) {
+      setMatchCount(0);
+      setCurrentMatchIndex(0);
+      return;
+    }
+
+    const walker = document.createTreeWalker(
+      previewRef.current,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    const textNodes: Text[] = [];
+    let node;
+    while ((node = walker.nextNode())) {
+      textNodes.push(node as Text);
+    }
+
+    let count = 0;
+    const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+
+    textNodes.forEach((textNode) => {
+      const text = textNode.textContent || "";
+      if (regex.test(text)) {
+        const fragment = document.createDocumentFragment();
+        let lastIndex = 0;
+        text.replace(regex, (match, _p1, offset) => {
+          if (offset > lastIndex) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex, offset)));
+          }
+          const mark = document.createElement("mark");
+          mark.className = "search-highlight bg-accent-yellow/40 rounded px-0.5";
+          mark.textContent = match;
+          mark.dataset.matchIndex = String(count);
+          count++;
+          fragment.appendChild(mark);
+          lastIndex = offset + match.length;
+          return match;
+        });
+        if (lastIndex < text.length) {
+          fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+        }
+        textNode.parentNode?.replaceChild(fragment, textNode);
+      }
+    });
+
+    setMatchCount(count);
+    if (count > 0 && currentMatchIndex >= count) {
+      setCurrentMatchIndex(0);
+    }
+  }, [searchQuery, currentMatchIndex]);
+
+  const scrollToMatch = useCallback((index: number) => {
+    if (!previewRef.current) return;
+    const marks = previewRef.current.querySelectorAll("mark.search-highlight");
+    marks.forEach((mark, i) => {
+      if (i === index) {
+        mark.classList.add("!bg-accent/60");
+        mark.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        mark.classList.remove("!bg-accent/60");
+      }
+    });
+  }, []);
+
+  const goToNextMatch = useCallback(() => {
+    if (matchCount === 0) return;
+    const nextIndex = (currentMatchIndex + 1) % matchCount;
+    setCurrentMatchIndex(nextIndex);
+    scrollToMatch(nextIndex);
+  }, [currentMatchIndex, matchCount, scrollToMatch]);
+
+  const goToPrevMatch = useCallback(() => {
+    if (matchCount === 0) return;
+    const prevIndex = (currentMatchIndex - 1 + matchCount) % matchCount;
+    setCurrentMatchIndex(prevIndex);
+    scrollToMatch(prevIndex);
+  }, [currentMatchIndex, matchCount, scrollToMatch]);
+
+  useEffect(() => {
+    if (showFindBar && searchQuery) {
+      const timeout = setTimeout(() => {
+        highlightMatches();
+      }, 150);
+      return () => clearTimeout(timeout);
+    }
+  }, [searchQuery, showFindBar, highlightMatches]);
+
+  useEffect(() => {
+    if (showFindBar && matchCount > 0) {
+      scrollToMatch(currentMatchIndex);
+    }
+  }, [currentMatchIndex, matchCount, showFindBar, scrollToMatch]);
+
+  useEffect(() => {
+    if (showFindBar && findInputRef.current) {
+      findInputRef.current.focus();
+      findInputRef.current.select();
+    }
+  }, [showFindBar]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        if (showFindBar) {
+          setShowFindBar(false);
+          setSearchQuery("");
+        } else {
+          onClose();
+        }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
@@ -128,8 +254,14 @@ export function MarkdownEditorPopup({
           handleSave();
         }
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+        if (viewMode === "preview" || viewMode === "split") {
+          e.preventDefault();
+          setShowFindBar(true);
+        }
+      }
     },
-    [onClose, hasChanges]
+    [onClose, hasChanges, showFindBar, viewMode]
   );
 
   useEffect(() => {
@@ -140,8 +272,11 @@ export function MarkdownEditorPopup({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
       <div className="w-full h-full max-w-[calc(100vw-40px)] max-h-[calc(100vh-40px)] bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary">
+        {/* Header - Drags the window */}
+        <div
+          data-tauri-drag-region
+          className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary cursor-grab active:cursor-grabbing"
+        >
           <div className="flex items-center gap-3">
             <span className="font-mono text-sm text-text-primary">
               {fileName}
@@ -288,11 +423,61 @@ export function MarkdownEditorPopup({
               {(viewMode === "preview" || viewMode === "split") && (
                 <div
                   className={cn(
-                    "h-full overflow-auto p-6 bg-bg-tertiary",
+                    "h-full bg-bg-tertiary flex flex-col",
                     viewMode === "split" ? "w-1/2" : "w-full"
                   )}
                 >
-                  <article className="markdown-preview max-w-[700px] mx-auto">
+                  {/* Find Bar */}
+                  {showFindBar && (
+                    <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-secondary">
+                      <Search className="w-4 h-4 text-text-secondary" />
+                      <input
+                        ref={findInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.shiftKey ? goToPrevMatch() : goToNextMatch();
+                          }
+                          if (e.key === "Escape") {
+                            setShowFindBar(false);
+                            setSearchQuery("");
+                          }
+                        }}
+                        placeholder="Find in preview..."
+                        className="flex-1 px-2 py-1 text-sm bg-bg-tertiary border border-border rounded text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:ring-1 focus:ring-accent"
+                      />
+                      <span className="text-xs text-text-secondary min-w-[60px] text-center">
+                        {matchCount > 0 ? `${currentMatchIndex + 1}/${matchCount}` : "No results"}
+                      </span>
+                      <button
+                        onClick={goToPrevMatch}
+                        disabled={matchCount === 0}
+                        className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={goToNextMatch}
+                        disabled={matchCount === 0}
+                        className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <ChevronDown className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowFindBar(false);
+                          setSearchQuery("");
+                        }}
+                        className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  <ScrollArea className="flex-1">
+                    <article ref={previewRef} className="markdown-preview max-w-[700px] mx-auto p-6">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{
@@ -343,7 +528,8 @@ export function MarkdownEditorPopup({
                         return content;
                       })()}
                     </ReactMarkdown>
-                  </article>
+                    </article>
+                  </ScrollArea>
                 </div>
               )}
             </>

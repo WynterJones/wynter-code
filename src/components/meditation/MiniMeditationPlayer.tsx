@@ -2,7 +2,6 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { Play, Pause, SkipBack, SkipForward, X, GripHorizontal } from "lucide-react";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { cn } from "@/lib/utils";
-import { TRACKS } from "./tracks";
 
 export function MiniMeditationPlayer() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -12,6 +11,7 @@ export function MiniMeditationPlayer() {
     miniPlayerVisible,
     currentTrack,
     isPlaying,
+    tracks,
     nextTrack,
     prevTrack,
     togglePlay,
@@ -24,7 +24,7 @@ export function MiniMeditationPlayer() {
   const dragStart = useRef({ x: 0, y: 0 });
   const positionStart = useRef({ x: 0, y: 0 });
 
-  const track = TRACKS[currentTrack];
+  const track = tracks[currentTrack] || tracks[0];
 
   // Drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -63,7 +63,7 @@ export function MiniMeditationPlayer() {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Only show when not in meditation mode but mini player is visible
-  if (isActive || !miniPlayerVisible) return null;
+  if (isActive || !miniPlayerVisible || !track) return null;
 
   return (
     <div

@@ -1,17 +1,20 @@
 import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight, ChevronUp, Home } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronUp, Home, Eye, EyeOff } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
 
 interface FileBrowserHeaderProps {
   currentPath: string;
   canGoBack: boolean;
   canGoForward: boolean;
+  showHiddenFiles: boolean;
   onGoBack: () => void;
   onGoForward: () => void;
   onGoUp: () => void;
   onNavigateTo: (path: string) => void;
   onGoHome: () => void;
+  onToggleHiddenFiles: () => void;
 }
 
 function getBreadcrumbs(path: string) {
@@ -26,11 +29,13 @@ export function FileBrowserHeader({
   currentPath,
   canGoBack,
   canGoForward,
+  showHiddenFiles,
   onGoBack,
   onGoForward,
   onGoUp,
   onNavigateTo,
   onGoHome,
+  onToggleHiddenFiles,
 }: FileBrowserHeaderProps) {
   const [isEditingPath, setIsEditingPath] = useState(false);
   const [pathInputValue, setPathInputValue] = useState(currentPath);
@@ -80,6 +85,16 @@ export function FileBrowserHeader({
         <IconButton size="sm" onClick={onGoHome}>
           <Home className="w-4 h-4" />
         </IconButton>
+        <div className="w-px h-4 bg-border mx-1" />
+        <Tooltip content={showHiddenFiles ? "Hide Dot Files" : "Show Dot Files"} side="bottom">
+          <IconButton
+            size="sm"
+            onClick={onToggleHiddenFiles}
+            className={showHiddenFiles ? "text-accent" : ""}
+          >
+            {showHiddenFiles ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </IconButton>
+        </Tooltip>
       </div>
 
       <div className="flex-1 flex items-center min-w-0">

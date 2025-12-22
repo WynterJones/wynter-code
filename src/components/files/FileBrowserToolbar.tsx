@@ -8,6 +8,7 @@ interface FileBrowserToolbarProps {
   selectedFile: FileNode | null;
   mode: "selectProject" | "browse";
   showQuickLook: boolean;
+  selectButtonLabel?: string;
   onCopyPath: () => void;
   onToggleQuickLook: () => void;
   onSendToPrompt: () => void;
@@ -28,6 +29,7 @@ export function FileBrowserToolbar({
   selectedFile,
   mode,
   showQuickLook,
+  selectButtonLabel = "Open as Project",
   onCopyPath,
   onToggleQuickLook,
   onSendToPrompt,
@@ -60,7 +62,7 @@ export function FileBrowserToolbar({
         </Button>
         <Button
           size="sm"
-          variant={showQuickLook ? "secondary" : "ghost"}
+          variant={showQuickLook ? "default" : "ghost"}
           onClick={onToggleQuickLook}
           disabled={!selectedFile}
         >
@@ -78,7 +80,7 @@ export function FileBrowserToolbar({
         {showOpenAsProject && (
           <Button size="sm" variant="primary" onClick={onSelectProject}>
             <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
-            Open as Project
+            {selectButtonLabel}
           </Button>
         )}
       </div>

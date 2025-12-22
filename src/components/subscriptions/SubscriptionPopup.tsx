@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, CreditCard, Tag, Plus, Search, Download, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { IconButton, Tooltip } from "@/components/ui";
+import { IconButton, Tooltip, ScrollArea } from "@/components/ui";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { SubscriptionCard } from "./SubscriptionCard";
@@ -157,8 +157,11 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
         <div className="w-full max-w-4xl h-[600px] max-h-[80vh] bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary">
+          {/* Header - Drags the window */}
+          <div
+            data-tauri-drag-region
+            className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary cursor-grab active:cursor-grabbing"
+          >
             <span className="font-medium text-text-primary">Subscriptions</span>
             <Tooltip content="Close (Esc)" side="bottom">
               <IconButton size="sm" onClick={onClose}>
@@ -276,7 +279,8 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
                   </div>
 
                   {/* Subscription List */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <ScrollArea className="flex-1">
+                    <div className="p-4 space-y-4">
                     {filteredCategorizedSubs.length === 0 && inactiveSubscriptions.length === 0 ? (
                       <div className="text-center py-12">
                         <CreditCard className="w-12 h-12 mx-auto mb-4 text-text-secondary opacity-50" />
@@ -347,14 +351,17 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
                         )}
                       </>
                     )}
-                  </div>
+                    </div>
+                  </ScrollArea>
                 </>
               )}
 
               {activeTab === "categories" && (
-                <div className="flex-1 overflow-y-auto p-4">
-                  <CategoryManager />
-                </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-4">
+                    <CategoryManager />
+                  </div>
+                </ScrollArea>
               )}
             </div>
           </div>

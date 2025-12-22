@@ -81,7 +81,10 @@ export function FileDialog({ type, initialValue = "", onConfirm, onCancel }: Fil
         className="bg-bg-secondary border border-border rounded-lg shadow-xl w-80"
         onKeyDown={handleKeyDown}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div
+          data-tauri-drag-region
+          className="flex items-center justify-between px-4 py-3 border-b border-border cursor-grab active:cursor-grabbing"
+        >
           <div className="flex items-center gap-2">
             <Icon className="w-4 h-4 text-accent" />
             <span className="text-sm font-medium text-text-primary">{getTitle()}</span>

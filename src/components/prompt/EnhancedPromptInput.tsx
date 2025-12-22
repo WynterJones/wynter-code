@@ -19,7 +19,18 @@ import { ImageThumbnails, type ImageAttachment } from "./ImageThumbnail";
 import { FileTagBadges, type FileReference } from "./FileTagBadge";
 import { FilePickerDropdown } from "./FilePickerDropdown";
 
-const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "avif"];
+const IMAGE_EXTENSIONS = [
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "svg",
+  "ico",
+  "bmp",
+  "tiff",
+  "avif",
+];
 
 function isImageFile(filename: string): boolean {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
@@ -66,7 +77,10 @@ export function EnhancedPromptInput({
   const [files, setFiles] = useState<FileReference[]>([]);
   const [showFilePicker, setShowFilePicker] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState("");
-  const [filePickerPosition, setFilePickerPosition] = useState({ top: 0, left: 0 });
+  const [filePickerPosition, setFilePickerPosition] = useState({
+    top: 0,
+    left: 0,
+  });
   const [isDragging, setIsDragging] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -106,6 +120,15 @@ export function EnhancedPromptInput({
       onImageConsumed?.();
     }
   }, [pendingImage, onImageConsumed]);
+
+  // Listen for global focus-prompt event (keyboard shortcut)
+  useEffect(() => {
+    const handleFocusPrompt = () => {
+      inputRef.current?.focus();
+    };
+    window.addEventListener("focus-prompt", handleFocusPrompt);
+    return () => window.removeEventListener("focus-prompt", handleFocusPrompt);
+  }, []);
 
   const handlePaste = useCallback((e: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -154,13 +177,19 @@ export function EnhancedPromptInput({
     const wynterData = e.dataTransfer?.getData("application/x-wynter-file");
     if (wynterData) {
       try {
-        const fileInfo = JSON.parse(wynterData) as { path: string; name: string; isDirectory: boolean };
+        const fileInfo = JSON.parse(wynterData) as {
+          path: string;
+          name: string;
+          isDirectory: boolean;
+        };
 
         if (fileInfo.isDirectory) return; // Don't handle directories
 
         if (isImageFile(fileInfo.name)) {
           // Read image as base64 via Tauri
-          const base64 = await invoke<string>("read_file_base64", { path: fileInfo.path });
+          const base64 = await invoke<string>("read_file_base64", {
+            path: fileInfo.path,
+          });
           const mimeType = getMimeType(fileInfo.name);
           setImages((prev) => [
             ...prev,
@@ -243,7 +272,7 @@ export function EnhancedPromptInput({
         setFileSearchQuery("");
       }
     },
-    []
+    [],
   );
 
   const handleFileSelect = useCallback(
@@ -277,7 +306,7 @@ export function EnhancedPromptInput({
 
       setTimeout(() => inputRef.current?.focus(), 0);
     },
-    [prompt]
+    [prompt],
   );
 
   const handleRemoveImage = useCallback((id: string) => {
@@ -289,13 +318,18 @@ export function EnhancedPromptInput({
   }, []);
 
   const handleSubmit = async () => {
-    if ((!prompt.trim() && images.length === 0 && files.length === 0) || isStreaming)
+    if (
+      (!prompt.trim() && images.length === 0 && files.length === 0) ||
+      isStreaming
+    )
       return;
 
     let currentSessionId = sessionId;
 
     if (!currentSessionId) {
-      currentSessionId = createSession(projectPath.split("/").pop() || "project");
+      currentSessionId = createSession(
+        projectPath.split("/").pop() || "project",
+      );
     }
 
     const userMessage = prompt.trim();
@@ -373,7 +407,12 @@ export function EnhancedPromptInput({
             setCurrentTool(currentSessionId!, undefined);
           },
           onToolResult: (toolId, content) => {
-            updateToolCallStatus(currentSessionId!, toolId, "completed", content);
+            updateToolCallStatus(
+              currentSessionId!,
+              toolId,
+              "completed",
+              content,
+            );
             setCurrentTool(currentSessionId!, undefined);
           },
           onUsage: (stats) => {
@@ -395,13 +434,13 @@ export function EnhancedPromptInput({
           },
         },
         claudeSessionId,
-        permissionMode
+        permissionMode,
       );
     } catch (error) {
       console.error("Error starting streaming:", error);
       appendStreamingText(
         currentSessionId,
-        `Error: ${error instanceof Error ? error.message : "Failed to send message"}`
+        `Error: ${error instanceof Error ? error.message : "Failed to send message"}`,
       );
       finishStreaming(currentSessionId);
     }
@@ -446,10 +485,7 @@ export function EnhancedPromptInput({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={cn(
-          "relative",
-          isFocused ? "z-50" : "z-10"
-        )}
+        className={cn("relative", isFocused ? "z-50" : "z-10")}
       >
         <div
           className={cn(
@@ -458,7 +494,7 @@ export function EnhancedPromptInput({
             isFocused
               ? "border-accent shadow-lg shadow-accent/10"
               : "border-border",
-            isDragging && "!border-accent !border-dashed bg-accent/5"
+            isDragging && "!border-accent !border-dashed bg-accent/5",
           )}
         >
           {hasAttachments && (
@@ -471,8 +507,8 @@ export function EnhancedPromptInput({
           <div className="flex items-start gap-3">
             <span
               className={cn(
-                "font-mono mt-1",
-                isFocused ? "text-accent text-lg" : "text-accent/70 text-sm"
+                "font-mono",
+                isFocused ? "text-accent text-lg" : "text-accent/70 text-sm",
               )}
             >
               $
@@ -492,7 +528,7 @@ export function EnhancedPromptInput({
                 "font-mono resize-none outline-none",
                 "disabled:opacity-50",
                 "transition-all duration-300 ease-out",
-                isFocused ? "text-base leading-relaxed" : "text-sm"
+                isFocused ? "text-base leading-relaxed" : "text-sm",
               )}
               style={{
                 minHeight: isFocused ? "120px" : "24px",
@@ -526,7 +562,7 @@ export function EnhancedPromptInput({
                   className={cn(
                     prompt.trim() || hasAttachments
                       ? "text-accent hover:text-accent"
-                      : "text-text-secondary"
+                      : "text-text-secondary",
                   )}
                 >
                   <Send className="w-4 h-4" />
@@ -538,13 +574,19 @@ export function EnhancedPromptInput({
           {isFocused && (
             <div className="flex items-center justify-between text-xs text-text-secondary border-t border-border/50 pt-2 mt-1">
               <span>
-                <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">@</kbd>{" "}
+                <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
+                  @
+                </kbd>{" "}
                 to add files •{" "}
-                <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">⌘V</kbd>{" "}
+                <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
+                  ⌘V
+                </kbd>{" "}
                 to paste images
               </span>
               <span>
-                <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">Esc</kbd>{" "}
+                <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
+                  Esc
+                </kbd>{" "}
                 to close •{" "}
                 <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                   Enter

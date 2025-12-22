@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "notes": "Initial release",
+  "pub_date": "2025-12-21T22:00:00Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "url": "https://github.com/WynterJones/wynter-code/releases/download/v1.0.0/Wynter.Code_1.0.0_aarch64.dmg",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQlZFTmRJQnZyRnNJdVVVNXA0RGE4Mkx4ZHdXOTM1VmloWGxmYzhOUWRMUFpIRnQ1ajhTWk1aTE1obm1QOEdjMG5CbU5QUmQzeENOMERHeTU4ak9haDhkZG9MbWthSWdVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY2MzczNTY4CWZpbGU6V3ludGVyIENvZGVfMS4wLjBfYWFyY2g2NC5kbWcKTFVFeXNkWDRqTFozMHlHN0hlOW9tZGUvMVF2UW9YbXNiMkJhVkJXNmYweHd5R0FBUXpCSUN3UnlLd0k4UHBRSmZZcUtuOFBYT0gxY2F6NVltMUdVQUE9PQo="
+    }
+  }
+}

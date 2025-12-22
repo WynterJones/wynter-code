@@ -89,8 +89,11 @@ export function AudioPlayerPopup({ filePath, onClose }: AudioPlayerPopupProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/90 backdrop-blur-sm">
       <div className="w-full max-w-md bg-bg-primary rounded-xl border border-border shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary">
+        {/* Header - Drags the window */}
+        <div
+          data-tauri-drag-region
+          className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary cursor-grab active:cursor-grabbing"
+        >
           <span className="font-mono text-sm text-text-primary truncate">{fileName}</span>
           <Tooltip content="Close (Esc)" side="bottom">
             <IconButton size="sm" onClick={onClose}>

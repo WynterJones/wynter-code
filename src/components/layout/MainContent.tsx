@@ -7,10 +7,12 @@ import { StreamingToolbar } from "@/components/output/StreamingToolbar";
 import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudeDropdown, ClaudePopup } from "@/components/claude";
+import { ModelSelector } from "@/components/model/ModelSelector";
+import { PermissionModeToggle } from "@/components/session";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { cn } from "@/lib/utils";
-import type { Project } from "@/types";
+import type { Project, PermissionMode } from "@/types";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 interface MainContentProps {
@@ -25,7 +27,7 @@ const MAX_ACTIVITY_HEIGHT = 400;
 const DEFAULT_ACTIVITY_HEIGHT = 180;
 
 export function MainContent({ project, pendingImage, onImageConsumed, onRequestImageBrowser }: MainContentProps) {
-  const { activeSessionId, getSessionsForProject, getMessages, getStreamingState, updateToolCallStatus } =
+  const { activeSessionId, getSessionsForProject, getMessages, getStreamingState, updateToolCallStatus, updateSessionPermissionMode } =
     useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId } = useTerminalStore();
 
@@ -104,6 +106,12 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     }
   };
 
+  const handleModeChange = (mode: PermissionMode) => {
+    if (currentSessionId) {
+      updateSessionPermissionMode(currentSessionId, mode);
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       <div className="h-[45px] px-4 flex items-center justify-between border-b border-border bg-bg-secondary">
@@ -111,7 +119,15 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           <FolderOpen className="w-4 h-4 text-text-secondary flex-shrink-0" />
           <span className="font-mono truncate">{project.path}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          <ModelSelector />
+          {currentSession && (
+            <PermissionModeToggle
+              mode={currentSession.permissionMode || "default"}
+              onChange={handleModeChange}
+            />
+          )}
+          <div className="w-px h-5 bg-border" />
           <ClaudeDropdown projectPath={project.path} />
           {!isTerminalSession && (
             <button
