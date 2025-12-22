@@ -1,5 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
-import { RefreshCw, ExternalLink, Trash2, Network, AlertCircle } from "lucide-react";
+import {
+  RefreshCw,
+  ExternalLink,
+  Trash2,
+  Network,
+  AlertCircle,
+  Circle,
+  Coffee,
+  Gem,
+  Globe,
+  Database,
+  Container,
+  Zap,
+  Cog,
+  Server,
+  HardDrive
+} from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { IconButton, Tooltip, Modal } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -61,18 +77,20 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
 
   const getProcessIcon = (name: string) => {
     const lowerName = name.toLowerCase();
-    if (lowerName.includes("node")) return "🟢";
-    if (lowerName.includes("python")) return "🐍";
-    if (lowerName.includes("ruby")) return "💎";
-    if (lowerName.includes("java")) return "☕";
-    if (lowerName.includes("go") || lowerName.includes("dlv")) return "🐹";
-    if (lowerName.includes("rust") || lowerName.includes("cargo")) return "🦀";
-    if (lowerName.includes("php")) return "🐘";
-    if (lowerName.includes("nginx")) return "🌐";
-    if (lowerName.includes("postgres") || lowerName.includes("mysql") || lowerName.includes("mongo")) return "🗄️";
-    if (lowerName.includes("redis")) return "📮";
-    if (lowerName.includes("docker")) return "🐳";
-    return "⚡";
+    const iconClass = "w-4 h-4";
+
+    if (lowerName.includes("node")) return <Circle className={cn(iconClass, "text-green-500 fill-green-500")} />;
+    if (lowerName.includes("python")) return <Circle className={cn(iconClass, "text-yellow-500 fill-yellow-500")} />;
+    if (lowerName.includes("ruby")) return <Gem className={cn(iconClass, "text-red-500")} />;
+    if (lowerName.includes("java")) return <Coffee className={cn(iconClass, "text-amber-600")} />;
+    if (lowerName.includes("go") || lowerName.includes("dlv")) return <Circle className={cn(iconClass, "text-cyan-500 fill-cyan-500")} />;
+    if (lowerName.includes("rust") || lowerName.includes("cargo")) return <Cog className={cn(iconClass, "text-orange-500")} />;
+    if (lowerName.includes("php")) return <Server className={cn(iconClass, "text-indigo-500")} />;
+    if (lowerName.includes("nginx")) return <Globe className={cn(iconClass, "text-green-600")} />;
+    if (lowerName.includes("postgres") || lowerName.includes("mysql") || lowerName.includes("mongo")) return <Database className={cn(iconClass, "text-blue-500")} />;
+    if (lowerName.includes("redis")) return <HardDrive className={cn(iconClass, "text-red-600")} />;
+    if (lowerName.includes("docker")) return <Container className={cn(iconClass, "text-sky-500")} />;
+    return <Zap className={cn(iconClass, "text-yellow-400")} />;
   };
 
   const commonPorts: Record<number, string> = {
@@ -139,9 +157,9 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
                   className="flex items-center justify-between p-3 rounded-lg bg-bg-tertiary/50 border border-border hover:border-border-hover transition-colors group"
                 >
                   <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <span className="text-base w-6 text-center" title={port.processName}>
+                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0" title={port.processName}>
                       {getProcessIcon(port.processName)}
-                    </span>
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-base font-semibold text-accent">

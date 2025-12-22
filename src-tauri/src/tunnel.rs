@@ -1,0 +1,287 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
+use tauri::{Emitter, State};
+use uuid::Uuid;
+
+#[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum TunnelStatus {
+    Starting,
+    Connected,
+    Reconnecting,
+    Failed,
+    Stopped,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelInfo {
+    pub tunnel_id: String,
+    pub port: u16,
+    pub url: Option<String>,
+    pub status: TunnelStatus,
+    pub error: Option<String>,
+    pub created_at: i64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelEvent {
+    pub tunnel_id: String,
+    pub event_type: String,
+    pub url: Option<String>,
+    pub status: Option<TunnelStatus>,
+    pub message: Option<String>,
+}
+
+struct TunnelInstance {
+    port: u16,
+    url: Option<String>,
+    status: TunnelStatus,
+    #[allow(dead_code)]
+    child_pid: Option<u32>,
+    created_at: i64,
+}
+
+pub struct TunnelManager {
+    tunnels: Mutex<HashMap<String, TunnelInstance>>,
+}
+
+impl TunnelManager {
+    pub fn new() -> Self {
+        Self {
+            tunnels: Mutex::new(HashMap::new()),
+        }
+    }
+}
+
+impl Default for TunnelManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[tauri::command]
+pub async fn check_cloudflared_installed() -> Result<bool, String> {
+    let output = Command::new("which")
+        .arg("cloudflared")
+        .output()
+        .map_err(|e| format!("Failed to check cloudflared: {}", e))?;
+
+    Ok(output.status.success())
+}
+
+#[tauri::command]
+pub async fn start_tunnel(
+    window: tauri::Window,
+    state: State<'_, Arc<TunnelManager>>,
+    port: u16,
+) -> Result<String, String> {
+    let tunnel_id = Uuid::new_v4().to_string();
+    let created_at = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+
+    // Create initial tunnel instance
+    {
+        let mut tunnels = state.tunnels.lock().unwrap();
+        tunnels.insert(
+            tunnel_id.clone(),
+            TunnelInstance {
+                port,
+                url: None,
+                status: TunnelStatus::Starting,
+                child_pid: None,
+                created_at,
+            },
+        );
+    }
+
+    // Emit starting event
+    let _ = window.emit(
+        "tunnel-event",
+        TunnelEvent {
+            tunnel_id: tunnel_id.clone(),
+            event_type: "status_change".to_string(),
+            url: None,
+            status: Some(TunnelStatus::Starting),
+            message: Some("Starting tunnel...".to_string()),
+        },
+    );
+
+    // Spawn cloudflared process
+    let mut child = Command::new("cloudflared")
+        .args(["tunnel", "--url", &format!("http://localhost:{}", port)])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            let mut tunnels = state.tunnels.lock().unwrap();
+            tunnels.remove(&tunnel_id);
+            format!("Failed to start cloudflared: {}", e)
+        })?;
+
+    let child_pid = child.id();
+
+    // Update with PID
+    {
+        let mut tunnels = state.tunnels.lock().unwrap();
+        if let Some(tunnel) = tunnels.get_mut(&tunnel_id) {
+            tunnel.child_pid = Some(child_pid);
+        }
+    }
+
+    // Spawn thread to monitor output and capture URL
+    let tunnel_id_clone = tunnel_id.clone();
+    let state_clone = state.inner().clone();
+    let window_clone = window.clone();
+
+    std::thread::spawn(move || {
+        // cloudflared outputs to stderr
+        if let Some(stderr) = child.stderr.take() {
+            let reader = BufReader::new(stderr);
+            let url_regex = regex::Regex::new(r"https://[a-z0-9-]+\.trycloudflare\.com").unwrap();
+
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    // Check for URL in output
+                    if let Some(url_match) = url_regex.find(&line) {
+                        let url = url_match.as_str().to_string();
+
+                        // Update tunnel with URL
+                        {
+                            let mut tunnels = state_clone.tunnels.lock().unwrap();
+                            if let Some(tunnel) = tunnels.get_mut(&tunnel_id_clone) {
+                                tunnel.url = Some(url.clone());
+                                tunnel.status = TunnelStatus::Connected;
+                            }
+                        }
+
+                        // Emit URL ready event
+                        let _ = window_clone.emit(
+                            "tunnel-event",
+                            TunnelEvent {
+                                tunnel_id: tunnel_id_clone.clone(),
+                                event_type: "url_ready".to_string(),
+                                url: Some(url),
+                                status: Some(TunnelStatus::Connected),
+                                message: Some("Tunnel connected!".to_string()),
+                            },
+                        );
+                    }
+
+                    // Check for reconnection messages
+                    if line.contains("Retrying") || line.contains("reconnect") {
+                        {
+                            let mut tunnels = state_clone.tunnels.lock().unwrap();
+                            if let Some(tunnel) = tunnels.get_mut(&tunnel_id_clone) {
+                                tunnel.status = TunnelStatus::Reconnecting;
+                            }
+                        }
+
+                        let _ = window_clone.emit(
+                            "tunnel-event",
+                            TunnelEvent {
+                                tunnel_id: tunnel_id_clone.clone(),
+                                event_type: "status_change".to_string(),
+                                url: None,
+                                status: Some(TunnelStatus::Reconnecting),
+                                message: Some("Reconnecting...".to_string()),
+                            },
+                        );
+                    }
+
+                    // Emit output for debugging
+                    let _ = window_clone.emit(
+                        "tunnel-event",
+                        TunnelEvent {
+                            tunnel_id: tunnel_id_clone.clone(),
+                            event_type: "output".to_string(),
+                            url: None,
+                            status: None,
+                            message: Some(line),
+                        },
+                    );
+                }
+            }
+        }
+
+        // Process ended - clean up
+        let exit_status = child.wait();
+        let error_msg = match exit_status {
+            Ok(status) if status.success() => None,
+            Ok(status) => Some(format!("Process exited with code: {:?}", status.code())),
+            Err(e) => Some(format!("Failed to wait on process: {}", e)),
+        };
+
+        {
+            let mut tunnels = state_clone.tunnels.lock().unwrap();
+            if let Some(tunnel) = tunnels.get_mut(&tunnel_id_clone) {
+                tunnel.status = TunnelStatus::Stopped;
+            }
+        }
+
+        let _ = window_clone.emit(
+            "tunnel-event",
+            TunnelEvent {
+                tunnel_id: tunnel_id_clone,
+                event_type: "status_change".to_string(),
+                url: None,
+                status: Some(TunnelStatus::Stopped),
+                message: error_msg,
+            },
+        );
+    });
+
+    Ok(tunnel_id)
+}
+
+#[tauri::command]
+pub async fn stop_tunnel(
+    state: State<'_, Arc<TunnelManager>>,
+    tunnel_id: String,
+) -> Result<(), String> {
+    let child_pid = {
+        let tunnels = state.tunnels.lock().unwrap();
+        tunnels
+            .get(&tunnel_id)
+            .and_then(|t| t.child_pid)
+    };
+
+    if let Some(pid) = child_pid {
+        // Kill the cloudflared process
+        let _ = Command::new("kill")
+            .args(["-9", &pid.to_string()])
+            .output();
+    }
+
+    // Remove from manager
+    let mut tunnels = state.tunnels.lock().unwrap();
+    tunnels.remove(&tunnel_id);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_tunnels(state: State<'_, Arc<TunnelManager>>) -> Result<Vec<TunnelInfo>, String> {
+    let tunnels = state.tunnels.lock().unwrap();
+
+    let tunnel_list: Vec<TunnelInfo> = tunnels
+        .iter()
+        .map(|(id, instance)| TunnelInfo {
+            tunnel_id: id.clone(),
+            port: instance.port,
+            url: instance.url.clone(),
+            status: instance.status.clone(),
+            error: None,
+            created_at: instance.created_at,
+        })
+        .collect();
+
+    Ok(tunnel_list)
+}

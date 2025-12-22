@@ -24,7 +24,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SubscriptionButton } from "@/components/subscriptions";
 import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
-import { ToolsDropdown, PortManagerPopup } from "@/components/tools";
+import { ToolsDropdown, PortManagerPopup, NodeModulesCleanerPopup, LocalhostTunnelPopup } from "@/components/tools";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import type { Project } from "@/types";
@@ -216,6 +216,8 @@ export function ProjectTabBar({
     activeTab: "icon",
   });
   const [showPortManager, setShowPortManager] = useState(false);
+  const [showNodeModulesCleaner, setShowNodeModulesCleaner] = useState(false);
+  const [showTunnelManager, setShowTunnelManager] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
@@ -434,7 +436,11 @@ export function ProjectTabBar({
 
       {/* Tools Dropdown */}
       <div className="border-l border-border px-2 h-full flex items-center">
-        <ToolsDropdown onOpenPortManager={() => setShowPortManager(true)} />
+        <ToolsDropdown
+          onOpenPortManager={() => setShowPortManager(true)}
+          onOpenNodeModulesCleaner={() => setShowNodeModulesCleaner(true)}
+          onOpenLocalhostTunnel={() => setShowTunnelManager(true)}
+        />
       </div>
 
       {/* Meditation Mode */}
@@ -590,6 +596,18 @@ export function ProjectTabBar({
       <PortManagerPopup
         isOpen={showPortManager}
         onClose={() => setShowPortManager(false)}
+      />
+
+      {/* Node Modules Cleaner Popup */}
+      <NodeModulesCleanerPopup
+        isOpen={showNodeModulesCleaner}
+        onClose={() => setShowNodeModulesCleaner(false)}
+      />
+
+      {/* Localhost Tunnel Popup */}
+      <LocalhostTunnelPopup
+        isOpen={showTunnelManager}
+        onClose={() => setShowTunnelManager(false)}
       />
     </div>
   );

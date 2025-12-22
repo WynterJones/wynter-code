@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Wrench, Network, ChevronDown } from "lucide-react";
+import { Wrench, Network, ChevronDown, Package, Globe } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -14,9 +14,11 @@ interface Tool {
 
 interface ToolsDropdownProps {
   onOpenPortManager: () => void;
+  onOpenNodeModulesCleaner: () => void;
+  onOpenLocalhostTunnel: () => void;
 }
 
-export function ToolsDropdown({ onOpenPortManager }: ToolsDropdownProps) {
+export function ToolsDropdown({ onOpenPortManager, onOpenNodeModulesCleaner, onOpenLocalhostTunnel }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -30,6 +32,26 @@ export function ToolsDropdown({ onOpenPortManager }: ToolsDropdownProps) {
       icon: <Network className="w-4 h-4" />,
       onClick: () => {
         onOpenPortManager();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "node-modules-cleaner",
+      name: "Node Modules Cleaner",
+      description: "Clean up node_modules folders",
+      icon: <Package className="w-4 h-4" />,
+      onClick: () => {
+        onOpenNodeModulesCleaner();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "localhost-tunnel",
+      name: "Localhost Tunnel",
+      description: "Share localhost via public URL",
+      icon: <Globe className="w-4 h-4" />,
+      onClick: () => {
+        onOpenLocalhostTunnel();
         setIsOpen(false);
       },
     },

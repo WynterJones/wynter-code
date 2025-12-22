@@ -1692,6 +1692,241 @@ pub fn kill_process(pid: u32) -> Result<(), String> {
     Ok(())
 }
 
+// Node Modules Cleaner Commands
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeModulesFolder {
+    pub path: String,
+    pub project_path: String,
+    pub project_name: String,
+    pub size: u64,
+    pub formatted_size: String,
+    pub last_modified: i64,
+    pub last_modified_formatted: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeModulesScanResult {
+    pub folders: Vec<NodeModulesFolder>,
+    pub total_size: u64,
+    pub total_size_formatted: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NodeModulesDeleteResult {
+    pub deleted_count: usize,
+    pub failed_count: usize,
+    pub space_recovered: u64,
+    pub space_recovered_formatted: String,
+    pub failed_paths: Vec<String>,
+}
+
+const BLOCKED_PATHS: &[&str] = &[
+    "/usr",
+    "/opt",
+    "/bin",
+    "/sbin",
+    "/System",
+    "/Library",
+    "/Applications",
+    "/private",
+    "/var",
+    "/etc",
+    "/tmp",
+    "/cores",
+];
+
+fn is_blocked_path(path: &Path) -> bool {
+    let path_str = path.to_string_lossy();
+    BLOCKED_PATHS.iter().any(|blocked| path_str.starts_with(blocked))
+}
+
+fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.1} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+fn calculate_folder_size(path: &Path) -> u64 {
+    let mut size: u64 = 0;
+    if let Ok(entries) = fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                size += calculate_folder_size(&entry_path);
+            } else if let Ok(metadata) = fs::metadata(&entry_path) {
+                size += metadata.len();
+            }
+        }
+    }
+    size
+}
+
+#[tauri::command]
+pub async fn scan_node_modules(scan_path: String) -> Result<NodeModulesScanResult, String> {
+    let scan_path_obj = Path::new(&scan_path);
+
+    if !scan_path_obj.exists() {
+        return Err(format!("Path does not exist: {}", scan_path));
+    }
+
+    if !scan_path_obj.is_dir() {
+        return Err(format!("Path is not a directory: {}", scan_path));
+    }
+
+    if is_blocked_path(scan_path_obj) {
+        return Err("Cannot scan system directories for safety".to_string());
+    }
+
+    let mut folders: Vec<NodeModulesFolder> = Vec::new();
+    let mut total_size: u64 = 0;
+
+    fn find_node_modules(
+        dir: &Path,
+        folders: &mut Vec<NodeModulesFolder>,
+        total_size: &mut u64,
+        depth: usize,
+    ) {
+        if depth > 10 {
+            return;
+        }
+
+        let entries = match fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            let file_name = entry.file_name().to_string_lossy().to_string();
+
+            if !entry_path.is_dir() {
+                continue;
+            }
+
+            if file_name.starts_with('.') {
+                continue;
+            }
+
+            if is_blocked_path(&entry_path) {
+                continue;
+            }
+
+            if file_name == "node_modules" {
+                let size = calculate_folder_size(&entry_path);
+                *total_size += size;
+
+                let project_path = dir.to_string_lossy().to_string();
+                let project_name = dir
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "Unknown".to_string());
+
+                let last_modified = fs::metadata(&entry_path)
+                    .and_then(|m| m.modified())
+                    .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64)
+                    .unwrap_or(0);
+
+                let last_modified_formatted = if last_modified > 0 {
+                    let datetime = chrono::DateTime::from_timestamp(last_modified, 0)
+                        .unwrap_or_default();
+                    datetime.format("%b %d, %Y").to_string()
+                } else {
+                    "Unknown".to_string()
+                };
+
+                folders.push(NodeModulesFolder {
+                    path: entry_path.to_string_lossy().to_string(),
+                    project_path,
+                    project_name,
+                    size,
+                    formatted_size: format_size(size),
+                    last_modified,
+                    last_modified_formatted,
+                });
+
+                continue;
+            }
+
+            find_node_modules(&entry_path, folders, total_size, depth + 1);
+        }
+    }
+
+    find_node_modules(scan_path_obj, &mut folders, &mut total_size, 0);
+
+    folders.sort_by(|a, b| b.size.cmp(&a.size));
+
+    Ok(NodeModulesScanResult {
+        folders,
+        total_size,
+        total_size_formatted: format_size(total_size),
+    })
+}
+
+#[tauri::command]
+pub async fn delete_node_modules(paths: Vec<String>) -> Result<NodeModulesDeleteResult, String> {
+    let mut deleted_count = 0;
+    let mut failed_count = 0;
+    let mut space_recovered: u64 = 0;
+    let mut failed_paths: Vec<String> = Vec::new();
+
+    for path_str in paths {
+        let path = Path::new(&path_str);
+
+        if !path_str.ends_with("node_modules") && !path_str.ends_with("node_modules/") {
+            failed_paths.push(format!("{}: Not a node_modules folder", path_str));
+            failed_count += 1;
+            continue;
+        }
+
+        if is_blocked_path(path) {
+            failed_paths.push(format!("{}: System path blocked", path_str));
+            failed_count += 1;
+            continue;
+        }
+
+        if !path.exists() {
+            failed_paths.push(format!("{}: Does not exist", path_str));
+            failed_count += 1;
+            continue;
+        }
+
+        let size = calculate_folder_size(path);
+
+        match fs::remove_dir_all(path) {
+            Ok(_) => {
+                deleted_count += 1;
+                space_recovered += size;
+            }
+            Err(e) => {
+                failed_paths.push(format!("{}: {}", path_str, e));
+                failed_count += 1;
+            }
+        }
+    }
+
+    Ok(NodeModulesDeleteResult {
+        deleted_count,
+        failed_count,
+        space_recovered,
+        space_recovered_formatted: format_size(space_recovered),
+        failed_paths,
+    })
+}
+
 pub fn get_migrations() -> Vec<Migration> {
     vec![
         Migration {

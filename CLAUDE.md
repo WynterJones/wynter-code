@@ -110,6 +110,38 @@ After user approves:
 
 ---
 
+## UI Patterns
+
+### File/Folder Selection
+**ALWAYS use the app's FileBrowserPopup** for file and folder selection. Never use native Tauri dialogs (`@tauri-apps/plugin-dialog`).
+
+```tsx
+import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
+
+// For folder selection
+<FileBrowserPopup
+  isOpen={showFileBrowser}
+  onClose={() => setShowFileBrowser(false)}
+  initialPath={homeDir}
+  mode="selectProject"
+  selectButtonLabel="Select Folder"
+  onSelectProject={(path) => handleFolderSelected(path)}
+/>
+
+// For file browsing
+<FileBrowserPopup
+  isOpen={showFileBrowser}
+  onClose={() => setShowFileBrowser(false)}
+  initialPath={projectPath}
+  mode="browse"
+  onSendToPrompt={(image) => handleImage(image)}
+/>
+```
+
+This ensures a consistent UX across the app with our custom file browser that includes git status indicators, quick look previews, and more.
+
+---
+
 ## Tips for Claude Code
 
 ### When Working on Features
@@ -122,3 +154,4 @@ After user approves:
 npm run lint    # Check code quality
 npm run build   # Verify compilation
 ```
+

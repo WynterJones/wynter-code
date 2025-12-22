@@ -2,6 +2,7 @@
 
 mod commands;
 mod terminal;
+mod tunnel;
 mod watcher;
 
 use std::sync::Arc;
@@ -133,6 +134,7 @@ fn main() {
             Ok(())
         })
         .manage(Arc::new(terminal::PtyManager::new()))
+        .manage(Arc::new(tunnel::TunnelManager::new()))
         .manage(Arc::new(watcher::FileWatcherManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
@@ -169,6 +171,8 @@ fn main() {
             commands::create_claude_file,
             commands::list_listening_ports,
             commands::kill_process,
+            commands::scan_node_modules,
+            commands::delete_node_modules,
             terminal::create_pty,
             terminal::write_pty,
             terminal::resize_pty,
@@ -176,6 +180,10 @@ fn main() {
             terminal::is_pty_active,
             watcher::start_file_watcher,
             watcher::stop_file_watcher,
+            tunnel::check_cloudflared_installed,
+            tunnel::start_tunnel,
+            tunnel::stop_tunnel,
+            tunnel::list_tunnels,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

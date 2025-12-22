@@ -25,6 +25,15 @@ A collection of feature ideas organized by where they live in the UI.
 - Auto-refresh and manual refresh options
 - Process icons based on runtime (Node, Python, Ruby, etc.)
 
+### Node Modules Cleaner ✓
+- Opens a popup to clean up node_modules folders
+- User picks folder to scan (folder picker dialog)
+- Shows path, size, last modified, project name
+- Delete individually or batch select
+- Total disk space recovery indicator
+- Confirmation before deletion
+- Excludes system paths for safety
+
 ---
 
 ## Project Tab Bar
@@ -36,16 +45,6 @@ A collection of feature ideas organized by where they live in the UI.
 ## Header Tools Dropdown
 
 *Tools accessible from a dropdown menu in the main header (next to subscriptions button).*
-
-### Node Modules Cleaner
-**Priority:** High
-
-Opens a popup to clean up node_modules folders:
-- Scans selected directory or entire system
-- Shows path, size, last modified, project name
-- Delete individually or batch select
-- Total disk space recovery indicator
-- Confirmation before deletion
 
 ### Color Picker
 **Priority:** Medium
@@ -259,7 +258,7 @@ Split view for sessions and terminals:
 - Prompt Templates (JSON storage + UI)
 
 **Medium Effort:**
-- Node Modules Cleaner (directory traversal + UI)
+- ~~Node Modules Cleaner (directory traversal + UI)~~ ✓
 - Test Runner Integration (process spawning + parsing)
 - Color Picker (system APIs)
 - Multi-Panel Layout (layout refactor)

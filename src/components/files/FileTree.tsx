@@ -50,7 +50,20 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         path: projectPath,
         depth: 1,
       });
-      setFiles(result);
+
+      if (silent) {
+        // Preserve expanded folder state during silent refreshes
+        setFiles((prevFiles) => {
+          const expandedPaths = collectExpandedPaths(prevFiles);
+          if (expandedPaths.size === 0) {
+            return result;
+          }
+          return mergeTreeState(result, prevFiles, expandedPaths);
+        });
+      } else {
+        setFiles(result);
+      }
+
       if (!silent) {
         setError(null);
       }
@@ -316,5 +329,62 @@ function updateNodeInTree(
       };
     }
     return node;
+  });
+}
+
+/**
+ * Collects all expanded folder paths from a tree
+ */
+function collectExpandedPaths(nodes: FileNode[]): Set<string> {
+  const expanded = new Set<string>();
+
+  function traverse(nodeList: FileNode[]) {
+    for (const node of nodeList) {
+      if (node.isDirectory && node.isExpanded) {
+        expanded.add(node.path);
+        if (node.children) {
+          traverse(node.children);
+        }
+      }
+    }
+  }
+
+  traverse(nodes);
+  return expanded;
+}
+
+/**
+ * Merges new tree data with old tree, preserving expanded state and children
+ * for folders that were previously expanded
+ */
+function mergeTreeState(
+  newNodes: FileNode[],
+  oldNodes: FileNode[],
+  expandedPaths: Set<string>
+): FileNode[] {
+  const oldNodeMap = new Map<string, FileNode>();
+  for (const node of oldNodes) {
+    oldNodeMap.set(node.path, node);
+  }
+
+  return newNodes.map((newNode) => {
+    const oldNode = oldNodeMap.get(newNode.path);
+
+    if (newNode.isDirectory && oldNode?.isDirectory && expandedPaths.has(newNode.path)) {
+      // Preserve expanded state and children for previously expanded folders
+      return {
+        ...newNode,
+        isExpanded: true,
+        children: oldNode.children
+          ? mergeTreeState(
+              oldNode.children, // Keep old children structure
+              oldNode.children,
+              expandedPaths
+            )
+          : undefined,
+      };
+    }
+
+    return newNode;
   });
 }
