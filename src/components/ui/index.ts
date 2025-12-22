@@ -19,3 +19,9 @@ export { Tooltip } from "./Tooltip";
 
 export { Modal } from "./Modal";
 export type { ModalProps } from "./Modal";
+
+export { IconPicker } from "./IconPicker";
+export type { IconPickerProps } from "./IconPicker";
+
+export { ContextMenu } from "./ContextMenu";
+export type { ContextMenuProps, ContextMenuPosition } from "./ContextMenu";

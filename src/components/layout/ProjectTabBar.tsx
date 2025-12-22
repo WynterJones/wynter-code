@@ -1,14 +1,32 @@
-import { useState, useRef, useEffect } from "react";
-import { Plus, X, Settings, ChevronLeft, ChevronRight, FolderOpen, Moon, FolderSearch } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Plus, X, Settings, ChevronLeft, ChevronRight, FolderOpen, Moon, FolderSearch, GripVertical } from "lucide-react";
+import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { IconButton, Tooltip } from "@/components/ui";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { IconButton, Tooltip, ContextMenu, IconPicker } from "@/components/ui";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SubscriptionButton } from "@/components/subscriptions";
 import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
+import type { Project } from "@/types";
 
 const PROJECT_COLORS = [
   "#cba6f7", // Purple
@@ -21,9 +39,11 @@ const PROJECT_COLORS = [
   "#cdd6f4", // White-ish
 ];
 
-interface DropdownPosition {
-  top: number;
-  left: number;
+interface ContextMenuState {
+  isOpen: boolean;
+  position: { x: number; y: number };
+  projectId: string | null;
+  activeTab: "icon" | "color";
 }
 
 interface ProjectTabBarProps {
@@ -32,6 +52,129 @@ interface ProjectTabBarProps {
   onSendToPrompt?: (image: ImageAttachment) => void;
   requestImageBrowser?: boolean;
   onImageBrowserOpened?: () => void;
+}
+
+interface SortableProjectTabProps {
+  project: Project;
+  isActive: boolean;
+  isCompact: boolean;
+  isDimmed: boolean;
+  onSelect: () => void;
+  onClose: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+}
+
+function SortableProjectTab({
+  project,
+  isActive,
+  isCompact,
+  isDimmed,
+  onSelect,
+  onClose,
+  onContextMenu,
+}: SortableProjectTabProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: project.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const renderIcon = () => {
+    if (project.icon) {
+      const IconComponent = LucideIcons[project.icon as keyof typeof LucideIcons] as React.ComponentType<{
+        className?: string;
+        style?: React.CSSProperties;
+      }>;
+      if (IconComponent) {
+        return (
+          <IconComponent
+            className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")}
+            style={{ color: project.color || "currentColor" }}
+          />
+        );
+      }
+    }
+    return (
+      <FolderOpen
+        className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")}
+        style={{ color: project.color || "currentColor" }}
+      />
+    );
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onSelect}
+      onContextMenu={onContextMenu}
+      className={cn(
+        "group relative flex items-center gap-1.5 cursor-pointer transition-all min-w-0 flex-shrink-0",
+        "border-r border-border/50",
+        isCompact ? "px-2.5 h-full" : "px-4 h-full gap-2",
+        isActive
+          ? "bg-bg-secondary text-text-primary"
+          : cn(
+              "hover:text-text-primary hover:bg-bg-secondary/50",
+              isDimmed ? "text-text-secondary/50" : "text-text-secondary"
+            ),
+        isDragging && "opacity-50 z-50"
+      )}
+    >
+      {/* Project color indicator - only show when active */}
+      {isActive && project.color && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-0.5"
+          style={{ backgroundColor: project.color }}
+        />
+      )}
+
+      {/* Drag handle */}
+      <div
+        {...attributes}
+        {...listeners}
+        className={cn(
+          "cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-bg-tertiary transition-opacity",
+          "opacity-0 group-hover:opacity-60 hover:!opacity-100",
+          isActive && "opacity-40"
+        )}
+      >
+        <GripVertical className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")} />
+      </div>
+
+      {/* Project icon */}
+      <div className="flex-shrink-0">
+        {renderIcon()}
+      </div>
+
+      <span className={cn("truncate", isCompact ? "text-xs max-w-[80px]" : "text-sm max-w-[140px]")}>
+        {project.name}
+      </span>
+
+      {/* Close button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        className={cn(
+          "p-0.5 rounded hover:bg-bg-hover transition-opacity",
+          "text-text-secondary hover:text-text-primary",
+          isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"
+        )}
+      >
+        <X className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
+      </button>
+    </div>
+  );
 }
 
 export function ProjectTabBar({
@@ -48,6 +191,8 @@ export function ProjectTabBar({
     removeProject,
     addProject,
     updateProjectColor,
+    updateProjectIcon,
+    reorderProjects,
     getProject,
   } = useProjectStore();
 
@@ -55,18 +200,37 @@ export function ProjectTabBar({
   const setMeditationActive = useMeditationStore((s) => s.setActive);
 
   const defaultBrowsePath = useSettingsStore((s) => s.defaultBrowsePath);
+  const compactProjectTabs = useSettingsStore((s) => s.compactProjectTabs);
+  const dimInactiveProjects = useSettingsStore((s) => s.dimInactiveProjects);
 
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [colorPickerProjectId, setColorPickerProjectId] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [fileBrowserMode, setFileBrowserMode] = useState<"selectProject" | "browse">("selectProject");
   const [fileBrowserInitialPath, setFileBrowserInitialPath] = useState<string | undefined>(undefined);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    isOpen: false,
+    position: { x: 0, y: 0 },
+    projectId: null,
+    activeTab: "icon",
+  });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const colorPickerRef = useRef<HTMLDivElement>(null);
 
   const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
+  const contextMenuProject = contextMenu.projectId ? getProject(contextMenu.projectId) : undefined;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const projectIds = useMemo(() => projects.map((p) => p.id), [projects]);
 
   const updateScrollButtons = () => {
     if (scrollContainerRef.current) {
@@ -91,36 +255,37 @@ export function ProjectTabBar({
   }, [projects]);
 
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
-        setColorPickerProjectId(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // Handle external request to open file browser for images
-  useEffect(() => {
     if (requestImageBrowser) {
       handleBrowseFiles();
       onImageBrowserOpened?.();
     }
   }, [requestImageBrowser]);
 
-  const handleIconClick = (e: React.MouseEvent, projectId: string) => {
-    e.stopPropagation();
-    if (colorPickerProjectId === projectId) {
-      setColorPickerProjectId(null);
-    } else {
-      const button = e.currentTarget as HTMLElement;
-      const rect = button.getBoundingClientRect();
-      setDropdownPosition({
-        top: rect.bottom + 8,
-        left: rect.left,
-      });
-      setColorPickerProjectId(projectId);
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = projects.findIndex((p) => p.id === active.id);
+      const newIndex = projects.findIndex((p) => p.id === over.id);
+      reorderProjects(oldIndex, newIndex);
     }
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, projectId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const tabElement = e.currentTarget as HTMLElement;
+    const rect = tabElement.getBoundingClientRect();
+    setContextMenu({
+      isOpen: true,
+      position: { x: rect.left, y: rect.bottom + 4 },
+      projectId,
+      activeTab: "icon",
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu((prev) => ({ ...prev, isOpen: false }));
   };
 
   const scrollLeft = () => {
@@ -147,7 +312,6 @@ export function ProjectTabBar({
 
   const handleOpenProject = async () => {
     setFileBrowserMode("selectProject");
-    // For opening projects: use default path if set, else home directory
     if (defaultBrowsePath) {
       setFileBrowserInitialPath(defaultBrowsePath);
     } else {
@@ -163,7 +327,6 @@ export function ProjectTabBar({
 
   const handleBrowseFiles = async () => {
     setFileBrowserMode("browse");
-    // For browsing: use current project if available, else default path, else home
     if (activeProject?.path) {
       setFileBrowserInitialPath(activeProject.path);
     } else if (defaultBrowsePath) {
@@ -188,121 +351,47 @@ export function ProjectTabBar({
     <div
       data-tauri-drag-region
       onDoubleClick={handleDoubleClick}
-      className="flex items-center h-11 bg-bg-primary border-b border-border select-none"
+      className={cn(
+        "flex items-center bg-bg-primary border-b border-border select-none",
+        compactProjectTabs ? "h-9" : "h-11"
+      )}
     >
       {/* Traffic light spacer for macOS */}
       <div
         data-tauri-drag-region
         className="w-20 h-full flex-shrink-0 flex items-center justify-end pr-2"
+      />
+
+      {/* Project Tabs with DnD */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
       >
-        {/* App icon or other controls can go here */}
-      </div>
-
-      {/* Project Tabs */}
-      <div
-        ref={scrollContainerRef}
-        data-tauri-drag-region
-        className="flex items-center flex-1 gap-0.5 overflow-x-auto scrollbar-none h-full"
-      >
-        {projects.map((project) => {
-          const isActive = activeProjectId === project.id;
-          return (
-            <div
-              key={project.id}
-              onClick={() => {
-                setActiveProject(project.id);
-                setMeditationActive(false);
-              }}
-              className={cn(
-                "group relative flex items-center gap-2 px-4 h-full cursor-pointer transition-colors min-w-0 flex-shrink-0",
-                "border-r border-border/50",
-                isActive
-                  ? "bg-bg-secondary text-text-primary"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-secondary/50"
-              )}
-            >
-              {/* Project color indicator - only show when active */}
-              {isActive && project.color && (
-                <div
-                  className="absolute bottom-0 left-0 right-0 h-0.5"
-                  style={{ backgroundColor: project.color }}
-                />
-              )}
-
-              {/* Project icon with color picker */}
-              <div className="relative" ref={colorPickerProjectId === project.id ? colorPickerRef : null}>
-                <button
-                  onClick={(e) => handleIconClick(e, project.id)}
-                  className="p-0.5 rounded hover:bg-bg-tertiary transition-colors"
-                >
-                  <FolderOpen
-                    className="w-3.5 h-3.5"
-                    style={{ color: project.color || "currentColor" }}
-                  />
-                </button>
-
-                {/* Color picker dropdown */}
-                {colorPickerProjectId === project.id && (
-                  <div
-                    className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[140px]"
-                    style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
-                  >
-                    <div className="text-xs text-text-secondary mb-2 font-medium">Project Color</div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {PROJECT_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateProjectColor(project.id, color);
-                            setColorPickerProjectId(null);
-                          }}
-                          className={cn(
-                            "w-7 h-7 rounded-full border-2 transition-all hover:scale-110",
-                            project.color === color
-                              ? "border-white ring-2 ring-accent/50"
-                              : "border-transparent hover:border-white/50"
-                          )}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                    {project.color && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateProjectColor(project.id, "");
-                          setColorPickerProjectId(null);
-                        }}
-                        className="w-full mt-2 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
-                      >
-                        Remove color
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <span className="truncate text-sm max-w-[140px]">{project.name}</span>
-
-              {/* Close button - always show on hover, or if active */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  removeProject(project.id);
+        <div
+          ref={scrollContainerRef}
+          data-tauri-drag-region
+          className="flex items-center flex-1 gap-0.5 overflow-x-auto scrollbar-none h-full"
+        >
+          <SortableContext items={projectIds} strategy={horizontalListSortingStrategy}>
+            {projects.map((project) => (
+              <SortableProjectTab
+                key={project.id}
+                project={project}
+                isActive={activeProjectId === project.id}
+                isCompact={compactProjectTabs}
+                isDimmed={dimInactiveProjects && activeProjectId !== project.id}
+                onSelect={() => {
+                  setActiveProject(project.id);
+                  setMeditationActive(false);
                 }}
-                className={cn(
-                  "p-0.5 rounded hover:bg-bg-hover transition-opacity ml-1",
-                  "text-text-secondary hover:text-text-primary",
-                  isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"
-                )}
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                onClose={() => removeProject(project.id)}
+                onContextMenu={(e) => handleContextMenu(e, project.id)}
+              />
+            ))}
+          </SortableContext>
+        </div>
+      </DndContext>
 
       {/* Scroll buttons */}
       <div className="flex items-center border-l border-border h-full">
@@ -382,6 +471,103 @@ export function ProjectTabBar({
           </IconButton>
         </Tooltip>
       </div>
+
+      {/* Context Menu for Project Customization */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        onClose={closeContextMenu}
+      >
+        <div className="min-w-[280px]">
+          {/* Tabs */}
+          <div className="flex border-b border-border mb-3">
+            <button
+              onClick={() => setContextMenu((prev) => ({ ...prev, activeTab: "icon" }))}
+              className={cn(
+                "flex-1 py-1.5 text-sm font-medium transition-colors",
+                contextMenu.activeTab === "icon"
+                  ? "text-accent border-b-2 border-accent"
+                  : "text-text-secondary hover:text-text-primary"
+              )}
+            >
+              Icon
+            </button>
+            <button
+              onClick={() => setContextMenu((prev) => ({ ...prev, activeTab: "color" }))}
+              className={cn(
+                "flex-1 py-1.5 text-sm font-medium transition-colors",
+                contextMenu.activeTab === "color"
+                  ? "text-accent border-b-2 border-accent"
+                  : "text-text-secondary hover:text-text-primary"
+              )}
+            >
+              Color
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          {contextMenu.activeTab === "icon" && contextMenuProject && (
+            <IconPicker
+              selectedIcon={contextMenuProject.icon}
+              onSelectIcon={(icon) => {
+                if (contextMenu.projectId) {
+                  updateProjectIcon(contextMenu.projectId, icon);
+                }
+                closeContextMenu();
+              }}
+              onRemoveIcon={
+                contextMenuProject.icon
+                  ? () => {
+                      if (contextMenu.projectId) {
+                        updateProjectIcon(contextMenu.projectId, "");
+                      }
+                      closeContextMenu();
+                    }
+                  : undefined
+              }
+            />
+          )}
+
+          {contextMenu.activeTab === "color" && contextMenuProject && (
+            <div>
+              <div className="text-xs text-text-secondary mb-2 font-medium">Project Color</div>
+              <div className="grid grid-cols-4 gap-2">
+                {PROJECT_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => {
+                      if (contextMenu.projectId) {
+                        updateProjectColor(contextMenu.projectId, color);
+                      }
+                      closeContextMenu();
+                    }}
+                    className={cn(
+                      "w-8 h-8 rounded-full border-2 transition-all hover:scale-110",
+                      contextMenuProject.color === color
+                        ? "border-white ring-2 ring-accent/50"
+                        : "border-transparent hover:border-white/50"
+                    )}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+              {contextMenuProject.color && (
+                <button
+                  onClick={() => {
+                    if (contextMenu.projectId) {
+                      updateProjectColor(contextMenu.projectId, "");
+                    }
+                    closeContextMenu();
+                  }}
+                  className="w-full mt-3 px-2 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors border-t border-border pt-3"
+                >
+                  Remove color
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </ContextMenu>
 
       {/* File Browser Popup */}
       <FileBrowserPopup

@@ -50,6 +50,8 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     customMusicPath,
     sidebarPosition,
     appFont,
+    compactProjectTabs,
+    dimInactiveProjects,
     setEditorTheme,
     setEditorFontSize,
     setEditorWordWrap,
@@ -59,6 +61,8 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     setCustomMusicPath,
     setSidebarPosition,
     setAppFont,
+    setCompactProjectTabs,
+    setDimInactiveProjects,
   } = useSettingsStore();
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
@@ -117,6 +121,10 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
                   onSidebarPositionChange={setSidebarPosition}
                   appFont={appFont}
                   onAppFontChange={setAppFont}
+                  compactProjectTabs={compactProjectTabs}
+                  onCompactProjectTabsChange={setCompactProjectTabs}
+                  dimInactiveProjects={dimInactiveProjects}
+                  onDimInactiveProjectsChange={setDimInactiveProjects}
                 />
               )}
               {activeTab === "editor" && (
@@ -347,6 +355,10 @@ interface GeneralSettingsProps {
   onSidebarPositionChange: (position: SidebarPosition) => void;
   appFont: AppFont;
   onAppFontChange: (font: AppFont) => void;
+  compactProjectTabs: boolean;
+  onCompactProjectTabsChange: (compact: boolean) => void;
+  dimInactiveProjects: boolean;
+  onDimInactiveProjectsChange: (dim: boolean) => void;
 }
 
 const SIDEBAR_POSITION_OPTIONS: { id: SidebarPosition; name: string }[] = [
@@ -361,12 +373,79 @@ function GeneralSettings({
   onSidebarPositionChange,
   appFont,
   onAppFontChange,
+  compactProjectTabs,
+  onCompactProjectTabsChange,
+  dimInactiveProjects,
+  onDimInactiveProjectsChange,
 }: GeneralSettingsProps) {
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-medium text-text-primary mb-4">
         General Settings
       </h2>
+
+      {/* Project Tabs Section */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+          Project Tabs
+        </h3>
+
+        {/* Compact Project Tabs */}
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-text-primary">
+              Compact Tabs
+            </label>
+            <p className="text-xs text-text-secondary">
+              Use smaller, more compact project tabs
+            </p>
+          </div>
+          <button
+            onClick={() => onCompactProjectTabsChange(!compactProjectTabs)}
+            className={cn(
+              "w-11 h-6 rounded-full transition-colors relative",
+              compactProjectTabs ? "bg-accent" : "bg-bg-hover"
+            )}
+          >
+            <div
+              className={cn(
+                "w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all",
+                compactProjectTabs ? "left-5" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
+
+        {/* Dim Inactive Projects */}
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-text-primary">
+              Dim Inactive Projects
+            </label>
+            <p className="text-xs text-text-secondary">
+              Gray out inactive project tabs to reduce visual clutter
+            </p>
+          </div>
+          <button
+            onClick={() => onDimInactiveProjectsChange(!dimInactiveProjects)}
+            className={cn(
+              "w-11 h-6 rounded-full transition-colors relative",
+              dimInactiveProjects ? "bg-accent" : "bg-bg-hover"
+            )}
+          >
+            <div
+              className={cn(
+                "w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all",
+                dimInactiveProjects ? "left-5" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
+
+        <p className="text-xs text-text-secondary italic pt-1">
+          Tip: Right-click any project tab to change its icon or color
+        </p>
+      </div>
 
       {/* App Font */}
       <div className="space-y-2">

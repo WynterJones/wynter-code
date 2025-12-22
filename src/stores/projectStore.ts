@@ -11,6 +11,8 @@ interface ProjectStore {
   removeProject: (id: string) => void;
   setActiveProject: (id: string) => void;
   updateProjectColor: (id: string, color: string) => void;
+  updateProjectIcon: (id: string, icon: string) => void;
+  reorderProjects: (fromIndex: number, toIndex: number) => void;
   getProject: (id: string) => Project | undefined;
 }
 
@@ -72,6 +74,23 @@ export const useProjectStore = create<ProjectStore>()(
             p.id === id ? { ...p, color: color || undefined } : p
           ),
         }));
+      },
+
+      updateProjectIcon: (id: string, icon: string) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, icon: icon || undefined } : p
+          ),
+        }));
+      },
+
+      reorderProjects: (fromIndex: number, toIndex: number) => {
+        set((state) => {
+          const newProjects = [...state.projects];
+          const [removed] = newProjects.splice(fromIndex, 1);
+          newProjects.splice(toIndex, 0, removed);
+          return { projects: newProjects };
+        });
       },
 
       getProject: (id: string) => {

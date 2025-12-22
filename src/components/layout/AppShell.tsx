@@ -188,18 +188,20 @@ export function AppShell() {
               />
             )}
             {sidebarCollapsed && (
-              <Tooltip content="Show sidebar" side={sidebarPosition === "right" ? "left" : "right"}>
-                <button
-                  onClick={toggleSidebar}
-                  className={`absolute top-2 p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors z-30 ${sidebarPosition === "right" ? "right-2" : "left-2"}`}
-                >
-                  {sidebarPosition === "right" ? (
-                    <PanelRightClose className="w-4 h-4" />
-                  ) : (
-                    <PanelLeftClose className="w-4 h-4" />
-                  )}
-                </button>
-              </Tooltip>
+              <div className={`absolute top-0 ${sidebarPosition === "right" ? "right-0" : "left-0"} z-50 p-2`}>
+                <Tooltip content="Show sidebar" side={sidebarPosition === "right" ? "left" : "right"}>
+                  <button
+                    onClick={toggleSidebar}
+                    className="p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+                  >
+                    {sidebarPosition === "right" ? (
+                      <PanelRightClose className="w-4 h-4" />
+                    ) : (
+                      <PanelLeftClose className="w-4 h-4" />
+                    )}
+                  </button>
+                </Tooltip>
+              </div>
             )}
             <MinimizedPopupTabs projectId={activeProject.id} />
           </div>

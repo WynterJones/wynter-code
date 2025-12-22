@@ -50,6 +50,8 @@ interface SettingsStore {
   markdownDefaultView: MarkdownViewMode;
   defaultBrowsePath: string;
   customMusicPath: string;
+  compactProjectTabs: boolean;
+  dimInactiveProjects: boolean;
 
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
@@ -63,6 +65,8 @@ interface SettingsStore {
   setMarkdownDefaultView: (mode: MarkdownViewMode) => void;
   setDefaultBrowsePath: (path: string) => void;
   setCustomMusicPath: (path: string) => void;
+  setCompactProjectTabs: (compact: boolean) => void;
+  setDimInactiveProjects: (dim: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -81,6 +85,8 @@ export const useSettingsStore = create<SettingsStore>()(
       markdownDefaultView: "preview",
       defaultBrowsePath: "",
       customMusicPath: "",
+      compactProjectTabs: false,
+      dimInactiveProjects: false,
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -128,6 +134,14 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setCustomMusicPath: (customMusicPath: string) => {
         set({ customMusicPath });
+      },
+
+      setCompactProjectTabs: (compactProjectTabs: boolean) => {
+        set({ compactProjectTabs });
+      },
+
+      setDimInactiveProjects: (dimInactiveProjects: boolean) => {
+        set({ dimInactiveProjects });
       },
     }),
     {

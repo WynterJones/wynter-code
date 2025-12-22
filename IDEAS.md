@@ -4,19 +4,23 @@ A collection of feature ideas organized by where they live in the UI.
 
 ---
 
+## Completed
+
+*Features that have been implemented.*
+
+### Enhanced Project Tabs ✓
+- Custom icon picker from Lucide library (120+ icons with search)
+- Compact tab mode toggle in Settings > General
+- Dim inactive projects toggle in Settings > General
+- Right-click context menu for icon and color selection
+- Drag to reorder tabs using @dnd-kit
+- Project icon and color persist across sessions
+
+---
+
 ## Project Tab Bar
 
 *Improvements to the project tabs at the top of the app.*
-
-### Enhanced Project Tabs
-**Priority:** High
-
-Better project tab customization:
-- Pick custom icon from Lucide library for each project
-- Smaller, more compact tab design
-- Option to gray out inactive projects (keep visible but dimmed)
-- Right-click to change icon or color
-- Drag to reorder tabs
 
 ---
 
@@ -248,8 +252,8 @@ Split view for sessions and terminals:
 ## Implementation Notes
 
 **Quick Wins (Low Effort, High Value):**
-- Enhanced Project Tabs (UI tweaks + Lucide picker)
-- Port Manager (uses lsof/netstat)
+- ~~Enhanced Project Tabs (UI tweaks + Lucide picker)~~ ✓
+- Port Manager (uses lsof/netstat) ← **NEXT**
 - System Health Dashboard (version checks)
 - Prompt Templates (JSON storage + UI)
 
