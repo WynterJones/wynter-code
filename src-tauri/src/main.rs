@@ -150,6 +150,7 @@ fn main() {
             commands::create_folder,
             commands::rename_item,
             commands::delete_to_trash,
+            commands::move_item,
             commands::get_home_dir,
             commands::check_node_modules_exists,
             commands::get_directory_stats,

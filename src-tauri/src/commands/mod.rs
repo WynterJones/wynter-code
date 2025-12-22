@@ -871,6 +871,47 @@ pub fn delete_to_trash(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn move_item(source_path: String, destination_folder: String) -> Result<String, String> {
+    let source = Path::new(&source_path);
+
+    if !source.exists() {
+        return Err(format!("Source path does not exist: {:?}", source));
+    }
+
+    let dest = Path::new(&destination_folder);
+    if !dest.exists() {
+        return Err(format!("Destination folder does not exist: {:?}", dest));
+    }
+
+    if !dest.is_dir() {
+        return Err(format!("Destination must be a directory: {:?}", dest));
+    }
+
+    let file_name = source
+        .file_name()
+        .ok_or("Cannot determine source filename")?;
+
+    let target = dest.join(file_name);
+
+    if target.exists() {
+        return Err(format!("An item with that name already exists at destination: {:?}", target));
+    }
+
+    // Prevent moving a folder into itself or its descendants
+    if source.is_dir() {
+        let source_canonical = source.canonicalize().map_err(|e| format!("Failed to resolve source path: {}", e))?;
+        let dest_canonical = dest.canonicalize().map_err(|e| format!("Failed to resolve destination path: {}", e))?;
+
+        if dest_canonical.starts_with(&source_canonical) {
+            return Err("Cannot move a folder into itself or its descendants".to_string());
+        }
+    }
+
+    fs::rename(&source_path, &target).map_err(|e| format!("Failed to move: {}", e))?;
+    Ok(target.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 pub fn get_home_dir() -> Result<String, String> {
     dirs::home_dir()
         .map(|p| p.to_string_lossy().to_string())

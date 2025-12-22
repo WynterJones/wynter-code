@@ -1,7 +1,8 @@
 [package]
 name = "wynter-code"
 version = "1.0.0"
-description = "A Tauri desktop application for Claude Code"
+description = "An opinionated workflow GUI for Claude Code"
+homepage = "https://code.wynter.ai"
 authors = ["Wynter Jones"]
 edition = "2021"
 

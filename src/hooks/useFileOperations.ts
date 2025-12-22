@@ -17,6 +17,10 @@ export function useFileOperations() {
     return invoke<void>("delete_to_trash", { path });
   };
 
+  const moveItem = async (sourcePath: string, destinationFolder: string): Promise<string> => {
+    return invoke<string>("move_item", { sourcePath, destinationFolder });
+  };
+
   const checkNodeModulesExists = async (projectPath: string): Promise<boolean> => {
     return invoke<boolean>("check_node_modules_exists", { projectPath });
   };
@@ -35,6 +39,7 @@ export function useFileOperations() {
     createFolder,
     renameItem,
     deleteToTrash,
+    moveItem,
     checkNodeModulesExists,
     checkFileExists,
   };

@@ -45,7 +45,7 @@
     },
     "updater": {
       "endpoints": [
-        "https://github.com/WynterJones/wynter-code/releases/latest/download/latest.json"
+        "https://code.wynter.ai/releases/latest.json"
       ],
       "pubkey": ""
     }

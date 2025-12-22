@@ -2,6 +2,8 @@
   "name": "wynter-code",
   "private": true,
   "version": "1.0.0",
+  "description": "An opinionated workflow GUI for Claude Code",
+  "homepage": "https://code.wynter.ai",
   "type": "module",
   "scripts": {
     "dev": "vite",

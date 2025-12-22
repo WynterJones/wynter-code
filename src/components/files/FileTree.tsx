@@ -34,7 +34,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
 
-  const { createFile, createFolder, renameItem, deleteToTrash } = useFileOperations();
+  const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
 
   const loadFiles = useCallback(async () => {
     try {
@@ -113,6 +113,15 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       await loadFiles();
     } catch (err) {
       console.error("Failed to delete:", err);
+    }
+  };
+
+  const handleMoveItem = async (sourcePath: string, destinationFolder: string) => {
+    try {
+      await moveItem(sourcePath, destinationFolder);
+      await loadFiles();
+    } catch (err) {
+      console.error("Failed to move item:", err);
     }
   };
 
@@ -195,6 +204,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
               onFileOpen={onFileOpen}
               onContextMenu={handleContextMenu}
               onNodeModulesClick={onNodeModulesClick}
+              onMoveItem={handleMoveItem}
             />
           ))}
         </div>
