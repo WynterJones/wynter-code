@@ -8,3 +8,4 @@ export { useOnboardingStore, ONBOARDING_STEPS, TOTAL_STEPS } from "./onboardingS
 export type { SystemCheckResults } from "./onboardingStore";
 export { useClaudeStore } from "./claudeStore";
 export type { ClaudeManagerTab } from "./claudeStore";
+export { useMcpStore, isSensitiveEnvKey } from "./mcpStore";

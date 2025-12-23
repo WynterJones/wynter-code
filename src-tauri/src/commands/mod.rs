@@ -2918,3 +2918,423 @@ pub async fn optimize_video(path: String, overwrite: bool) -> Result<Compression
         error: None,
     })
 }
+
+// ============================================================================
+// MCP Server Management
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServer {
+    pub name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub env: std::collections::HashMap<String, String>,
+    pub scope: String, // "global", "project", or "project-local"
+    pub is_enabled: bool,
+    pub project_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerInput {
+    pub name: String,
+    pub command: String,
+    pub args: Vec<String>,
+    pub env: std::collections::HashMap<String, String>,
+    pub scope: String,
+    pub project_path: Option<String>,
+}
+
+#[tauri::command]
+pub fn get_mcp_servers(project_path: Option<String>) -> Result<Vec<McpServer>, String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let mut servers: Vec<McpServer> = Vec::new();
+
+    // Read ~/.claude.json for global and project MCPs
+    let claude_json_path = home_dir.join(".claude.json");
+    if claude_json_path.exists() {
+        let content = fs::read_to_string(&claude_json_path)
+            .map_err(|e| format!("Failed to read ~/.claude.json: {}", e))?;
+        let config: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse ~/.claude.json: {}", e))?;
+
+        // Get global mcpServers
+        if let Some(mcp_servers) = config.get("mcpServers").and_then(|v| v.as_object()) {
+            for (name, server_config) in mcp_servers {
+                servers.push(parse_mcp_server(name, server_config, "global", None));
+            }
+        }
+
+        // Get project-specific mcpServers if project_path is provided
+        if let Some(ref project) = project_path {
+            if let Some(projects) = config.get("projects").and_then(|v| v.as_object()) {
+                if let Some(project_config) = projects.get(project) {
+                    if let Some(mcp_servers) = project_config.get("mcpServers").and_then(|v| v.as_object()) {
+                        for (name, server_config) in mcp_servers {
+                            servers.push(parse_mcp_server(name, server_config, "project", Some(project.clone())));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Read project-local .mcp.json if it exists
+    if let Some(ref project) = project_path {
+        let mcp_json_path = Path::new(project).join(".mcp.json");
+        if mcp_json_path.exists() {
+            if let Ok(content) = fs::read_to_string(&mcp_json_path) {
+                if let Ok(config) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(mcp_servers) = config.get("mcpServers").and_then(|v| v.as_object()) {
+                        for (name, server_config) in mcp_servers {
+                            servers.push(parse_mcp_server(name, server_config, "project-local", Some(project.clone())));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Read ~/.claude/settings.json to determine enabled state
+    let settings_path = home_dir.join(".claude").join("settings.json");
+    let enabled_mcps: std::collections::HashSet<String> = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path).unwrap_or_default();
+        if let Ok(settings) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(permissions) = settings.get("permissions").and_then(|v| v.as_object()) {
+                if let Some(allow) = permissions.get("allow").and_then(|v| v.as_array()) {
+                    allow
+                        .iter()
+                        .filter_map(|v| v.as_str())
+                        .filter(|s| s.starts_with("mcp__"))
+                        .map(|s| {
+                            // Extract MCP name from "mcp__name__*" or "mcp__name__tool"
+                            let parts: Vec<&str> = s.split("__").collect();
+                            if parts.len() >= 2 {
+                                parts[1].to_string()
+                            } else {
+                                s.to_string()
+                            }
+                        })
+                        .collect()
+                } else {
+                    std::collections::HashSet::new()
+                }
+            } else {
+                std::collections::HashSet::new()
+            }
+        } else {
+            std::collections::HashSet::new()
+        }
+    } else {
+        std::collections::HashSet::new()
+    };
+
+    // Update enabled state for each server
+    for server in &mut servers {
+        server.is_enabled = enabled_mcps.contains(&server.name);
+    }
+
+    Ok(servers)
+}
+
+fn parse_mcp_server(
+    name: &str,
+    config: &serde_json::Value,
+    scope: &str,
+    project_path: Option<String>,
+) -> McpServer {
+    let command = config
+        .get("command")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let args = config
+        .get("args")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let env = config
+        .get("env")
+        .and_then(|v| v.as_object())
+        .map(|obj| {
+            obj.iter()
+                .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    McpServer {
+        name: name.to_string(),
+        command,
+        args,
+        env,
+        scope: scope.to_string(),
+        is_enabled: false, // Will be updated later
+        project_path,
+    }
+}
+
+#[tauri::command]
+pub fn save_mcp_server(server: McpServerInput) -> Result<(), String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let server_config = serde_json::json!({
+        "command": server.command,
+        "args": server.args,
+        "env": server.env,
+    });
+
+    match server.scope.as_str() {
+        "global" => {
+            let claude_json_path = home_dir.join(".claude.json");
+            let mut config = if claude_json_path.exists() {
+                let content = fs::read_to_string(&claude_json_path)
+                    .map_err(|e| format!("Failed to read ~/.claude.json: {}", e))?;
+                serde_json::from_str(&content)
+                    .map_err(|e| format!("Failed to parse ~/.claude.json: {}", e))?
+            } else {
+                serde_json::json!({})
+            };
+
+            // Ensure mcpServers object exists
+            if config.get("mcpServers").is_none() {
+                config["mcpServers"] = serde_json::json!({});
+            }
+
+            config["mcpServers"][&server.name] = server_config;
+
+            let content = serde_json::to_string_pretty(&config)
+                .map_err(|e| format!("Failed to serialize config: {}", e))?;
+            fs::write(&claude_json_path, content)
+                .map_err(|e| format!("Failed to write ~/.claude.json: {}", e))?;
+        }
+        "project" => {
+            let project_path = server.project_path
+                .ok_or("Project path required for project scope")?;
+
+            let claude_json_path = home_dir.join(".claude.json");
+            let mut config = if claude_json_path.exists() {
+                let content = fs::read_to_string(&claude_json_path)
+                    .map_err(|e| format!("Failed to read ~/.claude.json: {}", e))?;
+                serde_json::from_str(&content)
+                    .map_err(|e| format!("Failed to parse ~/.claude.json: {}", e))?
+            } else {
+                serde_json::json!({})
+            };
+
+            // Ensure projects and project path exist
+            if config.get("projects").is_none() {
+                config["projects"] = serde_json::json!({});
+            }
+            if config["projects"].get(&project_path).is_none() {
+                config["projects"][&project_path] = serde_json::json!({});
+            }
+            if config["projects"][&project_path].get("mcpServers").is_none() {
+                config["projects"][&project_path]["mcpServers"] = serde_json::json!({});
+            }
+
+            config["projects"][&project_path]["mcpServers"][&server.name] = server_config;
+
+            let content = serde_json::to_string_pretty(&config)
+                .map_err(|e| format!("Failed to serialize config: {}", e))?;
+            fs::write(&claude_json_path, content)
+                .map_err(|e| format!("Failed to write ~/.claude.json: {}", e))?;
+        }
+        "project-local" => {
+            let project_path = server.project_path
+                .ok_or("Project path required for project-local scope")?;
+
+            let mcp_json_path = Path::new(&project_path).join(".mcp.json");
+            let mut config = if mcp_json_path.exists() {
+                let content = fs::read_to_string(&mcp_json_path)
+                    .map_err(|e| format!("Failed to read .mcp.json: {}", e))?;
+                serde_json::from_str(&content)
+                    .map_err(|e| format!("Failed to parse .mcp.json: {}", e))?
+            } else {
+                serde_json::json!({})
+            };
+
+            if config.get("mcpServers").is_none() {
+                config["mcpServers"] = serde_json::json!({});
+            }
+
+            config["mcpServers"][&server.name] = server_config;
+
+            let content = serde_json::to_string_pretty(&config)
+                .map_err(|e| format!("Failed to serialize config: {}", e))?;
+            fs::write(&mcp_json_path, content)
+                .map_err(|e| format!("Failed to write .mcp.json: {}", e))?;
+        }
+        _ => return Err(format!("Invalid scope: {}", server.scope)),
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_mcp_server(
+    name: String,
+    scope: String,
+    project_path: Option<String>,
+) -> Result<(), String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    match scope.as_str() {
+        "global" => {
+            let claude_json_path = home_dir.join(".claude.json");
+            if !claude_json_path.exists() {
+                return Ok(());
+            }
+
+            let content = fs::read_to_string(&claude_json_path)
+                .map_err(|e| format!("Failed to read ~/.claude.json: {}", e))?;
+            let mut config: serde_json::Value = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse ~/.claude.json: {}", e))?;
+
+            if let Some(mcp_servers) = config.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
+                mcp_servers.remove(&name);
+            }
+
+            let content = serde_json::to_string_pretty(&config)
+                .map_err(|e| format!("Failed to serialize config: {}", e))?;
+            fs::write(&claude_json_path, content)
+                .map_err(|e| format!("Failed to write ~/.claude.json: {}", e))?;
+        }
+        "project" => {
+            let project = project_path.ok_or("Project path required for project scope")?;
+
+            let claude_json_path = home_dir.join(".claude.json");
+            if !claude_json_path.exists() {
+                return Ok(());
+            }
+
+            let content = fs::read_to_string(&claude_json_path)
+                .map_err(|e| format!("Failed to read ~/.claude.json: {}", e))?;
+            let mut config: serde_json::Value = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse ~/.claude.json: {}", e))?;
+
+            if let Some(projects) = config.get_mut("projects").and_then(|v| v.as_object_mut()) {
+                if let Some(project_config) = projects.get_mut(&project).and_then(|v| v.as_object_mut()) {
+                    if let Some(mcp_servers) = project_config.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
+                        mcp_servers.remove(&name);
+                    }
+                }
+            }
+
+            let content = serde_json::to_string_pretty(&config)
+                .map_err(|e| format!("Failed to serialize config: {}", e))?;
+            fs::write(&claude_json_path, content)
+                .map_err(|e| format!("Failed to write ~/.claude.json: {}", e))?;
+        }
+        "project-local" => {
+            let project = project_path.ok_or("Project path required for project-local scope")?;
+
+            let mcp_json_path = Path::new(&project).join(".mcp.json");
+            if !mcp_json_path.exists() {
+                return Ok(());
+            }
+
+            let content = fs::read_to_string(&mcp_json_path)
+                .map_err(|e| format!("Failed to read .mcp.json: {}", e))?;
+            let mut config: serde_json::Value = serde_json::from_str(&content)
+                .map_err(|e| format!("Failed to parse .mcp.json: {}", e))?;
+
+            if let Some(mcp_servers) = config.get_mut("mcpServers").and_then(|v| v.as_object_mut()) {
+                mcp_servers.remove(&name);
+            }
+
+            let content = serde_json::to_string_pretty(&config)
+                .map_err(|e| format!("Failed to serialize config: {}", e))?;
+            fs::write(&mcp_json_path, content)
+                .map_err(|e| format!("Failed to write .mcp.json: {}", e))?;
+        }
+        _ => return Err(format!("Invalid scope: {}", scope)),
+    }
+
+    // Also remove from permissions
+    let _ = toggle_mcp_server(name, false);
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn toggle_mcp_server(name: String, enabled: bool) -> Result<(), String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| "Could not determine home directory".to_string())?;
+
+    let settings_path = home_dir.join(".claude").join("settings.json");
+
+    let mut settings: serde_json::Value = if settings_path.exists() {
+        let content = fs::read_to_string(&settings_path)
+            .map_err(|e| format!("Failed to read settings: {}", e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse settings: {}", e))?
+    } else {
+        serde_json::json!({})
+    };
+
+    // Ensure permissions.allow exists
+    if settings.get("permissions").is_none() {
+        settings["permissions"] = serde_json::json!({});
+    }
+    if settings["permissions"].get("allow").is_none() {
+        settings["permissions"]["allow"] = serde_json::json!([]);
+    }
+
+    let permission_pattern = format!("mcp__{}__*", name);
+
+    if let Some(allow) = settings["permissions"]["allow"].as_array_mut() {
+        // Remove existing entries for this MCP
+        allow.retain(|v| {
+            if let Some(s) = v.as_str() {
+                !s.starts_with(&format!("mcp__{}__", name))
+            } else {
+                true
+            }
+        });
+
+        // Add if enabling
+        if enabled {
+            allow.push(serde_json::json!(permission_pattern));
+        }
+    }
+
+    // Ensure directory exists
+    if let Some(parent) = settings_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let content = serde_json::to_string_pretty(&settings)
+        .map_err(|e| format!("Failed to serialize settings: {}", e))?;
+    fs::write(&settings_path, content)
+        .map_err(|e| format!("Failed to write settings: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn validate_mcp_command(command: String) -> Result<bool, String> {
+    // Use 'which' on Unix or 'where' on Windows to check if command exists
+    #[cfg(target_os = "windows")]
+    let check_cmd = "where";
+    #[cfg(not(target_os = "windows"))]
+    let check_cmd = "which";
+
+    let output = Command::new(check_cmd)
+        .arg(&command)
+        .output()
+        .map_err(|e| format!("Failed to check command: {}", e))?;
+
+    Ok(output.status.success())
+}

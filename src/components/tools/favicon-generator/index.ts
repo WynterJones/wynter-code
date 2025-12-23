@@ -1,0 +1,1 @@
+export { FaviconGeneratorPopup } from "./FaviconGeneratorPopup";

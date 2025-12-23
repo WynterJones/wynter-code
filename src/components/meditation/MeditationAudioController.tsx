@@ -13,6 +13,8 @@ import { getRandomTrackIndex } from "./tracks";
  */
 export function MeditationAudioController() {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const hasAutoPlayedRef = useRef(false);
+  const previousSrcRef = useRef<string | null>(null);
 
   const {
     isActive,
@@ -102,17 +104,25 @@ export function MeditationAudioController() {
   useEffect(() => {
     if (!audioRef.current || !shouldBeActive || !audioSrc) return;
 
-    audioRef.current.load();
-    if (isPlaying) {
-      audioRef.current.play().catch(() => setPlaying(false));
+    // Only reload if the source actually changed
+    if (previousSrcRef.current !== audioSrc) {
+      previousSrcRef.current = audioSrc;
+      audioRef.current.load();
+      // If currently playing, continue playing the new source
+      if (useMeditationStore.getState().isPlaying) {
+        audioRef.current.play().catch(() => setPlaying(false));
+      }
     }
-  }, [audioSrc, shouldBeActive, isPlaying, setPlaying]);
+  }, [audioSrc, shouldBeActive, setPlaying]);
 
   // Handle when audio should stop completely
   useEffect(() => {
     if (!shouldBeActive && audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+      // Reset auto-play flag when meditation becomes inactive
+      hasAutoPlayedRef.current = false;
+      previousSrcRef.current = null;
     }
   }, [shouldBeActive]);
 
@@ -125,10 +135,10 @@ export function MeditationAudioController() {
     // Streams don't end, they just keep playing
   };
 
-  // Auto-play when audio is ready and meditation is active
+  // Auto-play only on initial activation (not after user pauses)
   const handleCanPlay = () => {
-    if (shouldBeActive && !isPlaying && audioRef.current) {
-      // Auto-play when meditation screen opens
+    if (shouldBeActive && !hasAutoPlayedRef.current && audioRef.current) {
+      hasAutoPlayedRef.current = true;
       audioRef.current.play().catch(() => setPlaying(false));
     }
   };

@@ -57,7 +57,11 @@ import {
   DatabaseViewerPopup,
   OverwatchPopup,
   BeadsTrackerPopup,
+  FaviconGeneratorPopup,
 } from "@/components/tools";
+import { McpManagerPopup } from "@/components/tools/mcp-manager";
+import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
+import { useMcpStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useStorybookDetection } from "@/hooks/useStorybookDetection";
@@ -378,6 +382,8 @@ export function ProjectTabBar({
   const [showBackgroundServices, setShowBackgroundServices] = useState(false);
   const [showDatabaseViewer, setShowDatabaseViewer] = useState(false);
   const [showBeadsTracker, setShowBeadsTracker] = useState(false);
+  const [showFaviconGenerator, setShowFaviconGenerator] = useState(false);
+  const [showDevToolkit, setShowDevToolkit] = useState(false);
   const [hasBeads, setHasBeads] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -494,6 +500,15 @@ export function ProjectTabBar({
           break;
         case "openBeadsTracker":
           if (hasBeads) setShowBeadsTracker(true);
+          break;
+        case "openMcpManager":
+          useMcpStore.getState().openPopup();
+          break;
+        case "openFaviconGenerator":
+          setShowFaviconGenerator(true);
+          break;
+        case "openDevToolkit":
+          setShowDevToolkit(true);
           break;
       }
     };
@@ -717,6 +732,9 @@ export function ProjectTabBar({
           onOpenStorybookViewer={() => setShowStorybookViewer(true)}
           onOpenBackgroundServices={() => setShowBackgroundServices(true)}
           onOpenOverwatch={() => setShowOverwatch(true)}
+          onOpenMcpManager={() => useMcpStore.getState().openPopup()}
+          onOpenFaviconGenerator={() => setShowFaviconGenerator(true)}
+          onOpenDevToolkit={() => setShowDevToolkit(true)}
           hasStorybook={hasStorybook}
         />
       </div>
@@ -997,6 +1015,21 @@ export function ProjectTabBar({
           projectPath={activeProject.path}
         />
       )}
+
+      {/* MCP Manager */}
+      <McpManagerPopup />
+
+      {/* Favicon Generator */}
+      <FaviconGeneratorPopup
+        isOpen={showFaviconGenerator}
+        onClose={() => setShowFaviconGenerator(false)}
+      />
+
+      {/* Dev Toolkit */}
+      <DevToolkitPopup
+        isOpen={showDevToolkit}
+        onClose={() => setShowDevToolkit(false)}
+      />
     </div>
   );
 }

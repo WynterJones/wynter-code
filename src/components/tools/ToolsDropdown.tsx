@@ -14,6 +14,9 @@ import {
   Server,
   Eye,
   CircleDot,
+  Blocks,
+  Image,
+  Hammer,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -131,6 +134,30 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openEnvManager",
     category: "utilities",
   },
+  {
+    id: "mcp-manager",
+    name: "MCP Servers",
+    description: "Manage Model Context Protocol servers",
+    icon: Blocks,
+    actionKey: "openMcpManager",
+    category: "utilities",
+  },
+  {
+    id: "favicon-generator",
+    name: "Favicon Generator",
+    description: "Generate favicons from any image",
+    icon: Image,
+    actionKey: "openFaviconGenerator",
+    category: "utilities",
+  },
+  {
+    id: "dev-toolkit",
+    name: "Dev Toolkit",
+    description: "Text and encoding utilities",
+    icon: Hammer,
+    actionKey: "openDevToolkit",
+    category: "utilities",
+  },
 ];
 
 interface Tool {
@@ -161,6 +188,9 @@ interface ToolsDropdownProps {
   onOpenStorybookViewer: () => void;
   onOpenBackgroundServices: () => void;
   onOpenOverwatch: () => void;
+  onOpenMcpManager: () => void;
+  onOpenFaviconGenerator: () => void;
+  onOpenDevToolkit: () => void;
   hasStorybook?: boolean;
 }
 
@@ -176,6 +206,9 @@ export function ToolsDropdown({
   onOpenStorybookViewer,
   onOpenBackgroundServices,
   onOpenOverwatch,
+  onOpenMcpManager,
+  onOpenFaviconGenerator,
+  onOpenDevToolkit,
   hasStorybook = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -311,6 +344,39 @@ export function ToolsDropdown({
       category: "utilities",
       onClick: () => {
         onOpenEnvManager();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "mcp-manager",
+      name: "MCP Servers",
+      description: "Manage Model Context Protocol servers",
+      icon: <Blocks className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenMcpManager();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "favicon-generator",
+      name: "Favicon Generator",
+      description: "Generate favicons from any image",
+      icon: <Image className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenFaviconGenerator();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "dev-toolkit",
+      name: "Dev Toolkit",
+      description: "Text and encoding utilities",
+      icon: <Hammer className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenDevToolkit();
         setIsOpen(false);
       },
     },

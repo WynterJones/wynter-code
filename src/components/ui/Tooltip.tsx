@@ -18,6 +18,7 @@ export function Tooltip({
   className,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
+  const [isPositioned, setIsPositioned] = useState(false);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -70,10 +71,13 @@ export function Tooltip({
     y = Math.max(padding, Math.min(y, window.innerHeight - tooltipRect.height - padding));
 
     setCoords({ x, y });
+    setIsPositioned(true);
   }, [side]);
 
   useEffect(() => {
     if (isVisible) {
+      // Reset positioned state when visibility changes
+      setIsPositioned(false);
       requestAnimationFrame(calculatePosition);
     }
   }, [isVisible, calculatePosition]);
@@ -94,6 +98,7 @@ export function Tooltip({
               position: "fixed",
               left: coords.x,
               top: coords.y,
+              opacity: isPositioned ? 1 : 0,
             }}
             className={cn(
               "z-[99999] px-2.5 py-1.5 text-sm font-medium rounded-md shadow-lg",

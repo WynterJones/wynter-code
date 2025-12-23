@@ -302,6 +302,12 @@ fn main() {
             beads::beads_close,
             beads::beads_reopen,
             beads::beads_show,
+            // MCP Server Management
+            commands::get_mcp_servers,
+            commands::save_mcp_server,
+            commands::delete_mcp_server,
+            commands::toggle_mcp_server,
+            commands::validate_mcp_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
