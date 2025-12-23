@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { GripHorizontal, FolderOpen, Terminal as TerminalIcon } from "lucide-react";
+import { GripHorizontal, FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns } from "lucide-react";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
@@ -9,8 +9,10 @@ import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudeDropdown, ClaudePopup } from "@/components/claude";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle } from "@/components/session";
+import { PanelLayoutContainer } from "@/components/panels";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
 import type { Project, PermissionMode } from "@/types";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
@@ -30,6 +32,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const { activeSessionId, getSessionsForProject, getMessages, getStreamingState, updateToolCallStatus, updateSessionPermissionMode } =
     useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId } = useTerminalStore();
+  const { useMultiPanelLayout, setUseMultiPanelLayout } = useSettingsStore();
 
   const sessions = getSessionsForProject(project.id);
   const currentSessionId = activeSessionId.get(project.id);
@@ -129,7 +132,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           )}
           <div className="w-px h-5 bg-border" />
           <ClaudeDropdown projectPath={project.path} />
-          {!isTerminalSession && (
+          {!isTerminalSession && !useMultiPanelLayout && (
             <button
               onClick={() => toggleTerminal(project.id)}
               className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
@@ -138,10 +141,25 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
               <TerminalIcon className="w-4 h-4" />
             </button>
           )}
+          <button
+            onClick={() => setUseMultiPanelLayout(!useMultiPanelLayout)}
+            className={cn(
+              "p-1.5 rounded transition-colors",
+              useMultiPanelLayout
+                ? "bg-accent/20 text-accent hover:bg-accent/30"
+                : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+            )}
+            title={useMultiPanelLayout ? "Switch to classic layout" : "Switch to multi-panel layout"}
+          >
+            {useMultiPanelLayout ? <Columns className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+          </button>
         </div>
       </div>
 
-      {isTerminalSession && currentSessionId ? (
+      {/* Multi-panel layout mode */}
+      {useMultiPanelLayout && !isTerminalSession ? (
+        <PanelLayoutContainer projectId={project.id} projectPath={project.path} />
+      ) : isTerminalSession && currentSessionId ? (
         <div className="flex-1 overflow-hidden">
           <Terminal
             key={currentSessionId}
@@ -224,7 +242,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         </>
       )}
 
-      {!isTerminalSession && (
+      {!isTerminalSession && !useMultiPanelLayout && (
         <TerminalPanel projectId={project.id} projectPath={project.path} />
       )}
 

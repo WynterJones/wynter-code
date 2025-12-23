@@ -6,7 +6,7 @@ import { X, Save, RotateCcw, Eye, Code, Columns, Minus, Search, ChevronUp, Chevr
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip, Badge, ScrollArea } from "@/components/ui";
-import { useSettingsStore, MARKDOWN_MAX_WIDTHS, MARKDOWN_FONTS } from "@/stores/settingsStore";
+import { useSettingsStore, MARKDOWN_MAX_WIDTHS } from "@/stores/settingsStore";
 import { defineMonacoThemes } from "@/hooks/useMonacoTheme";
 
 // Helper to toggle checkbox in markdown content
@@ -59,10 +59,8 @@ export function MarkdownEditorPopup({
     markdownDefaultView,
     markdownMaxWidth,
     markdownFontSize,
-    markdownFont,
     setMarkdownMaxWidth,
     setMarkdownFontSize,
-    setMarkdownFont,
   } = useSettingsStore();
 
   const [showSettings, setShowSettings] = useState(false);
@@ -297,7 +295,6 @@ export function MarkdownEditorPopup({
 
   // Get computed styles for markdown preview
   const maxWidthValue = MARKDOWN_MAX_WIDTHS.find(w => w.id === markdownMaxWidth)?.value || "700px";
-  const fontFamilyValue = MARKDOWN_FONTS.find(f => f.id === markdownFont)?.family || "system-ui, -apple-system, sans-serif";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
@@ -406,20 +403,6 @@ export function MarkdownEditorPopup({
                         onChange={(e) => setMarkdownFontSize(Number(e.target.value))}
                         className="w-full accent-accent"
                       />
-                    </div>
-
-                    {/* Font Family */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-text-secondary">Font Family</label>
-                      <select
-                        value={markdownFont}
-                        onChange={(e) => setMarkdownFont(e.target.value as typeof markdownFont)}
-                        className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
-                      >
-                        {MARKDOWN_FONTS.map((f) => (
-                          <option key={f.id} value={f.id}>{f.name}</option>
-                        ))}
-                      </select>
                     </div>
                   </div>
                 )}
@@ -575,7 +558,6 @@ export function MarkdownEditorPopup({
                       style={{
                         maxWidth: maxWidthValue,
                         fontSize: `${markdownFontSize}px`,
-                        fontFamily: fontFamilyValue,
                       }}
                     >
                     <ReactMarkdown

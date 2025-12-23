@@ -8,3 +8,4 @@ export * from "./command";
 export * from "./env";
 export * from "./apiTester";
 export * from "./databaseViewer";
+export * from "./panel";

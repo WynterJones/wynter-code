@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-23
-**Active Ideas:** 3
+**Active Ideas:** 2
 
 ---
 
@@ -26,13 +26,6 @@ Unified dashboard for external services.
 - Sparkline charts for trends
 - Credentials in system keychain
 - Integrations: Railway, Vercel, Netlify, Plausible, PostHog, Sentry, Supabase, Stripe
-
-### Database Viewer: MySQL Support
-Extend Database Viewer to support MySQL connections.
-- Add MySQL connection pool handling (MySqlPool)
-- Handle MySQL SQL dialect for schema introspection
-- MySQL: INFORMATION_SCHEMA queries for tables/columns
-- Enable the "Add Connection" button for detected MySQL services
 
 ### Multi-Panel Layout
 Split view for sessions and terminals.
@@ -68,4 +61,4 @@ Split view for sessions and terminals.
 | Workspaces | `WorkspaceSelectorPopup` - workspace layer above projects with custom avatars, icon/image/shape | 2025-12-23 |
 | Storybook Viewer | `StorybookViewerPopup` - detect Storybook, launch dev server, embedded iframe preview | 2025-12-23 |
 | Background Services Viewer | `BackgroundServicesPopup` - view and kill developer services (Redis, Postgres, Node, etc.) | 2025-12-23 |
-| Database Viewer | `DatabaseViewerPopup` - SQLite browser with CRUD, SQL runner, detects running Postgres/MySQL | 2025-12-23 |
+| Database Viewer | `DatabaseViewerPopup` - SQLite + PostgreSQL + MySQL browser with CRUD, SQL runner, detects running services | 2025-12-23 |

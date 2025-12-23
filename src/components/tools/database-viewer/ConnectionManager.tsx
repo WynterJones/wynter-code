@@ -113,28 +113,15 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
               <p className="text-xs text-text-tertiary px-2 mb-1 uppercase tracking-wider">
                 Running Locally
               </p>
-              {detectedServices.map((service) => {
-                const isSupported = service.serviceType === "postgres";
-                return (
+              {detectedServices.map((service) => (
                   <div
                     key={`${service.serviceType}-${service.port}`}
-                    className={cn(
-                      "p-2 rounded-md border border-dashed",
-                      isSupported
-                        ? "border-green-500/30 bg-green-500/5 hover:bg-green-500/10"
-                        : "border-gray-500/30 bg-gray-500/5"
-                    )}
+                    className="p-2 rounded-md border border-dashed border-green-500/30 bg-green-500/5 hover:bg-green-500/10"
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <div className={cn(
-                          "w-2 h-2 rounded-full",
-                          isSupported ? "bg-green-500 animate-pulse" : "bg-gray-400"
-                        )} />
-                        <Server className={cn(
-                          "w-3.5 h-3.5",
-                          isSupported ? "text-green-500" : "text-gray-400"
-                        )} />
+                        <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                        <Server className="w-3.5 h-3.5 text-green-500" />
                         <span className="text-sm font-medium">
                           {service.serviceType === "postgres" ? "PostgreSQL" : "MySQL"}
                         </span>
@@ -142,26 +129,18 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                           {service.host}:{service.port}
                         </span>
                       </div>
-                      {isSupported && (
-                        <Tooltip content="Add Connection">
-                          <IconButton
-                            size="sm"
-                            className="p-1"
-                            onClick={() => createConnectionFromService(service)}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                      <Tooltip content="Add Connection">
+                        <IconButton
+                          size="sm"
+                          className="p-1"
+                          onClick={() => createConnectionFromService(service)}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </IconButton>
+                      </Tooltip>
                     </div>
-                    {!isSupported && (
-                      <div className="text-xs text-text-tertiary mt-1 pl-4 italic">
-                        MySQL support coming soon
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+                ))}
             </div>
           )}
 

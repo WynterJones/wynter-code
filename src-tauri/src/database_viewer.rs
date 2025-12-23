@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use sqlx::mysql::{MySqlPool, MySqlPoolOptions, MySqlRow};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::{Column, Row, TypeInfo};
@@ -108,6 +109,7 @@ pub struct DetectedService {
 pub enum DbPool {
     Sqlite(SqlitePool),
     Postgres(PgPool),
+    MySql(MySqlPool),
 }
 
 // Store connection type alongside pool
@@ -250,6 +252,72 @@ fn get_pg_column_value(row: &PgRow, column: &sqlx::postgres::PgColumn) -> serde_
     }
 }
 
+// MySQL row conversion
+fn mysql_row_to_hashmap(row: &MySqlRow) -> HashMap<String, serde_json::Value> {
+    let mut map = HashMap::new();
+    for column in row.columns() {
+        let name = column.name().to_string();
+        let value = get_mysql_column_value(row, column);
+        map.insert(name, value);
+    }
+    map
+}
+
+fn get_mysql_column_value(row: &MySqlRow, column: &sqlx::mysql::MySqlColumn) -> serde_json::Value {
+    let type_name = column.type_info().name();
+    let idx = column.ordinal();
+
+    match type_name.to_uppercase().as_str() {
+        "TINYINT" | "SMALLINT" | "MEDIUMINT" | "INT" | "BIGINT" => {
+            row.try_get::<i64, _>(idx)
+                .map(serde_json::Value::from)
+                .or_else(|_| row.try_get::<i32, _>(idx).map(|v| serde_json::Value::from(v as i64)))
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "FLOAT" | "DOUBLE" | "DECIMAL" => {
+            row.try_get::<f64, _>(idx)
+                .or_else(|_| row.try_get::<f32, _>(idx).map(|v| v as f64))
+                .map(serde_json::Value::from)
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "BOOLEAN" | "BOOL" => {
+            row.try_get::<bool, _>(idx)
+                .map(serde_json::Value::from)
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "JSON" => {
+            row.try_get::<serde_json::Value, _>(idx)
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "DATETIME" | "TIMESTAMP" => {
+            row.try_get::<chrono::NaiveDateTime, _>(idx)
+                .map(|dt| serde_json::Value::from(dt.to_string()))
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "DATE" => {
+            row.try_get::<chrono::NaiveDate, _>(idx)
+                .map(|d| serde_json::Value::from(d.to_string()))
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "TIME" => {
+            row.try_get::<chrono::NaiveTime, _>(idx)
+                .map(|t| serde_json::Value::from(t.to_string()))
+                .unwrap_or(serde_json::Value::Null)
+        }
+        "BLOB" | "BINARY" | "VARBINARY" => {
+            row.try_get::<Vec<u8>, _>(idx)
+                .map(|bytes| serde_json::Value::from(format!("0x{}", hex::encode(bytes))))
+                .unwrap_or(serde_json::Value::Null)
+        }
+        _ => {
+            // Default to string for text, varchar, char, enum, etc.
+            row.try_get::<String, _>(idx)
+                .map(serde_json::Value::from)
+                .unwrap_or(serde_json::Value::Null)
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn db_test_connection(config: ConnectionConfig) -> Result<bool, String> {
     match config.db_type.as_str() {
@@ -278,6 +346,26 @@ pub async fn db_test_connection(config: ConnectionConfig) -> Result<bool, String
             );
 
             let pool = PgPoolOptions::new()
+                .max_connections(1)
+                .connect(&url)
+                .await
+                .map_err(|e| format!("Connection failed: {}", e))?;
+            pool.close().await;
+            Ok(true)
+        }
+        "mysql" => {
+            let host = config.host.as_deref().unwrap_or("localhost");
+            let port = config.port.unwrap_or(3306);
+            let database = config.database.as_deref().unwrap_or("mysql");
+            let username = config.username.as_deref().unwrap_or("root");
+            let password = config.password.as_deref().unwrap_or("");
+
+            let url = format!(
+                "mysql://{}:{}@{}:{}/{}",
+                username, password, host, port, database
+            );
+
+            let pool = MySqlPoolOptions::new()
                 .max_connections(1)
                 .connect(&url)
                 .await
@@ -332,6 +420,28 @@ pub async fn db_connect(
                 db_type: "postgres".to_string(),
             }
         }
+        "mysql" => {
+            let host = config.host.as_deref().unwrap_or("localhost");
+            let port = config.port.unwrap_or(3306);
+            let database = config.database.as_deref().unwrap_or("mysql");
+            let username = config.username.as_deref().unwrap_or("root");
+            let password = config.password.as_deref().unwrap_or("");
+
+            let url = format!(
+                "mysql://{}:{}@{}:{}/{}",
+                username, password, host, port, database
+            );
+
+            let pool = MySqlPoolOptions::new()
+                .max_connections(5)
+                .connect(&url)
+                .await
+                .map_err(|e| format!("Connection failed: {}", e))?;
+            ConnectionEntry {
+                pool: DbPool::MySql(pool),
+                db_type: "mysql".to_string(),
+            }
+        }
         _ => return Err(format!("Unsupported database type: {}", config.db_type)),
     };
 
@@ -350,6 +460,7 @@ pub async fn db_disconnect(
         match entry.pool {
             DbPool::Sqlite(pool) => pool.close().await,
             DbPool::Postgres(pool) => pool.close().await,
+            DbPool::MySql(pool) => pool.close().await,
         }
     }
     Ok(())
@@ -400,6 +511,40 @@ pub async fn db_list_tables(
                 ORDER BY table_schema, table_name
             "#;
             let rows: Vec<PgRow> = sqlx::query(query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| format!("Query failed: {}", e))?;
+
+            let tables: Vec<TableInfo> = rows
+                .iter()
+                .map(|row| {
+                    let name: String = row.try_get("name").unwrap_or_default();
+                    let schema: Option<String> = row.try_get("schema").ok();
+                    let table_type: String = row.try_get("table_type").unwrap_or_else(|_| "table".to_string());
+                    TableInfo {
+                        name,
+                        schema,
+                        row_count: None,
+                        table_type,
+                    }
+                })
+                .collect();
+            Ok(tables)
+        }
+        DbPool::MySql(pool) => {
+            let query = r#"
+                SELECT
+                    TABLE_NAME as name,
+                    TABLE_SCHEMA as `schema`,
+                    CASE TABLE_TYPE
+                        WHEN 'VIEW' THEN 'view'
+                        ELSE 'table'
+                    END as table_type
+                FROM information_schema.TABLES
+                WHERE TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys')
+                ORDER BY TABLE_SCHEMA, TABLE_NAME
+            "#;
+            let rows: Vec<MySqlRow> = sqlx::query(query)
                 .fetch_all(pool)
                 .await
                 .map_err(|e| format!("Query failed: {}", e))?;
@@ -537,6 +682,70 @@ pub async fn db_get_table_schema(
                 primary_keys,
             })
         }
+        DbPool::MySql(pool) => {
+            // Parse schema.table format if provided
+            let (schema_name, tbl_name) = if table_name.contains('.') {
+                let parts: Vec<&str> = table_name.splitn(2, '.').collect();
+                (parts[0].to_string(), parts[1].to_string())
+            } else {
+                // For MySQL, we need to get the current database
+                let db_row: MySqlRow = sqlx::query("SELECT DATABASE() as db")
+                    .fetch_one(pool)
+                    .await
+                    .map_err(|e| format!("Query failed: {}", e))?;
+                let current_db: String = db_row.try_get("db").unwrap_or_else(|_| "mysql".to_string());
+                (current_db, table_name.clone())
+            };
+
+            // Get columns with primary key info
+            let column_query = r#"
+                SELECT
+                    c.COLUMN_NAME as name,
+                    c.DATA_TYPE as data_type,
+                    c.IS_NULLABLE as is_nullable,
+                    c.COLUMN_DEFAULT as column_default,
+                    CASE WHEN c.COLUMN_KEY = 'PRI' THEN 1 ELSE 0 END as is_primary_key
+                FROM information_schema.COLUMNS c
+                WHERE c.TABLE_SCHEMA = ? AND c.TABLE_NAME = ?
+                ORDER BY c.ORDINAL_POSITION
+            "#;
+
+            let rows: Vec<MySqlRow> = sqlx::query(column_query)
+                .bind(&schema_name)
+                .bind(&tbl_name)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| format!("Query failed: {}", e))?;
+
+            let mut columns: Vec<ColumnInfo> = Vec::new();
+            let mut primary_keys: Vec<String> = Vec::new();
+
+            for row in &rows {
+                let name: String = row.try_get("name").unwrap_or_default();
+                let data_type: String = row.try_get("data_type").unwrap_or_default();
+                let is_nullable: String = row.try_get("is_nullable").unwrap_or_else(|_| "YES".to_string());
+                let is_pk: i32 = row.try_get("is_primary_key").unwrap_or(0);
+                let default_value: Option<String> = row.try_get("column_default").ok();
+
+                if is_pk == 1 {
+                    primary_keys.push(name.clone());
+                }
+
+                columns.push(ColumnInfo {
+                    name,
+                    data_type,
+                    nullable: is_nullable == "YES",
+                    primary_key: is_pk == 1,
+                    default_value,
+                });
+            }
+
+            Ok(TableSchema {
+                table_name: tbl_name,
+                columns,
+                primary_keys,
+            })
+        }
     }
 }
 
@@ -609,6 +818,42 @@ pub async fn db_execute_query(
 
                 let data: Vec<HashMap<String, serde_json::Value>> =
                     rows.iter().map(pg_row_to_hashmap).collect();
+
+                Ok(QueryResult {
+                    columns,
+                    rows: data,
+                    rows_affected: rows.len() as u64,
+                    execution_time: start.elapsed().as_millis() as u64,
+                })
+            } else {
+                let result = sqlx::query(&query)
+                    .execute(pool)
+                    .await
+                    .map_err(|e| format!("Query failed: {}", e))?;
+
+                Ok(QueryResult {
+                    columns: vec![],
+                    rows: vec![],
+                    rows_affected: result.rows_affected(),
+                    execution_time: start.elapsed().as_millis() as u64,
+                })
+            }
+        }
+        DbPool::MySql(pool) => {
+            if is_select {
+                let rows: Vec<MySqlRow> = sqlx::query(&query)
+                    .fetch_all(pool)
+                    .await
+                    .map_err(|e| format!("Query failed: {}", e))?;
+
+                let columns: Vec<String> = if !rows.is_empty() {
+                    rows[0].columns().iter().map(|c| c.name().to_string()).collect()
+                } else {
+                    vec![]
+                };
+
+                let data: Vec<HashMap<String, serde_json::Value>> =
+                    rows.iter().map(mysql_row_to_hashmap).collect();
 
                 Ok(QueryResult {
                     columns,
@@ -752,6 +997,50 @@ pub async fn db_fetch_rows(
                 execution_time: start.elapsed().as_millis() as u64,
             })
         }
+        DbPool::MySql(pool) => {
+            // Handle schema.table format - MySQL uses backticks
+            let full_table_name = if table_name.contains('.') {
+                table_name.clone()
+            } else {
+                format!("`{}`", table_name)
+            };
+
+            // MySQL uses backticks instead of double quotes for identifiers
+            let mysql_where_clause = where_clause.replace('"', "`");
+            let mysql_order_clause = order_clause.replace('"', "`");
+
+            let count_query = format!("SELECT COUNT(*) as count FROM {}{}", full_table_name, mysql_where_clause);
+            let count_row: MySqlRow = sqlx::query(&count_query)
+                .fetch_one(pool)
+                .await
+                .map_err(|e| format!("Count query failed: {}", e))?;
+            let total_count: i64 = count_row.try_get("count").unwrap_or(0);
+
+            let data_query = format!(
+                "SELECT * FROM {}{}{} LIMIT {} OFFSET {}",
+                full_table_name, mysql_where_clause, mysql_order_clause, limit, offset
+            );
+            let rows: Vec<MySqlRow> = sqlx::query(&data_query)
+                .fetch_all(pool)
+                .await
+                .map_err(|e| format!("Data query failed: {}", e))?;
+
+            let columns: Vec<String> = if !rows.is_empty() {
+                rows[0].columns().iter().map(|c| c.name().to_string()).collect()
+            } else {
+                vec![]
+            };
+
+            let data: Vec<HashMap<String, serde_json::Value>> =
+                rows.iter().map(mysql_row_to_hashmap).collect();
+
+            Ok(FetchResult {
+                columns,
+                rows: data,
+                total_count,
+                execution_time: start.elapsed().as_millis() as u64,
+            })
+        }
     }
 }
 
@@ -816,6 +1105,31 @@ pub async fn db_insert_row(
             Ok(InsertResult {
                 success: true,
                 last_insert_id: None,
+            })
+        }
+        DbPool::MySql(pool) => {
+            // MySQL uses backticks for identifiers
+            let mysql_columns: Vec<String> = data.keys().map(|k| format!("`{}`", k)).collect();
+            let full_table_name = if table_name.contains('.') {
+                table_name.clone()
+            } else {
+                format!("`{}`", table_name)
+            };
+
+            let query = format!(
+                "INSERT INTO {} ({}) VALUES ({})",
+                full_table_name,
+                mysql_columns.join(", "),
+                values.join(", ")
+            );
+            let result = sqlx::query(&query)
+                .execute(pool)
+                .await
+                .map_err(|e| format!("Insert failed: {}", e))?;
+
+            Ok(InsertResult {
+                success: true,
+                last_insert_id: Some(result.last_insert_id() as i64),
             })
         }
     }
@@ -892,6 +1206,53 @@ pub async fn db_update_row(
                 .map_err(|e| format!("Update failed: {}", e))?;
             Ok(result.rows_affected())
         }
+        DbPool::MySql(pool) => {
+            // MySQL uses backticks for identifiers
+            let mysql_set_clause: Vec<String> = data
+                .iter()
+                .map(|(k, v)| {
+                    let value = match v {
+                        serde_json::Value::Null => "NULL".to_string(),
+                        serde_json::Value::Bool(b) => if *b { "true".to_string() } else { "false".to_string() },
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::String(s) => format!("'{}'", s.replace('\'', "''")),
+                        _ => format!("'{}'", v.to_string().replace('\'', "''")),
+                    };
+                    format!("`{}` = {}", k, value)
+                })
+                .collect();
+
+            let mysql_where_clause: Vec<String> = primary_key
+                .iter()
+                .map(|(k, v)| {
+                    let value = match v {
+                        serde_json::Value::Null => "NULL".to_string(),
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::String(s) => format!("'{}'", s.replace('\'', "''")),
+                        _ => format!("'{}'", v.to_string().replace('\'', "''")),
+                    };
+                    format!("`{}` = {}", k, value)
+                })
+                .collect();
+
+            let full_table_name = if table_name.contains('.') {
+                table_name.clone()
+            } else {
+                format!("`{}`", table_name)
+            };
+
+            let query = format!(
+                "UPDATE {} SET {} WHERE {}",
+                full_table_name,
+                mysql_set_clause.join(", "),
+                mysql_where_clause.join(" AND ")
+            );
+            let result = sqlx::query(&query)
+                .execute(pool)
+                .await
+                .map_err(|e| format!("Update failed: {}", e))?;
+            Ok(result.rows_affected())
+        }
     }
 }
 
@@ -942,6 +1303,38 @@ pub async fn db_delete_row(
                 "DELETE FROM {} WHERE {}",
                 full_table_name,
                 where_clause.join(" AND ")
+            );
+            let result = sqlx::query(&query)
+                .execute(pool)
+                .await
+                .map_err(|e| format!("Delete failed: {}", e))?;
+            Ok(result.rows_affected())
+        }
+        DbPool::MySql(pool) => {
+            // MySQL uses backticks for identifiers
+            let mysql_where_clause: Vec<String> = primary_key
+                .iter()
+                .map(|(k, v)| {
+                    let value = match v {
+                        serde_json::Value::Null => "NULL".to_string(),
+                        serde_json::Value::Number(n) => n.to_string(),
+                        serde_json::Value::String(s) => format!("'{}'", s.replace('\'', "''")),
+                        _ => format!("'{}'", v.to_string().replace('\'', "''")),
+                    };
+                    format!("`{}` = {}", k, value)
+                })
+                .collect();
+
+            let full_table_name = if table_name.contains('.') {
+                table_name.clone()
+            } else {
+                format!("`{}`", table_name)
+            };
+
+            let query = format!(
+                "DELETE FROM {} WHERE {}",
+                full_table_name,
+                mysql_where_clause.join(" AND ")
             );
             let result = sqlx::query(&query)
                 .execute(pool)
