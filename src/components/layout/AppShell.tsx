@@ -9,10 +9,12 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useOnboardingStore } from "@/stores";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useCommandPaletteStore } from "@/stores/commandPaletteStore";
 import { SettingsPopup, KeyboardShortcutsPopup } from "@/components/settings";
 import { SubscriptionPopup } from "@/components/subscriptions";
 import { OnboardingFlow } from "@/components/onboarding";
 import { MeditationScreen, MiniMeditationPlayer, MeditationAudioController } from "@/components/meditation";
+import { CommandPalette } from "@/components/command-palette";
 import { Tooltip } from "@/components/ui";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useCustomMusic } from "@/hooks/useCustomMusic";
@@ -123,6 +125,8 @@ export function AppShell() {
     window.dispatchEvent(new CustomEvent("focus-file-browser"));
   }, [sidebarCollapsed]);
 
+  const openCommandPalette = useCommandPaletteStore((s) => s.open);
+
   // Register global keyboard shortcuts
   useKeyboardShortcuts({
     onOpenSettings: () => setShowSettings(true),
@@ -130,6 +134,7 @@ export function AppShell() {
     onToggleFileBrowser: handleToggleFileBrowser,
     onShowShortcuts: () => setShowShortcuts(true),
     onFocusPrompt: handleFocusPrompt,
+    onOpenCommandPalette: openCommandPalette,
   });
 
   // Show onboarding if not completed
@@ -151,6 +156,7 @@ export function AppShell() {
       {showSubscriptions && <SubscriptionPopup onClose={() => setShowSubscriptions(false)} />}
       {showShortcuts && <KeyboardShortcutsPopup onClose={() => setShowShortcuts(false)} />}
       {isMeditating && <MeditationScreen />}
+      <CommandPalette />
       <MeditationAudioController />
       <MiniMeditationPlayer />
 

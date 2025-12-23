@@ -21,6 +21,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   { key: "w", modifiers: ["ctrl", "meta", "shift"], description: "Close current session", category: "sessions", action: "closeSession" },
 
   // UI
+  { key: "p", modifiers: ["ctrl", "meta"], description: "Open command palette", category: "ui", action: "openCommandPalette" },
   { key: "k", modifiers: ["ctrl", "meta"], description: "Focus prompt input", category: "ui", action: "focusPrompt" },
   { key: "b", modifiers: ["ctrl", "meta"], description: "Toggle sidebar", category: "ui", action: "toggleSidebar" },
   { key: ",", modifiers: ["ctrl", "meta"], description: "Open settings", category: "ui", action: "openSettings" },
@@ -39,6 +40,7 @@ interface UseKeyboardShortcutsOptions {
   onToggleFileBrowser: () => void;
   onShowShortcuts: () => void;
   onFocusPrompt: () => void;
+  onOpenCommandPalette: () => void;
 }
 
 export function useKeyboardShortcuts({
@@ -47,6 +49,7 @@ export function useKeyboardShortcuts({
   onToggleFileBrowser,
   onShowShortcuts,
   onFocusPrompt,
+  onOpenCommandPalette,
 }: UseKeyboardShortcutsOptions) {
   const { projects, activeProjectId, setActiveProject } = useProjectStore();
   const { createSession, removeSession, getSessionsForProject, getActiveSession, setActiveSession } = useSessionStore();
@@ -83,6 +86,13 @@ export function useKeyboardShortcuts({
           removeSession(activeProjectId, activeSession.id);
         }
       }
+      return;
+    }
+
+    // Ctrl/Cmd + P: Open command palette
+    if (isMod && !isShift && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      onOpenCommandPalette();
       return;
     }
 
@@ -164,6 +174,7 @@ export function useKeyboardShortcuts({
     onToggleFileBrowser,
     onShowShortcuts,
     onFocusPrompt,
+    onOpenCommandPalette,
   ]);
 
   useEffect(() => {

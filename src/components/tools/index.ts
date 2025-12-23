@@ -5,3 +5,5 @@ export { LocalhostTunnelPopup } from "./LocalhostTunnelPopup";
 export { QRCodeDisplay } from "./QRCodeDisplay";
 export { SystemHealthPopup } from "./system-health";
 export { LivePreviewPopup } from "@/components/livepreview";
+export { EnvManagerPopup } from "./env-manager";
+export { ApiTesterPopup } from "./api-tester";

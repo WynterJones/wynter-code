@@ -9,7 +9,9 @@ import { ContextMenu, ContextMenuItem } from "./ContextMenu";
 import { FileDialog } from "./FileDialog";
 import { useFileOperations } from "@/hooks/useFileOperations";
 import { useGitStatus } from "@/hooks/useGitStatus";
-import { FilePlus, FolderPlus, FolderOpen, Copy, Eye, Pencil, Trash2, ImagePlus } from "lucide-react";
+import { useCompression } from "@/hooks/useCompression";
+import { canOptimize, formatBytes } from "@/types/compression";
+import { Archive, FilePlus, FolderPlus, FolderOpen, Copy, Eye, ImageMinus, Pencil, Trash2, ImagePlus } from "lucide-react";
 import type { FileNode } from "@/types";
 
 export interface ImageAttachment {
@@ -75,6 +77,7 @@ export function FileBrowserPopup({
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(
     isOpen ? currentPath : undefined
   );
+  const { createArchive, optimizeFile } = useCompression();
 
   useEffect(() => {
     if (isOpen) {
@@ -297,6 +300,46 @@ export function FileBrowserPopup({
       });
     }
 
+    // Compression items
+    items.push({
+      label: node.isDirectory ? "Compress to Zip" : "Add to Zip",
+      icon: Archive,
+      action: async () => {
+        try {
+          const result = await createArchive([node.path]);
+          if (result.success) {
+            console.log(
+              `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${result.savingsPercent.toFixed(1)}% saved)`
+            );
+            await loadDirectory(currentPath);
+          }
+        } catch (err) {
+          console.error("Failed to create archive:", err);
+        }
+      },
+      separator: true,
+    });
+
+    if (canOptimize(node.path, node.isDirectory)) {
+      items.push({
+        label: "Optimize File Size",
+        icon: ImageMinus,
+        action: async () => {
+          try {
+            const result = await optimizeFile(node.path);
+            if (result.success) {
+              console.log(
+                `Optimized ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${result.savingsPercent.toFixed(1)}% saved)`
+              );
+              await loadDirectory(currentPath);
+            }
+          } catch (err) {
+            console.error("Failed to optimize file:", err);
+          }
+        },
+      });
+    }
+
     items.push(
       {
         label: "Rename",
@@ -323,7 +366,7 @@ export function FileBrowserPopup({
     );
 
     return items;
-  }, [contextMenu, mode, currentPath, navigateTo, onSelectProject, onSendToPrompt, onClose, deleteToTrash]);
+  }, [contextMenu, mode, currentPath, navigateTo, onSelectProject, onSendToPrompt, onClose, deleteToTrash, createArchive, optimizeFile]);
 
   useEffect(() => {
     if (!isOpen) return;

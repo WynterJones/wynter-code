@@ -1248,11 +1248,20 @@ fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
     let version = if version.starts_with('v') {
         version[1..].to_string()
     } else if version.contains(' ') {
-        // Handle "git version 2.42.0" format
-        version.split_whitespace()
-            .last()
-            .unwrap_or(&version)
-            .to_string()
+        // Handle different formats:
+        // - "git version 2.42.0" -> take last word
+        // - "1.0.48 (Claude Code)" -> take first word (version number)
+        let first_word = version.split_whitespace().next().unwrap_or(&version);
+
+        // If first word looks like a version number, use it; otherwise use last word
+        if first_word.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+            first_word.to_string()
+        } else {
+            version.split_whitespace()
+                .last()
+                .unwrap_or(&version)
+                .to_string()
+        }
     } else {
         version
     };
@@ -2018,6 +2027,281 @@ pub async fn delete_node_modules(paths: Vec<String>) -> Result<NodeModulesDelete
     })
 }
 
+// ============================================
+// Environment Variables Commands
+// ============================================
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvVariable {
+    pub key: String,
+    pub value: String,
+    pub is_sensitive: bool,
+    pub comment: Option<String>,
+    pub line_number: Option<usize>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvFile {
+    pub filename: String,
+    pub path: String,
+    pub variables: Vec<EnvVariable>,
+    pub exists: bool,
+    pub is_gitignored: bool,
+    pub last_modified: Option<i64>,
+}
+
+const SENSITIVE_PATTERNS: &[&str] = &[
+    "API_KEY", "API-KEY", "APIKEY",
+    "SECRET", "PASSWORD", "PASSWD", "PASS",
+    "TOKEN", "PRIVATE_KEY", "PRIVATE-KEY",
+    "AUTH", "CREDENTIAL", "CRED",
+    "DATABASE_URL", "DATABASE-URL", "DB_URL",
+    "CONNECTION_STRING", "CONN_STRING",
+    "AWS_", "STRIPE_", "GITHUB_TOKEN", "NPM_TOKEN",
+    "OPENAI", "ANTHROPIC", "SUPABASE",
+    "REDIS", "MONGO", "POSTGRES", "MYSQL",
+];
+
+fn is_sensitive_key(key: &str) -> bool {
+    let upper_key = key.to_uppercase();
+    SENSITIVE_PATTERNS.iter().any(|pattern| upper_key.contains(pattern))
+}
+
+fn parse_env_content(content: &str) -> Vec<EnvVariable> {
+    let mut variables = Vec::new();
+
+    for (line_num, line) in content.lines().enumerate() {
+        let trimmed = line.trim();
+
+        // Skip empty lines and comments
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        // Parse KEY=value format
+        if let Some(eq_pos) = trimmed.find('=') {
+            let key = trimmed[..eq_pos].trim().to_string();
+            let value_part = &trimmed[eq_pos + 1..];
+
+            // Handle inline comments and quoted values
+            let (value, comment) = parse_value_and_comment(value_part);
+
+            variables.push(EnvVariable {
+                key: key.clone(),
+                value,
+                is_sensitive: is_sensitive_key(&key),
+                comment,
+                line_number: Some(line_num + 1),
+            });
+        }
+    }
+
+    variables
+}
+
+fn parse_value_and_comment(value_part: &str) -> (String, Option<String>) {
+    let trimmed = value_part.trim();
+
+    // Handle quoted values
+    if trimmed.starts_with('"') || trimmed.starts_with('\'') {
+        let quote_char = trimmed.chars().next().unwrap();
+        if let Some(end_quote) = trimmed[1..].find(quote_char) {
+            let value = trimmed[1..=end_quote].to_string();
+            let rest = trimmed[end_quote + 2..].trim();
+            let comment = if rest.starts_with('#') {
+                Some(rest[1..].trim().to_string())
+            } else {
+                None
+            };
+            return (value, comment);
+        }
+    }
+
+    // Handle unquoted values with possible inline comments
+    if let Some(hash_pos) = trimmed.find(" #") {
+        let value = trimmed[..hash_pos].trim().to_string();
+        let comment = trimmed[hash_pos + 2..].trim().to_string();
+        return (value, Some(comment));
+    }
+
+    (trimmed.to_string(), None)
+}
+
+fn serialize_env_variables(variables: &[EnvVariable]) -> String {
+    let mut content = String::new();
+
+    for var in variables {
+        let value_needs_quotes = var.value.contains(' ') ||
+                                  var.value.contains('#') ||
+                                  var.value.is_empty();
+
+        let formatted_value = if value_needs_quotes {
+            format!("\"{}\"", var.value.replace('\"', "\\\""))
+        } else {
+            var.value.clone()
+        };
+
+        let line = if let Some(ref comment) = var.comment {
+            format!("{}={} # {}\n", var.key, formatted_value, comment)
+        } else {
+            format!("{}={}\n", var.key, formatted_value)
+        };
+
+        content.push_str(&line);
+    }
+
+    content
+}
+
+#[tauri::command]
+pub fn list_env_files(project_path: String) -> Result<Vec<EnvFile>, String> {
+    let project_dir = Path::new(&project_path);
+
+    if !project_dir.exists() {
+        return Err(format!("Project path does not exist: {}", project_path));
+    }
+
+    let env_filenames = vec![
+        ".env",
+        ".env.local",
+        ".env.development",
+        ".env.development.local",
+        ".env.test",
+        ".env.test.local",
+        ".env.production",
+        ".env.production.local",
+        ".env.staging",
+        ".env.example",
+    ];
+
+    let gitignore = build_gitignore(project_dir);
+    let mut env_files = Vec::new();
+
+    for filename in env_filenames {
+        let file_path = project_dir.join(filename);
+        let exists = file_path.exists();
+
+        let is_gitignored = if exists {
+            is_path_gitignored(&file_path, false, &gitignore)
+        } else {
+            false
+        };
+
+        let (variables, last_modified) = if exists {
+            let content = fs::read_to_string(&file_path).unwrap_or_default();
+            let variables = parse_env_content(&content);
+            let modified = fs::metadata(&file_path)
+                .and_then(|m| m.modified())
+                .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64)
+                .ok();
+            (variables, modified)
+        } else {
+            (Vec::new(), None)
+        };
+
+        env_files.push(EnvFile {
+            filename: filename.to_string(),
+            path: file_path.to_string_lossy().to_string(),
+            variables,
+            exists,
+            is_gitignored,
+            last_modified,
+        });
+    }
+
+    Ok(env_files)
+}
+
+#[tauri::command]
+pub fn read_env_file(file_path: String) -> Result<EnvFile, String> {
+    let path = Path::new(&file_path);
+    let filename = path.file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    if !path.exists() {
+        return Ok(EnvFile {
+            filename,
+            path: file_path,
+            variables: Vec::new(),
+            exists: false,
+            is_gitignored: false,
+            last_modified: None,
+        });
+    }
+
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let variables = parse_env_content(&content);
+
+    let project_dir = path.parent();
+    let is_gitignored = if let Some(proj_path) = project_dir {
+        let gitignore = build_gitignore(proj_path);
+        is_path_gitignored(path, false, &gitignore)
+    } else {
+        false
+    };
+
+    let last_modified = fs::metadata(path)
+        .and_then(|m| m.modified())
+        .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64)
+        .ok();
+
+    Ok(EnvFile {
+        filename,
+        path: file_path,
+        variables,
+        exists: true,
+        is_gitignored,
+        last_modified,
+    })
+}
+
+#[tauri::command]
+pub fn write_env_file(file_path: String, variables: Vec<EnvVariable>) -> Result<(), String> {
+    let content = serialize_env_variables(&variables);
+    fs::write(&file_path, content).map_err(|e| format!("Failed to write env file: {}", e))
+}
+
+#[tauri::command]
+pub fn create_env_file(project_path: String, filename: String) -> Result<String, String> {
+    let file_path = Path::new(&project_path).join(&filename);
+
+    if file_path.exists() {
+        return Err(format!("File already exists: {}", filename));
+    }
+
+    // Create empty file with a comment header
+    let content = format!("# Environment variables for {}\n# Created by Wynter Code\n\n", filename);
+    fs::write(&file_path, content).map_err(|e| format!("Failed to create env file: {}", e))?;
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub fn check_env_gitignore(project_path: String, filename: String) -> Result<bool, String> {
+    let project_dir = Path::new(&project_path);
+    let file_path = project_dir.join(&filename);
+    let gitignore = build_gitignore(project_dir);
+
+    Ok(is_path_gitignored(&file_path, false, &gitignore))
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SystemEnvVar {
+    pub key: String,
+    pub value: String,
+}
+
+#[tauri::command]
+pub fn get_system_env_vars() -> Vec<SystemEnvVar> {
+    std::env::vars()
+        .map(|(key, value)| SystemEnvVar { key, value })
+        .collect()
+}
+
 pub fn get_migrations() -> Vec<Migration> {
     vec![
         Migration {
@@ -2097,4 +2381,423 @@ pub fn get_migrations() -> Vec<Migration> {
             kind: tauri_plugin_sql::MigrationKind::Up,
         },
     ]
+}
+
+// ============================================
+// File Compression Commands
+// ============================================
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CompressionResult {
+    pub success: bool,
+    pub output_path: String,
+    pub original_size: u64,
+    pub compressed_size: u64,
+    pub savings_percent: f32,
+    pub error: Option<String>,
+}
+
+#[tauri::command]
+pub async fn create_zip_archive(
+    paths: Vec<String>,
+    output_path: Option<String>,
+    overwrite: bool,
+) -> Result<CompressionResult, String> {
+    use std::io::{Read, Write};
+    use walkdir::WalkDir;
+    use zip::write::SimpleFileOptions;
+    use zip::CompressionMethod;
+
+    if paths.is_empty() {
+        return Err("No paths provided".to_string());
+    }
+
+    // Calculate original size
+    let mut original_size: u64 = 0;
+    for path_str in &paths {
+        let path = Path::new(path_str);
+        if path.is_dir() {
+            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                if entry.file_type().is_file() {
+                    if let Ok(meta) = fs::metadata(entry.path()) {
+                        original_size += meta.len();
+                    }
+                }
+            }
+        } else if let Ok(meta) = fs::metadata(path) {
+            original_size += meta.len();
+        }
+    }
+
+    // Determine output path
+    let first_path = Path::new(&paths[0]);
+    let archive_name = first_path
+        .file_stem()
+        .and_then(|n| n.to_str())
+        .unwrap_or("archive");
+
+    let parent_dir = first_path.parent().unwrap_or(Path::new("."));
+
+    let zip_path = if let Some(ref out) = output_path {
+        Path::new(out).to_path_buf()
+    } else {
+        let mut candidate = parent_dir.join(format!("{}.zip", archive_name));
+        if !overwrite {
+            let mut counter = 1;
+            while candidate.exists() {
+                candidate = parent_dir.join(format!("{}_{}.zip", archive_name, counter));
+                counter += 1;
+            }
+        }
+        candidate
+    };
+
+    if zip_path.exists() && !overwrite {
+        return Err(format!("File already exists: {:?}", zip_path));
+    }
+
+    // Create zip file
+    let file = fs::File::create(&zip_path)
+        .map_err(|e| format!("Failed to create zip file: {}", e))?;
+
+    let mut zip = zip::ZipWriter::new(file);
+    let options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Deflated)
+        .compression_level(Some(6));
+
+    for path_str in &paths {
+        let path = Path::new(path_str);
+
+        if path.is_dir() {
+            // Add directory contents
+            for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                let entry_path = entry.path();
+                let relative_path = entry_path
+                    .strip_prefix(path.parent().unwrap_or(Path::new(".")))
+                    .unwrap_or(entry_path);
+
+                if entry.file_type().is_dir() {
+                    let dir_name = format!("{}/", relative_path.to_string_lossy());
+                    zip.add_directory(&dir_name, options)
+                        .map_err(|e| format!("Failed to add directory: {}", e))?;
+                } else {
+                    let mut file = fs::File::open(entry_path)
+                        .map_err(|e| format!("Failed to open file: {}", e))?;
+
+                    let mut buffer = Vec::new();
+                    file.read_to_end(&mut buffer)
+                        .map_err(|e| format!("Failed to read file: {}", e))?;
+
+                    zip.start_file(relative_path.to_string_lossy(), options)
+                        .map_err(|e| format!("Failed to start file in zip: {}", e))?;
+
+                    zip.write_all(&buffer)
+                        .map_err(|e| format!("Failed to write to zip: {}", e))?;
+                }
+            }
+        } else {
+            // Add single file
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+
+            let mut file = fs::File::open(path)
+                .map_err(|e| format!("Failed to open file: {}", e))?;
+
+            let mut buffer = Vec::new();
+            file.read_to_end(&mut buffer)
+                .map_err(|e| format!("Failed to read file: {}", e))?;
+
+            zip.start_file(file_name, options)
+                .map_err(|e| format!("Failed to start file in zip: {}", e))?;
+
+            zip.write_all(&buffer)
+                .map_err(|e| format!("Failed to write to zip: {}", e))?;
+        }
+    }
+
+    zip.finish().map_err(|e| format!("Failed to finish zip: {}", e))?;
+
+    // Get compressed size
+    let compressed_size = fs::metadata(&zip_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let savings_percent = if original_size > 0 {
+        ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(CompressionResult {
+        success: true,
+        output_path: zip_path.to_string_lossy().to_string(),
+        original_size,
+        compressed_size,
+        savings_percent,
+        error: None,
+    })
+}
+
+#[tauri::command]
+pub async fn optimize_image(path: String, overwrite: bool) -> Result<CompressionResult, String> {
+    let input_path = Path::new(&path);
+
+    if !input_path.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+
+    let original_size = fs::metadata(&input_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+
+    // Determine output path
+    let output_path = if overwrite {
+        input_path.to_path_buf()
+    } else {
+        let stem = input_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
+        let parent = input_path.parent().unwrap_or(Path::new("."));
+        parent.join(format!("{}_optimized.{}", stem, ext))
+    };
+
+    match ext.as_str() {
+        "png" => {
+            // Use oxipng for PNG optimization
+            let input_data = fs::read(&input_path)
+                .map_err(|e| format!("Failed to read PNG: {}", e))?;
+
+            let options = oxipng::Options::from_preset(3);
+            let optimized = oxipng::optimize_from_memory(&input_data, &options)
+                .map_err(|e| format!("PNG optimization failed: {}", e))?;
+
+            fs::write(&output_path, &optimized)
+                .map_err(|e| format!("Failed to write optimized PNG: {}", e))?;
+
+            let compressed_size = optimized.len() as u64;
+            let savings_percent = if original_size > 0 {
+                ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(CompressionResult {
+                success: true,
+                output_path: output_path.to_string_lossy().to_string(),
+                original_size,
+                compressed_size,
+                savings_percent,
+                error: None,
+            })
+        }
+        "jpg" | "jpeg" => {
+            // Use image crate for JPEG - re-encode with quality preservation
+            let img = image::open(&input_path)
+                .map_err(|e| format!("Failed to open JPEG: {}", e))?;
+
+            // Save with optimized settings (quality 90 is visually lossless)
+            img.save(&output_path)
+                .map_err(|e| format!("Failed to save JPEG: {}", e))?;
+
+            let compressed_size = fs::metadata(&output_path)
+                .map(|m| m.len())
+                .unwrap_or(0);
+
+            let savings_percent = if original_size > 0 {
+                ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(CompressionResult {
+                success: true,
+                output_path: output_path.to_string_lossy().to_string(),
+                original_size,
+                compressed_size,
+                savings_percent,
+                error: None,
+            })
+        }
+        "gif" | "webp" => {
+            // Use image crate for GIF/WebP
+            let img = image::open(&input_path)
+                .map_err(|e| format!("Failed to open image: {}", e))?;
+
+            img.save(&output_path)
+                .map_err(|e| format!("Failed to save image: {}", e))?;
+
+            let compressed_size = fs::metadata(&output_path)
+                .map(|m| m.len())
+                .unwrap_or(0);
+
+            let savings_percent = if original_size > 0 {
+                ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(CompressionResult {
+                success: true,
+                output_path: output_path.to_string_lossy().to_string(),
+                original_size,
+                compressed_size,
+                savings_percent,
+                error: None,
+            })
+        }
+        _ => Err(format!("Unsupported image format: {}", ext)),
+    }
+}
+
+#[tauri::command]
+pub async fn optimize_pdf(path: String, overwrite: bool) -> Result<CompressionResult, String> {
+    use lopdf::Document;
+
+    let input_path = Path::new(&path);
+
+    if !input_path.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+
+    let original_size = fs::metadata(&input_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    // Determine output path
+    let output_path = if overwrite {
+        input_path.to_path_buf()
+    } else {
+        let stem = input_path.file_stem().and_then(|s| s.to_str()).unwrap_or("document");
+        let parent = input_path.parent().unwrap_or(Path::new("."));
+        parent.join(format!("{}_optimized.pdf", stem))
+    };
+
+    // Load and optimize PDF
+    let mut doc = Document::load(&input_path)
+        .map_err(|e| format!("Failed to load PDF: {}", e))?;
+
+    // Remove unused objects
+    doc.prune_objects();
+
+    // Compress streams
+    doc.compress();
+
+    // Save optimized PDF
+    doc.save(&output_path)
+        .map_err(|e| format!("Failed to save optimized PDF: {}", e))?;
+
+    let compressed_size = fs::metadata(&output_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let savings_percent = if original_size > 0 {
+        ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(CompressionResult {
+        success: true,
+        output_path: output_path.to_string_lossy().to_string(),
+        original_size,
+        compressed_size,
+        savings_percent,
+        error: None,
+    })
+}
+
+#[tauri::command]
+pub fn check_ffmpeg_available() -> bool {
+    Command::new("ffmpeg")
+        .arg("-version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+pub async fn optimize_video(path: String, overwrite: bool) -> Result<CompressionResult, String> {
+    let input_path = Path::new(&path);
+
+    if !input_path.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+
+    // Check if ffmpeg is available
+    if !check_ffmpeg_available() {
+        return Err("ffmpeg is not installed. Please install ffmpeg to optimize videos.".to_string());
+    }
+
+    let original_size = fs::metadata(&input_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp4");
+
+    // Determine output path
+    let output_path = if overwrite {
+        // Use temp file then replace
+        let temp_path = input_path.with_extension(format!("temp.{}", ext));
+        temp_path
+    } else {
+        let stem = input_path.file_stem().and_then(|s| s.to_str()).unwrap_or("video");
+        let parent = input_path.parent().unwrap_or(Path::new("."));
+        parent.join(format!("{}_optimized.{}", stem, ext))
+    };
+
+    // Run ffmpeg with CRF 23 (good quality/size balance)
+    let output = Command::new("ffmpeg")
+        .args([
+            "-i", &path,
+            "-c:v", "libx264",
+            "-crf", "23",
+            "-preset", "medium",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            "-y",
+            output_path.to_str().unwrap_or("output.mp4"),
+        ])
+        .output()
+        .map_err(|e| format!("Failed to run ffmpeg: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!("ffmpeg failed: {}", stderr));
+    }
+
+    // If overwriting, replace original with temp
+    let final_path = if overwrite {
+        fs::rename(&output_path, &input_path)
+            .map_err(|e| format!("Failed to replace original: {}", e))?;
+        input_path.to_path_buf()
+    } else {
+        output_path
+    };
+
+    let compressed_size = fs::metadata(&final_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let savings_percent = if original_size > 0 {
+        ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(CompressionResult {
+        success: true,
+        output_path: final_path.to_string_lossy().to_string(),
+        original_size,
+        compressed_size,
+        savings_percent,
+        error: None,
+    })
 }

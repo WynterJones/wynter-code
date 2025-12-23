@@ -4,10 +4,12 @@ import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { ScrollArea } from "@/components/ui";
 import { FileTreeNode } from "./FileTreeNode";
 import { FileTreeToolbar } from "./FileTreeToolbar";
-import { ContextMenu, buildFileContextMenuItems } from "./ContextMenu";
+import { ContextMenu, buildFileContextMenuItems, buildCompressionMenuItems } from "./ContextMenu";
 import { FileDialog } from "./FileDialog";
 import { useFileOperations } from "@/hooks/useFileOperations";
 import { useGitStatus } from "@/hooks/useGitStatus";
+import { useCompression } from "@/hooks/useCompression";
+import { formatBytes } from "@/types/compression";
 import type { FileNode } from "@/types";
 
 interface FileTreeProps {
@@ -38,6 +40,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
 
   const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
+  const { createArchive, optimizeFile } = useCompression();
   const isRefreshing = useRef(false);
 
   // Refresh contents of expanded folders without collapsing them
@@ -235,6 +238,36 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     }
   };
 
+  const handleCreateArchive = async (node: FileNode) => {
+    try {
+      const result = await createArchive([node.path]);
+      if (result.success) {
+        const savings = result.savingsPercent.toFixed(1);
+        console.log(
+          `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${savings}% saved)`
+        );
+        await loadFiles();
+      }
+    } catch (err) {
+      console.error("Failed to create archive:", err);
+    }
+  };
+
+  const handleOptimizeFile = async (node: FileNode) => {
+    try {
+      const result = await optimizeFile(node.path);
+      if (result.success) {
+        const savings = result.savingsPercent.toFixed(1);
+        console.log(
+          `Optimized ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${savings}% saved)`
+        );
+        await loadFiles();
+      }
+    } catch (err) {
+      console.error("Failed to optimize file:", err);
+    }
+  };
+
   const handleDialogConfirm = async (name: string) => {
     if (!dialog) return;
 
@@ -265,13 +298,24 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
 
     const { node } = contextMenu;
 
-    return buildFileContextMenuItems(
+    const baseItems = buildFileContextMenuItems(
       node.isDirectory,
       () => handleCreateFile(node.path),
       () => handleCreateFolder(node.path),
       () => handleRename(node),
       () => handleDelete(node)
     );
+
+    const compressionItems = buildCompressionMenuItems(
+      node.path,
+      node.isDirectory,
+      () => handleCreateArchive(node),
+      () => handleOptimizeFile(node)
+    );
+
+    // Insert compression items before delete (last item)
+    const deleteItem = baseItems.pop()!;
+    return [...baseItems, ...compressionItems, deleteItem];
   };
 
   if (loading) {

@@ -2,8 +2,8 @@
 
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
-**Last Updated:** 2025-12-23
-**Active Ideas:** 13
+**Last Updated:** 2025-12-22
+**Active Ideas:** 8
 
 ---
 
@@ -19,14 +19,6 @@
 
 ## Ideas
 
-### API Testing Tool
-Lightweight Postman-like interface for HTTP requests.
-- Make HTTP requests (GET, POST, PUT, DELETE)
-- Save request collections per project
-- Response syntax highlighting
-- Environment variables for URLs/tokens
-- cURL export
-
 ### Project Starter Templates
 Generate new projects from templates.
 - Chrome Extension, Next.js, Rails, Express, Tauri, Electron, React+Vite, CLI Tool
@@ -41,14 +33,6 @@ Unified dashboard for external services.
 - Sparkline charts for trends
 - Credentials in system keychain
 - Integrations: Railway, Vercel, Netlify, Plausible, PostHog, Sentry, Supabase, Stripe
-
-### File Compression
-Compress files without losing quality.
-- Images: lossless PNG, JPEG optimization
-- Videos: smart compression
-- PDFs: reduce file size
-- Before/after size comparison
-- Replace original or save as new
 
 ### Test Runner
 Run and view tests visually.
@@ -73,27 +57,6 @@ PostgreSQL browser for local/remote databases.
 - Export to CSV/JSON
 - Query history and saved queries
 
-### Environment Variables
-Manage .env files visually.
-- View/edit .env, .env.local, .env.production
-- Compare differences between env files
-- Mark sensitive values (hidden by default)
-- Never commit warnings for secrets
-
-### Quick Command Palette
-Global command launcher (Cmd+Shift+P).
-- Search across all app features
-- Recent commands
-- Custom command aliases
-- Chain multiple commands
-
-### Project Switcher
-Fast project switching (Cmd+O).
-- Recent projects list
-- Fuzzy search by name
-- Preview project info
-- Open in new window option
-
 ### Prompt Templates
 Insert saved prompts with variables.
 - Create snippets with variables (e.g., `Fix the bug in {{file}}`)
@@ -117,3 +80,15 @@ Split view for sessions and terminals.
 |------|------|------|
 | System Health Dashboard | `_PLANS/SYSTEM_HEALTH_DASHBOARD.md` | 2025-12-23 |
 | Live Preview Server | `_PLANS/LIVE_PREVIEW_SERVER.md` | 2025-12-23 |
+
+---
+
+## Implemented
+
+| Idea | Implementation | Date |
+|------|----------------|------|
+| Quick Command Palette | `Ctrl/Cmd+P` - search tools, projects, sessions | 2025-12-23 |
+| Environment Variables | `EnvManagerPopup` - visual .env editor | 2025-12-23 |
+| Project Switcher | Merged into Command Palette | 2025-12-23 |
+| File Compression | Context menu in FileTree + FileBrowser, Settings tab | 2025-12-23 |
+| API Testing Tool | `ApiTesterPopup` - HTTP tester with tabs, history, webhooks | 2025-12-22 |

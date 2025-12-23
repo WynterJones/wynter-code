@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from "react";
 import {
   Wrench,
   Network,
-  ChevronDown,
   Package,
   Globe,
   Pipette,
   Activity,
   Play,
+  Key,
+  Send,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -66,6 +67,20 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Activity,
     actionKey: "openSystemHealth",
   },
+  {
+    id: "env-manager",
+    name: "Environment Variables",
+    description: "Manage .env files and secrets",
+    icon: Key,
+    actionKey: "openEnvManager",
+  },
+  {
+    id: "api-tester",
+    name: "API Tester",
+    description: "Test HTTP APIs with tabs and history",
+    icon: Send,
+    actionKey: "openApiTester",
+  },
 ];
 
 interface Tool {
@@ -82,6 +97,8 @@ interface ToolsDropdownProps {
   onOpenLocalhostTunnel: () => void;
   onOpenSystemHealth: () => void;
   onOpenLivePreview: () => void;
+  onOpenEnvManager: () => void;
+  onOpenApiTester: () => void;
 }
 
 export function ToolsDropdown({
@@ -90,6 +107,8 @@ export function ToolsDropdown({
   onOpenLocalhostTunnel,
   onOpenSystemHealth,
   onOpenLivePreview,
+  onOpenEnvManager,
+  onOpenApiTester,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -163,6 +182,26 @@ export function ToolsDropdown({
         setIsOpen(false);
       },
     },
+    {
+      id: "env-manager",
+      name: "Environment Variables",
+      description: "Manage .env files and secrets",
+      icon: <Key className="w-4 h-4" />,
+      onClick: () => {
+        onOpenEnvManager();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "api-tester",
+      name: "API Tester",
+      description: "Test HTTP APIs with tabs and history",
+      icon: <Send className="w-4 h-4" />,
+      onClick: () => {
+        onOpenApiTester();
+        setIsOpen(false);
+      },
+    },
   ];
 
   useEffect(() => {
@@ -218,12 +257,6 @@ export function ToolsDropdown({
           )}
         >
           <Wrench className="w-4 h-4" />
-          <ChevronDown
-            className={cn(
-              "w-3 h-3 transition-transform",
-              isOpen && "rotate-180",
-            )}
-          />
         </button>
       </Tooltip>
 

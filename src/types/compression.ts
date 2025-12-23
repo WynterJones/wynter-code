@@ -1,0 +1,42 @@
+export interface CompressionResult {
+  success: boolean;
+  outputPath: string;
+  originalSize: number;
+  compressedSize: number;
+  savingsPercent: number;
+  error?: string;
+}
+
+export type CompressionType = "archive" | "image" | "pdf" | "video";
+
+export const OPTIMIZABLE_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"];
+export const OPTIMIZABLE_VIDEO_EXTENSIONS = ["mp4", "mov", "avi", "mkv", "webm"];
+export const OPTIMIZABLE_EXTENSIONS = [
+  ...OPTIMIZABLE_IMAGE_EXTENSIONS,
+  "pdf",
+  ...OPTIMIZABLE_VIDEO_EXTENSIONS,
+];
+
+export function getCompressionType(
+  path: string
+): CompressionType | null {
+  const ext = path.split(".").pop()?.toLowerCase() || "";
+  if (OPTIMIZABLE_IMAGE_EXTENSIONS.includes(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+  if (OPTIMIZABLE_VIDEO_EXTENSIONS.includes(ext)) return "video";
+  return null;
+}
+
+export function canOptimize(path: string, isDirectory: boolean): boolean {
+  if (isDirectory) return false;
+  const ext = path.split(".").pop()?.toLowerCase() || "";
+  return OPTIMIZABLE_EXTENSIONS.includes(ext);
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+}

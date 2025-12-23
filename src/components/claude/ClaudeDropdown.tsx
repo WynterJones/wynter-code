@@ -65,8 +65,8 @@ export function ClaudeDropdown({ projectPath }: ClaudeDropdownProps) {
         className={cn(
           "p-1.5 rounded transition-colors",
           isDropdownOpen
-            ? "bg-bg-tertiary text-text-primary"
-            : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+            ? "bg-accent/15 text-accent border border-accent/50"
+            : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary border border-transparent"
         )}
         title="Claude Code Manager"
       >

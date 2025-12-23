@@ -38,6 +38,20 @@ tiny_http = "0.12"
 tungstenite = "0.24"
 local-ip-address = "0.6"
 
+# HTTP client for API testing
+reqwest = { version = "0.12", features = ["json"] }
+
+# File compression
+zip = "2.2"
+walkdir = "2"
+
+# Image optimization
+oxipng = "9"
+image = "0.25"
+
+# PDF optimization
+lopdf = "0.34"
+
 # macOS color picker (NSColorSampler)
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"

@@ -5,3 +5,5 @@ export * from "./claude";
 export * from "./subscription";
 export * from "./livepreview";
 export * from "./command";
+export * from "./env";
+export * from "./apiTester";

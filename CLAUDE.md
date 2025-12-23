@@ -195,4 +195,5 @@ npm run build   # Verify compilation
 
 - Always use OverlayScrollbars for scrollbars for any scrollable container.
 - When we make new tools, add their paths to justfiles for quicker access.
-- Never use emojies always proper icons
+- Never use emojies always proper icons.
+- **Command Palette**: When adding new tools, add them to `TOOL_DEFINITIONS` in `src/components/tools/ToolsDropdown.tsx`. Tools appear in the command palette (`Ctrl/Cmd+P`) automatically.

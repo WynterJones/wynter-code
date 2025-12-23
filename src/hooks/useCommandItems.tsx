@@ -6,16 +6,17 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { TOOL_DEFINITIONS } from "@/components/tools";
 import type { CommandItem } from "@/types";
 
-export interface ToolActions {
-  openLivePreview: () => void;
-  openColorPicker: () => void;
-  openPortManager: () => void;
-  openNodeModulesCleaner: () => void;
-  openLocalhostTunnel: () => void;
-  openSystemHealth: () => void;
+function dispatchToolAction(actionKey: string) {
+  if (actionKey === "openColorPicker") {
+    invoke("pick_color_and_show").catch((err) => {
+      console.error("Failed to open color picker:", err);
+    });
+  } else {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: actionKey } }));
+  }
 }
 
-export function useCommandItems(toolActions: ToolActions): CommandItem[] {
+export function useCommandItems(): CommandItem[] {
   const { projects, activeProjectId, setActiveProject } = useProjectStore();
   const { getSessionsForProject, setActiveSession } = useSessionStore();
 
@@ -32,12 +33,7 @@ export function useCommandItems(toolActions: ToolActions): CommandItem[] {
         description: tool.description,
         icon: <Icon className="w-4 h-4" />,
         category: "Tools",
-        action: () => {
-          const actionFn = toolActions[tool.actionKey as keyof ToolActions];
-          if (actionFn) {
-            actionFn();
-          }
-        },
+        action: () => dispatchToolAction(tool.actionKey),
       });
     });
 
@@ -55,25 +51,33 @@ export function useCommandItems(toolActions: ToolActions): CommandItem[] {
       });
     });
 
-    // Add sessions for active project only
-    if (activeProjectId) {
-      const sessions = getSessionsForProject(activeProjectId);
-      sessions.forEach((session) => {
+    // Add sessions from ALL projects
+    projects.forEach((project) => {
+      const sessions = getSessionsForProject(project.id);
+      sessions.forEach((session, index) => {
         const SessionIcon = session.type === "claude" ? MessageSquare : Terminal;
+        const sessionName = session.name || `Session ${index + 1}`;
         items.push({
           id: `session-${session.id}`,
           type: "session",
-          label: session.name,
-          description: session.type === "claude" ? "Claude Session" : "Terminal",
+          label: sessionName,
+          description: project.name,
           icon: <SessionIcon className="w-4 h-4" style={{ color: session.color }} />,
+          keywords: [project.name, project.path],
           category: "Sessions",
-          action: () => setActiveSession(activeProjectId, session.id),
+          action: () => {
+            // Switch to the project first if not active, then switch to the session
+            if (activeProjectId !== project.id) {
+              setActiveProject(project.id);
+            }
+            setActiveSession(project.id, session.id);
+          },
         });
       });
-    }
+    });
 
     return items;
-  }, [projects, activeProjectId, getSessionsForProject, setActiveSession, setActiveProject, toolActions]);
+  }, [projects, activeProjectId, getSessionsForProject, setActiveSession, setActiveProject]);
 }
 
 export function filterCommandItems(items: CommandItem[], query: string): CommandItem[] {

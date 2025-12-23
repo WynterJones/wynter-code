@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod api_tester;
 mod color_picker;
 mod commands;
 mod live_preview;
@@ -191,6 +192,7 @@ fn main() {
         .manage(Arc::new(tunnel::TunnelManager::new()))
         .manage(Arc::new(watcher::FileWatcherManager::new()))
         .manage(Arc::new(live_preview::PreviewManager::new()))
+        .manage(Arc::new(api_tester::WebhookManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -229,6 +231,17 @@ fn main() {
             commands::kill_process,
             commands::scan_node_modules,
             commands::delete_node_modules,
+            commands::list_env_files,
+            commands::read_env_file,
+            commands::write_env_file,
+            commands::create_env_file,
+            commands::check_env_gitignore,
+            commands::get_system_env_vars,
+            commands::create_zip_archive,
+            commands::optimize_image,
+            commands::optimize_pdf,
+            commands::optimize_video,
+            commands::check_ffmpeg_available,
             terminal::create_pty,
             terminal::write_pty,
             terminal::resize_pty,
@@ -253,6 +266,10 @@ fn main() {
             live_preview::start_preview_server,
             live_preview::stop_preview_server,
             live_preview::list_preview_servers,
+            api_tester::send_http_request,
+            api_tester::start_webhook_server,
+            api_tester::stop_webhook_server,
+            api_tester::list_webhook_servers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

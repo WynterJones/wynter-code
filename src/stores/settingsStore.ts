@@ -52,6 +52,8 @@ interface SettingsStore {
   customMusicPath: string;
   compactProjectTabs: boolean;
   dimInactiveProjects: boolean;
+  compressionArchiveOverwrite: boolean;
+  compressionMediaOverwrite: boolean;
 
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
@@ -67,6 +69,8 @@ interface SettingsStore {
   setCustomMusicPath: (path: string) => void;
   setCompactProjectTabs: (compact: boolean) => void;
   setDimInactiveProjects: (dim: boolean) => void;
+  setCompressionArchiveOverwrite: (overwrite: boolean) => void;
+  setCompressionMediaOverwrite: (overwrite: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -87,6 +91,8 @@ export const useSettingsStore = create<SettingsStore>()(
       customMusicPath: "",
       compactProjectTabs: false,
       dimInactiveProjects: false,
+      compressionArchiveOverwrite: false,
+      compressionMediaOverwrite: false,
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -142,6 +148,14 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setDimInactiveProjects: (dimInactiveProjects: boolean) => {
         set({ dimInactiveProjects });
+      },
+
+      setCompressionArchiveOverwrite: (compressionArchiveOverwrite: boolean) => {
+        set({ compressionArchiveOverwrite });
+      },
+
+      setCompressionMediaOverwrite: (compressionMediaOverwrite: boolean) => {
+        set({ compressionMediaOverwrite });
       },
     }),
     {

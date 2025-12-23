@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
-import { FilePlus, FolderPlus, Pencil, Trash2, type LucideIcon } from "lucide-react";
+import { Archive, FilePlus, FolderPlus, ImageMinus, Pencil, Trash2, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { canOptimize } from "@/types/compression";
 
 export interface ContextMenuItem {
   label: string;
@@ -111,4 +112,33 @@ export function buildFileContextMenuItems(
     { label: "Rename", icon: Pencil, action: onRename },
     { label: "Delete", icon: Trash2, action: onDelete, variant: "danger", separator: true },
   ];
+}
+
+// Helper to build compression menu items
+export function buildCompressionMenuItems(
+  path: string,
+  isDirectory: boolean,
+  onCreateArchive: () => void,
+  onOptimize: () => void
+): ContextMenuItem[] {
+  const items: ContextMenuItem[] = [];
+
+  // Always offer archive creation
+  items.push({
+    label: isDirectory ? "Compress to Zip" : "Add to Zip",
+    icon: Archive,
+    action: onCreateArchive,
+    separator: true,
+  });
+
+  // Add optimize option for supported file types
+  if (canOptimize(path, isDirectory)) {
+    items.push({
+      label: "Optimize File Size",
+      icon: ImageMinus,
+      action: onOptimize,
+    });
+  }
+
+  return items;
 }

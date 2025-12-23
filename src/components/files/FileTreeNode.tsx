@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/types/compression";
 import type { FileNode } from "@/types";
 import {
   type GitStatusMap,
@@ -18,6 +19,8 @@ interface FileTreeNodeProps {
   onNodeModulesClick?: () => void;
   onMoveItem?: (sourcePath: string, destinationFolder: string) => Promise<void>;
   gitStatusMap?: GitStatusMap;
+  selectedPaths?: Set<string>;
+  onSelect?: (node: FileNode, shiftKey: boolean) => void;
 }
 
 export function FileTreeNode({
@@ -29,8 +32,13 @@ export function FileTreeNode({
   onNodeModulesClick,
   onMoveItem,
   gitStatusMap,
+  selectedPaths,
+  onSelect,
 }: FileTreeNodeProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  const isSelected = selectedPaths?.has(node.path) ?? false;
 
   // Compute git status for this node
   const gitStatus = useMemo((): GitFileStatusType | undefined => {
@@ -64,7 +72,14 @@ export function FileTreeNode({
 
   const gitStatusColorClass = getGitStatusColor(gitStatus);
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    // Handle selection with shift key
+    if (onSelect && (e.shiftKey || e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      onSelect(node, e.shiftKey);
+      return;
+    }
+
     if (node.isDirectory) {
       // Special handling for node_modules - switch to Modules tab
       if (node.name === "node_modules" && onNodeModulesClick) {
@@ -163,6 +178,8 @@ export function FileTreeNode({
       <div
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         draggable
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
@@ -170,9 +187,10 @@ export function FileTreeNode({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={cn(
-          "flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-bg-hover transition-colors",
+          "flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-bg-hover transition-colors group",
           "text-sm text-text-primary",
           node.isIgnored && "opacity-50",
+          isSelected && "bg-accent/20",
           isDragOver && node.isDirectory && "bg-accent/20 ring-1 ring-accent ring-inset"
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -195,7 +213,14 @@ export function FileTreeNode({
           isExpanded={node.isExpanded}
         />
 
-        <span className={cn("truncate", gitStatusColorClass)}>{node.name}</span>
+        <span className={cn("truncate flex-1", gitStatusColorClass)}>{node.name}</span>
+
+        {/* File size on hover - only for files */}
+        {isHovered && !node.isDirectory && node.size !== undefined && (
+          <span className="text-xs text-text-secondary ml-auto pr-1 whitespace-nowrap">
+            {formatBytes(node.size)}
+          </span>
+        )}
       </div>
 
       {node.isExpanded && node.children && (

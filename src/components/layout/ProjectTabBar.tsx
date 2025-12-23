@@ -24,7 +24,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SubscriptionButton } from "@/components/subscriptions";
 import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
-import { ToolsDropdown, PortManagerPopup, NodeModulesCleanerPopup, LocalhostTunnelPopup, SystemHealthPopup, LivePreviewPopup } from "@/components/tools";
+import { ToolsDropdown, PortManagerPopup, NodeModulesCleanerPopup, LocalhostTunnelPopup, SystemHealthPopup, LivePreviewPopup, EnvManagerPopup, ApiTesterPopup } from "@/components/tools";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import type { Project } from "@/types";
@@ -220,6 +220,8 @@ export function ProjectTabBar({
   const [showTunnelManager, setShowTunnelManager] = useState(false);
   const [showSystemHealth, setShowSystemHealth] = useState(false);
   const [showLivePreview, setShowLivePreview] = useState(false);
+  const [showEnvManager, setShowEnvManager] = useState(false);
+  const [showApiTester, setShowApiTester] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
@@ -266,6 +268,40 @@ export function ProjectTabBar({
       onImageBrowserOpened?.();
     }
   }, [requestImageBrowser]);
+
+  // Listen for command palette tool actions
+  useEffect(() => {
+    const handleCommandPaletteTool = (e: CustomEvent<{ action: string }>) => {
+      switch (e.detail.action) {
+        case "openLivePreview":
+          setShowLivePreview(true);
+          break;
+        case "openPortManager":
+          setShowPortManager(true);
+          break;
+        case "openNodeModulesCleaner":
+          setShowNodeModulesCleaner(true);
+          break;
+        case "openLocalhostTunnel":
+          setShowTunnelManager(true);
+          break;
+        case "openSystemHealth":
+          setShowSystemHealth(true);
+          break;
+        case "openEnvManager":
+          setShowEnvManager(true);
+          break;
+        case "openApiTester":
+          setShowApiTester(true);
+          break;
+      }
+    };
+
+    window.addEventListener("command-palette-tool", handleCommandPaletteTool as EventListener);
+    return () => {
+      window.removeEventListener("command-palette-tool", handleCommandPaletteTool as EventListener);
+    };
+  }, []);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -444,6 +480,8 @@ export function ProjectTabBar({
           onOpenLocalhostTunnel={() => setShowTunnelManager(true)}
           onOpenSystemHealth={() => setShowSystemHealth(true)}
           onOpenLivePreview={() => setShowLivePreview(true)}
+          onOpenEnvManager={() => setShowEnvManager(true)}
+          onOpenApiTester={() => setShowApiTester(true)}
         />
       </div>
 
@@ -624,6 +662,18 @@ export function ProjectTabBar({
       <LivePreviewPopup
         isOpen={showLivePreview}
         onClose={() => setShowLivePreview(false)}
+      />
+
+      {/* Environment Variables Manager */}
+      <EnvManagerPopup
+        isOpen={showEnvManager}
+        onClose={() => setShowEnvManager(false)}
+      />
+
+      {/* API Tester */}
+      <ApiTesterPopup
+        isOpen={showApiTester}
+        onClose={() => setShowApiTester(false)}
       />
     </div>
   );
