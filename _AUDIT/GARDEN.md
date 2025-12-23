@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-23
-**Active Ideas:** 6
+**Active Ideas:** 5
 
 ---
 
@@ -27,13 +27,6 @@ Unified dashboard for external services.
 - Credentials in system keychain
 - Integrations: Railway, Vercel, Netlify, Plausible, PostHog, Sentry, Supabase, Stripe
 
-### Storybook Viewer
-Embedded Storybook preview.
-- Detect if Storybook is configured
-- Launch Storybook server
-- Browse components in mini browser
-- Hot reload support
-
 ### Database Viewer
 PostgreSQL browser for local/remote databases.
 - Connect to local/remote databases
@@ -50,15 +43,13 @@ Split view for sessions and terminals.
 - Save layout presets
 - Quick toggle between layouts
 
-### Workspaces
-Organization layer above projects for switching work contexts.
-- Pill button to the left of project tabs with icon badge + name
-- Click opens dropdown popup with search and workspace list
-- CRUD operations: create, rename, recolor, delete workspaces
-- Each workspace contains its own project tabs
-- Switching workspace changes visible projects
-- Remembers last active project per workspace
-- Hierarchy: Workspace -> Projects -> Sessions -> Terminals
+### Background Task Watcher
+Monitor long-running processes with notifications.
+- Track builds, tests, deploys in a unified view
+- Desktop notification when tasks complete
+- Success/fail status indicators
+- Output preview without switching context
+- History log of recent tasks
 
 ---
 
@@ -68,6 +59,7 @@ Organization layer above projects for switching work contexts.
 |------|------|------|
 | System Health Dashboard | `_PLANS/SYSTEM_HEALTH_DASHBOARD.md` | 2025-12-23 |
 | Live Preview Server | `_PLANS/LIVE_PREVIEW_SERVER.md` | 2025-12-23 |
+| Multi-Model Support | `_PLANS/MULTI_MODEL_SUPPORT.md` | 2025-12-23 |
 
 ---
 
@@ -82,3 +74,5 @@ Organization layer above projects for switching work contexts.
 | Project Switcher | Merged into Command Palette | 2025-12-23 |
 | File Compression | Context menu in FileTree + FileBrowser, Settings tab | 2025-12-23 |
 | API Testing Tool | `ApiTesterPopup` - HTTP tester with tabs, history, webhooks | 2025-12-22 |
+| Workspaces | `WorkspaceSelectorPopup` - workspace layer above projects with custom avatars, icon/image/shape | 2025-12-23 |
+| Storybook Viewer | `StorybookViewerPopup` - detect Storybook, launch dev server, embedded iframe preview | 2025-12-23 |

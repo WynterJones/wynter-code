@@ -3,7 +3,6 @@ import { persist } from "zustand/middleware";
 import type {
   Workspace,
   WorkspaceAvatar,
-  AvatarShape,
 } from "@/types/workspace";
 import { createWorkspace, createDefaultAvatar } from "@/types/workspace";
 import type { Project } from "@/types";

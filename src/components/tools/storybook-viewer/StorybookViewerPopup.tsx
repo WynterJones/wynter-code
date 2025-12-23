@@ -91,16 +91,27 @@ export function StorybookViewerPopup({
     listen<StorybookEvent>("storybook-event", (event) => {
       const { serverId, eventType, url, status, message } = event.payload;
 
+      console.log("[Storybook Event]", eventType, message, status);
+
       if (eventType === "ready" || eventType === "status_change") {
         updateServer(serverId, {
           url: url ?? undefined,
           status: status ?? undefined,
         });
-        setStarting(false);
+        if (eventType === "ready") {
+          setStarting(false);
+        }
       }
 
       if (eventType === "stopped") {
         updateServer(serverId, { status: "idle" });
+        setStarting(false);
+        // Show error if process exited with an error
+        if (message) {
+          setError(`Storybook stopped: ${message}`);
+        }
+        // Remove the server from the store since it stopped
+        removeServer(serverId);
       }
 
       if (eventType === "error") {
@@ -118,10 +129,15 @@ export function StorybookViewerPopup({
     return () => {
       if (unlisten) unlisten();
     };
-  }, [isOpen, updateServer]);
+  }, [isOpen, updateServer, removeServer]);
 
   const handleStartStorybook = useCallback(async () => {
-    if (!activeProject?.path || !startCommand) return;
+    if (!activeProject?.path || !startCommand) {
+      console.log("[Storybook] Cannot start - path:", activeProject?.path, "command:", startCommand);
+      return;
+    }
+
+    console.log("[Storybook] Starting with command:", startCommand, "in", activeProject.path);
 
     const port = parseInt(portInput, 10);
     if (isNaN(port) || port < 1 || port > 65535) {

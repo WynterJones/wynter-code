@@ -56,6 +56,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useStorybookDetection } from "@/hooks/useStorybookDetection";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { WorkspaceSelectorPopup } from "@/components/workspaces";
 import type { Project } from "@/types";
 
 const PROJECT_COLORS = [
@@ -295,9 +297,52 @@ export function ProjectTabBar({
   const isMeditating = useMeditationStore((s) => s.isActive);
   const setMeditationActive = useMeditationStore((s) => s.setActive);
 
+  const {
+    workspaces,
+    activeWorkspaceId,
+    migrateFromProjectStore,
+    addProjectToWorkspace,
+    getActiveWorkspace,
+    setLastActiveProject,
+  } = useWorkspaceStore();
+
   const defaultBrowsePath = useSettingsStore((s) => s.defaultBrowsePath);
   const compactProjectTabs = useSettingsStore((s) => s.compactProjectTabs);
   const dimInactiveProjects = useSettingsStore((s) => s.dimInactiveProjects);
+
+  // Get the active workspace and filter projects
+  const activeWorkspace = getActiveWorkspace();
+  const workspaceProjectIds = activeWorkspace?.projectIds || [];
+  const filteredProjects = useMemo(() => {
+    if (!activeWorkspace) return projects; // Show all if no workspace
+    return projects.filter((p) => workspaceProjectIds.includes(p.id));
+  }, [projects, workspaceProjectIds, activeWorkspace]);
+
+  // Migrate existing projects to workspace on first load
+  useEffect(() => {
+    if (workspaces.length === 0 && projects.length > 0) {
+      migrateFromProjectStore(projects);
+    }
+  }, [workspaces.length, projects.length, migrateFromProjectStore]);
+
+  // Restore last active project when switching workspaces
+  useEffect(() => {
+    if (activeWorkspace?.lastActiveProjectId) {
+      // Only restore if the project exists and is in this workspace
+      const projectExists = projects.some(
+        (p) => p.id === activeWorkspace.lastActiveProjectId
+      );
+      if (projectExists && activeProjectId !== activeWorkspace.lastActiveProjectId) {
+        setActiveProject(activeWorkspace.lastActiveProjectId);
+      }
+    } else if (activeWorkspace && activeWorkspace.projectIds.length > 0) {
+      // If no last active, select first project in workspace
+      const firstProjectId = activeWorkspace.projectIds[0];
+      if (firstProjectId && activeProjectId !== firstProjectId) {
+        setActiveProject(firstProjectId);
+      }
+    }
+  }, [activeWorkspaceId]); // Only run when workspace changes
 
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -346,7 +391,7 @@ export function ProjectTabBar({
     }),
   );
 
-  const projectIds = useMemo(() => projects.map((p) => p.id), [projects]);
+  const projectIds = useMemo(() => filteredProjects.map((p) => p.id), [filteredProjects]);
 
   const updateScrollButtons = () => {
     if (scrollContainerRef.current) {
@@ -431,9 +476,10 @@ export function ProjectTabBar({
     const { active, over } = event;
 
     if (over && active.id !== over.id) {
-      const oldIndex = projects.findIndex((p) => p.id === active.id);
-      const newIndex = projects.findIndex((p) => p.id === over.id);
-      reorderProjects(oldIndex, newIndex);
+      // For now, reorder in projectStore - in future, reorder within workspace
+      const oldGlobalIndex = projects.findIndex((p) => p.id === active.id);
+      const newGlobalIndex = projects.findIndex((p) => p.id === over.id);
+      reorderProjects(oldGlobalIndex, newGlobalIndex);
     }
   };
 
@@ -509,7 +555,17 @@ export function ProjectTabBar({
   };
 
   const handleSelectProject = (path: string) => {
+    // Add to projectStore first
     addProject(path);
+
+    // Get the newly added project ID
+    const newProject = useProjectStore.getState().projects.find((p) => p.path === path);
+
+    // Add to active workspace
+    if (newProject && activeWorkspaceId) {
+      addProjectToWorkspace(activeWorkspaceId, newProject.id);
+    }
+
     setShowFileBrowser(false);
   };
 
@@ -528,6 +584,11 @@ export function ProjectTabBar({
         className="w-20 h-full flex-shrink-0 flex items-center justify-end pr-2"
       />
 
+      {/* Workspace Selector */}
+      <div className="flex items-center px-2 h-full border-r border-border">
+        <WorkspaceSelectorPopup compact={compactProjectTabs} />
+      </div>
+
       {/* Project Tabs with DnD */}
       <DndContext
         sensors={sensors}
@@ -543,7 +604,7 @@ export function ProjectTabBar({
             items={projectIds}
             strategy={horizontalListSortingStrategy}
           >
-            {projects.map((project) => (
+            {filteredProjects.map((project) => (
               <SortableProjectTab
                 key={project.id}
                 project={project}
@@ -552,6 +613,10 @@ export function ProjectTabBar({
                 isDimmed={dimInactiveProjects && activeProjectId !== project.id}
                 onSelect={() => {
                   setActiveProject(project.id);
+                  // Track last active project in workspace
+                  if (activeWorkspaceId) {
+                    setLastActiveProject(activeWorkspaceId, project.id);
+                  }
                   setMeditationActive(false);
                 }}
                 onClose={() => removeProject(project.id)}

@@ -2,8 +2,8 @@
 
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
-**Last Updated:** 2025-12-22
-**Composted Ideas:** 27
+**Last Updated:** 2025-12-23
+**Composted Ideas:** 33
 
 ---
 
@@ -126,3 +126,27 @@ Track Claude API/CLI usage with graphs and cost estimation.
 ### Prompt Templates
 Insert saved prompts with variables - create snippets with variables, organize by category, quick insert with keyboard shortcut, import/export template packs.
 > **Why rejected:** User decided not to implement.
+
+### Chat Box / Chat Helper
+Standalone chat interface for general questions and assistance.
+> **Why rejected:** Unnecessary - Claude Code can already help with anything directly in the main interface.
+
+### Code Screenshot Tool
+Generate beautiful code screenshots (like Carbon/Ray.so) directly in the app.
+> **Why rejected:** Browser tools like Carbon and Ray.so already do this well. Not worth custom implementation.
+
+### Cron Expression Builder
+Visual cron job editor with plain English explanations.
+> **Why rejected:** Rarely needed. Online tools like crontab.guru handle this perfectly.
+
+### SSH Connection Manager
+Save SSH connections, quick connect, file transfer, keep-alive.
+> **Why rejected:** Terminal handles SSH fine. Dedicated tools like Termius exist for power users.
+
+### Dependency Update Dashboard
+See outdated packages across all projects with changelog previews.
+> **Why rejected:** `npm outdated` and Renovate/Dependabot handle this better. Not core to the app.
+
+### Git Worktree Manager
+Visual interface for git worktrees to work on multiple branches simultaneously.
+> **Why rejected:** Niche power user feature. CLI is straightforward enough for the rare times it's needed.

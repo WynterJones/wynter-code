@@ -271,7 +271,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const handleDelete = async (node: FileNode) => {
     try {
       await deleteToTrash(node.path);
-      await loadFiles();
+      await loadFiles(true);
       refetchGitStatus();
     } catch (err) {
       console.error("Failed to delete:", err);
@@ -281,7 +281,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const handleMoveItem = async (sourcePath: string, destinationFolder: string) => {
     try {
       await moveItem(sourcePath, destinationFolder);
-      await loadFiles();
+      await loadFiles(true);
       refetchGitStatus();
     } catch (err) {
       console.error("Failed to move item:", err);
@@ -297,7 +297,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
           `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${savings}% saved)`
         );
         setSelectedPaths(new Set());
-        await loadFiles();
+        await loadFiles(true);
       }
     } catch (err) {
       console.error("Failed to create archive:", err);
@@ -312,7 +312,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         console.log(
           `Optimized ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${savings}% saved)`
         );
-        await loadFiles();
+        await loadFiles(true);
       }
     } catch (err) {
       console.error("Failed to optimize file:", err);
@@ -330,7 +330,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       } else if (dialog.type === "folder") {
         await createFolder(dialog.parentPath, name);
       }
-      await loadFiles();
+      await loadFiles(true);
       refetchGitStatus();
     } catch (err) {
       console.error("File operation failed:", err);

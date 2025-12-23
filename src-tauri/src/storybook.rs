@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, State};
 use uuid::Uuid;
 
@@ -28,11 +28,15 @@ pub struct StorybookEvent {
 }
 
 struct StorybookInstance {
+    #[allow(dead_code)]
     project_path: String,
+    #[allow(dead_code)]
     port: u16,
+    #[allow(dead_code)]
     url: String,
     status: StorybookStatus,
     child_pid: Option<u32>,
+    #[allow(dead_code)]
     created_at: i64,
 }
 
@@ -98,21 +102,32 @@ pub async fn start_storybook_server(
         },
     );
 
-    // Parse command
-    let parts: Vec<&str> = command.split_whitespace().collect();
-    if parts.is_empty() {
-        return Err("Invalid command".to_string());
-    }
+    // Build the full command with port and --no-open to prevent browser auto-open
+    // For npm/pnpm/yarn scripts, we need -- to pass args to the underlying command
+    let full_command = if command.starts_with("npm run") || command.starts_with("pnpm run") || command.starts_with("yarn run") || command.starts_with("bun run") {
+        format!("{} -- -p {} --no-open", command, port)
+    } else {
+        format!("{} -p {} --no-open", command, port)
+    };
 
-    let mut cmd = Command::new(parts[0]);
+    // Use interactive shell to run the command to ensure PATH and environment are available
+    // This is important for nvm/fnm/volta users where node is in a non-standard location
+    let mut cmd = if cfg!(target_os = "windows") {
+        let mut c = Command::new("cmd");
+        c.args(["/C", &full_command]);
+        c
+    } else {
+        let mut c = Command::new("bash");
+        // Use -l for login shell to load .bash_profile/.zprofile where nvm is typically configured
+        // Use -c to run the command
+        c.args(["-l", "-c", &full_command]);
+        c
+    };
+
     cmd.current_dir(&project_path);
 
-    for part in &parts[1..] {
-        cmd.arg(part);
-    }
-
-    // Add port flag for Storybook
-    cmd.arg("-p").arg(port.to_string());
+    // Inherit environment variables from the parent process
+    cmd.envs(std::env::vars());
 
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -142,94 +157,188 @@ pub async fn start_storybook_server(
         let stderr = child.stderr.take();
         let stdout = child.stdout.take();
 
-        let ready_patterns = [
-            "storybook",
-            "started",
-            "localhost:",
-            "local:",
-            "ready",
+        // Shared flag for server ready
+        let server_ready = Arc::new(Mutex::new(false));
+
+        // Collect stderr output for error reporting
+        let stderr_output = Arc::new(Mutex::new(Vec::<String>::new()));
+
+        // Patterns that indicate Storybook is ready
+        let ready_keywords: Vec<&str> = vec![
+            "storybook started",
+            "storybook 7",
+            "storybook 8",
+            "for manager and",
             "webpack compiled",
+            "build finished",
+            "ready in",
         ];
 
-        let mut server_ready = false;
+        let port_str = port.to_string();
 
-        // Monitor stderr
-        if let Some(stderr) = stderr {
-            let reader = BufReader::new(stderr);
-            for line in reader.lines().map_while(Result::ok) {
-                if !server_ready {
+        // Clone everything for threads
+        let server_ready_stderr = server_ready.clone();
+        let server_ready_stdout = server_ready.clone();
+        let state_stderr = state_clone.clone();
+        let state_stdout = state_clone.clone();
+        let window_stderr = window_clone.clone();
+        let window_stdout = window_clone.clone();
+        let url_stderr = url_clone.clone();
+        let url_stdout = url_clone.clone();
+        let server_id_stderr = server_id_clone.clone();
+        let server_id_stdout = server_id_clone.clone();
+        let keywords_stderr = ready_keywords.clone();
+        let keywords_stdout = ready_keywords.clone();
+        let port_stderr = port_str.clone();
+        let port_stdout = port_str.clone();
+        let stderr_output_clone = stderr_output.clone();
+
+        // Helper to mark ready
+        let mark_ready = |server_id: &str, state: &Arc<StorybookManager>, window: &tauri::Window, url: &str, ready_flag: &Arc<Mutex<bool>>| {
+            let mut ready = ready_flag.lock().unwrap();
+            if *ready {
+                return false;
+            }
+            *ready = true;
+            drop(ready);
+
+            {
+                let mut servers = state.servers.lock().unwrap();
+                if let Some(server) = servers.get_mut(server_id) {
+                    server.status = StorybookStatus::Running;
+                }
+            }
+
+            let _ = window.emit(
+                "storybook-event",
+                StorybookEvent {
+                    server_id: server_id.to_string(),
+                    event_type: "ready".to_string(),
+                    url: Some(url.to_string()),
+                    status: Some(StorybookStatus::Running),
+                    message: Some("Storybook is ready!".to_string()),
+                },
+            );
+            true
+        };
+
+        // Monitor stderr in a separate thread
+        let stderr_handle = if let Some(stderr) = stderr {
+            Some(std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines().map_while(Result::ok) {
+                    // Capture stderr for error reporting
+                    {
+                        let mut output = stderr_output_clone.lock().unwrap();
+                        output.push(line.clone());
+                        // Keep only last 20 lines
+                        if output.len() > 20 {
+                            output.remove(0);
+                        }
+                    }
+
                     let line_lower = line.to_lowercase();
-                    for pattern in &ready_patterns {
-                        if line_lower.contains(&pattern.to_lowercase())
-                            && line_lower.contains(&port.to_string())
-                        {
-                            server_ready = true;
 
-                            {
-                                let mut servers = state_clone.servers.lock().unwrap();
-                                if let Some(server) = servers.get_mut(&server_id_clone) {
-                                    server.status = StorybookStatus::Running;
-                                }
-                            }
-
-                            let _ = window_clone.emit(
-                                "storybook-event",
-                                StorybookEvent {
-                                    server_id: server_id_clone.clone(),
-                                    event_type: "ready".to_string(),
-                                    url: Some(url_clone.clone()),
-                                    status: Some(StorybookStatus::Running),
-                                    message: Some("Storybook is ready!".to_string()),
-                                },
-                            );
+                    // Check for ready keywords
+                    for keyword in &keywords_stderr {
+                        if line_lower.contains(*keyword) {
+                            mark_ready(&server_id_stderr, &state_stderr, &window_stderr, &url_stderr, &server_ready_stderr);
                             break;
                         }
+                    }
+
+                    // Check for localhost URL with port
+                    if line_lower.contains("localhost:") && line_lower.contains(&port_stderr) {
+                        mark_ready(&server_id_stderr, &state_stderr, &window_stderr, &url_stderr, &server_ready_stderr);
+                    }
+                }
+            }))
+        } else {
+            None
+        };
+
+        // Monitor stdout in a separate thread
+        let stdout_handle = if let Some(stdout) = stdout {
+            Some(std::thread::spawn(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines().map_while(Result::ok) {
+                    let line_lower = line.to_lowercase();
+
+                    // Check for ready keywords
+                    for keyword in &keywords_stdout {
+                        if line_lower.contains(*keyword) {
+                            mark_ready(&server_id_stdout, &state_stdout, &window_stdout, &url_stdout, &server_ready_stdout);
+                            break;
+                        }
+                    }
+
+                    // Check for localhost URL with port
+                    if line_lower.contains("localhost:") && line_lower.contains(&port_stdout) {
+                        mark_ready(&server_id_stdout, &state_stdout, &window_stdout, &url_stdout, &server_ready_stdout);
+                    }
+                }
+            }))
+        } else {
+            None
+        };
+
+        // Wait a bit then check if we should auto-mark as ready (fallback)
+        std::thread::sleep(Duration::from_secs(10));
+        {
+            let ready = server_ready.lock().unwrap();
+            if !*ready {
+                drop(ready);
+                // Check if process is still running - if so, assume it's ready
+                if child.try_wait().ok().flatten().is_none() {
+                    let mut ready = server_ready.lock().unwrap();
+                    if !*ready {
+                        *ready = true;
+                        drop(ready);
+
+                        {
+                            let mut servers = state_clone.servers.lock().unwrap();
+                            if let Some(server) = servers.get_mut(&server_id_clone) {
+                                server.status = StorybookStatus::Running;
+                            }
+                        }
+
+                        let _ = window_clone.emit(
+                            "storybook-event",
+                            StorybookEvent {
+                                server_id: server_id_clone.clone(),
+                                event_type: "ready".to_string(),
+                                url: Some(url_clone.clone()),
+                                status: Some(StorybookStatus::Running),
+                                message: Some("Storybook appears to be ready".to_string()),
+                            },
+                        );
                     }
                 }
             }
         }
 
-        // Monitor stdout
-        if let Some(stdout) = stdout {
-            let reader = BufReader::new(stdout);
-            for line in reader.lines().map_while(Result::ok) {
-                if !server_ready {
-                    let line_lower = line.to_lowercase();
-                    for pattern in &ready_patterns {
-                        if line_lower.contains(&pattern.to_lowercase())
-                            && line_lower.contains(&port.to_string())
-                        {
-                            server_ready = true;
-
-                            {
-                                let mut servers = state_clone.servers.lock().unwrap();
-                                if let Some(server) = servers.get_mut(&server_id_clone) {
-                                    server.status = StorybookStatus::Running;
-                                }
-                            }
-
-                            let _ = window_clone.emit(
-                                "storybook-event",
-                                StorybookEvent {
-                                    server_id: server_id_clone.clone(),
-                                    event_type: "ready".to_string(),
-                                    url: Some(url_clone.clone()),
-                                    status: Some(StorybookStatus::Running),
-                                    message: Some("Storybook is ready!".to_string()),
-                                },
-                            );
-                            break;
-                        }
-                    }
-                }
-            }
+        // Wait for output threads to finish
+        if let Some(handle) = stderr_handle {
+            let _ = handle.join();
+        }
+        if let Some(handle) = stdout_handle {
+            let _ = handle.join();
         }
 
         // Process ended
         let exit_status = child.wait();
         let error_msg = match exit_status {
             Ok(status) if status.success() => None,
-            Ok(status) => Some(format!("Process exited with code: {:?}", status.code())),
+            Ok(status) => {
+                // Include stderr output in error message
+                let stderr_lines = stderr_output.lock().unwrap();
+                let stderr_str = if stderr_lines.is_empty() {
+                    String::new()
+                } else {
+                    format!("\n{}", stderr_lines.join("\n"))
+                };
+                Some(format!("Process exited with code: {:?}{}", status.code(), stderr_str))
+            },
             Err(e) => Some(format!("Failed to wait on process: {}", e)),
         };
 
@@ -265,8 +374,12 @@ pub async fn stop_storybook_server(
         servers.get(&server_id).and_then(|s| s.child_pid)
     };
 
-    // Kill the process
+    // Kill the process and its children
     if let Some(pid) = child_pid {
+        // Kill the process group to ensure all children are killed
+        let _ = Command::new("pkill")
+            .args(["-P", &pid.to_string()])
+            .output();
         let _ = Command::new("kill")
             .args(["-9", &pid.to_string()])
             .output();
