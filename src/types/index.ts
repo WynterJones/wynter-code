@@ -7,3 +7,4 @@ export * from "./livepreview";
 export * from "./command";
 export * from "./env";
 export * from "./apiTester";
+export * from "./databaseViewer";

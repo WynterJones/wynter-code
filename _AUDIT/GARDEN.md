@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-23
-**Active Ideas:** 5
+**Active Ideas:** 3
 
 ---
 
@@ -27,13 +27,12 @@ Unified dashboard for external services.
 - Credentials in system keychain
 - Integrations: Railway, Vercel, Netlify, Plausible, PostHog, Sentry, Supabase, Stripe
 
-### Database Viewer
-PostgreSQL browser for local/remote databases.
-- Connect to local/remote databases
-- View tables, schemas, relationships
-- Run queries with syntax highlighting
-- Export to CSV/JSON
-- Query history and saved queries
+### Database Viewer: MySQL Support
+Extend Database Viewer to support MySQL connections.
+- Add MySQL connection pool handling (MySqlPool)
+- Handle MySQL SQL dialect for schema introspection
+- MySQL: INFORMATION_SCHEMA queries for tables/columns
+- Enable the "Add Connection" button for detected MySQL services
 
 ### Multi-Panel Layout
 Split view for sessions and terminals.
@@ -42,14 +41,6 @@ Split view for sessions and terminals.
 - Resize panels
 - Save layout presets
 - Quick toggle between layouts
-
-### Background Task Watcher
-Monitor long-running processes with notifications.
-- Track builds, tests, deploys in a unified view
-- Desktop notification when tasks complete
-- Success/fail status indicators
-- Output preview without switching context
-- History log of recent tasks
 
 ---
 
@@ -76,3 +67,5 @@ Monitor long-running processes with notifications.
 | API Testing Tool | `ApiTesterPopup` - HTTP tester with tabs, history, webhooks | 2025-12-22 |
 | Workspaces | `WorkspaceSelectorPopup` - workspace layer above projects with custom avatars, icon/image/shape | 2025-12-23 |
 | Storybook Viewer | `StorybookViewerPopup` - detect Storybook, launch dev server, embedded iframe preview | 2025-12-23 |
+| Background Services Viewer | `BackgroundServicesPopup` - view and kill developer services (Redis, Postgres, Node, etc.) | 2025-12-23 |
+| Database Viewer | `DatabaseViewerPopup` - SQLite browser with CRUD, SQL runner, detects running Postgres/MySQL | 2025-12-23 |

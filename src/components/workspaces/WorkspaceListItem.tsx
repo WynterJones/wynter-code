@@ -107,7 +107,7 @@ export function WorkspaceListItem({
         <div className="flex justify-end pt-2 border-t border-border">
           <button
             onClick={handleDone}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs bg-accent text-white rounded hover:bg-accent/90 transition-colors"
+            className="btn-primary !px-3 !py-1.5 !text-xs"
           >
             Done
           </button>

@@ -45,7 +45,7 @@ export function EnvFileSelector({
             className={cn(
               "flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors",
               selectedFile === file.filename
-                ? "bg-accent text-bg-primary"
+                ? "bg-accent text-[#3d2066]"
                 : "bg-bg-tertiary text-text-primary hover:bg-bg-hover"
             )}
           >

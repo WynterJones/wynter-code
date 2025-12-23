@@ -32,6 +32,7 @@ notify = "6"
 notify-debouncer-mini = "0.4"
 regex = "1"
 sysinfo = "0.31"
+hex = "0.4"
 
 # Live preview server
 tiny_http = "0.12"
@@ -51,6 +52,9 @@ image = "0.25"
 
 # PDF optimization
 lopdf = "0.34"
+
+# Database viewer (multi-database support)
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "mysql", "tls-rustls", "chrono", "uuid", "json"] }
 
 # macOS color picker (NSColorSampler)
 [target.'cfg(target_os = "macos")'.dependencies]

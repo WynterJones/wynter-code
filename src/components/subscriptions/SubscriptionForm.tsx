@@ -3,7 +3,7 @@ import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip } from "@/components/ui";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { useProjectStore } from "@/stores/projectStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { Subscription, SubscriptionInput, BillingCycle, CurrencyCode } from "@/types";
 
 interface SubscriptionFormProps {
@@ -33,13 +33,13 @@ export function SubscriptionForm({
   onSave,
   onCancel,
 }: SubscriptionFormProps) {
-  const { addSubscription, updateSubscription, getCategoriesForProject, getFaviconUrl } =
+  const { addSubscription, updateSubscription, getCategoriesForWorkspace, getFaviconUrl } =
     useSubscriptionStore();
-  const { activeProjectId } = useProjectStore();
+  const { activeWorkspaceId } = useWorkspaceStore();
 
-  const categories = activeProjectId ? getCategoriesForProject(activeProjectId) : [];
+  const categories = activeWorkspaceId ? getCategoriesForWorkspace(activeWorkspaceId) : [];
 
-  const [formData, setFormData] = useState<Omit<SubscriptionInput, "projectId">>({
+  const [formData, setFormData] = useState<Omit<SubscriptionInput, "workspaceId">>({
     name: subscription?.name ?? "",
     url: subscription?.url ?? "",
     faviconUrl: subscription?.faviconUrl ?? "",
@@ -82,8 +82,8 @@ export function SubscriptionForm({
       }
     }
 
-    if (!activeProjectId && !subscription) {
-      newErrors.project = "No project selected";
+    if (!activeWorkspaceId && !subscription) {
+      newErrors.workspace = "No workspace selected";
     }
 
     setErrors(newErrors);
@@ -97,10 +97,10 @@ export function SubscriptionForm({
 
     if (subscription) {
       updateSubscription(subscription.id, formData);
-    } else if (activeProjectId) {
+    } else if (activeWorkspaceId) {
       addSubscription({
         ...formData,
-        projectId: activeProjectId,
+        workspaceId: activeWorkspaceId,
       });
     }
 
@@ -126,9 +126,9 @@ export function SubscriptionForm({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {errors.project && (
+          {errors.workspace && (
             <div className="p-2 rounded-lg bg-accent-red/10 border border-accent-red/30">
-              <p className="text-xs text-accent-red">{errors.project}</p>
+              <p className="text-xs text-accent-red">{errors.workspace}</p>
             </div>
           )}
 
@@ -230,7 +230,7 @@ export function SubscriptionForm({
                   className={cn(
                     "px-3 py-1.5 rounded-md text-sm transition-colors",
                     formData.billingCycle === cycle.value
-                      ? "bg-accent text-white"
+                      ? "bg-accent text-[#3d2066]"
                       : "bg-bg-tertiary text-text-secondary hover:text-text-primary"
                   )}
                 >
@@ -291,13 +291,7 @@ export function SubscriptionForm({
             >
               Cancel
             </button>
-            <button
-              type="submit"
-              className={cn(
-                "px-4 py-2 rounded-lg text-sm font-medium",
-                "bg-accent text-white hover:bg-accent/90 transition-colors"
-              )}
-            >
+            <button type="submit" className="btn-primary">
               {isEditing ? "Save Changes" : "Add Subscription"}
             </button>
           </div>

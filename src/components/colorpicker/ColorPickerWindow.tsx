@@ -208,7 +208,7 @@ export function ColorPickerWindow() {
           </p>
           <button
             onClick={handleRequestPermission}
-            className="px-4 py-2 bg-accent text-bg-primary text-xs font-medium rounded-md hover:bg-accent/90 transition-colors"
+            className="btn-primary !text-xs"
           >
             Open System Settings
           </button>

@@ -215,7 +215,7 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
                   <button
                     onClick={handleCreateWorkspace}
                     disabled={!newName.trim()}
-                    className="px-3 py-1.5 text-xs bg-accent text-white rounded hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="btn-primary !px-3 !py-1.5 !text-xs"
                   >
                     Create
                   </button>
@@ -261,9 +261,9 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
                 {/* Workspaces List */}
                 <OverlayScrollbarsComponent
                   options={{
-                    scrollbars: { autoHide: "leave", autoHideDelay: 100 },
+                    scrollbars: { theme: "os-theme-custom", autoHide: "leave", autoHideDelay: 100 },
                   }}
-                  className="max-h-[350px]"
+                  className="max-h-[350px] os-theme-custom"
                 >
                   <div className="p-2 space-y-1">
                     {filteredWorkspaces.length === 0 ? (

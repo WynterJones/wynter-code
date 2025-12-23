@@ -133,7 +133,7 @@ export function WebhookPanel({ onClose }: WebhookPanelProps) {
         <button
           onClick={handleStart}
           disabled={starting}
-          className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent text-white rounded-md hover:bg-accent/90 disabled:opacity-50 transition-colors"
+          className="btn-primary w-full !px-3 !py-1.5 !text-xs"
         >
           <Play className="w-3.5 h-3.5" />
           Start Server

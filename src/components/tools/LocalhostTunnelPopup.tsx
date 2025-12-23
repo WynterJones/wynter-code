@@ -260,11 +260,7 @@ export function LocalhostTunnelPopup({ isOpen, onClose }: LocalhostTunnelPopupPr
             <button
               onClick={handleStartTunnel}
               disabled={!selectedPort || starting}
-              className={cn(
-                "h-9 px-4 text-sm font-medium rounded-lg transition-colors",
-                "bg-accent text-bg-primary hover:bg-accent/90",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
+              className="btn-primary !h-9"
             >
               {starting ? (
                 <RefreshCw className="w-4 h-4 animate-spin" />

@@ -424,7 +424,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     <div className="relative flex flex-col h-full">
       <ScrollArea className="flex-1">
         <div className="py-2 min-h-full" onClick={handleContainerClick}>
-          {files.map((file) => (
+          {files.filter((f) => f.name !== ".DS_Store").map((file) => (
             <FileTreeNode
               key={file.path}
               node={file}

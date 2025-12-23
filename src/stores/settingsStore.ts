@@ -21,6 +21,24 @@ export type AppFont =
 
 export type TerminalShell = "system" | "bash" | "zsh" | "fish" | "sh";
 
+export type MarkdownMaxWidth = "700" | "900" | "1200" | "full";
+export type MarkdownFont = "default" | "inter" | "georgia" | "lora" | "merriweather";
+
+export const MARKDOWN_MAX_WIDTHS: { id: MarkdownMaxWidth; name: string; value: string }[] = [
+  { id: "700", name: "Narrow (700px)", value: "700px" },
+  { id: "900", name: "Medium (900px)", value: "900px" },
+  { id: "1200", name: "Wide (1200px)", value: "1200px" },
+  { id: "full", name: "Full Width", value: "100%" },
+];
+
+export const MARKDOWN_FONTS: { id: MarkdownFont; name: string; family: string }[] = [
+  { id: "default", name: "System Default", family: "system-ui, -apple-system, sans-serif" },
+  { id: "inter", name: "Inter", family: "'Inter', sans-serif" },
+  { id: "georgia", name: "Georgia", family: "Georgia, serif" },
+  { id: "lora", name: "Lora", family: "'Lora', serif" },
+  { id: "merriweather", name: "Merriweather", family: "'Merriweather', serif" },
+];
+
 export const TERMINAL_SHELLS: { id: TerminalShell; name: string; path: string | null }[] = [
   { id: "system", name: "System Default", path: null },
   { id: "bash", name: "Bash", path: "/bin/bash" },
@@ -58,6 +76,9 @@ interface SettingsStore {
   editorWordWrap: boolean;
   editorMinimap: boolean;
   markdownDefaultView: MarkdownViewMode;
+  markdownMaxWidth: MarkdownMaxWidth;
+  markdownFontSize: number;
+  markdownFont: MarkdownFont;
   defaultBrowsePath: string;
   customMusicPath: string;
   compactProjectTabs: boolean;
@@ -76,6 +97,9 @@ interface SettingsStore {
   setEditorWordWrap: (wrap: boolean) => void;
   setEditorMinimap: (show: boolean) => void;
   setMarkdownDefaultView: (mode: MarkdownViewMode) => void;
+  setMarkdownMaxWidth: (width: MarkdownMaxWidth) => void;
+  setMarkdownFontSize: (size: number) => void;
+  setMarkdownFont: (font: MarkdownFont) => void;
   setDefaultBrowsePath: (path: string) => void;
   setCustomMusicPath: (path: string) => void;
   setCompactProjectTabs: (compact: boolean) => void;
@@ -99,6 +123,9 @@ export const useSettingsStore = create<SettingsStore>()(
       editorWordWrap: true,
       editorMinimap: true,
       markdownDefaultView: "preview",
+      markdownMaxWidth: "700",
+      markdownFontSize: 15,
+      markdownFont: "default",
       defaultBrowsePath: "",
       customMusicPath: "",
       compactProjectTabs: false,
@@ -145,6 +172,18 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setMarkdownDefaultView: (markdownDefaultView: MarkdownViewMode) => {
         set({ markdownDefaultView });
+      },
+
+      setMarkdownMaxWidth: (markdownMaxWidth: MarkdownMaxWidth) => {
+        set({ markdownMaxWidth });
+      },
+
+      setMarkdownFontSize: (markdownFontSize: number) => {
+        set({ markdownFontSize });
+      },
+
+      setMarkdownFont: (markdownFont: MarkdownFont) => {
+        set({ markdownFont });
       },
 
       setDefaultBrowsePath: (defaultBrowsePath: string) => {

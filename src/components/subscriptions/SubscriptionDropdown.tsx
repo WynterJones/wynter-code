@@ -1,7 +1,7 @@
 import { Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { useProjectStore } from "@/stores/projectStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { SubscriptionCard } from "./SubscriptionCard";
 
 interface SubscriptionDropdownProps {
@@ -13,13 +13,13 @@ export function SubscriptionDropdown({
   onClose: _onClose,
   onOpenManage,
 }: SubscriptionDropdownProps) {
-  const { getSubscriptionsByProject, calculateSummary } = useSubscriptionStore();
-  const { activeProjectId } = useProjectStore();
+  const { getSubscriptionsByWorkspace, calculateSummary } = useSubscriptionStore();
+  const { activeWorkspaceId } = useWorkspaceStore();
 
-  const projectSubscriptions = activeProjectId
-    ? getSubscriptionsByProject(activeProjectId).filter(s => s.isActive)
+  const workspaceSubscriptions = activeWorkspaceId
+    ? getSubscriptionsByWorkspace(activeWorkspaceId).filter(s => s.isActive)
     : [];
-  const summary = calculateSummary(activeProjectId ?? undefined);
+  const summary = calculateSummary(activeWorkspaceId ?? undefined);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -29,7 +29,7 @@ export function SubscriptionDropdown({
     }).format(amount);
   };
 
-  const isEmpty = projectSubscriptions.length === 0;
+  const isEmpty = workspaceSubscriptions.length === 0;
 
   return (
     <div className="absolute right-0 mt-1 w-80 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 overflow-hidden">
@@ -41,14 +41,14 @@ export function SubscriptionDropdown({
         </span>
       </div>
 
-      {/* Content - flat list of subscriptions for current project */}
+      {/* Content - flat list of subscriptions for current workspace */}
       <div className="max-h-[320px] overflow-y-auto">
         {isEmpty ? (
           <div className="px-4 py-8 text-center">
             <p className="text-sm text-text-secondary mb-3">
-              {activeProjectId ? "No subscriptions for this project" : "No project selected"}
+              {activeWorkspaceId ? "No subscriptions for this workspace" : "No workspace selected"}
             </p>
-            {activeProjectId && (
+            {activeWorkspaceId && (
               <button
                 onClick={onOpenManage}
                 className="text-sm text-accent hover:underline"
@@ -59,7 +59,7 @@ export function SubscriptionDropdown({
           </div>
         ) : (
           <div className="py-1">
-            {projectSubscriptions.map((sub) => (
+            {workspaceSubscriptions.map((sub) => (
               <SubscriptionCard
                 key={sub.id}
                 subscription={sub}

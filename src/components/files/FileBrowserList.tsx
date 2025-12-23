@@ -74,9 +74,11 @@ export function FileBrowserList({
     );
   }
 
+  // Always hide .DS_Store files, then apply hidden files filter
+  const withoutDSStore = files.filter((f) => f.name !== ".DS_Store");
   const filteredFiles = showHiddenFiles
-    ? files
-    : files.filter((f) => !f.name.startsWith("."));
+    ? withoutDSStore
+    : withoutDSStore.filter((f) => !f.name.startsWith("."));
 
   const sortedFiles = [...filteredFiles].sort((a, b) => {
     if (a.isDirectory && !b.isDirectory) return -1;

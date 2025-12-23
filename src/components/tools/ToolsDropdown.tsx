@@ -4,19 +4,17 @@ import {
   Network,
   Package,
   Globe,
-  Pipette,
   Activity,
   Play,
   Key,
   Send,
-  Rocket,
   Search,
   FlaskConical,
   BookOpen,
+  Server,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
-import { invoke } from "@tauri-apps/api/core";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -27,72 +25,19 @@ export interface ToolDefinition {
   description: string;
   icon: LucideIcon;
   actionKey: string;
+  category: "development" | "infrastructure" | "utilities";
   disabled?: boolean;
 }
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
+  // Development
   {
     id: "live-preview",
     name: "Live Preview",
     description: "Preview project in browser",
     icon: Play,
     actionKey: "openLivePreview",
-  },
-  {
-    id: "color-picker",
-    name: "Color Picker",
-    description: "Pick colors from anywhere on screen",
-    icon: Pipette,
-    actionKey: "openColorPicker",
-  },
-  {
-    id: "port-manager",
-    name: "Port Manager",
-    description: "View and manage localhost ports",
-    icon: Network,
-    actionKey: "openPortManager",
-  },
-  {
-    id: "node-modules-cleaner",
-    name: "Node Modules Cleaner",
-    description: "Clean up node_modules folders",
-    icon: Package,
-    actionKey: "openNodeModulesCleaner",
-  },
-  {
-    id: "localhost-tunnel",
-    name: "Localhost Tunnel",
-    description: "Share localhost via public URL",
-    icon: Globe,
-    actionKey: "openLocalhostTunnel",
-  },
-  {
-    id: "system-health",
-    name: "System Health",
-    description: "View dev tools and system resources",
-    icon: Activity,
-    actionKey: "openSystemHealth",
-  },
-  {
-    id: "env-manager",
-    name: "Environment Variables",
-    description: "Manage .env files and secrets",
-    icon: Key,
-    actionKey: "openEnvManager",
-  },
-  {
-    id: "api-tester",
-    name: "API Tester",
-    description: "Test HTTP APIs with tabs and history",
-    icon: Send,
-    actionKey: "openApiTester",
-  },
-  {
-    id: "project-templates",
-    name: "Project Templates",
-    description: "Create new project from template",
-    icon: Rocket,
-    actionKey: "openProjectTemplates",
+    category: "development",
   },
   {
     id: "test-runner",
@@ -100,6 +45,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Run and view test results",
     icon: FlaskConical,
     actionKey: "openTestRunner",
+    category: "development",
   },
   {
     id: "storybook-viewer",
@@ -107,6 +53,65 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "View and browse Storybook components",
     icon: BookOpen,
     actionKey: "openStorybookViewer",
+    category: "development",
+  },
+  {
+    id: "api-tester",
+    name: "API Tester",
+    description: "Test HTTP APIs with tabs and history",
+    icon: Send,
+    actionKey: "openApiTester",
+    category: "development",
+  },
+  // Infrastructure
+  {
+    id: "port-manager",
+    name: "Port Manager",
+    description: "View and manage localhost ports",
+    icon: Network,
+    actionKey: "openPortManager",
+    category: "infrastructure",
+  },
+  {
+    id: "localhost-tunnel",
+    name: "Localhost Tunnel",
+    description: "Share localhost via public URL",
+    icon: Globe,
+    actionKey: "openLocalhostTunnel",
+    category: "infrastructure",
+  },
+  {
+    id: "background-services",
+    name: "Background Services",
+    description: "View and manage developer services",
+    icon: Server,
+    actionKey: "openBackgroundServices",
+    category: "infrastructure",
+  },
+  {
+    id: "system-health",
+    name: "System Health",
+    description: "View dev tools and system resources",
+    icon: Activity,
+    actionKey: "openSystemHealth",
+    category: "infrastructure",
+  },
+  // Utilities
+  {
+    id: "node-modules-cleaner",
+    name: "Node Modules Cleaner",
+    description: "Clean up node_modules folders",
+    icon: Package,
+    actionKey: "openNodeModulesCleaner",
+    category: "utilities",
+  },
+  {
+    id: "env-manager",
+    name: "Environment Variables",
+    description: "Manage .env files and secrets",
+    icon: Key,
+    actionKey: "openEnvManager",
+    category: "utilities",
   },
 ];
 
@@ -116,7 +121,14 @@ interface Tool {
   description: string;
   icon: React.ReactNode;
   onClick: () => void;
+  category: "development" | "infrastructure" | "utilities";
   disabled?: boolean;
+}
+
+interface ToolCategory {
+  id: "development" | "infrastructure" | "utilities";
+  label: string;
+  tools: Tool[];
 }
 
 interface ToolsDropdownProps {
@@ -127,7 +139,9 @@ interface ToolsDropdownProps {
   onOpenLivePreview: () => void;
   onOpenEnvManager: () => void;
   onOpenApiTester: () => void;
+  onOpenTestRunner: () => void;
   onOpenStorybookViewer: () => void;
+  onOpenBackgroundServices: () => void;
   hasStorybook?: boolean;
 }
 
@@ -139,7 +153,9 @@ export function ToolsDropdown({
   onOpenLivePreview,
   onOpenEnvManager,
   onOpenApiTester,
+  onOpenTestRunner,
   onOpenStorybookViewer,
+  onOpenBackgroundServices,
   hasStorybook = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -149,90 +165,27 @@ export function ToolsDropdown({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpenColorPicker = async () => {
-    try {
-      await invoke("pick_color_and_show");
-    } catch (err) {
-      console.error("Failed to open color picker:", err);
-    }
-    setIsOpen(false);
-  };
-
   const tools: Tool[] = [
+    // Development
     {
       id: "live-preview",
       name: "Live Preview",
       description: "Preview project in browser",
       icon: <Play className="w-4 h-4" />,
+      category: "development",
       onClick: () => {
         onOpenLivePreview();
         setIsOpen(false);
       },
     },
     {
-      id: "color-picker",
-      name: "Color Picker",
-      description: "Pick colors from anywhere on screen",
-      icon: <Pipette className="w-4 h-4" />,
-      onClick: handleOpenColorPicker,
-    },
-    {
-      id: "port-manager",
-      name: "Port Manager",
-      description: "View and manage localhost ports",
-      icon: <Network className="w-4 h-4" />,
+      id: "test-runner",
+      name: "Test Runner",
+      description: "Run and view test results",
+      icon: <FlaskConical className="w-4 h-4" />,
+      category: "development",
       onClick: () => {
-        onOpenPortManager();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "node-modules-cleaner",
-      name: "Node Modules Cleaner",
-      description: "Clean up node_modules folders",
-      icon: <Package className="w-4 h-4" />,
-      onClick: () => {
-        onOpenNodeModulesCleaner();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "localhost-tunnel",
-      name: "Localhost Tunnel",
-      description: "Share localhost via public URL",
-      icon: <Globe className="w-4 h-4" />,
-      onClick: () => {
-        onOpenLocalhostTunnel();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "system-health",
-      name: "System Health",
-      description: "View dev tools and system resources",
-      icon: <Activity className="w-4 h-4" />,
-      onClick: () => {
-        onOpenSystemHealth();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "env-manager",
-      name: "Environment Variables",
-      description: "Manage .env files and secrets",
-      icon: <Key className="w-4 h-4" />,
-      onClick: () => {
-        onOpenEnvManager();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "api-tester",
-      name: "API Tester",
-      description: "Test HTTP APIs with tabs and history",
-      icon: <Send className="w-4 h-4" />,
-      onClick: () => {
-        onOpenApiTester();
+        onOpenTestRunner();
         setIsOpen(false);
       },
     },
@@ -243,12 +196,92 @@ export function ToolsDropdown({
         ? "View and browse Storybook components"
         : "Storybook not detected in project",
       icon: <BookOpen className="w-4 h-4" />,
+      category: "development",
       onClick: () => {
         if (!hasStorybook) return;
         onOpenStorybookViewer();
         setIsOpen(false);
       },
       disabled: !hasStorybook,
+    },
+    {
+      id: "api-tester",
+      name: "API Tester",
+      description: "Test HTTP APIs with tabs and history",
+      icon: <Send className="w-4 h-4" />,
+      category: "development",
+      onClick: () => {
+        onOpenApiTester();
+        setIsOpen(false);
+      },
+    },
+    // Infrastructure
+    {
+      id: "port-manager",
+      name: "Port Manager",
+      description: "View and manage localhost ports",
+      icon: <Network className="w-4 h-4" />,
+      category: "infrastructure",
+      onClick: () => {
+        onOpenPortManager();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "localhost-tunnel",
+      name: "Localhost Tunnel",
+      description: "Share localhost via public URL",
+      icon: <Globe className="w-4 h-4" />,
+      category: "infrastructure",
+      onClick: () => {
+        onOpenLocalhostTunnel();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "background-services",
+      name: "Background Services",
+      description: "View and manage developer services",
+      icon: <Server className="w-4 h-4" />,
+      category: "infrastructure",
+      onClick: () => {
+        onOpenBackgroundServices();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "system-health",
+      name: "System Health",
+      description: "View dev tools and system resources",
+      icon: <Activity className="w-4 h-4" />,
+      category: "infrastructure",
+      onClick: () => {
+        onOpenSystemHealth();
+        setIsOpen(false);
+      },
+    },
+    // Utilities
+    {
+      id: "node-modules-cleaner",
+      name: "Node Modules Cleaner",
+      description: "Clean up node_modules folders",
+      icon: <Package className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenNodeModulesCleaner();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "env-manager",
+      name: "Environment Variables",
+      description: "Manage .env files and secrets",
+      icon: <Key className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenEnvManager();
+        setIsOpen(false);
+      },
     },
   ];
 
@@ -262,6 +295,22 @@ export function ToolsDropdown({
         tool.description.toLowerCase().includes(query),
     );
   }, [searchQuery, tools]);
+
+  // Group tools by category
+  const categories: ToolCategory[] = useMemo(() => {
+    const categoryOrder: Array<{ id: ToolCategory["id"]; label: string }> = [
+      { id: "development", label: "Development" },
+      { id: "infrastructure", label: "Infrastructure" },
+      { id: "utilities", label: "Utilities" },
+    ];
+
+    return categoryOrder
+      .map((cat) => ({
+        ...cat,
+        tools: filteredTools.filter((tool) => tool.category === cat.id),
+      }))
+      .filter((cat) => cat.tools.length > 0);
+  }, [filteredTools]);
 
   // Autofocus search input when dropdown opens
   useEffect(() => {
@@ -357,45 +406,59 @@ export function ToolsDropdown({
             {/* Tools List */}
             <OverlayScrollbarsComponent
               options={{
-                scrollbars: { autoHide: "leave", autoHideDelay: 100 },
+                scrollbars: { theme: "os-theme-custom", autoHide: "leave", autoHideDelay: 100 },
               }}
-              className="max-h-[400px]"
+              className="max-h-[400px] os-theme-custom"
             >
               <div className="p-1">
-                {filteredTools.length === 0 ? (
+                {categories.length === 0 ? (
                   <div className="px-3 py-4 text-sm text-text-secondary text-center">
                     No tools found
                   </div>
                 ) : (
-                  filteredTools.map((tool) => (
-                    <button
-                      key={tool.id}
-                      onClick={tool.onClick}
-                      disabled={tool.disabled}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors group",
-                        tool.disabled
-                          ? "opacity-50 cursor-not-allowed"
-                          : "hover:bg-bg-hover"
-                      )}
-                    >
+                  categories.map((category, categoryIndex) => (
+                    <div key={category.id}>
+                      {/* Category Header */}
                       <div
                         className={cn(
-                          "flex-shrink-0 text-text-secondary transition-colors",
-                          !tool.disabled && "group-hover:text-accent"
+                          "px-3 py-1.5 text-[10px] font-semibold text-text-secondary uppercase tracking-wider",
+                          categoryIndex > 0 && "mt-1 border-t border-border pt-2"
                         )}
                       >
-                        {tool.icon}
+                        {category.label}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-text-primary">
-                          {tool.name}
-                        </div>
-                        <div className="text-[10px] text-text-secondary truncate">
-                          {tool.description}
-                        </div>
-                      </div>
-                    </button>
+                      {/* Category Tools */}
+                      {category.tools.map((tool) => (
+                        <button
+                          key={tool.id}
+                          onClick={tool.onClick}
+                          disabled={tool.disabled}
+                          className={cn(
+                            "w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors group",
+                            tool.disabled
+                              ? "opacity-50 cursor-not-allowed"
+                              : "hover:bg-bg-hover"
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex-shrink-0 text-text-secondary transition-colors",
+                              !tool.disabled && "group-hover:text-accent"
+                            )}
+                          >
+                            {tool.icon}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-text-primary">
+                              {tool.name}
+                            </div>
+                            <div className="text-[10px] text-text-secondary truncate">
+                              {tool.description}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   ))
                 )}
               </div>

@@ -434,10 +434,9 @@ export function ClaudePopup({ projectPath }: ClaudePopupProps) {
                           onClick={handleSave}
                           disabled={!hasChanges || isLoading}
                           className={cn(
-                            "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg transition-colors",
                             hasChanges
-                              ? "bg-accent text-white hover:bg-accent/90"
-                              : "bg-bg-hover text-text-secondary cursor-not-allowed"
+                              ? "btn-primary !px-3 !py-1.5"
+                              : "flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-bg-hover text-text-secondary cursor-not-allowed"
                           )}
                         >
                           <Save className="w-4 h-4" />

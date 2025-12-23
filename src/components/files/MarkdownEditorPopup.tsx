@@ -2,11 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import Editor, { type Monaco } from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { X, Save, RotateCcw, Eye, Code, Columns, Minus, Search, ChevronUp, ChevronDown } from "lucide-react";
+import { X, Save, RotateCcw, Eye, Code, Columns, Minus, Search, ChevronUp, ChevronDown, Settings } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip, Badge, ScrollArea } from "@/components/ui";
-import { useSettingsStore } from "@/stores/settingsStore";
+import { useSettingsStore, MARKDOWN_MAX_WIDTHS, MARKDOWN_FONTS } from "@/stores/settingsStore";
 import { defineMonacoThemes } from "@/hooks/useMonacoTheme";
 
 // Helper to toggle checkbox in markdown content
@@ -52,8 +52,21 @@ export function MarkdownEditorPopup({
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0);
   const [matchCount, setMatchCount] = useState(0);
 
-  const { editorTheme, editorFontSize, editorWordWrap, markdownDefaultView } =
-    useSettingsStore();
+  const {
+    editorTheme,
+    editorFontSize,
+    editorWordWrap,
+    markdownDefaultView,
+    markdownMaxWidth,
+    markdownFontSize,
+    markdownFont,
+    setMarkdownMaxWidth,
+    setMarkdownFontSize,
+    setMarkdownFont,
+  } = useSettingsStore();
+
+  const [showSettings, setShowSettings] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
 
   const [viewMode, setViewMode] = useState<ViewMode>(markdownDefaultView);
 
@@ -269,6 +282,23 @@ export function MarkdownEditorPopup({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  // Close settings popup when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setShowSettings(false);
+      }
+    }
+    if (showSettings) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [showSettings]);
+
+  // Get computed styles for markdown preview
+  const maxWidthValue = MARKDOWN_MAX_WIDTHS.find(w => w.id === markdownMaxWidth)?.value || "700px";
+  const fontFamilyValue = MARKDOWN_FONTS.find(f => f.id === markdownFont)?.family || "system-ui, -apple-system, sans-serif";
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
       <div className="w-full h-full max-w-[calc(100vw-40px)] max-h-[calc(100vh-40px)] bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
@@ -332,6 +362,68 @@ export function MarkdownEditorPopup({
                   <Eye className="w-4 h-4" />
                 </button>
               </Tooltip>
+              <div className="w-px h-4 bg-border/50 mx-0.5" />
+              <div className="relative" ref={settingsRef}>
+                <Tooltip content="Preview Settings" side="bottom">
+                  <button
+                    onClick={() => setShowSettings(!showSettings)}
+                    className={cn(
+                      "p-1.5 rounded transition-colors",
+                      showSettings
+                        ? "bg-bg-hover text-accent"
+                        : "text-text-secondary hover:text-text-primary"
+                    )}
+                  >
+                    <Settings className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+                {showSettings && (
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 p-4 space-y-4">
+                    <div className="text-xs font-medium text-text-primary mb-3">Preview Settings</div>
+
+                    {/* Max Width */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-text-secondary">Content Width</label>
+                      <select
+                        value={markdownMaxWidth}
+                        onChange={(e) => setMarkdownMaxWidth(e.target.value as typeof markdownMaxWidth)}
+                        className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        {MARKDOWN_MAX_WIDTHS.map((w) => (
+                          <option key={w.id} value={w.id}>{w.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Font Size */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-text-secondary">Font Size: {markdownFontSize}px</label>
+                      <input
+                        type="range"
+                        min="12"
+                        max="24"
+                        value={markdownFontSize}
+                        onChange={(e) => setMarkdownFontSize(Number(e.target.value))}
+                        className="w-full accent-accent"
+                      />
+                    </div>
+
+                    {/* Font Family */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-text-secondary">Font Family</label>
+                      <select
+                        value={markdownFont}
+                        onChange={(e) => setMarkdownFont(e.target.value as typeof markdownFont)}
+                        className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
+                      >
+                        {MARKDOWN_FONTS.map((f) => (
+                          <option key={f.id} value={f.id}>{f.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="w-px h-6 bg-border mx-2" />
@@ -477,7 +569,15 @@ export function MarkdownEditorPopup({
                     </div>
                   )}
                   <ScrollArea className="flex-1">
-                    <article ref={previewRef} className="markdown-preview max-w-[700px] mx-auto p-6">
+                    <article
+                      ref={previewRef}
+                      className="markdown-preview mx-auto p-6"
+                      style={{
+                        maxWidth: maxWidthValue,
+                        fontSize: `${markdownFontSize}px`,
+                        fontFamily: fontFamilyValue,
+                      }}
+                    >
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       components={{

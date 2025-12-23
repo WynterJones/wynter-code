@@ -917,13 +917,7 @@ export function ProjectTemplatesPopup({
           >
             Cancel
           </button>
-          <button
-            onClick={handleCreate}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-md",
-              "bg-accent text-white hover:bg-accent/90 transition-colors",
-            )}
-          >
+          <button onClick={handleCreate} className="btn-primary">
             <Play className="w-4 h-4" />
             Create Project
           </button>
@@ -976,13 +970,7 @@ export function ProjectTemplatesPopup({
             Close
           </button>
           {onOpenProject && (
-            <button
-              onClick={handleOpenCreatedProject}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-md",
-                "bg-accent text-white hover:bg-accent/90 transition-colors",
-              )}
-            >
+            <button onClick={handleOpenCreatedProject} className="btn-primary">
               <FolderOpen className="w-4 h-4" />
               Open Project
             </button>

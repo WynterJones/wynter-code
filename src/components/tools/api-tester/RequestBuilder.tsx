@@ -62,12 +62,7 @@ export function RequestBuilder({ request, onSend, loading }: RequestBuilderProps
       <button
         onClick={onSend}
         disabled={loading || !request.url}
-        className={cn(
-          "flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors",
-          loading || !request.url
-            ? "bg-bg-tertiary text-text-secondary cursor-not-allowed"
-            : "bg-accent text-white hover:bg-accent/90"
-        )}
+        className="btn-primary"
       >
         {loading ? (
           <>

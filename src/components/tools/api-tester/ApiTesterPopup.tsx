@@ -138,7 +138,7 @@ export function ApiTesterPopup({ isOpen, onClose }: ApiTesterPopupProps) {
               className={cn(
                 "flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
                 sidePanel === "history"
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-[#3d2066]"
                   : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               )}
             >
@@ -150,7 +150,7 @@ export function ApiTesterPopup({ isOpen, onClose }: ApiTesterPopupProps) {
               className={cn(
                 "flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors",
                 sidePanel === "webhook"
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-[#3d2066]"
                   : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               )}
             >

@@ -10,8 +10,8 @@ import {
   FolderSearch,
   GripVertical,
   Rocket,
-  FlaskConical,
   Minus,
+  Database,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -52,6 +52,8 @@ import {
   ProjectTemplatesPopup,
   TestRunnerPopup,
   StorybookViewerPopup,
+  BackgroundServicesPopup,
+  DatabaseViewerPopup,
 } from "@/components/tools";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
@@ -369,6 +371,8 @@ export function ProjectTabBar({
   const [showProjectTemplates, setShowProjectTemplates] = useState(false);
   const [showTestRunner, setShowTestRunner] = useState(false);
   const [showStorybookViewer, setShowStorybookViewer] = useState(false);
+  const [showBackgroundServices, setShowBackgroundServices] = useState(false);
+  const [showDatabaseViewer, setShowDatabaseViewer] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -456,6 +460,9 @@ export function ProjectTabBar({
           break;
         case "openStorybookViewer":
           setShowStorybookViewer(true);
+          break;
+        case "openBackgroundServices":
+          setShowBackgroundServices(true);
           break;
       }
     };
@@ -675,7 +682,9 @@ export function ProjectTabBar({
           onOpenLivePreview={() => setShowLivePreview(true)}
           onOpenEnvManager={() => setShowEnvManager(true)}
           onOpenApiTester={() => setShowApiTester(true)}
+          onOpenTestRunner={() => setShowTestRunner(true)}
           onOpenStorybookViewer={() => setShowStorybookViewer(true)}
+          onOpenBackgroundServices={() => setShowBackgroundServices(true)}
           hasStorybook={hasStorybook}
         />
       </div>
@@ -693,20 +702,20 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
+      {/* Database Viewer */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Database Viewer">
+          <IconButton size="sm" onClick={() => setShowDatabaseViewer(true)}>
+            <Database className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
       {/* Project Templates */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="New Project">
           <IconButton size="sm" onClick={() => setShowProjectTemplates(true)}>
             <Rocket className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
-      </div>
-
-      {/* Test Runner */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content="Test Runner">
-          <IconButton size="sm" onClick={() => setShowTestRunner(true)}>
-            <FlaskConical className="w-4 h-4" />
           </IconButton>
         </Tooltip>
       </div>
@@ -913,6 +922,18 @@ export function ProjectTabBar({
       <StorybookViewerPopup
         isOpen={showStorybookViewer}
         onClose={() => setShowStorybookViewer(false)}
+      />
+
+      {/* Background Services */}
+      <BackgroundServicesPopup
+        isOpen={showBackgroundServices}
+        onClose={() => setShowBackgroundServices(false)}
+      />
+
+      {/* Database Viewer */}
+      <DatabaseViewerPopup
+        isOpen={showDatabaseViewer}
+        onClose={() => setShowDatabaseViewer(false)}
       />
     </div>
   );

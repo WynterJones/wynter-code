@@ -1,19 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, CreditCard, Tag, Plus, Search, Download, Upload } from "lucide-react";
+import { X, CreditCard, Tag, Plus, Search, Download, Upload, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip, ScrollArea } from "@/components/ui";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { useProjectStore } from "@/stores/projectStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { SubscriptionCard } from "./SubscriptionCard";
 import { SubscriptionForm } from "./SubscriptionForm";
 import { CategoryManager } from "./CategoryManager";
+import { SubscriptionStats } from "./SubscriptionStats";
 import type { Subscription, ShareableSubscriptionData } from "@/types";
 
 interface SubscriptionPopupProps {
   onClose: () => void;
 }
 
-type PopupTab = "subscriptions" | "categories";
+type PopupTab = "subscriptions" | "categories" | "viewAll";
 
 export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
   const [activeTab, setActiveTab] = useState<PopupTab>("subscriptions");
@@ -22,9 +23,11 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
   const [isAddingSubscription, setIsAddingSubscription] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { activeProjectId } = useProjectStore();
+  const { activeWorkspaceId, getActiveWorkspace } = useWorkspaceStore();
+  const activeWorkspace = getActiveWorkspace();
+
   const {
-    getSubscriptionsByProject,
+    getSubscriptionsByWorkspace,
     getCategorizedSubscriptions,
     calculateSummary,
     deleteSubscription,
@@ -52,9 +55,9 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const summary = calculateSummary(activeProjectId ?? undefined);
-  const projectSubscriptions = activeProjectId ? getSubscriptionsByProject(activeProjectId) : [];
-  const categorizedSubs = activeProjectId ? getCategorizedSubscriptions(activeProjectId) : [];
+  const summary = calculateSummary(activeWorkspaceId ?? undefined);
+  const workspaceSubscriptions = activeWorkspaceId ? getSubscriptionsByWorkspace(activeWorkspaceId) : [];
+  const categorizedSubs = activeWorkspaceId ? getCategorizedSubscriptions(activeWorkspaceId) : [];
 
   // Filter subscriptions by search query
   const filteredCategorizedSubs = searchQuery
@@ -70,8 +73,8 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
         .filter((g) => g.subscriptions.length > 0)
     : categorizedSubs;
 
-  // Inactive subscriptions for current project
-  const inactiveSubscriptions = projectSubscriptions.filter((s) => !s.isActive);
+  // Inactive subscriptions for current workspace
+  const inactiveSubscriptions = workspaceSubscriptions.filter((s) => !s.isActive);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -88,28 +91,28 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
   };
 
   const handleExport = () => {
-    if (!activeProjectId) return;
+    if (!activeWorkspaceId) return;
 
-    const data = exportSubscriptions(activeProjectId);
+    const data = exportSubscriptions(activeWorkspaceId);
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `subscriptions-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `subscriptions-${activeWorkspace?.name ?? "export"}-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !activeProjectId) return;
+    if (!file || !activeWorkspaceId) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string) as ShareableSubscriptionData;
         if (data.subscriptions && data.version) {
-          importSubscriptions(activeProjectId, data);
+          importSubscriptions(activeWorkspaceId, data);
         } else {
           alert("Invalid subscription file format");
         }
@@ -126,26 +129,21 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
   };
 
   const tabs: { id: PopupTab; label: string; icon: typeof CreditCard }[] = [
-    { id: "subscriptions", label: "All Subscriptions", icon: CreditCard },
+    { id: "viewAll", label: "View All", icon: BarChart3 },
+    { id: "subscriptions", label: "Subscriptions", icon: CreditCard },
     { id: "categories", label: "Categories", icon: Tag },
   ];
 
-  if (!activeProjectId) {
+  if (!activeWorkspaceId) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
         <div className="w-full max-w-md bg-bg-primary rounded-xl border border-border shadow-2xl p-8 text-center">
           <CreditCard className="w-12 h-12 mx-auto mb-4 text-text-secondary opacity-50" />
-          <h2 className="text-lg font-medium text-text-primary mb-2">No Project Selected</h2>
+          <h2 className="text-lg font-medium text-text-primary mb-2">No Workspace Selected</h2>
           <p className="text-sm text-text-secondary mb-4">
-            Select or create a project to manage subscriptions.
+            Select or create a workspace to manage subscriptions.
           </p>
-          <button
-            onClick={onClose}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm",
-              "bg-accent text-white hover:bg-accent/90 transition-colors"
-            )}
-          >
+          <button onClick={onClose} className="btn-primary">
             Close
           </button>
         </div>
@@ -162,7 +160,14 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
             data-tauri-drag-region
             className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary cursor-grab active:cursor-grabbing"
           >
-            <span className="font-medium text-text-primary">Subscriptions</span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-text-primary">Subscriptions</span>
+              {activeTab !== "viewAll" && activeWorkspace && (
+                <span className="text-xs text-text-secondary px-2 py-0.5 rounded-full bg-bg-tertiary">
+                  {activeWorkspace.name}
+                </span>
+              )}
+            </div>
             <Tooltip content="Close (Esc)" side="bottom">
               <IconButton size="sm" onClick={onClose}>
                 <X className="w-4 h-4" />
@@ -191,70 +196,77 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
                 ))}
               </div>
 
-              {/* Import/Export */}
-              <div className="mt-4 pt-4 border-t border-border space-y-1">
-                <button
-                  onClick={handleExport}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                    "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
-                  )}
-                >
-                  <Download className="w-4 h-4" />
-                  Export
-                </button>
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                    "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
-                  )}
-                >
-                  <Upload className="w-4 h-4" />
-                  Import
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleImport}
-                  className="hidden"
-                />
-              </div>
+              {/* Import/Export - only show for workspace tabs */}
+              {activeTab !== "viewAll" && (
+                <div className="mt-4 pt-4 border-t border-border space-y-1">
+                  <button
+                    onClick={handleExport}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                      "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
+                    )}
+                  >
+                    <Download className="w-4 h-4" />
+                    Export
+                  </button>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                      "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
+                    )}
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleImport}
+                    className="hidden"
+                  />
+                </div>
+              )}
 
-              {/* Summary stats at bottom of sidebar */}
-              <div className="mt-auto pt-4 border-t border-border space-y-2">
-                <div className="px-3 py-2 rounded-lg bg-bg-tertiary">
-                  <div className="text-xs text-text-secondary">Monthly</div>
-                  <div className="text-lg font-mono font-medium text-accent-green">
-                    {formatCurrency(summary.totalMonthly)}
+              {/* Summary stats at bottom of sidebar - show workspace stats for workspace tabs */}
+              {activeTab !== "viewAll" && (
+                <div className="mt-auto pt-4 border-t border-border space-y-2">
+                  <div className="px-3 py-2 rounded-lg bg-bg-tertiary">
+                    <div className="text-xs text-text-secondary">Monthly</div>
+                    <div className="text-lg font-mono font-medium text-accent-green">
+                      {formatCurrency(summary.totalMonthly)}
+                    </div>
+                  </div>
+                  <div className="px-3 py-2 rounded-lg bg-bg-tertiary">
+                    <div className="text-xs text-text-secondary">Yearly</div>
+                    <div className="text-sm font-mono text-text-primary">
+                      {formatCurrency(summary.totalYearly)}
+                    </div>
+                  </div>
+                  <div className="flex justify-between px-3 text-xs text-text-secondary">
+                    <span>Active: {summary.activeCount}</span>
+                    <span>Inactive: {summary.inactiveCount}</span>
                   </div>
                 </div>
-                <div className="px-3 py-2 rounded-lg bg-bg-tertiary">
-                  <div className="text-xs text-text-secondary">Yearly</div>
-                  <div className="text-sm font-mono text-text-primary">
-                    {formatCurrency(summary.totalYearly)}
-                  </div>
-                </div>
-                <div className="flex justify-between px-3 text-xs text-text-secondary">
-                  <span>Active: {summary.activeCount}</span>
-                  <span>Inactive: {summary.inactiveCount}</span>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Content */}
             <div className="flex-1 flex flex-col min-h-0">
+              {activeTab === "viewAll" && (
+                <ScrollArea className="flex-1">
+                  <SubscriptionStats />
+                </ScrollArea>
+              )}
+
               {activeTab === "subscriptions" && (
                 <>
                   {/* Toolbar */}
                   <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
                     <button
                       onClick={() => setIsAddingSubscription(true)}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm",
-                        "bg-accent text-white hover:bg-accent/90 transition-colors"
-                      )}
+                      className="btn-primary"
                     >
                       <Plus className="w-4 h-4" />
                       Add Subscription

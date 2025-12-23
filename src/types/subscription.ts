@@ -3,7 +3,7 @@ export type CurrencyCode = "USD" | "EUR" | "GBP" | "CAD" | "AUD";
 
 export interface SubscriptionCategory {
   id: string;
-  projectId: string;
+  workspaceId: string;
   name: string;
   color: string | null;
   sortOrder: number;
@@ -12,7 +12,7 @@ export interface SubscriptionCategory {
 }
 
 export interface SubscriptionCategoryInput {
-  projectId: string;
+  workspaceId: string;
   name: string;
   color?: string | null;
   sortOrder?: number;
@@ -20,7 +20,7 @@ export interface SubscriptionCategoryInput {
 
 export interface Subscription {
   id: string;
-  projectId: string;
+  workspaceId: string;
   name: string;
   url: string | null;
   faviconUrl: string | null;
@@ -36,7 +36,7 @@ export interface Subscription {
 }
 
 export interface SubscriptionInput {
-  projectId: string;
+  workspaceId: string;
   name: string;
   url?: string | null;
   faviconUrl?: string | null;
@@ -63,8 +63,8 @@ export interface SubscriptionSummary {
 }
 
 export interface ShareableSubscriptionData {
-  subscriptions: Omit<Subscription, "id" | "projectId" | "createdAt" | "updatedAt" | "sortOrder">[];
-  categories: Omit<SubscriptionCategory, "id" | "projectId" | "createdAt" | "updatedAt" | "sortOrder">[];
+  subscriptions: Omit<Subscription, "id" | "workspaceId" | "createdAt" | "updatedAt" | "sortOrder">[];
+  categories: Omit<SubscriptionCategory, "id" | "workspaceId" | "createdAt" | "updatedAt" | "sortOrder">[];
   exportedAt: number;
   version: string;
 }

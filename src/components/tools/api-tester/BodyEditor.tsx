@@ -49,7 +49,7 @@ export function BodyEditor({ requestId }: BodyEditorProps) {
             className={cn(
               "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
               request.body.type === type
-                ? "bg-accent text-white"
+                ? "bg-accent text-[#3d2066]"
                 : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
             )}
           >

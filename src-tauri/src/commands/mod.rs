@@ -1792,6 +1792,123 @@ pub fn kill_process(pid: u32) -> Result<(), String> {
     Ok(())
 }
 
+// Background Services Commands
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BackgroundService {
+    pub pid: u32,
+    pub name: String,
+    pub category: String,
+    pub memory_bytes: u64,
+    pub cpu_percent: f32,
+    pub port: Option<u16>,
+    pub status: String,
+    pub user: String,
+}
+
+const KNOWN_SERVICES: &[(&str, &str)] = &[
+    // Databases
+    ("postgres", "databases"),
+    ("mysqld", "databases"),
+    ("mysql", "databases"),
+    ("mongod", "databases"),
+    ("redis-server", "databases"),
+    ("redis", "databases"),
+    ("elasticsearch", "databases"),
+    ("mariadbd", "databases"),
+    ("memcached", "databases"),
+    ("sqlite", "databases"),
+    // Web Servers
+    ("nginx", "web_servers"),
+    ("httpd", "web_servers"),
+    ("apache2", "web_servers"),
+    ("caddy", "web_servers"),
+    ("lighttpd", "web_servers"),
+    // Dev Servers
+    ("node", "dev_servers"),
+    ("python", "dev_servers"),
+    ("python3", "dev_servers"),
+    ("ruby", "dev_servers"),
+    ("rails", "dev_servers"),
+    ("go", "dev_servers"),
+    ("cargo", "dev_servers"),
+    ("php", "dev_servers"),
+    ("php-fpm", "dev_servers"),
+    ("java", "dev_servers"),
+    ("uvicorn", "dev_servers"),
+    ("gunicorn", "dev_servers"),
+    ("next-server", "dev_servers"),
+    ("vite", "dev_servers"),
+    ("webpack", "dev_servers"),
+    ("esbuild", "dev_servers"),
+    ("bun", "dev_servers"),
+    ("deno", "dev_servers"),
+    // Message Queues
+    ("rabbitmq", "message_queues"),
+    ("kafka", "message_queues"),
+    ("beam.smp", "message_queues"),
+    ("celery", "message_queues"),
+];
+
+fn get_service_category(process_name: &str) -> Option<&'static str> {
+    let name_lower = process_name.to_lowercase();
+    for (pattern, category) in KNOWN_SERVICES {
+        if name_lower.contains(pattern) {
+            return Some(category);
+        }
+    }
+    None
+}
+
+#[tauri::command]
+pub fn list_background_services() -> Result<Vec<BackgroundService>, String> {
+    use sysinfo::System;
+    use std::collections::HashMap;
+
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    // First, get port information to merge with services
+    let port_info: HashMap<u32, u16> = list_listening_ports()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|p| (p.pid, p.port))
+        .collect();
+
+    let mut services: Vec<BackgroundService> = Vec::new();
+
+    for (pid, process) in sys.processes() {
+        let name = process.name().to_string_lossy().to_string();
+
+        // Check if this is a known developer service
+        if let Some(category) = get_service_category(&name) {
+            let pid_u32 = pid.as_u32();
+
+            services.push(BackgroundService {
+                pid: pid_u32,
+                name,
+                category: category.to_string(),
+                memory_bytes: process.memory(),
+                cpu_percent: process.cpu_usage(),
+                port: port_info.get(&pid_u32).copied(),
+                status: format!("{:?}", process.status()),
+                user: process.user_id()
+                    .map(|u| u.to_string())
+                    .unwrap_or_else(|| "unknown".to_string()),
+            });
+        }
+    }
+
+    // Sort by category, then by name
+    services.sort_by(|a, b| {
+        a.category.cmp(&b.category)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+
+    Ok(services)
+}
+
 // Node Modules Cleaner Commands
 
 #[derive(Debug, Serialize, Deserialize)]

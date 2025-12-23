@@ -108,13 +108,7 @@ export function NpmSearch({ projectPath, onPackageInstalled }: NpmSearchProps) {
           <button
             onClick={handleSearch}
             disabled={searching || !query.trim()}
-            className={cn(
-              "absolute right-1 top-1/2 -translate-y-1/2",
-              "px-2 py-0.5 text-xs rounded",
-              "bg-accent text-white",
-              "hover:bg-accent/90 transition-colors",
-              "disabled:opacity-50 disabled:cursor-not-allowed"
-            )}
+            className="btn-primary absolute right-1 top-1/2 -translate-y-1/2 !px-2 !py-0.5 !text-xs !rounded"
           >
             {searching ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
           </button>

@@ -3,6 +3,7 @@
 mod api_tester;
 mod color_picker;
 mod commands;
+mod database_viewer;
 mod live_preview;
 mod storybook;
 mod terminal;
@@ -195,6 +196,7 @@ fn main() {
         .manage(Arc::new(live_preview::PreviewManager::new()))
         .manage(Arc::new(api_tester::WebhookManager::new()))
         .manage(Arc::new(storybook::StorybookManager::new()))
+        .manage(Arc::new(database_viewer::DatabaseManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -231,6 +233,7 @@ fn main() {
             commands::create_claude_file,
             commands::list_listening_ports,
             commands::kill_process,
+            commands::list_background_services,
             commands::scan_node_modules,
             commands::delete_node_modules,
             commands::list_env_files,
@@ -274,6 +277,17 @@ fn main() {
             api_tester::list_webhook_servers,
             storybook::start_storybook_server,
             storybook::stop_storybook_server,
+            database_viewer::db_test_connection,
+            database_viewer::db_connect,
+            database_viewer::db_disconnect,
+            database_viewer::db_list_tables,
+            database_viewer::db_get_table_schema,
+            database_viewer::db_execute_query,
+            database_viewer::db_fetch_rows,
+            database_viewer::db_insert_row,
+            database_viewer::db_update_row,
+            database_viewer::db_delete_row,
+            database_viewer::db_detect_services,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

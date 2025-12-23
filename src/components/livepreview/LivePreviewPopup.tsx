@@ -377,12 +377,7 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
                   (detectionResult.projectType === "unknown" &&
                     !detectionResult.hasIndexHtml)
                 }
-                className={cn(
-                  "w-full mt-3 h-10 text-sm font-medium rounded-lg transition-colors",
-                  "bg-accent text-bg-primary hover:bg-accent/90",
-                  "disabled:opacity-50 disabled:cursor-not-allowed",
-                  "flex items-center justify-center gap-2"
-                )}
+                className="btn-primary w-full mt-3 !h-10"
               >
                 {starting ? (
                   <>

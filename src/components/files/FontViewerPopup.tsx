@@ -98,7 +98,7 @@ export function FontViewerPopup({ filePath, onClose }: FontViewerPopupProps) {
                   onClick={() => setSelectedSize(size)}
                   className={`px-3 py-1 text-sm rounded transition-colors ${
                     selectedSize === size
-                      ? "bg-accent text-white"
+                      ? "bg-accent text-[#3d2066]"
                       : "bg-bg-hover text-text-secondary hover:text-text-primary"
                   }`}
                 >

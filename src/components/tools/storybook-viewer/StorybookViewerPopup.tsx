@@ -21,7 +21,6 @@ import {
   StorybookServer,
 } from "@/stores/storybookStore";
 import { useProjectStore } from "@/stores/projectStore";
-import { cn } from "@/lib/utils";
 
 interface StorybookViewerPopupProps {
   isOpen: boolean;
@@ -254,11 +253,7 @@ export function StorybookViewerPopup({
       <button
         onClick={handleStartStorybook}
         disabled={starting}
-        className={cn(
-          "flex items-center gap-2 px-6 py-3 rounded-lg transition-colors",
-          "bg-accent text-bg-primary hover:bg-accent/90",
-          "disabled:opacity-50 disabled:cursor-not-allowed"
-        )}
+        className="btn-primary !px-6 !py-3"
       >
         {starting ? (
           <>

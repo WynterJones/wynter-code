@@ -10,3 +10,5 @@ export { ApiTesterPopup } from "./api-tester";
 export { ProjectTemplatesPopup } from "./ProjectTemplatesPopup";
 export { TestRunnerPopup } from "./test-runner";
 export { StorybookViewerPopup } from "./storybook-viewer";
+export { BackgroundServicesPopup } from "./background-services";
+export { DatabaseViewerPopup } from "./database-viewer";

@@ -225,7 +225,7 @@ export function FileTreeNode({
 
       {node.isExpanded && node.children && (
         <div>
-          {node.children.map((child) => (
+          {node.children.filter((c) => c.name !== ".DS_Store").map((child) => (
             <FileTreeNode
               key={child.path}
               node={child}

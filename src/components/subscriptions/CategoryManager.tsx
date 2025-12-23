@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus, Pencil, Trash2, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
-import { useProjectStore } from "@/stores/projectStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { SubscriptionCategory } from "@/types";
 
 // Catppuccin color palette
@@ -23,17 +23,17 @@ interface CategoryManagerProps {
 }
 
 export function CategoryManager({ className }: CategoryManagerProps) {
-  const { activeProjectId } = useProjectStore();
+  const { activeWorkspaceId } = useWorkspaceStore();
   const {
-    getCategoriesForProject,
-    getSubscriptionsByProject,
+    getCategoriesForWorkspace,
+    getSubscriptionsByWorkspace,
     addCategory,
     updateCategory,
     deleteCategory,
   } = useSubscriptionStore();
 
-  const categories = activeProjectId ? getCategoriesForProject(activeProjectId) : [];
-  const subscriptions = activeProjectId ? getSubscriptionsByProject(activeProjectId) : [];
+  const categories = activeWorkspaceId ? getCategoriesForWorkspace(activeWorkspaceId) : [];
+  const subscriptions = activeWorkspaceId ? getSubscriptionsByWorkspace(activeWorkspaceId) : [];
 
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -47,10 +47,10 @@ export function CategoryManager({ className }: CategoryManagerProps) {
   };
 
   const handleAdd = () => {
-    if (!newName.trim() || !activeProjectId) return;
+    if (!newName.trim() || !activeWorkspaceId) return;
 
     addCategory({
-      projectId: activeProjectId,
+      workspaceId: activeWorkspaceId,
       name: newName.trim(),
       color: newColor,
     });
@@ -90,11 +90,11 @@ export function CategoryManager({ className }: CategoryManagerProps) {
     }
   };
 
-  if (!activeProjectId) {
+  if (!activeWorkspaceId) {
     return (
       <div className={cn("text-center py-8", className)}>
         <p className="text-sm text-text-secondary">
-          Select a project to manage categories.
+          Select a workspace to manage categories.
         </p>
       </div>
     );
@@ -166,11 +166,7 @@ export function CategoryManager({ className }: CategoryManagerProps) {
             <button
               onClick={handleAdd}
               disabled={!newName.trim()}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium",
-                "bg-accent text-white hover:bg-accent/90 transition-colors",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
-              )}
+              className="btn-primary !px-3 !py-1.5 !text-xs"
             >
               Add Category
             </button>

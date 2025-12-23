@@ -225,7 +225,7 @@ export function AppShell() {
               onClick={() => {
                 // Will trigger folder dialog
               }}
-              className="px-4 py-2 bg-accent text-bg-primary rounded-md hover:bg-accent/90 transition-colors"
+              className="btn-primary"
             >
               Open Project
             </button>
