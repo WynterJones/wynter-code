@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-23
-**Active Ideas:** 1
+**Active Ideas:** 0
 
 ---
 
@@ -19,13 +19,7 @@
 
 ## Ideas
 
-### Multi-Panel Layout
-Split view for sessions and terminals.
-- Split horizontal/vertical
-- Drag sessions/terminals between panels
-- Resize panels
-- Save layout presets
-- Quick toggle between layouts
+*No active ideas. Use "I have an idea for..." to plant one.*
 
 ---
 
@@ -33,10 +27,8 @@ Split view for sessions and terminals.
 
 | Idea | Plan | Date |
 |------|------|------|
-| System Health Dashboard | `_PLANS/SYSTEM_HEALTH_DASHBOARD.md` | 2025-12-23 |
-| Live Preview Server | `_PLANS/LIVE_PREVIEW_SERVER.md` | 2025-12-23 |
 | Multi-Model Support | `_PLANS/MULTI_MODEL_SUPPORT.md` | 2025-12-23 |
-| Overwatch Dashboard | `_PLANS/OVERWATCH.md` | 2025-12-23 |
+| Farmwork Tycoon | `_PLANS/PIXIJS_GAME_MODE.md` | 2025-12-23 |
 
 ---
 
@@ -44,10 +36,12 @@ Split view for sessions and terminals.
 
 | Idea | Implementation | Date |
 |------|----------------|------|
+| Multi-Panel Layout | Split view with horizontal/vertical splits, drag sessions between panels, resize, layout presets | 2025-12-23 |
 | Radio Streaming | Meditation player with Nightride.fm stations + Radio Browser API search, favorites, stream metadata | 2025-12-23 |
 | Beads Issue Tracker | `bd` CLI + UI tabs - local SQLite issue tracking with epics, kanban board, dependencies | 2025-12-23 |
-| Services Overwatch | `OverwatchPopup` - Railway, Plausible, Netlify, Sentry monitoring cards (in progress) | 2025-12-23 |
+| Services Overwatch | `OverwatchPopup` - Railway, Plausible, Netlify, Sentry monitoring cards | 2025-12-23 |
 | System Health | `SystemHealthPopup` - dev tools and system resources dashboard | 2025-12-23 |
+| Live Preview | `LivePreviewPopup` - embedded browser preview with dev server management | 2025-12-23 |
 | Project Starter Templates | `ProjectTemplatesPopup` - 42 templates, 7 categories, favorites, search | 2025-12-23 |
 | Test Runner | `TestRunnerPopup` - detect frameworks, run tests with live terminal output | 2025-12-23 |
 | Quick Command Palette | `Ctrl/Cmd+P` - search tools, projects, sessions | 2025-12-23 |
