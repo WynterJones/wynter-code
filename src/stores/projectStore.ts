@@ -12,6 +12,7 @@ interface ProjectStore {
   setActiveProject: (id: string) => void;
   updateProjectColor: (id: string, color: string) => void;
   updateProjectIcon: (id: string, icon: string) => void;
+  toggleMinimized: (id: string) => void;
   reorderProjects: (fromIndex: number, toIndex: number) => void;
   getProject: (id: string) => Project | undefined;
 }
@@ -80,6 +81,14 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           projects: state.projects.map((p) =>
             p.id === id ? { ...p, icon: icon || undefined } : p
+          ),
+        }));
+      },
+
+      toggleMinimized: (id: string) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, minimized: !p.minimized } : p
           ),
         }));
       },

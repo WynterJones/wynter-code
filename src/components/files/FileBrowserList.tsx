@@ -7,23 +7,25 @@ import { type GitStatusMap, type GitFileStatusType } from "@/hooks/useGitStatus"
 
 interface FileBrowserListProps {
   files: FileNode[];
-  selectedFile: FileNode | null;
+  selectedPaths: Set<string>;
   loading: boolean;
   showHiddenFiles: boolean;
-  onSelect: (file: FileNode) => void;
+  onSelect: (file: FileNode, shiftKey: boolean, ctrlKey: boolean) => void;
   onOpen: (file: FileNode) => void;
   onContextMenu: (e: React.MouseEvent, file: FileNode) => void;
+  onClearSelection: () => void;
   gitStatusMap?: GitStatusMap;
 }
 
 export function FileBrowserList({
   files,
-  selectedFile,
+  selectedPaths,
   loading,
   showHiddenFiles,
   onSelect,
   onOpen,
   onContextMenu,
+  onClearSelection,
   gitStatusMap,
 }: FileBrowserListProps) {
   // Helper to get status for a node (file or directory)
@@ -82,14 +84,21 @@ export function FileBrowserList({
     return a.name.localeCompare(b.name);
   });
 
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Only clear selection if clicking on the container itself, not on a file item
+    if (e.target === e.currentTarget) {
+      onClearSelection();
+    }
+  };
+
   return (
     <ScrollArea className="flex-1 min-h-0">
-      <div className="pb-1">
+      <div className="pb-1 min-h-full" onClick={handleContainerClick}>
         {sortedFiles.map((file) => (
           <FileBrowserListItem
             key={file.path}
             node={file}
-            isSelected={selectedFile?.path === file.path}
+            isSelected={selectedPaths.has(file.path)}
             onSelect={onSelect}
             onOpen={onOpen}
             onContextMenu={onContextMenu}

@@ -44,6 +44,7 @@ pub async fn create_pty(
     cwd: String,
     cols: u16,
     rows: u16,
+    shell: Option<String>,
 ) -> Result<String, String> {
     let pty_system = native_pty_system();
 
@@ -58,8 +59,10 @@ pub async fn create_pty(
 
     let pty_id = Uuid::new_v4().to_string();
 
-    // Get the user's default shell
-    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    // Use provided shell or fall back to user's default shell
+    let shell = shell.unwrap_or_else(|| {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string())
+    });
 
     let mut cmd = CommandBuilder::new(&shell);
     cmd.cwd(&cwd);

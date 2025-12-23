@@ -63,7 +63,8 @@ export function FileBrowserPopup({
 }: FileBrowserPopupProps) {
   const [currentPath, setCurrentPath] = useState(initialPath || "");
   const [files, setFiles] = useState<FileNode[]>([]);
-  const [selectedFile, setSelectedFile] = useState<FileNode | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [lastSelectedPath, setLastSelectedPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -99,7 +100,8 @@ export function FileBrowserPopup({
 
   const loadDirectory = async (path: string) => {
     setLoading(true);
-    setSelectedFile(null);
+    setSelectedPaths(new Set());
+    setLastSelectedPath(null);
     try {
       const result = await invoke<FileNode[]>("get_file_tree", {
         path,
@@ -155,28 +157,90 @@ export function FileBrowserPopup({
     }
   }, [homeDir, navigateTo]);
 
-  const handleSelect = useCallback((file: FileNode) => {
-    setSelectedFile(file);
+  // Helper to get sorted files for range selection
+  const getSortedFiles = useCallback(() => {
+    const filteredFiles = showHiddenFiles
+      ? files
+      : files.filter((f) => !f.name.startsWith("."));
+    return [...filteredFiles].sort((a, b) => {
+      if (a.isDirectory && !b.isDirectory) return -1;
+      if (!a.isDirectory && b.isDirectory) return 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [files, showHiddenFiles]);
+
+  const handleSelect = useCallback((file: FileNode, shiftKey: boolean, ctrlKey: boolean) => {
+    if (shiftKey && lastSelectedPath) {
+      // Range select
+      const sortedFiles = getSortedFiles();
+      const paths = sortedFiles.map(f => f.path);
+      const startIdx = paths.indexOf(lastSelectedPath);
+      const endIdx = paths.indexOf(file.path);
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        const newSelection = new Set(selectedPaths);
+        for (let i = from; i <= to; i++) {
+          newSelection.add(paths[i]);
+        }
+        setSelectedPaths(newSelection);
+      }
+    } else if (ctrlKey) {
+      // Toggle selection
+      const newSelection = new Set(selectedPaths);
+      if (newSelection.has(file.path)) {
+        newSelection.delete(file.path);
+      } else {
+        newSelection.add(file.path);
+      }
+      setSelectedPaths(newSelection);
+      setLastSelectedPath(file.path);
+    } else {
+      // Single select
+      setSelectedPaths(new Set([file.path]));
+      setLastSelectedPath(file.path);
+    }
+  }, [lastSelectedPath, selectedPaths, getSortedFiles]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedPaths(new Set());
+    setLastSelectedPath(null);
   }, []);
 
   const handleOpen = useCallback((file: FileNode) => {
     if (file.isDirectory) {
       navigateTo(file.path);
     }
+    // Clear selection when opening a file/folder
+    setSelectedPaths(new Set());
+    setLastSelectedPath(null);
   }, [navigateTo]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
+    // If right-clicking on a non-selected node, select only that node
+    if (!selectedPaths.has(node.path)) {
+      setSelectedPaths(new Set([node.path]));
+      setLastSelectedPath(node.path);
+    }
     setContextMenu({ x: e.clientX, y: e.clientY, node });
-    setSelectedFile(node);
-  }, []);
+  }, [selectedPaths]);
+
+  // Get the first selected file (for single-file operations)
+  const getSelectedFile = useCallback((): FileNode | null => {
+    if (selectedPaths.size === 0) return null;
+    const path = Array.from(selectedPaths)[0];
+    return files.find(f => f.path === path) || null;
+  }, [selectedPaths, files]);
 
   const handleCopyPath = useCallback(async () => {
-    if (selectedFile) {
-      await navigator.clipboard.writeText(selectedFile.path);
-    }
-  }, [selectedFile]);
+    if (selectedPaths.size === 0) return;
+    // Copy all selected paths, one per line
+    const paths = Array.from(selectedPaths).join("\n");
+    await navigator.clipboard.writeText(paths);
+  }, [selectedPaths]);
 
   const handleSendToPrompt = useCallback(async () => {
+    const selectedFile = getSelectedFile();
     if (!selectedFile || !isImageFile(selectedFile) || !onSendToPrompt) return;
 
     try {
@@ -198,14 +262,15 @@ export function FileBrowserPopup({
     } catch (err) {
       console.error("Failed to read image:", err);
     }
-  }, [selectedFile, onSendToPrompt, onClose]);
+  }, [getSelectedFile, onSendToPrompt, onClose]);
 
   const handleSelectProject = useCallback(() => {
+    const selectedFile = getSelectedFile();
     if (selectedFile?.isDirectory && onSelectProject) {
       onSelectProject(selectedFile.path);
       onClose();
     }
-  }, [selectedFile, onSelectProject, onClose]);
+  }, [getSelectedFile, onSelectProject, onClose]);
 
   const handleCreateFile = useCallback(() => {
     setDialog({ type: "file", parentPath: currentPath });
@@ -238,6 +303,7 @@ export function FileBrowserPopup({
     if (!contextMenu?.node) return [];
     const node = contextMenu.node;
     const items: ContextMenuItem[] = [];
+    const hasMultipleSelection = selectedPaths.size > 1;
 
     if (node.isDirectory) {
       items.push(
@@ -261,27 +327,30 @@ export function FileBrowserPopup({
 
     items.push(
       {
-        label: "Copy Path",
+        label: hasMultipleSelection ? `Copy ${selectedPaths.size} Paths` : "Copy Path",
         icon: Copy,
-        action: () => navigator.clipboard.writeText(node.path),
+        action: () => {
+          const paths = hasMultipleSelection
+            ? Array.from(selectedPaths).join("\n")
+            : node.path;
+          navigator.clipboard.writeText(paths);
+        },
         separator: !node.isDirectory,
       },
       {
         label: "Quick Look",
         icon: Eye,
         action: () => {
-          setSelectedFile(node);
           setShowQuickLook(true);
         },
       }
     );
 
-    if (isImageFile(node) && onSendToPrompt) {
+    if (isImageFile(node) && onSendToPrompt && !hasMultipleSelection) {
       items.push({
         label: "Send to Prompt",
         icon: ImagePlus,
         action: async () => {
-          setSelectedFile(node);
           const src = convertFileSrc(node.path);
           const response = await fetch(src);
           const blob = await response.blob();
@@ -300,27 +369,40 @@ export function FileBrowserPopup({
       });
     }
 
-    // Compression items
-    items.push({
-      label: node.isDirectory ? "Compress to Zip" : "Add to Zip",
-      icon: Archive,
-      action: async () => {
-        try {
-          const result = await createArchive([node.path]);
-          if (result.success) {
-            console.log(
-              `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${result.savingsPercent.toFixed(1)}% saved)`
-            );
-            await loadDirectory(currentPath);
-          }
-        } catch (err) {
-          console.error("Failed to create archive:", err);
-        }
-      },
-      separator: true,
-    });
+    // Compression items - only show "Compress to Zip" for folders or multiple selections
+    const pathsToCompress = hasMultipleSelection
+      ? Array.from(selectedPaths)
+      : [node.path];
+    const showCompressOption = node.isDirectory || hasMultipleSelection;
 
-    if (canOptimize(node.path, node.isDirectory)) {
+    if (showCompressOption) {
+      const label = hasMultipleSelection
+        ? `Compress ${selectedPaths.size} Items to Zip`
+        : "Compress to Zip";
+
+      items.push({
+        label,
+        icon: Archive,
+        action: async () => {
+          try {
+            const result = await createArchive(pathsToCompress);
+            if (result.success) {
+              console.log(
+                `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${result.savingsPercent.toFixed(1)}% saved)`
+              );
+              setSelectedPaths(new Set());
+              await loadDirectory(currentPath);
+            }
+          } catch (err) {
+            console.error("Failed to create archive:", err);
+          }
+        },
+        separator: true,
+      });
+    }
+
+    // Only show optimize for single selection
+    if (!hasMultipleSelection && canOptimize(node.path, node.isDirectory)) {
       items.push({
         label: "Optimize File Size",
         icon: ImageMinus,
@@ -340,8 +422,9 @@ export function FileBrowserPopup({
       });
     }
 
-    items.push(
-      {
+    // Only show rename for single selection
+    if (!hasMultipleSelection) {
+      items.push({
         label: "Rename",
         icon: Pencil,
         action: () => setDialog({
@@ -351,22 +434,78 @@ export function FileBrowserPopup({
           currentPath: node.path,
         }),
         separator: true,
+      });
+    }
+
+    items.push({
+      label: hasMultipleSelection ? `Delete ${selectedPaths.size} Items` : "Delete",
+      icon: Trash2,
+      action: async () => {
+        for (const path of selectedPaths) {
+          await deleteToTrash(path);
+        }
+        setSelectedPaths(new Set());
+        await loadDirectory(currentPath);
+        refetchGitStatus();
       },
-      {
-        label: "Delete",
-        icon: Trash2,
-        action: async () => {
-          await deleteToTrash(node.path);
-          await loadDirectory(currentPath);
-          refetchGitStatus();
-        },
-        variant: "danger",
-        separator: true,
-      }
-    );
+      variant: "danger",
+      separator: true,
+    });
 
     return items;
-  }, [contextMenu, mode, currentPath, navigateTo, onSelectProject, onSendToPrompt, onClose, deleteToTrash, createArchive, optimizeFile]);
+  }, [contextMenu, selectedPaths, mode, currentPath, navigateTo, onSelectProject, onSendToPrompt, onClose, deleteToTrash, createArchive, optimizeFile, refetchGitStatus]);
+
+  const selectPrevious = useCallback((extend: boolean = false) => {
+    const sortedFiles = getSortedFiles();
+    if (sortedFiles.length === 0) return;
+
+    if (selectedPaths.size === 0) {
+      const file = sortedFiles[sortedFiles.length - 1];
+      setSelectedPaths(new Set([file.path]));
+      setLastSelectedPath(file.path);
+      return;
+    }
+
+    const currentPath = lastSelectedPath || Array.from(selectedPaths)[0];
+    const currentIndex = sortedFiles.findIndex((f) => f.path === currentPath);
+    if (currentIndex > 0) {
+      const newFile = sortedFiles[currentIndex - 1];
+      if (extend) {
+        const newSelection = new Set(selectedPaths);
+        newSelection.add(newFile.path);
+        setSelectedPaths(newSelection);
+      } else {
+        setSelectedPaths(new Set([newFile.path]));
+      }
+      setLastSelectedPath(newFile.path);
+    }
+  }, [getSortedFiles, selectedPaths, lastSelectedPath]);
+
+  const selectNext = useCallback((extend: boolean = false) => {
+    const sortedFiles = getSortedFiles();
+    if (sortedFiles.length === 0) return;
+
+    if (selectedPaths.size === 0) {
+      const file = sortedFiles[0];
+      setSelectedPaths(new Set([file.path]));
+      setLastSelectedPath(file.path);
+      return;
+    }
+
+    const currentPath = lastSelectedPath || Array.from(selectedPaths)[0];
+    const currentIndex = sortedFiles.findIndex((f) => f.path === currentPath);
+    if (currentIndex < sortedFiles.length - 1) {
+      const newFile = sortedFiles[currentIndex + 1];
+      if (extend) {
+        const newSelection = new Set(selectedPaths);
+        newSelection.add(newFile.path);
+        setSelectedPaths(newSelection);
+      } else {
+        setSelectedPaths(new Set([newFile.path]));
+      }
+      setLastSelectedPath(newFile.path);
+    }
+  }, [getSortedFiles, selectedPaths, lastSelectedPath]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -387,77 +526,40 @@ export function FileBrowserPopup({
         e.preventDefault();
         goForward();
       }
-      if (e.key === "Enter" && selectedFile) {
+      if (e.key === "Enter" && selectedPaths.size > 0) {
         e.preventDefault();
-        handleOpen(selectedFile);
+        const selectedFile = getSelectedFile();
+        if (selectedFile) handleOpen(selectedFile);
       }
-      if (e.key === " " && selectedFile) {
+      if (e.key === " " && selectedPaths.size > 0) {
         e.preventDefault();
         setShowQuickLook((prev) => !prev);
       }
-      if ((e.key === "c" || e.key === "C") && e.metaKey && selectedFile) {
+      if ((e.key === "c" || e.key === "C") && e.metaKey && selectedPaths.size > 0) {
         e.preventDefault();
         handleCopyPath();
       }
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        selectPrevious();
+        selectPrevious(e.shiftKey);
       }
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        selectNext();
+        selectNext(e.shiftKey);
+      }
+      if (e.key === "Escape") {
+        handleClearSelection();
       }
     };
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, selectedFile, goUp, goBack, goForward, handleOpen, handleCopyPath]);
-
-  const selectPrevious = () => {
-    const filteredFiles = showHiddenFiles
-      ? files
-      : files.filter((f) => !f.name.startsWith("."));
-    const sortedFiles = [...filteredFiles].sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1;
-      if (!a.isDirectory && b.isDirectory) return 1;
-      return a.name.localeCompare(b.name);
-    });
-
-    if (!selectedFile) {
-      setSelectedFile(sortedFiles[sortedFiles.length - 1] || null);
-      return;
-    }
-
-    const currentIndex = sortedFiles.findIndex((f) => f.path === selectedFile.path);
-    if (currentIndex > 0) {
-      setSelectedFile(sortedFiles[currentIndex - 1]);
-    }
-  };
-
-  const selectNext = () => {
-    const filteredFiles = showHiddenFiles
-      ? files
-      : files.filter((f) => !f.name.startsWith("."));
-    const sortedFiles = [...filteredFiles].sort((a, b) => {
-      if (a.isDirectory && !b.isDirectory) return -1;
-      if (!a.isDirectory && b.isDirectory) return 1;
-      return a.name.localeCompare(b.name);
-    });
-
-    if (!selectedFile) {
-      setSelectedFile(sortedFiles[0] || null);
-      return;
-    }
-
-    const currentIndex = sortedFiles.findIndex((f) => f.path === selectedFile.path);
-    if (currentIndex < sortedFiles.length - 1) {
-      setSelectedFile(sortedFiles[currentIndex + 1]);
-    }
-  };
+  }, [isOpen, selectedPaths, goUp, goBack, goForward, handleOpen, handleCopyPath, getSelectedFile, selectPrevious, selectNext, handleClearSelection]);
 
   const handleClose = () => {
     setShowQuickLook(false);
-    setSelectedFile(null);
+    setSelectedPaths(new Set());
+    setLastSelectedPath(null);
     setContextMenu(null);
     setDialog(null);
     onClose();
@@ -488,25 +590,27 @@ export function FileBrowserPopup({
         <div className="flex-1 flex min-h-0 overflow-hidden relative">
           <FileBrowserList
             files={files}
-            selectedFile={selectedFile}
+            selectedPaths={selectedPaths}
             loading={loading}
             showHiddenFiles={showHiddenFiles}
             onSelect={handleSelect}
             onOpen={handleOpen}
             onContextMenu={handleContextMenu}
+            onClearSelection={handleClearSelection}
             gitStatusMap={gitStatusMap}
           />
 
-          {showQuickLook && selectedFile && (
+          {showQuickLook && selectedPaths.size > 0 && getSelectedFile() && (
             <QuickLookPreview
-              file={selectedFile}
+              file={getSelectedFile()!}
               onClose={() => setShowQuickLook(false)}
             />
           )}
         </div>
 
         <FileBrowserToolbar
-          selectedFile={selectedFile}
+          selectedFile={getSelectedFile()}
+          selectedCount={selectedPaths.size}
           mode={mode}
           showQuickLook={showQuickLook}
           selectButtonLabel={selectButtonLabel}

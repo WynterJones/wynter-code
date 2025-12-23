@@ -4,7 +4,13 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { useSettingsStore, TERMINAL_SHELLS, type TerminalShell } from "@/stores/settingsStore";
 import "@xterm/xterm/css/xterm.css";
+
+function getShellPath(shell: TerminalShell): string | null {
+  const shellConfig = TERMINAL_SHELLS.find(s => s.id === shell);
+  return shellConfig?.path ?? null;
+}
 
 interface TerminalProps {
   projectPath: string;
@@ -17,9 +23,13 @@ export function Terminal({ projectPath, ptyId, onPtyCreated }: TerminalProps) {
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
 
+  // Get the configured shell setting
+  const terminalShell = useSettingsStore((s) => s.terminalShell);
+
   // Stable refs to capture initial values - effect only runs once on mount
   const initialPtyId = useRef(ptyId);
   const initialProjectPath = useRef(projectPath);
+  const initialShellPath = useRef(getShellPath(terminalShell));
   const onPtyCreatedRef = useRef(onPtyCreated);
 
   // Keep callback ref updated
@@ -96,6 +106,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated }: TerminalProps) {
             cwd: initialProjectPath.current,
             cols: term.cols,
             rows: term.rows,
+            shell: initialShellPath.current,
           });
 
           // Check again after async call

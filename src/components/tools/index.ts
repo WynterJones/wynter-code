@@ -7,3 +7,6 @@ export { SystemHealthPopup } from "./system-health";
 export { LivePreviewPopup } from "@/components/livepreview";
 export { EnvManagerPopup } from "./env-manager";
 export { ApiTesterPopup } from "./api-tester";
+export { ProjectTemplatesPopup } from "./ProjectTemplatesPopup";
+export { TestRunnerPopup } from "./test-runner";
+export { StorybookViewerPopup } from "./storybook-viewer";

@@ -82,8 +82,8 @@ pre,
   --os-padding-axis: 2px;
   --os-track-border-radius: 5px;
   --os-handle-border-radius: 5px;
-  --os-handle-bg: var(--border);
-  --os-handle-bg-hover: #3a3a4a;
+  --os-handle-bg: #52525b;
+  --os-handle-bg-hover: #71717a;
   --os-handle-bg-active: var(--accent);
   --os-track-bg: transparent;
   --os-track-bg-hover: var(--bg-tertiary);

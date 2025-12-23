@@ -3,7 +3,7 @@
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
 **Last Updated:** 2025-12-22
-**Composted Ideas:** 26
+**Composted Ideas:** 27
 
 ---
 
@@ -122,3 +122,7 @@ Rename multiple files with find/replace and regex support.
 ### Token Usage Dashboard
 Track Claude API/CLI usage with graphs and cost estimation.
 > **Why rejected:** Claude Max subscription makes this less relevant. Over-engineering for marginal benefit.
+
+### Prompt Templates
+Insert saved prompts with variables - create snippets with variables, organize by category, quick insert with keyboard shortcut, import/export template packs.
+> **Why rejected:** User decided not to implement.

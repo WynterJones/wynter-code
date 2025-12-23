@@ -9,7 +9,7 @@ import {
 interface FileBrowserListItemProps {
   node: FileNode;
   isSelected: boolean;
-  onSelect: (node: FileNode) => void;
+  onSelect: (node: FileNode, shiftKey: boolean, ctrlKey: boolean) => void;
   onOpen: (node: FileNode) => void;
   onContextMenu: (e: React.MouseEvent, node: FileNode) => void;
   gitStatus?: GitFileStatusType;
@@ -34,7 +34,7 @@ export function FileBrowserListItem({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onSelect(node);
+    onSelect(node, e.shiftKey, e.metaKey || e.ctrlKey);
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {

@@ -1,5 +1,18 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Plus, X, Settings, ChevronLeft, ChevronRight, FolderOpen, Moon, FolderSearch, GripVertical } from "lucide-react";
+import {
+  Plus,
+  X,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  FolderOpen,
+  Moon,
+  FolderSearch,
+  GripVertical,
+  Rocket,
+  FlaskConical,
+  Minus,
+} from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
@@ -23,10 +36,26 @@ import { IconButton, Tooltip, ContextMenu, IconPicker } from "@/components/ui";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SubscriptionButton } from "@/components/subscriptions";
-import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
-import { ToolsDropdown, PortManagerPopup, NodeModulesCleanerPopup, LocalhostTunnelPopup, SystemHealthPopup, LivePreviewPopup, EnvManagerPopup, ApiTesterPopup } from "@/components/tools";
+import {
+  FileBrowserPopup,
+  ImageAttachment,
+} from "@/components/files/FileBrowserPopup";
+import {
+  ToolsDropdown,
+  PortManagerPopup,
+  NodeModulesCleanerPopup,
+  LocalhostTunnelPopup,
+  SystemHealthPopup,
+  LivePreviewPopup,
+  EnvManagerPopup,
+  ApiTesterPopup,
+  ProjectTemplatesPopup,
+  TestRunnerPopup,
+  StorybookViewerPopup,
+} from "@/components/tools";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
+import { useStorybookDetection } from "@/hooks/useStorybookDetection";
 import type { Project } from "@/types";
 
 const PROJECT_COLORS = [
@@ -62,6 +91,7 @@ interface SortableProjectTabProps {
   isDimmed: boolean;
   onSelect: () => void;
   onClose: () => void;
+  onToggleMinimize: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }
 
@@ -72,6 +102,7 @@ function SortableProjectTab({
   isDimmed,
   onSelect,
   onClose,
+  onToggleMinimize,
   onContextMenu,
 }: SortableProjectTabProps) {
   const {
@@ -90,7 +121,9 @@ function SortableProjectTab({
 
   const renderIcon = () => {
     if (project.icon) {
-      const IconComponent = LucideIcons[project.icon as keyof typeof LucideIcons] as React.ComponentType<{
+      const IconComponent = LucideIcons[
+        project.icon as keyof typeof LucideIcons
+      ] as React.ComponentType<{
         className?: string;
         style?: React.CSSProperties;
       }>;
@@ -111,23 +144,38 @@ function SortableProjectTab({
     );
   };
 
-  return (
+  const isMinimized = project.minimized;
+
+  const tabContent = (
     <div
       ref={setNodeRef}
       style={style}
-      onClick={onSelect}
+      onClick={() => {
+        if (isMinimized) {
+          onToggleMinimize();
+        }
+        onSelect();
+      }}
       onContextMenu={onContextMenu}
       className={cn(
-        "group relative flex items-center gap-1.5 cursor-pointer transition-all min-w-0 flex-shrink-0",
-        "border-r border-border/50",
-        isCompact ? "px-2.5 h-full" : "px-4 h-full gap-2",
+        "group relative flex items-center cursor-pointer transition-all min-w-0 flex-shrink-0",
+        isMinimized
+          ? cn(
+              "px-2.5 gap-1 border-r border-border",
+              isCompact ? "h-9" : "h-11",
+            )
+          : isCompact
+            ? "px-2.5 h-full gap-1.5 border-r border-border/50"
+            : "px-4 h-full gap-2 border-r border-border/50",
         isActive
           ? "bg-bg-secondary text-text-primary"
           : cn(
               "hover:text-text-primary hover:bg-bg-secondary/50",
-              isDimmed ? "text-text-secondary/50" : "text-text-secondary"
+              isDimmed || isMinimized
+                ? "text-text-secondary/50"
+                : "text-text-secondary",
             ),
-        isDragging && "opacity-50 z-50"
+        isDragging && "opacity-50 z-50",
       )}
     >
       {/* Project color indicator - only show when active */}
@@ -138,44 +186,90 @@ function SortableProjectTab({
         />
       )}
 
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className={cn(
-          "cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-bg-tertiary transition-opacity",
-          "opacity-0 group-hover:opacity-60 hover:!opacity-100",
-          isActive && "opacity-40"
-        )}
-      >
-        <GripVertical className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")} />
-      </div>
+      {/* Drag handle - hidden when minimized */}
+      {!isMinimized && (
+        <div
+          {...attributes}
+          {...listeners}
+          className={cn(
+            "cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-bg-tertiary transition-opacity",
+            "opacity-0 group-hover:opacity-60 hover:!opacity-100",
+            isActive && "opacity-40",
+          )}
+        >
+          <GripVertical
+            className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")}
+          />
+        </div>
+      )}
 
       {/* Project icon */}
-      <div className="flex-shrink-0">
-        {renderIcon()}
-      </div>
+      <div className="flex-shrink-0">{renderIcon()}</div>
 
-      <span className={cn("truncate", isCompact ? "text-xs max-w-[80px]" : "text-sm max-w-[140px]")}>
-        {project.name}
-      </span>
+      {/* Project name - hidden when minimized */}
+      {!isMinimized && (
+        <span
+          className={cn(
+            "truncate",
+            isCompact ? "text-xs max-w-[80px]" : "text-sm max-w-[140px]",
+          )}
+        >
+          {project.name}
+        </span>
+      )}
 
-      {/* Close button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose();
-        }}
-        className={cn(
-          "p-0.5 rounded hover:bg-bg-hover transition-opacity",
-          "text-text-secondary hover:text-text-primary",
-          isActive ? "opacity-60 hover:opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"
-        )}
-      >
-        <X className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
-      </button>
+      {/* Minimize button - only shown on hover when not minimized */}
+      {!isMinimized && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMinimize();
+          }}
+          className={cn(
+            "p-0.5 rounded hover:bg-bg-hover transition-opacity",
+            "text-text-secondary hover:text-text-primary",
+            isActive
+              ? "opacity-0 group-hover:opacity-60 hover:!opacity-100"
+              : "opacity-0 group-hover:opacity-60 hover:!opacity-100",
+          )}
+          title="Minimize"
+        >
+          <Minus className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
+        </button>
+      )}
+
+      {/* Close button - hidden when minimized */}
+      {!isMinimized && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
+          className={cn(
+            "p-0.5 rounded hover:bg-bg-hover transition-opacity",
+            "text-text-secondary hover:text-text-primary",
+            isActive
+              ? "opacity-60 hover:opacity-100"
+              : "opacity-0 group-hover:opacity-60 hover:!opacity-100",
+          )}
+        >
+          <X className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
+        </button>
+      )}
     </div>
   );
+
+  if (isMinimized) {
+    return (
+      <div className="h-full flex items-center">
+        <Tooltip content={project.name} side="bottom">
+          {tabContent}
+        </Tooltip>
+      </div>
+    );
+  }
+
+  return tabContent;
 }
 
 export function ProjectTabBar({
@@ -193,6 +287,7 @@ export function ProjectTabBar({
     addProject,
     updateProjectColor,
     updateProjectIcon,
+    toggleMinimized,
     reorderProjects,
     getProject,
   } = useProjectStore();
@@ -207,8 +302,12 @@ export function ProjectTabBar({
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
-  const [fileBrowserMode, setFileBrowserMode] = useState<"selectProject" | "browse">("selectProject");
-  const [fileBrowserInitialPath, setFileBrowserInitialPath] = useState<string | undefined>(undefined);
+  const [fileBrowserMode, setFileBrowserMode] = useState<
+    "selectProject" | "browse"
+  >("selectProject");
+  const [fileBrowserInitialPath, setFileBrowserInitialPath] = useState<
+    string | undefined
+  >(undefined);
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     isOpen: false,
     position: { x: 0, y: 0 },
@@ -222,10 +321,19 @@ export function ProjectTabBar({
   const [showLivePreview, setShowLivePreview] = useState(false);
   const [showEnvManager, setShowEnvManager] = useState(false);
   const [showApiTester, setShowApiTester] = useState(false);
+  const [showProjectTemplates, setShowProjectTemplates] = useState(false);
+  const [showTestRunner, setShowTestRunner] = useState(false);
+  const [showStorybookViewer, setShowStorybookViewer] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
-  const contextMenuProject = contextMenu.projectId ? getProject(contextMenu.projectId) : undefined;
+  const { hasStorybook } = useStorybookDetection();
+
+  const activeProject = activeProjectId
+    ? getProject(activeProjectId)
+    : undefined;
+  const contextMenuProject = contextMenu.projectId
+    ? getProject(contextMenu.projectId)
+    : undefined;
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -235,14 +343,15 @@ export function ProjectTabBar({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   const projectIds = useMemo(() => projects.map((p) => p.id), [projects]);
 
   const updateScrollButtons = () => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
     }
@@ -294,12 +403,27 @@ export function ProjectTabBar({
         case "openApiTester":
           setShowApiTester(true);
           break;
+        case "openProjectTemplates":
+          setShowProjectTemplates(true);
+          break;
+        case "openTestRunner":
+          setShowTestRunner(true);
+          break;
+        case "openStorybookViewer":
+          setShowStorybookViewer(true);
+          break;
       }
     };
 
-    window.addEventListener("command-palette-tool", handleCommandPaletteTool as EventListener);
+    window.addEventListener(
+      "command-palette-tool",
+      handleCommandPaletteTool as EventListener,
+    );
     return () => {
-      window.removeEventListener("command-palette-tool", handleCommandPaletteTool as EventListener);
+      window.removeEventListener(
+        "command-palette-tool",
+        handleCommandPaletteTool as EventListener,
+      );
     };
   }, []);
 
@@ -395,7 +519,7 @@ export function ProjectTabBar({
       onDoubleClick={handleDoubleClick}
       className={cn(
         "flex items-center bg-bg-primary border-b border-border select-none",
-        compactProjectTabs ? "h-9" : "h-11"
+        compactProjectTabs ? "h-9" : "h-11",
       )}
     >
       {/* Traffic light spacer for macOS */}
@@ -415,7 +539,10 @@ export function ProjectTabBar({
           data-tauri-drag-region
           className="flex items-center flex-1 gap-0.5 overflow-x-auto scrollbar-none h-full"
         >
-          <SortableContext items={projectIds} strategy={horizontalListSortingStrategy}>
+          <SortableContext
+            items={projectIds}
+            strategy={horizontalListSortingStrategy}
+          >
             {projects.map((project) => (
               <SortableProjectTab
                 key={project.id}
@@ -428,6 +555,7 @@ export function ProjectTabBar({
                   setMeditationActive(false);
                 }}
                 onClose={() => removeProject(project.id)}
+                onToggleMinimize={() => toggleMinimized(project.id)}
                 onContextMenu={(e) => handleContextMenu(e, project.id)}
               />
             ))}
@@ -444,7 +572,7 @@ export function ProjectTabBar({
             "p-1.5 h-full transition-colors",
             canScrollLeft
               ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
-              : "text-text-secondary/30 cursor-not-allowed"
+              : "text-text-secondary/30 cursor-not-allowed",
           )}
         >
           <ChevronLeft className="w-4 h-4" />
@@ -456,7 +584,7 @@ export function ProjectTabBar({
             "p-1.5 h-full transition-colors",
             canScrollRight
               ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
-              : "text-text-secondary/30 cursor-not-allowed"
+              : "text-text-secondary/30 cursor-not-allowed",
           )}
         >
           <ChevronRight className="w-4 h-4" />
@@ -482,6 +610,8 @@ export function ProjectTabBar({
           onOpenLivePreview={() => setShowLivePreview(true)}
           onOpenEnvManager={() => setShowEnvManager(true)}
           onOpenApiTester={() => setShowApiTester(true)}
+          onOpenStorybookViewer={() => setShowStorybookViewer(true)}
+          hasStorybook={hasStorybook}
         />
       </div>
 
@@ -491,11 +621,27 @@ export function ProjectTabBar({
           <IconButton
             size="sm"
             onClick={() => setMeditationActive(!isMeditating)}
-            className={cn(
-              isMeditating && "text-accent bg-accent/10"
-            )}
+            className={cn(isMeditating && "text-accent bg-accent/10")}
           >
             <Moon className={cn("w-4 h-4", isMeditating && "fill-accent")} />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Project Templates */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="New Project">
+          <IconButton size="sm" onClick={() => setShowProjectTemplates(true)}>
+            <Rocket className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Test Runner */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Test Runner">
+          <IconButton size="sm" onClick={() => setShowTestRunner(true)}>
+            <FlaskConical className="w-4 h-4" />
           </IconButton>
         </Tooltip>
       </div>
@@ -514,7 +660,7 @@ export function ProjectTabBar({
         data-tauri-drag-region
         className={cn(
           "flex items-center gap-2 px-3 h-full border-l border-border transition-opacity duration-500",
-          isMeditating && "opacity-30 hover:opacity-100"
+          isMeditating && "opacity-30 hover:opacity-100",
         )}
       >
         {onOpenSubscriptions && (
@@ -537,23 +683,27 @@ export function ProjectTabBar({
           {/* Tabs */}
           <div className="flex border-b border-border mb-3">
             <button
-              onClick={() => setContextMenu((prev) => ({ ...prev, activeTab: "icon" }))}
+              onClick={() =>
+                setContextMenu((prev) => ({ ...prev, activeTab: "icon" }))
+              }
               className={cn(
                 "flex-1 py-1.5 text-sm font-medium transition-colors",
                 contextMenu.activeTab === "icon"
                   ? "text-accent border-b-2 border-accent"
-                  : "text-text-secondary hover:text-text-primary"
+                  : "text-text-secondary hover:text-text-primary",
               )}
             >
               Icon
             </button>
             <button
-              onClick={() => setContextMenu((prev) => ({ ...prev, activeTab: "color" }))}
+              onClick={() =>
+                setContextMenu((prev) => ({ ...prev, activeTab: "color" }))
+              }
               className={cn(
                 "flex-1 py-1.5 text-sm font-medium transition-colors",
                 contextMenu.activeTab === "color"
                   ? "text-accent border-b-2 border-accent"
-                  : "text-text-secondary hover:text-text-primary"
+                  : "text-text-secondary hover:text-text-primary",
               )}
             >
               Color
@@ -585,7 +735,9 @@ export function ProjectTabBar({
 
           {contextMenu.activeTab === "color" && contextMenuProject && (
             <div>
-              <div className="text-xs text-text-secondary mb-2 font-medium">Project Color</div>
+              <div className="text-xs text-text-secondary mb-2 font-medium">
+                Project Color
+              </div>
               <div className="grid grid-cols-4 gap-2">
                 {PROJECT_COLORS.map((color) => (
                   <button
@@ -600,7 +752,7 @@ export function ProjectTabBar({
                       "w-8 h-8 rounded-full border-2 transition-all hover:scale-110",
                       contextMenuProject.color === color
                         ? "border-white ring-2 ring-accent/50"
-                        : "border-transparent hover:border-white/50"
+                        : "border-transparent hover:border-white/50",
                     )}
                     style={{ backgroundColor: color }}
                   />
@@ -674,6 +826,28 @@ export function ProjectTabBar({
       <ApiTesterPopup
         isOpen={showApiTester}
         onClose={() => setShowApiTester(false)}
+      />
+
+      {/* Project Templates */}
+      <ProjectTemplatesPopup
+        isOpen={showProjectTemplates}
+        onClose={() => setShowProjectTemplates(false)}
+        onOpenProject={(path) => {
+          addProject(path);
+          setShowProjectTemplates(false);
+        }}
+      />
+
+      {/* Test Runner */}
+      <TestRunnerPopup
+        isOpen={showTestRunner}
+        onClose={() => setShowTestRunner(false)}
+      />
+
+      {/* Storybook Viewer */}
+      <StorybookViewerPopup
+        isOpen={showStorybookViewer}
+        onClose={() => setShowStorybookViewer(false)}
       />
     </div>
   );

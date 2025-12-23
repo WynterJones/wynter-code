@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -7,10 +7,12 @@ import {
   useSettingsStore,
   EDITOR_THEMES,
   APP_FONTS,
+  TERMINAL_SHELLS,
   type EditorTheme,
   type MarkdownViewMode,
   type SidebarPosition,
   type AppFont,
+  type TerminalShell,
 } from "@/stores/settingsStore";
 import { KEYBOARD_SHORTCUTS, formatShortcut, type KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
@@ -21,7 +23,7 @@ interface SettingsPopupProps {
   onClose: () => void;
 }
 
-type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "keyboard" | "about";
+type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "about";
 
 const APP_VERSION = "1.0.0";
 
@@ -54,6 +56,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     appFont,
     compactProjectTabs,
     dimInactiveProjects,
+    terminalShell,
     setEditorTheme,
     setEditorFontSize,
     setEditorWordWrap,
@@ -65,6 +68,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     setAppFont,
     setCompactProjectTabs,
     setDimInactiveProjects,
+    setTerminalShell,
   } = useSettingsStore();
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
@@ -74,6 +78,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     { id: "music", label: "Music", icon: Music },
     { id: "colors", label: "Colors", icon: Palette },
     { id: "compression", label: "Compression", icon: Archive },
+    { id: "terminal", label: "Terminal", icon: TerminalSquare },
     { id: "keyboard", label: "Keyboard", icon: Keyboard },
     { id: "about", label: "About", icon: Info },
   ];
@@ -157,6 +162,12 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
               )}
               {activeTab === "colors" && <ColorsTab />}
               {activeTab === "compression" && <CompressionSettings />}
+              {activeTab === "terminal" && (
+                <TerminalSettings
+                  terminalShell={terminalShell}
+                  onTerminalShellChange={setTerminalShell}
+                />
+              )}
               {activeTab === "keyboard" && <KeyboardShortcutsSection />}
               {activeTab === "about" && <AboutSection />}
             </div>
@@ -656,6 +667,77 @@ function MusicSettings({
           onSelectProject={handleSelectFolder}
         />
       )}
+    </div>
+  );
+}
+
+interface TerminalSettingsProps {
+  terminalShell: TerminalShell;
+  onTerminalShellChange: (shell: TerminalShell) => void;
+}
+
+function TerminalSettings({
+  terminalShell,
+  onTerminalShellChange,
+}: TerminalSettingsProps) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-lg font-medium text-text-primary mb-4">
+        Terminal Settings
+      </h2>
+
+      {/* Default Shell */}
+      <div className="space-y-2">
+        <label className="text-sm font-medium text-text-primary">
+          Default Shell
+        </label>
+        <p className="text-xs text-text-secondary mb-2">
+          Choose which shell to use for new terminal sessions. Your shell&apos;s
+          configuration file (.zshrc, .bashrc, etc.) will be loaded automatically.
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          {TERMINAL_SHELLS.map((shell) => (
+            <button
+              key={shell.id}
+              onClick={() => onTerminalShellChange(shell.id)}
+              className={cn(
+                "px-4 py-3 rounded-lg border text-sm text-left transition-all",
+                terminalShell === shell.id
+                  ? "border-accent bg-accent/10 text-text-primary"
+                  : "border-border hover:border-accent/50 text-text-secondary hover:text-text-primary"
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "w-3 h-3 rounded-full border-2",
+                    terminalShell === shell.id ? "border-accent bg-accent" : "border-border"
+                  )}
+                />
+                <div>
+                  <div>{shell.name}</div>
+                  {shell.path && (
+                    <div className="text-xs text-text-secondary font-mono">
+                      {shell.path}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-4 rounded-lg bg-bg-secondary border border-border">
+        <h3 className="text-sm font-medium text-text-primary mb-2">
+          Note
+        </h3>
+        <p className="text-xs text-text-secondary">
+          Changes apply to new terminal sessions. Close and reopen the terminal
+          to use the new shell. &quot;System Default&quot; uses your operating system&apos;s
+          default shell (usually set in $SHELL).
+        </p>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ export interface Project {
   path: string;
   color?: string;
   icon?: string;
+  minimized?: boolean;
   lastOpenedAt: Date | null;
   createdAt: Date;
 }

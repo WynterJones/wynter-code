@@ -4,6 +4,7 @@ mod api_tester;
 mod color_picker;
 mod commands;
 mod live_preview;
+mod storybook;
 mod terminal;
 mod tunnel;
 mod watcher;
@@ -193,6 +194,7 @@ fn main() {
         .manage(Arc::new(watcher::FileWatcherManager::new()))
         .manage(Arc::new(live_preview::PreviewManager::new()))
         .manage(Arc::new(api_tester::WebhookManager::new()))
+        .manage(Arc::new(storybook::StorybookManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -270,6 +272,8 @@ fn main() {
             api_tester::start_webhook_server,
             api_tester::stop_webhook_server,
             api_tester::list_webhook_servers,
+            storybook::start_storybook_server,
+            storybook::stop_storybook_server,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -6,6 +6,7 @@ import type { FileNode } from "@/types";
 
 interface FileBrowserToolbarProps {
   selectedFile: FileNode | null;
+  selectedCount: number;
   mode: "selectProject" | "browse";
   showQuickLook: boolean;
   selectButtonLabel?: string;
@@ -27,6 +28,7 @@ function isImageFile(file: FileNode | null): boolean {
 
 export function FileBrowserToolbar({
   selectedFile,
+  selectedCount,
   mode,
   showQuickLook,
   selectButtonLabel = "Open as Project",
@@ -37,8 +39,10 @@ export function FileBrowserToolbar({
   onCreateFile,
   onCreateFolder,
 }: FileBrowserToolbarProps) {
-  const showOpenAsProject = mode === "selectProject" && selectedFile?.isDirectory;
-  const showSendToPrompt = isImageFile(selectedFile);
+  const hasSelection = selectedCount > 0;
+  const hasMultipleSelection = selectedCount > 1;
+  const showOpenAsProject = mode === "selectProject" && selectedFile?.isDirectory && !hasMultipleSelection;
+  const showSendToPrompt = isImageFile(selectedFile) && !hasMultipleSelection;
 
   return (
     <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-bg-secondary flex-shrink-0 rounded-b-lg">
@@ -53,18 +57,23 @@ export function FileBrowserToolbar({
             <FolderPlus className="w-4 h-4" />
           </IconButton>
         </Tooltip>
+        {hasMultipleSelection && (
+          <span className="text-xs text-text-secondary ml-2">
+            {selectedCount} items selected
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
-        <Button size="sm" variant="ghost" onClick={onCopyPath} disabled={!selectedFile}>
+        <Button size="sm" variant="ghost" onClick={onCopyPath} disabled={!hasSelection}>
           <Copy className="w-3.5 h-3.5 mr-1.5" />
-          Copy Path
+          {hasMultipleSelection ? `Copy ${selectedCount} Paths` : "Copy Path"}
         </Button>
         <Button
           size="sm"
           variant={showQuickLook ? "default" : "ghost"}
           onClick={onToggleQuickLook}
-          disabled={!selectedFile}
+          disabled={!hasSelection}
         >
           <Eye className="w-3.5 h-3.5 mr-1.5" />
           Quick Look

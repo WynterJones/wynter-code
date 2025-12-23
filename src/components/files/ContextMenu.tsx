@@ -119,20 +119,30 @@ export function buildCompressionMenuItems(
   path: string,
   isDirectory: boolean,
   onCreateArchive: () => void,
-  onOptimize: () => void
+  onOptimize: () => void,
+  showCompressOption: boolean = true,
+  selectedCount?: number
 ): ContextMenuItem[] {
   const items: ContextMenuItem[] = [];
 
-  // Always offer archive creation
-  items.push({
-    label: isDirectory ? "Compress to Zip" : "Add to Zip",
-    icon: Archive,
-    action: onCreateArchive,
-    separator: true,
-  });
+  // Only show compress option for folders or multiple selection
+  if (showCompressOption) {
+    const label = selectedCount && selectedCount > 1
+      ? `Compress ${selectedCount} Items to Zip`
+      : isDirectory
+        ? "Compress to Zip"
+        : "Add to Zip";
 
-  // Add optimize option for supported file types
-  if (canOptimize(path, isDirectory)) {
+    items.push({
+      label,
+      icon: Archive,
+      action: onCreateArchive,
+      separator: true,
+    });
+  }
+
+  // Add optimize option for supported file types (only for single selection)
+  if (!selectedCount && canOptimize(path, isDirectory)) {
     items.push({
       label: "Optimize File Size",
       icon: ImageMinus,

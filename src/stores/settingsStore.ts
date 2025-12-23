@@ -19,6 +19,16 @@ export type AppFont =
   | "roboto-mono"
   | "space-mono";
 
+export type TerminalShell = "system" | "bash" | "zsh" | "fish" | "sh";
+
+export const TERMINAL_SHELLS: { id: TerminalShell; name: string; path: string | null }[] = [
+  { id: "system", name: "System Default", path: null },
+  { id: "bash", name: "Bash", path: "/bin/bash" },
+  { id: "zsh", name: "Zsh", path: "/bin/zsh" },
+  { id: "fish", name: "Fish", path: "/usr/local/bin/fish" },
+  { id: "sh", name: "Sh", path: "/bin/sh" },
+];
+
 export const EDITOR_THEMES: { id: EditorTheme; name: string }[] = [
   { id: "one-dark", name: "One Dark" },
   { id: "dracula", name: "Dracula" },
@@ -54,6 +64,7 @@ interface SettingsStore {
   dimInactiveProjects: boolean;
   compressionArchiveOverwrite: boolean;
   compressionMediaOverwrite: boolean;
+  terminalShell: TerminalShell;
 
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
@@ -71,6 +82,7 @@ interface SettingsStore {
   setDimInactiveProjects: (dim: boolean) => void;
   setCompressionArchiveOverwrite: (overwrite: boolean) => void;
   setCompressionMediaOverwrite: (overwrite: boolean) => void;
+  setTerminalShell: (shell: TerminalShell) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -93,6 +105,7 @@ export const useSettingsStore = create<SettingsStore>()(
       dimInactiveProjects: false,
       compressionArchiveOverwrite: false,
       compressionMediaOverwrite: false,
+      terminalShell: "system",
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -156,6 +169,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setCompressionMediaOverwrite: (compressionMediaOverwrite: boolean) => {
         set({ compressionMediaOverwrite });
+      },
+
+      setTerminalShell: (terminalShell: TerminalShell) => {
+        set({ terminalShell });
       },
     }),
     {

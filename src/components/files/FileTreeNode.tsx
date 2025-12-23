@@ -236,6 +236,8 @@ export function FileTreeNode({
               onNodeModulesClick={onNodeModulesClick}
               onMoveItem={onMoveItem}
               gitStatusMap={gitStatusMap}
+              selectedPaths={selectedPaths}
+              onSelect={onSelect}
             />
           ))}
         </div>

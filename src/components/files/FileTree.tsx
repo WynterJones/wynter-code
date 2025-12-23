@@ -37,6 +37,8 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const [error, setError] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [dialog, setDialog] = useState<DialogState | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [lastSelectedPath, setLastSelectedPath] = useState<string | null>(null);
 
   const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
@@ -190,12 +192,60 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   };
 
   const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
+    // If right-clicking on a non-selected node, select only that node
+    if (!selectedPaths.has(node.path)) {
+      setSelectedPaths(new Set([node.path]));
+      setLastSelectedPath(node.path);
+    }
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
       node,
     });
   };
+
+  // Collect all visible paths in order for shift-select
+  const collectVisiblePaths = useCallback((nodes: FileNode[]): string[] => {
+    const paths: string[] = [];
+    const traverse = (nodeList: FileNode[]) => {
+      for (const node of nodeList) {
+        paths.push(node.path);
+        if (node.isDirectory && node.isExpanded && node.children) {
+          traverse(node.children);
+        }
+      }
+    };
+    traverse(nodes);
+    return paths;
+  }, []);
+
+  const handleSelect = useCallback((node: FileNode, shiftKey: boolean) => {
+    if (shiftKey && lastSelectedPath) {
+      // Range select
+      const visiblePaths = collectVisiblePaths(files);
+      const startIdx = visiblePaths.indexOf(lastSelectedPath);
+      const endIdx = visiblePaths.indexOf(node.path);
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        const newSelection = new Set(selectedPaths);
+        for (let i = from; i <= to; i++) {
+          newSelection.add(visiblePaths[i]);
+        }
+        setSelectedPaths(newSelection);
+      }
+    } else {
+      // Toggle single selection (Cmd/Ctrl click)
+      const newSelection = new Set(selectedPaths);
+      if (newSelection.has(node.path)) {
+        newSelection.delete(node.path);
+      } else {
+        newSelection.add(node.path);
+      }
+      setSelectedPaths(newSelection);
+      setLastSelectedPath(node.path);
+    }
+  }, [lastSelectedPath, selectedPaths, files, collectVisiblePaths]);
 
   const closeContextMenu = () => {
     setContextMenu(null);
@@ -238,14 +288,15 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     }
   };
 
-  const handleCreateArchive = async (node: FileNode) => {
+  const handleCreateArchive = async (paths: string[]) => {
     try {
-      const result = await createArchive([node.path]);
+      const result = await createArchive(paths);
       if (result.success) {
         const savings = result.savingsPercent.toFixed(1);
         console.log(
           `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${savings}% saved)`
         );
+        setSelectedPaths(new Set());
         await loadFiles();
       }
     } catch (err) {
@@ -297,6 +348,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     if (!contextMenu) return [];
 
     const { node } = contextMenu;
+    const hasMultipleSelection = selectedPaths.size > 1;
 
     const baseItems = buildFileContextMenuItems(
       node.isDirectory,
@@ -306,11 +358,21 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       () => handleDelete(node)
     );
 
+    // Determine paths for compression
+    const pathsToCompress = hasMultipleSelection
+      ? Array.from(selectedPaths)
+      : [node.path];
+
+    // Only show compress option for folders or multiple selection
+    const showCompressOption = node.isDirectory || hasMultipleSelection;
+
     const compressionItems = buildCompressionMenuItems(
       node.path,
       node.isDirectory,
-      () => handleCreateArchive(node),
-      () => handleOptimizeFile(node)
+      () => handleCreateArchive(pathsToCompress),
+      () => handleOptimizeFile(node),
+      showCompressOption,
+      hasMultipleSelection ? selectedPaths.size : undefined
     );
 
     // Insert compression items before delete (last item)
@@ -346,10 +408,22 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     );
   }
 
+  const handleClearSelection = () => {
+    setSelectedPaths(new Set());
+    setLastSelectedPath(null);
+  };
+
+  const handleContainerClick = (e: React.MouseEvent) => {
+    // Only clear selection if clicking on the container itself, not on a file item
+    if (e.target === e.currentTarget) {
+      handleClearSelection();
+    }
+  };
+
   return (
     <div className="relative flex flex-col h-full">
       <ScrollArea className="flex-1">
-        <div className="py-2">
+        <div className="py-2 min-h-full" onClick={handleContainerClick}>
           {files.map((file) => (
             <FileTreeNode
               key={file.path}
@@ -361,6 +435,8 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
               onNodeModulesClick={onNodeModulesClick}
               onMoveItem={handleMoveItem}
               gitStatusMap={gitStatusMap}
+              selectedPaths={selectedPaths}
+              onSelect={handleSelect}
             />
           ))}
         </div>

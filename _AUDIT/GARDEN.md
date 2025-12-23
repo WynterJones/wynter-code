@@ -2,8 +2,8 @@
 
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
-**Last Updated:** 2025-12-22
-**Active Ideas:** 8
+**Last Updated:** 2025-12-23
+**Active Ideas:** 6
 
 ---
 
@@ -19,13 +19,6 @@
 
 ## Ideas
 
-### Project Starter Templates
-Generate new projects from templates.
-- Chrome Extension, Next.js, Rails, Express, Tauri, Electron, React+Vite, CLI Tool
-- Custom template creation from existing projects
-- Variables in templates (project name, author)
-- One-click scaffold in chosen directory
-
 ### Services Overwatch Dashboard
 Unified dashboard for external services.
 - Tabbed interface for categories
@@ -33,14 +26,6 @@ Unified dashboard for external services.
 - Sparkline charts for trends
 - Credentials in system keychain
 - Integrations: Railway, Vercel, Netlify, Plausible, PostHog, Sentry, Supabase, Stripe
-
-### Test Runner
-Run and view tests visually.
-- Support Jest, Vitest, RSpec, Mocha
-- Pass/fail status in real-time
-- Coverage report visualization
-- Re-run failed tests only
-- Watch mode toggle
 
 ### Storybook Viewer
 Embedded Storybook preview.
@@ -57,13 +42,6 @@ PostgreSQL browser for local/remote databases.
 - Export to CSV/JSON
 - Query history and saved queries
 
-### Prompt Templates
-Insert saved prompts with variables.
-- Create snippets with variables (e.g., `Fix the bug in {{file}}`)
-- Organize by category (refactor, debug, explain, generate)
-- Quick insert with keyboard shortcut
-- Import/export template packs
-
 ### Multi-Panel Layout
 Split view for sessions and terminals.
 - Split horizontal/vertical
@@ -71,6 +49,16 @@ Split view for sessions and terminals.
 - Resize panels
 - Save layout presets
 - Quick toggle between layouts
+
+### Workspaces
+Organization layer above projects for switching work contexts.
+- Pill button to the left of project tabs with icon badge + name
+- Click opens dropdown popup with search and workspace list
+- CRUD operations: create, rename, recolor, delete workspaces
+- Each workspace contains its own project tabs
+- Switching workspace changes visible projects
+- Remembers last active project per workspace
+- Hierarchy: Workspace -> Projects -> Sessions -> Terminals
 
 ---
 
@@ -87,6 +75,8 @@ Split view for sessions and terminals.
 
 | Idea | Implementation | Date |
 |------|----------------|------|
+| Project Starter Templates | `ProjectTemplatesPopup` - 42 templates, 7 categories, favorites, search | 2025-12-23 |
+| Test Runner | `TestRunnerPopup` - detect frameworks, run tests with live terminal output | 2025-12-23 |
 | Quick Command Palette | `Ctrl/Cmd+P` - search tools, projects, sessions | 2025-12-23 |
 | Environment Variables | `EnvManagerPopup` - visual .env editor | 2025-12-23 |
 | Project Switcher | Merged into Command Palette | 2025-12-23 |
