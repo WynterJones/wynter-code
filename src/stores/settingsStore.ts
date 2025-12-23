@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { ClaudeModel } from "@/types";
+import type {
+  AudioSourceType,
+  NightrideStation,
+  RadioBrowserFavorite,
+} from "@/types/radio";
 
 export type EditorTheme =
   | "one-dark"
@@ -78,6 +83,12 @@ interface SettingsStore {
   terminalShell: TerminalShell;
   useMultiPanelLayout: boolean;
 
+  // Radio settings
+  audioSourceType: AudioSourceType;
+  nightrideStation: NightrideStation;
+  radioBrowserFavorites: RadioBrowserFavorite[];
+  currentRadioBrowserStation: RadioBrowserFavorite | null;
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
@@ -98,6 +109,13 @@ interface SettingsStore {
   setCompressionMediaOverwrite: (overwrite: boolean) => void;
   setTerminalShell: (shell: TerminalShell) => void;
   setUseMultiPanelLayout: (use: boolean) => void;
+
+  // Radio setters
+  setAudioSourceType: (type: AudioSourceType) => void;
+  setNightrideStation: (station: NightrideStation) => void;
+  addRadioBrowserFavorite: (station: RadioBrowserFavorite) => void;
+  removeRadioBrowserFavorite: (stationuuid: string) => void;
+  setCurrentRadioBrowserStation: (station: RadioBrowserFavorite | null) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -124,6 +142,12 @@ export const useSettingsStore = create<SettingsStore>()(
       compressionMediaOverwrite: false,
       terminalShell: "system",
       useMultiPanelLayout: false,
+
+      // Radio defaults
+      audioSourceType: "nightride",
+      nightrideStation: "chillsynth",
+      radioBrowserFavorites: [],
+      currentRadioBrowserStation: null,
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -203,6 +227,40 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setUseMultiPanelLayout: (useMultiPanelLayout: boolean) => {
         set({ useMultiPanelLayout });
+      },
+
+      // Radio setters
+      setAudioSourceType: (audioSourceType: AudioSourceType) => {
+        set({ audioSourceType });
+      },
+
+      setNightrideStation: (nightrideStation: NightrideStation) => {
+        set({ nightrideStation });
+      },
+
+      addRadioBrowserFavorite: (station: RadioBrowserFavorite) => {
+        set((state) => ({
+          radioBrowserFavorites: [
+            ...state.radioBrowserFavorites.filter(
+              (s) => s.stationuuid !== station.stationuuid
+            ),
+            station,
+          ],
+        }));
+      },
+
+      removeRadioBrowserFavorite: (stationuuid: string) => {
+        set((state) => ({
+          radioBrowserFavorites: state.radioBrowserFavorites.filter(
+            (s) => s.stationuuid !== stationuuid
+          ),
+        }));
+      },
+
+      setCurrentRadioBrowserStation: (
+        currentRadioBrowserStation: RadioBrowserFavorite | null
+      ) => {
+        set({ currentRadioBrowserStation });
       },
     }),
     {

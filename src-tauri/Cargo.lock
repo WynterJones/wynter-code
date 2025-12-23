@@ -7915,6 +7915,7 @@ dependencies = [
  "tokio",
  "trash",
  "tungstenite",
+ "urlencoding",
  "uuid",
  "walkdir",
  "zip 2.4.2",

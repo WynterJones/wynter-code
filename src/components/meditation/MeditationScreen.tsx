@@ -11,7 +11,6 @@ export function MeditationScreen() {
     prevTrack,
     volume,
     setVolume,
-    setPlaying,
   } = useMeditationStore();
 
   const [ambientPhase, setAmbientPhase] = useState(0);
@@ -22,14 +21,6 @@ export function MeditationScreen() {
     "Create", "Dream", "Love", "Believe", "Be", "Shine", "Grow",
     "Peace", "Flow", "Trust", "Heal", "Light", "Inspire"
   ];
-
-  // Auto-play music when meditation starts
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPlaying(true);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [setPlaying]);
 
   // Ambient light cycle (dusk to night) - slower cycle
   useEffect(() => {

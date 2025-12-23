@@ -1,10 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod api_tester;
+mod beads;
 mod color_picker;
 mod commands;
 mod database_viewer;
 mod live_preview;
+mod overwatch;
 mod storybook;
 mod terminal;
 mod tunnel;
@@ -288,6 +290,18 @@ fn main() {
             database_viewer::db_update_row,
             database_viewer::db_delete_row,
             database_viewer::db_detect_services,
+            overwatch::overwatch_railway_status,
+            overwatch::overwatch_plausible_stats,
+            overwatch::overwatch_netlify_status,
+            overwatch::overwatch_sentry_stats,
+            beads::beads_has_init,
+            beads::beads_list,
+            beads::beads_stats,
+            beads::beads_create,
+            beads::beads_update,
+            beads::beads_close,
+            beads::beads_reopen,
+            beads::beads_show,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

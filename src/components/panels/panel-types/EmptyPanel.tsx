@@ -1,4 +1,4 @@
-import { MessageSquare, Terminal, FileCode, Globe, Plus } from "lucide-react";
+import { MessageSquare, Terminal, FolderOpen, FileCode, Globe, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps, PanelType } from "@/types/panel";
 
@@ -16,10 +16,16 @@ const PANEL_OPTIONS: { type: PanelType; name: string; icon: React.ComponentType<
     description: "Command line interface",
   },
   {
+    type: "file-browser",
+    name: "File Browser",
+    icon: FolderOpen,
+    description: "Browse and navigate directories",
+  },
+  {
     type: "file-viewer",
     name: "File Viewer",
     icon: FileCode,
-    description: "Preview files from your project",
+    description: "Preview a specific file",
   },
   {
     type: "browser-preview",

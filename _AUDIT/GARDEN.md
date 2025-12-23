@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-23
-**Active Ideas:** 2
+**Active Ideas:** 1
 
 ---
 
@@ -18,14 +18,6 @@
 ---
 
 ## Ideas
-
-### Services Overwatch Dashboard
-Unified dashboard for external services.
-- Tabbed interface for categories
-- Real-time status indicators
-- Sparkline charts for trends
-- Credentials in system keychain
-- Integrations: Railway, Vercel, Netlify, Plausible, PostHog, Sentry, Supabase, Stripe
 
 ### Multi-Panel Layout
 Split view for sessions and terminals.
@@ -44,6 +36,7 @@ Split view for sessions and terminals.
 | System Health Dashboard | `_PLANS/SYSTEM_HEALTH_DASHBOARD.md` | 2025-12-23 |
 | Live Preview Server | `_PLANS/LIVE_PREVIEW_SERVER.md` | 2025-12-23 |
 | Multi-Model Support | `_PLANS/MULTI_MODEL_SUPPORT.md` | 2025-12-23 |
+| Overwatch Dashboard | `_PLANS/OVERWATCH.md` | 2025-12-23 |
 
 ---
 
@@ -51,6 +44,10 @@ Split view for sessions and terminals.
 
 | Idea | Implementation | Date |
 |------|----------------|------|
+| Radio Streaming | Meditation player with Nightride.fm stations + Radio Browser API search, favorites, stream metadata | 2025-12-23 |
+| Beads Issue Tracker | `bd` CLI + UI tabs - local SQLite issue tracking with epics, kanban board, dependencies | 2025-12-23 |
+| Services Overwatch | `OverwatchPopup` - Railway, Plausible, Netlify, Sentry monitoring cards (in progress) | 2025-12-23 |
+| System Health | `SystemHealthPopup` - dev tools and system resources dashboard | 2025-12-23 |
 | Project Starter Templates | `ProjectTemplatesPopup` - 42 templates, 7 categories, favorites, search | 2025-12-23 |
 | Test Runner | `TestRunnerPopup` - detect frameworks, run tests with live terminal output | 2025-12-23 |
 | Quick Command Palette | `Ctrl/Cmd+P` - search tools, projects, sessions | 2025-12-23 |

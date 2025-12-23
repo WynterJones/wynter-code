@@ -12,6 +12,8 @@ import {
   FlaskConical,
   BookOpen,
   Server,
+  Eye,
+  CircleDot,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -63,6 +65,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openApiTester",
     category: "development",
   },
+  {
+    id: "beads-tracker",
+    name: "Beads Tracker",
+    description: "View and manage project issues",
+    icon: CircleDot,
+    actionKey: "openBeadsTracker",
+    category: "development",
+  },
   // Infrastructure
   {
     id: "port-manager",
@@ -94,6 +104,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "View dev tools and system resources",
     icon: Activity,
     actionKey: "openSystemHealth",
+    category: "infrastructure",
+  },
+  {
+    id: "overwatch",
+    name: "Overwatch",
+    description: "Monitor production services",
+    icon: Eye,
+    actionKey: "openOverwatch",
     category: "infrastructure",
   },
   // Utilities
@@ -142,6 +160,7 @@ interface ToolsDropdownProps {
   onOpenTestRunner: () => void;
   onOpenStorybookViewer: () => void;
   onOpenBackgroundServices: () => void;
+  onOpenOverwatch: () => void;
   hasStorybook?: boolean;
 }
 
@@ -156,6 +175,7 @@ export function ToolsDropdown({
   onOpenTestRunner,
   onOpenStorybookViewer,
   onOpenBackgroundServices,
+  onOpenOverwatch,
   hasStorybook = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -257,6 +277,17 @@ export function ToolsDropdown({
       category: "infrastructure",
       onClick: () => {
         onOpenSystemHealth();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "overwatch",
+      name: "Overwatch",
+      description: "Monitor production services",
+      icon: <Eye className="w-4 h-4" />,
+      category: "infrastructure",
+      onClick: () => {
+        onOpenOverwatch();
         setIsOpen(false);
       },
     },

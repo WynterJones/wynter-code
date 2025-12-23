@@ -12,6 +12,7 @@ import {
   Rocket,
   Minus,
   Database,
+  CircleDot,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -54,6 +55,8 @@ import {
   StorybookViewerPopup,
   BackgroundServicesPopup,
   DatabaseViewerPopup,
+  OverwatchPopup,
+  BeadsTrackerPopup,
 } from "@/components/tools";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
@@ -365,6 +368,7 @@ export function ProjectTabBar({
   const [showNodeModulesCleaner, setShowNodeModulesCleaner] = useState(false);
   const [showTunnelManager, setShowTunnelManager] = useState(false);
   const [showSystemHealth, setShowSystemHealth] = useState(false);
+  const [showOverwatch, setShowOverwatch] = useState(false);
   const [showLivePreview, setShowLivePreview] = useState(false);
   const [showEnvManager, setShowEnvManager] = useState(false);
   const [showApiTester, setShowApiTester] = useState(false);
@@ -373,6 +377,8 @@ export function ProjectTabBar({
   const [showStorybookViewer, setShowStorybookViewer] = useState(false);
   const [showBackgroundServices, setShowBackgroundServices] = useState(false);
   const [showDatabaseViewer, setShowDatabaseViewer] = useState(false);
+  const [showBeadsTracker, setShowBeadsTracker] = useState(false);
+  const [hasBeads, setHasBeads] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -427,6 +433,25 @@ export function ProjectTabBar({
     }
   }, [requestImageBrowser]);
 
+  // Check for beads directory when project changes
+  useEffect(() => {
+    const checkBeads = async () => {
+      if (activeProject?.path) {
+        try {
+          const hasInit = await invoke<boolean>("beads_has_init", {
+            projectPath: activeProject.path,
+          });
+          setHasBeads(hasInit);
+        } catch {
+          setHasBeads(false);
+        }
+      } else {
+        setHasBeads(false);
+      }
+    };
+    checkBeads();
+  }, [activeProject?.path]);
+
   // Listen for command palette tool actions
   useEffect(() => {
     const handleCommandPaletteTool = (e: CustomEvent<{ action: string }>) => {
@@ -463,6 +488,12 @@ export function ProjectTabBar({
           break;
         case "openBackgroundServices":
           setShowBackgroundServices(true);
+          break;
+        case "openOverwatch":
+          setShowOverwatch(true);
+          break;
+        case "openBeadsTracker":
+          if (hasBeads) setShowBeadsTracker(true);
           break;
       }
     };
@@ -685,6 +716,7 @@ export function ProjectTabBar({
           onOpenTestRunner={() => setShowTestRunner(true)}
           onOpenStorybookViewer={() => setShowStorybookViewer(true)}
           onOpenBackgroundServices={() => setShowBackgroundServices(true)}
+          onOpenOverwatch={() => setShowOverwatch(true)}
           hasStorybook={hasStorybook}
         />
       </div>
@@ -701,6 +733,21 @@ export function ProjectTabBar({
           </IconButton>
         </Tooltip>
       </div>
+
+      {/* Beads Tracker */}
+      {hasBeads && (
+        <div className="border-l border-border px-2 h-full flex items-center">
+          <Tooltip content="Beads Tracker">
+            <IconButton
+              size="sm"
+              onClick={() => setShowBeadsTracker(true)}
+              className={cn(showBeadsTracker && "text-accent bg-accent/10")}
+            >
+              <CircleDot className="w-4 h-4" />
+            </IconButton>
+          </Tooltip>
+        </div>
+      )}
 
       {/* Database Viewer */}
       <div className="border-l border-border px-2 h-full flex items-center">
@@ -884,6 +931,12 @@ export function ProjectTabBar({
         onClose={() => setShowSystemHealth(false)}
       />
 
+      {/* Overwatch Popup */}
+      <OverwatchPopup
+        isOpen={showOverwatch}
+        onClose={() => setShowOverwatch(false)}
+      />
+
       {/* Live Preview Popup */}
       <LivePreviewPopup
         isOpen={showLivePreview}
@@ -935,6 +988,15 @@ export function ProjectTabBar({
         isOpen={showDatabaseViewer}
         onClose={() => setShowDatabaseViewer(false)}
       />
+
+      {/* Beads Tracker */}
+      {activeProject?.path && (
+        <BeadsTrackerPopup
+          isOpen={showBeadsTracker}
+          onClose={() => setShowBeadsTracker(false)}
+          projectPath={activeProject.path}
+        />
+      )}
     </div>
   );
 }

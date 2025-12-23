@@ -10,6 +10,7 @@ export type PanelType =
   | "empty"
   | "claude-output"
   | "terminal"
+  | "file-browser"
   | "file-viewer"
   | "browser-preview";
 
@@ -70,6 +71,9 @@ export interface PanelState {
 
   /** File path (for file-viewer panels) */
   filePath?: string;
+
+  /** Browser path (for file-browser panels) */
+  browserPath?: string;
 
   /** Browser URL (for browser-preview panels) */
   browserUrl?: string;

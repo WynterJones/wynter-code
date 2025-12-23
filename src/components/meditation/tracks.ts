@@ -1,10 +1,3 @@
-// Built-in meditation track files (reduced to 3 to save space)
-const BUILT_IN_TRACK_FILES = [
-  "calm-breeze.mp3",
-  "ocean.mp3",
-  "zen-wave.mp3",
-];
-
 /**
  * Convert filename to Title Case display name
  * e.g., "zen-music.mp3" -> "Zen Music"
@@ -28,11 +21,9 @@ export interface Track {
   isCustom: boolean;
 }
 
-export const BUILT_IN_TRACKS: Track[] = BUILT_IN_TRACK_FILES.map((file) => ({
-  name: fileToDisplayName(file),
-  file,
-  isCustom: false,
-}));
+// Built-in tracks removed - now using radio streams by default
+// This empty array is kept for backwards compatibility with custom folder loading
+export const BUILT_IN_TRACKS: Track[] = [];
 
 /**
  * Get a random track index, optionally excluding current track

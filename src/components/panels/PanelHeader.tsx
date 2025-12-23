@@ -4,6 +4,7 @@ import {
   ChevronDown,
   MessageSquare,
   Terminal,
+  FolderOpen,
   FileCode,
   Globe,
   Plus,
@@ -16,6 +17,7 @@ const PANEL_ICONS: Record<PanelType, React.ComponentType<{ className?: string }>
   empty: Plus,
   "claude-output": MessageSquare,
   terminal: Terminal,
+  "file-browser": FolderOpen,
   "file-viewer": FileCode,
   "browser-preview": Globe,
 };

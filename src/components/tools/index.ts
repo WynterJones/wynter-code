@@ -12,3 +12,5 @@ export { TestRunnerPopup } from "./test-runner";
 export { StorybookViewerPopup } from "./storybook-viewer";
 export { BackgroundServicesPopup } from "./background-services";
 export { DatabaseViewerPopup } from "./database-viewer";
+export { OverwatchPopup } from "./overwatch";
+export { BeadsTrackerPopup } from "./BeadsTrackerPopup";

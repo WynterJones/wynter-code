@@ -4,6 +4,7 @@ import {
   BUILT_IN_TRACKS,
   getRandomTrackIndex,
 } from "@/components/meditation/tracks";
+import type { StreamMetadata } from "@/types/radio";
 
 interface MeditationState {
   isActive: boolean;
@@ -12,6 +13,10 @@ interface MeditationState {
   isPlaying: boolean;
   volume: number;
   tracks: Track[];
+
+  // Stream state
+  isStream: boolean;
+  streamMetadata: StreamMetadata | null;
 
   setActive: (active: boolean) => void;
   setMiniPlayerVisible: (visible: boolean) => void;
@@ -24,6 +29,10 @@ interface MeditationState {
   closeMiniPlayer: () => void;
   setTracks: (tracks: Track[]) => void;
   resetToBuiltIn: () => void;
+
+  // Stream setters
+  setIsStream: (isStream: boolean) => void;
+  setStreamMetadata: (metadata: StreamMetadata | null) => void;
 }
 
 export const useMeditationStore = create<MeditationState>((set, get) => ({
@@ -33,6 +42,10 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
   isPlaying: false,
   volume: 1.0,
   tracks: BUILT_IN_TRACKS,
+
+  // Stream state defaults
+  isStream: false,
+  streamMetadata: null,
 
   setActive: (active) => {
     const { isPlaying } = get();
@@ -78,4 +91,8 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
       tracks: BUILT_IN_TRACKS,
       currentTrack: getRandomTrackIndex(BUILT_IN_TRACKS.length),
     }),
+
+  // Stream setters
+  setIsStream: (isStream) => set({ isStream }),
+  setStreamMetadata: (streamMetadata) => set({ streamMetadata }),
 }));

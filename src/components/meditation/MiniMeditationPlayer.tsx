@@ -1,6 +1,15 @@
 import { useRef, useState, useEffect, useCallback } from "react";
-import { Play, Pause, SkipBack, SkipForward, X, GripHorizontal } from "lucide-react";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  X,
+  Radio,
+} from "lucide-react";
 import { useMeditationStore } from "@/stores/meditationStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { getNightrideStationBySlug } from "./radioStations";
 import { cn } from "@/lib/utils";
 
 export function MiniMeditationPlayer() {
@@ -16,7 +25,11 @@ export function MiniMeditationPlayer() {
     prevTrack,
     togglePlay,
     closeMiniPlayer,
+    isStream,
   } = useMeditationStore();
+
+  const { audioSourceType, nightrideStation, currentRadioBrowserStation } =
+    useSettingsStore();
 
   // Dragging state
   const [position, setPosition] = useState({ x: 24, y: 24 }); // bottom-right offset
@@ -24,28 +37,53 @@ export function MiniMeditationPlayer() {
   const dragStart = useRef({ x: 0, y: 0 });
   const positionStart = useRef({ x: 0, y: 0 });
 
+  // Get display name based on audio source
+  const getDisplayName = () => {
+    if (audioSourceType === "nightride") {
+      const station = getNightrideStationBySlug(nightrideStation);
+      return station?.name || "Nightride FM";
+    }
+    if (audioSourceType === "radiobrowser" && currentRadioBrowserStation) {
+      return currentRadioBrowserStation.name;
+    }
+    const track = tracks[currentTrack] || tracks[0];
+    return track?.name || "No Track";
+  };
+
   const track = tracks[currentTrack] || tracks[0];
 
   // Drag handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button')) return;
-    setIsDragging(true);
-    dragStart.current = { x: e.clientX, y: e.clientY };
-    positionStart.current = { ...position };
-    e.preventDefault();
-  }, [position]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if ((e.target as HTMLElement).closest("button")) return;
+      setIsDragging(true);
+      dragStart.current = { x: e.clientX, y: e.clientY };
+      positionStart.current = { ...position };
+      e.preventDefault();
+    },
+    [position]
+  );
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging) return;
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging) return;
 
-    const deltaX = dragStart.current.x - e.clientX;
-    const deltaY = dragStart.current.y - e.clientY;
+      const deltaX = dragStart.current.x - e.clientX;
+      const deltaY = dragStart.current.y - e.clientY;
 
-    const newX = Math.max(10, Math.min(window.innerWidth - 200, positionStart.current.x + deltaX));
-    const newY = Math.max(10, Math.min(window.innerHeight - 80, positionStart.current.y + deltaY));
+      const newX = Math.max(
+        10,
+        Math.min(window.innerWidth - 200, positionStart.current.x + deltaX)
+      );
+      const newY = Math.max(
+        10,
+        Math.min(window.innerHeight - 80, positionStart.current.y + deltaY)
+      );
 
-    setPosition({ x: newX, y: newY });
-  }, [isDragging]);
+      setPosition({ x: newX, y: newY });
+    },
+    [isDragging]
+  );
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
@@ -53,17 +91,20 @@ export function MiniMeditationPlayer() {
 
   useEffect(() => {
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
       };
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   // Only show when not in meditation mode but mini player is visible
-  if (isActive || !miniPlayerVisible || !track) return null;
+  // For streams, we don't need a track - for custom we do
+  const hasValidSource =
+    isStream || (audioSourceType === "custom" && track !== undefined);
+  if (isActive || !miniPlayerVisible || !hasValidSource) return null;
 
   return (
     <div
@@ -77,33 +118,42 @@ export function MiniMeditationPlayer() {
       style={{
         right: `${position.x}px`,
         bottom: `${position.y}px`,
-        userSelect: 'none',
+        userSelect: "none",
       }}
       onMouseDown={handleMouseDown}
     >
-      {/* Drag handle */}
-      <div className="text-text-secondary/40 hover:text-text-secondary/60 transition-colors">
-        <GripHorizontal className="w-4 h-4" />
-      </div>
-
-      {/* Track info */}
-      <div className="flex flex-col min-w-[80px]">
-        <span className="text-[10px] text-text-secondary/60 leading-none">Meditation</span>
-        <span className="text-xs text-text-primary truncate">{track.name}</span>
+      {/* Track/Station info */}
+      <div className="flex flex-col min-w-[80px] mr-2">
+        <span className="text-[10px] text-text-secondary/60 leading-none flex items-center gap-1">
+          {isStream && <Radio className="w-2.5 h-2.5 text-green-400" />}
+          {isStream ? "Radio" : "Meditation"}
+        </span>
+        <span className="text-xs text-text-primary truncate">
+          {getDisplayName()}
+        </span>
       </div>
 
       {/* Controls */}
       <div className="flex items-center gap-1">
-        <button
-          onClick={(e) => { e.stopPropagation(); prevTrack(); }}
-          className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-        >
-          <SkipBack className="w-3.5 h-3.5" />
-        </button>
+        {/* Hide skip buttons for streams */}
+        {!isStream && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              prevTrack();
+            }}
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <SkipBack className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         <button
-          onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-          className="p-2 rounded-full bg-accent/90 text-white hover:bg-accent transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            togglePlay();
+          }}
+          className="btn-primary !p-2 !rounded-full"
         >
           {isPlaying ? (
             <Pause className="w-3.5 h-3.5" />
@@ -112,17 +162,25 @@ export function MiniMeditationPlayer() {
           )}
         </button>
 
-        <button
-          onClick={(e) => { e.stopPropagation(); nextTrack(); }}
-          className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-        >
-          <SkipForward className="w-3.5 h-3.5" />
-        </button>
+        {!isStream && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              nextTrack();
+            }}
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <SkipForward className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Close button */}
       <button
-        onClick={(e) => { e.stopPropagation(); closeMiniPlayer(); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          closeMiniPlayer();
+        }}
         className="p-1 rounded-md text-text-secondary/50 hover:text-text-primary hover:bg-bg-hover transition-colors ml-1"
       >
         <X className="w-3.5 h-3.5" />

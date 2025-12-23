@@ -18,6 +18,9 @@ import { KEYBOARD_SHORTCUTS, formatShortcut, type KeyboardShortcut } from "@/hoo
 import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
 import { ColorsTab } from "./ColorsTab";
 import { CompressionSettings } from "./CompressionSettings";
+import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector";
+import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
+import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
 
 interface SettingsPopupProps {
   onClose: () => void;
@@ -572,6 +575,7 @@ function MusicSettings({
 }: MusicSettingsProps) {
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [trackCount, setTrackCount] = useState<number | null>(null);
+  const { audioSourceType } = useSettingsStore();
 
   useEffect(() => {
     if (!customMusicPath) {
@@ -595,66 +599,92 @@ function MusicSettings({
         Music Settings
       </h2>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-text-primary">
-          Custom Music Folder
-        </label>
-        <p className="text-xs text-text-secondary mb-2">
-          Select a folder containing mp3 files to use for meditation music.
-          This will replace the built-in tracks.
-        </p>
+      {/* Audio Source Selector */}
+      <RadioSourceSelector />
 
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={customMusicPath}
-            readOnly
-            placeholder="No custom folder selected (using built-in tracks)"
-            className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-secondary text-sm cursor-pointer"
-            onClick={() => setShowFileBrowser(true)}
-          />
-          <button
-            onClick={() => setShowFileBrowser(true)}
-            className="px-3 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover text-sm transition-colors"
-          >
-            Browse
-          </button>
-          {customMusicPath && (
+      {/* Conditional content based on source type */}
+      {audioSourceType === "nightride" && <NightrideStationSelector />}
+
+      {audioSourceType === "radiobrowser" && <RadioBrowserSearch />}
+
+      {audioSourceType === "custom" && (
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-text-primary">
+            Custom Music Folder
+          </label>
+          <p className="text-xs text-text-secondary mb-2">
+            Select a folder containing mp3 files to use for meditation music.
+          </p>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={customMusicPath}
+              readOnly
+              placeholder="No custom folder selected"
+              className="flex-1 px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-secondary text-sm cursor-pointer"
+              onClick={() => setShowFileBrowser(true)}
+            />
             <button
-              onClick={() => onCustomMusicPathChange("")}
+              onClick={() => setShowFileBrowser(true)}
               className="px-3 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover text-sm transition-colors"
             >
-              Clear
+              Browse
             </button>
+            {customMusicPath && (
+              <button
+                onClick={() => onCustomMusicPathChange("")}
+                className="px-3 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover text-sm transition-colors"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          {customMusicPath && trackCount !== null && (
+            <p
+              className={cn(
+                "text-xs mt-2",
+                trackCount > 0 ? "text-green-400" : "text-amber-400"
+              )}
+            >
+              {trackCount > 0
+                ? `Found ${trackCount} mp3 file${trackCount === 1 ? "" : "s"}`
+                : "No mp3 files found in this folder"}
+            </p>
           )}
         </div>
+      )}
 
-        {customMusicPath && trackCount !== null && (
-          <p
-            className={cn(
-              "text-xs mt-2",
-              trackCount > 0 ? "text-green-400" : "text-amber-400"
-            )}
-          >
-            {trackCount > 0
-              ? `Found ${trackCount} mp3 file${trackCount === 1 ? "" : "s"}`
-              : "No mp3 files found in this folder"}
-          </p>
-        )}
-      </div>
-
+      {/* Info Box */}
       <div className="p-4 rounded-lg bg-bg-secondary border border-border">
         <h3 className="text-sm font-medium text-text-primary mb-2">
-          How it works
+          {audioSourceType === "nightride" && "About Nightride FM"}
+          {audioSourceType === "radiobrowser" && "About Radio Browser"}
+          {audioSourceType === "custom" && "How it works"}
         </h3>
         <ul className="text-xs text-text-secondary space-y-1">
-          <li>- Scans the selected folder for .mp3 files</li>
-          <li>
-            - Filenames are converted to display names (hyphens/underscores
-            become spaces)
-          </li>
-          <li>- Tracks play in random order, just like built-in music</li>
-          <li>- Clear the path to return to built-in tracks</li>
+          {audioSourceType === "nightride" && (
+            <>
+              <li>- 7 curated synthwave and electronic stations</li>
+              <li>- 24/7 streaming with now-playing info</li>
+              <li>- Perfect for focus and meditation</li>
+            </>
+          )}
+          {audioSourceType === "radiobrowser" && (
+            <>
+              <li>- Search thousands of internet radio stations</li>
+              <li>- Save your favorites for quick access</li>
+              <li>- Various genres and languages available</li>
+            </>
+          )}
+          {audioSourceType === "custom" && (
+            <>
+              <li>- Scans the selected folder for .mp3 files</li>
+              <li>- Filenames are converted to display names</li>
+              <li>- Tracks play in random order</li>
+            </>
+          )}
         </ul>
       </div>
 

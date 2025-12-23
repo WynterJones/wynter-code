@@ -18,5 +18,6 @@ export { LAYOUT_TEMPLATES, getLayoutTemplateList, getLayoutTemplate } from "./la
 export { EmptyPanel } from "./panel-types/EmptyPanel";
 export { ClaudeOutputPanel } from "./panel-types/ClaudeOutputPanel";
 export { TerminalPanelContent } from "./panel-types/TerminalPanelContent";
+export { FileBrowserPanel } from "./panel-types/FileBrowserPanel";
 export { FileViewerPanel } from "./panel-types/FileViewerPanel";
 export { BrowserPreviewPanel } from "./panel-types/BrowserPreviewPanel";

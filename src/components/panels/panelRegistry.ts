@@ -35,6 +35,15 @@ export const PANEL_TYPES: Record<PanelType, PanelTypeConfig> = {
     requiresProtection: true, // Running processes need protection
   },
 
+  "file-browser": {
+    id: "file-browser",
+    name: "File Browser",
+    icon: "FolderOpen",
+    defaultTitle: "Files",
+    canHaveMultiple: true,
+    requiresProtection: false,
+  },
+
   "file-viewer": {
     id: "file-viewer",
     name: "File Viewer",

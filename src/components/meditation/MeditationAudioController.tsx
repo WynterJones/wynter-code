@@ -1,12 +1,15 @@
 import { useRef, useEffect } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useMeditationStore } from "@/stores/meditationStore";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { useStreamMetadata } from "@/hooks/useStreamMetadata";
+import { getNightrideStationBySlug, NIGHTRIDE_STATIONS } from "./radioStations";
 import { getRandomTrackIndex } from "./tracks";
 
 /**
  * Persistent audio controller that lives in AppShell.
- * Handles all meditation audio playback so audio continues
- * seamlessly between meditation screen and mini player.
+ * Handles all meditation audio playback (streams and local files)
+ * so audio continues seamlessly between meditation screen and mini player.
  */
 export function MeditationAudioController() {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -20,14 +23,59 @@ export function MeditationAudioController() {
     tracks,
     setPlaying,
     setTrack,
+    setIsStream,
+    setStreamMetadata,
   } = useMeditationStore();
 
-  const track = tracks[currentTrack] || tracks[0];
+  const { audioSourceType, nightrideStation, currentRadioBrowserStation } =
+    useSettingsStore();
 
-  const audioSrc =
-    track?.isCustom && track.path
-      ? convertFileSrc(track.path)
-      : `/audio/meditation/${track?.file || ""}`;
+  // Determine audio source based on settings
+  const getAudioSource = (): { url: string; isStream: boolean } => {
+    // Nightride.fm radio
+    if (audioSourceType === "nightride") {
+      const station = getNightrideStationBySlug(nightrideStation);
+      return {
+        url: station?.streamUrl || NIGHTRIDE_STATIONS[0].streamUrl,
+        isStream: true,
+      };
+    }
+
+    // Radio Browser station
+    if (audioSourceType === "radiobrowser" && currentRadioBrowserStation) {
+      return {
+        url: currentRadioBrowserStation.streamUrl,
+        isStream: true,
+      };
+    }
+
+    // Custom MP3 folder or fallback to tracks
+    const track = tracks[currentTrack] || tracks[0];
+    if (!track) {
+      return { url: "", isStream: false };
+    }
+
+    const url =
+      track.isCustom && track.path
+        ? convertFileSrc(track.path)
+        : `/audio/meditation/${track.file || ""}`;
+
+    return { url, isStream: false };
+  };
+
+  const { url: audioSrc, isStream } = getAudioSource();
+
+  // Update stream state in store
+  useEffect(() => {
+    setIsStream(isStream);
+  }, [isStream, setIsStream]);
+
+  // Stream metadata polling (only for streams)
+  const metadata = useStreamMetadata(isStream ? audioSrc : null, isPlaying);
+
+  useEffect(() => {
+    setStreamMetadata(metadata);
+  }, [metadata, setStreamMetadata]);
 
   // Should audio be active at all?
   const shouldBeActive = isActive || miniPlayerVisible;
@@ -50,15 +98,15 @@ export function MeditationAudioController() {
     }
   }, [isPlaying, shouldBeActive, setPlaying]);
 
-  // Handle track changes
+  // Handle source changes (track changes or station changes)
   useEffect(() => {
-    if (!audioRef.current || !shouldBeActive) return;
+    if (!audioRef.current || !shouldBeActive || !audioSrc) return;
 
     audioRef.current.load();
     if (isPlaying) {
       audioRef.current.play().catch(() => setPlaying(false));
     }
-  }, [currentTrack, shouldBeActive, isPlaying, setPlaying]);
+  }, [audioSrc, shouldBeActive, isPlaying, setPlaying]);
 
   // Handle when audio should stop completely
   useEffect(() => {
@@ -68,25 +116,39 @@ export function MeditationAudioController() {
     }
   }, [shouldBeActive]);
 
-  // Pick random next track when song ends
+  // Pick random next track when song ends (only for non-streams)
   const handleEnded = () => {
-    const next = getRandomTrackIndex(tracks.length, currentTrack);
-    setTrack(next);
+    if (!isStream && tracks.length > 0) {
+      const next = getRandomTrackIndex(tracks.length, currentTrack);
+      setTrack(next);
+    }
+    // Streams don't end, they just keep playing
   };
 
-  // Only render audio element when needed
-  if (!shouldBeActive || !track) return null;
+  // Auto-play when audio is ready and meditation is active
+  const handleCanPlay = () => {
+    if (shouldBeActive && !isPlaying && audioRef.current) {
+      // Auto-play when meditation screen opens
+      audioRef.current.play().catch(() => setPlaying(false));
+    }
+  };
+
+  // Only render audio element when needed and we have a valid source
+  if (!shouldBeActive || !audioSrc) return null;
 
   return (
     <audio
       ref={audioRef}
       src={audioSrc}
+      onCanPlay={handleCanPlay}
       onPlay={() => setPlaying(true)}
       onPause={() => {
         // Only update state if we're still supposed to be active
         // This prevents race conditions during cleanup
-        if (useMeditationStore.getState().isActive ||
-            useMeditationStore.getState().miniPlayerVisible) {
+        if (
+          useMeditationStore.getState().isActive ||
+          useMeditationStore.getState().miniPlayerVisible
+        ) {
           setPlaying(false);
         }
       }}
