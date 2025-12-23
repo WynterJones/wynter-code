@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,13 @@ import {
 } from "@/stores/settingsStore";
 import { KEYBOARD_SHORTCUTS, formatShortcut, type KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
+import { ColorsTab } from "./ColorsTab";
 
 interface SettingsPopupProps {
   onClose: () => void;
 }
 
-type SettingsTab = "general" | "editor" | "markdown" | "music" | "keyboard" | "about";
+type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "keyboard" | "about";
 
 const APP_VERSION = "1.0.0";
 
@@ -70,6 +71,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     { id: "editor", label: "Editor", icon: Code },
     { id: "markdown", label: "Markdown", icon: FileText },
     { id: "music", label: "Music", icon: Music },
+    { id: "colors", label: "Colors", icon: Palette },
     { id: "keyboard", label: "Keyboard", icon: Keyboard },
     { id: "about", label: "About", icon: Info },
   ];
@@ -151,6 +153,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
                   onCustomMusicPathChange={setCustomMusicPath}
                 />
               )}
+              {activeTab === "colors" && <ColorsTab />}
               {activeTab === "keyboard" && <KeyboardShortcutsSection />}
               {activeTab === "about" && <AboutSection />}
             </div>

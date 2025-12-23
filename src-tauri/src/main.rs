@@ -1,13 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod color_picker;
 mod commands;
+mod live_preview;
 mod terminal;
 mod tunnel;
 mod watcher;
 
 use std::sync::Arc;
 use tauri::{
-    menu::{Menu, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    image::Image,
+    menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    tray::TrayIconBuilder,
     Emitter, Manager,
 };
 
@@ -95,6 +99,56 @@ fn main() {
             let menu = create_menu(app.handle())?;
             app.set_menu(menu)?;
 
+            // Setup system tray for color picker
+            let tray_menu = MenuBuilder::new(app)
+                .item(&MenuItemBuilder::with_id("pick_color", "Pick Color").build(app)?)
+                .item(&MenuItemBuilder::with_id("show_picker", "Show Color Picker").build(app)?)
+                .separator()
+                .item(&MenuItemBuilder::with_id("tray_quit", "Quit").build(app)?)
+                .build()?;
+
+            let _tray = TrayIconBuilder::new()
+                .icon(Image::from_path("icons/icon.png").unwrap_or_else(|_| {
+                    app.default_window_icon().cloned().unwrap()
+                }))
+                .menu(&tray_menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "pick_color" => {
+                            let app_handle = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let _ = color_picker::pick_color_and_show(app_handle).await;
+                            });
+                        }
+                        "show_picker" => {
+                            let app_handle = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let _ = color_picker::open_color_picker_window(app_handle, None).await;
+                            });
+                        }
+                        "tray_quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let tauri::tray::TrayIconEvent::Click {
+                        button: tauri::tray::MouseButton::Left,
+                        button_state: tauri::tray::MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        // Left click on tray icon triggers color pick
+                        let app_handle = tray.app_handle().clone();
+                        tauri::async_runtime::spawn(async move {
+                            let _ = color_picker::pick_color_and_show(app_handle).await;
+                        });
+                    }
+                })
+                .build(app)?;
+
             // Handle menu events
             app.on_menu_event(|app, event| {
                 match event.id().as_ref() {
@@ -136,6 +190,7 @@ fn main() {
         .manage(Arc::new(terminal::PtyManager::new()))
         .manage(Arc::new(tunnel::TunnelManager::new()))
         .manage(Arc::new(watcher::FileWatcherManager::new()))
+        .manage(Arc::new(live_preview::PreviewManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -161,6 +216,7 @@ fn main() {
             commands::check_node_modules_exists,
             commands::get_directory_stats,
             commands::check_system_requirements,
+            commands::get_system_resources,
             commands::get_claude_files,
             commands::write_claude_file,
             commands::delete_claude_file,
@@ -184,6 +240,19 @@ fn main() {
             tunnel::start_tunnel,
             tunnel::stop_tunnel,
             tunnel::list_tunnels,
+            color_picker::pick_screen_color,
+            color_picker::open_color_picker_window,
+            color_picker::close_color_picker_window,
+            color_picker::get_cursor_position,
+            color_picker::pick_color_and_show,
+            color_picker::check_screen_recording_permission,
+            color_picker::request_screen_recording_permission,
+            color_picker::save_color_picker_position,
+            live_preview::detect_project_type,
+            live_preview::get_local_ip,
+            live_preview::start_preview_server,
+            live_preview::stop_preview_server,
+            live_preview::list_preview_servers,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

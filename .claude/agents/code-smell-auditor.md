@@ -2,7 +2,7 @@
 name: code-smell-auditor
 description: Detect DRY violations, complexity issues, naming problems, and technical debt
 tools: Read, Grep, Glob, Edit
-model: haiku
+model: opus
 ---
 
 # Code Smell Auditor Agent

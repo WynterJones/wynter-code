@@ -2,7 +2,7 @@
 name: tauri-security-auditor
 description: Audit Tauri IPC, capabilities, and shell security
 tools: Read, Grep, Glob, Edit
-model: haiku
+model: opus
 ---
 
 # Tauri Security Auditor

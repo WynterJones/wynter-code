@@ -2,7 +2,7 @@
 name: i18n-locale-translator
 description: Translate UI text content into English (en) and Japanese (jp) using i18n locale system
 tools: Read, Write, Edit, Glob, Grep
-model: sonnet
+model: opus
 ---
 
 # i18n Locale Translator Agent

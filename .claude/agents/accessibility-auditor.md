@@ -2,7 +2,7 @@
 name: accessibility-auditor
 description: WCAG 2.1 accessibility auditing for React/Next.js applications
 tools: Read, Grep, Glob, Edit
-model: haiku
+model: opus
 ---
 
 # Accessibility Auditor Agent

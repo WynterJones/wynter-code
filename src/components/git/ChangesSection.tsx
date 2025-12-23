@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { FileEdit } from "lucide-react";
+import { FileEdit, FileDiff, Plus, Minus } from "lucide-react";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { FileChangeItem } from "./FileChangeItem";
 import { DiffViewer } from "./DiffViewer";
 import { DiffPopup } from "./DiffPopup";
-import { Button } from "@/components/ui";
+import { IconButton, Tooltip } from "@/components/ui";
 import { gitService, type GitFile } from "@/services/git";
 
 interface ChangesSectionProps {
@@ -106,35 +106,38 @@ export function ChangesSection({
       iconColor="text-accent-yellow"
       count={totalChanges}
       actions={
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1">
           {allDiffableFiles.length > 0 && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => handleOpenDiffPopup()}
-            >
-              View Diff
-            </Button>
+            <Tooltip content="View Diff" side="bottom">
+              <IconButton
+                size="sm"
+                onClick={() => handleOpenDiffPopup()}
+              >
+                <FileDiff className="w-3.5 h-3.5" />
+              </IconButton>
+            </Tooltip>
           )}
           {unstaged.length > 0 && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleStageAll}
-              disabled={isStageAllLoading}
-            >
-              Stage All
-            </Button>
+            <Tooltip content="Stage All" side="left">
+              <IconButton
+                size="sm"
+                onClick={handleStageAll}
+                disabled={isStageAllLoading}
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </IconButton>
+            </Tooltip>
           )}
           {staged.length > 0 && (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handleUnstageAll}
-              disabled={isUnstageAllLoading}
-            >
-              Unstage All
-            </Button>
+            <Tooltip content="Unstage All" side="left">
+              <IconButton
+                size="sm"
+                onClick={handleUnstageAll}
+                disabled={isUnstageAllLoading}
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </IconButton>
+            </Tooltip>
           )}
         </div>
       }

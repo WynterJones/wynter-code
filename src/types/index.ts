@@ -3,3 +3,5 @@ export * from "./session";
 export * from "./file";
 export * from "./claude";
 export * from "./subscription";
+export * from "./livepreview";
+export * from "./command";

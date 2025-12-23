@@ -24,7 +24,7 @@ import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SubscriptionButton } from "@/components/subscriptions";
 import { FileBrowserPopup, ImageAttachment } from "@/components/files/FileBrowserPopup";
-import { ToolsDropdown, PortManagerPopup, NodeModulesCleanerPopup, LocalhostTunnelPopup } from "@/components/tools";
+import { ToolsDropdown, PortManagerPopup, NodeModulesCleanerPopup, LocalhostTunnelPopup, SystemHealthPopup, LivePreviewPopup } from "@/components/tools";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import type { Project } from "@/types";
@@ -218,6 +218,8 @@ export function ProjectTabBar({
   const [showPortManager, setShowPortManager] = useState(false);
   const [showNodeModulesCleaner, setShowNodeModulesCleaner] = useState(false);
   const [showTunnelManager, setShowTunnelManager] = useState(false);
+  const [showSystemHealth, setShowSystemHealth] = useState(false);
+  const [showLivePreview, setShowLivePreview] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
@@ -440,6 +442,8 @@ export function ProjectTabBar({
           onOpenPortManager={() => setShowPortManager(true)}
           onOpenNodeModulesCleaner={() => setShowNodeModulesCleaner(true)}
           onOpenLocalhostTunnel={() => setShowTunnelManager(true)}
+          onOpenSystemHealth={() => setShowSystemHealth(true)}
+          onOpenLivePreview={() => setShowLivePreview(true)}
         />
       </div>
 
@@ -608,6 +612,18 @@ export function ProjectTabBar({
       <LocalhostTunnelPopup
         isOpen={showTunnelManager}
         onClose={() => setShowTunnelManager(false)}
+      />
+
+      {/* System Health Popup */}
+      <SystemHealthPopup
+        isOpen={showSystemHealth}
+        onClose={() => setShowSystemHealth(false)}
+      />
+
+      {/* Live Preview Popup */}
+      <LivePreviewPopup
+        isOpen={showLivePreview}
+        onClose={() => setShowLivePreview(false)}
       />
     </div>
   );

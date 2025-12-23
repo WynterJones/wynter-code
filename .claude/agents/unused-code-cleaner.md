@@ -2,7 +2,7 @@
 name: unused-code-cleaner
 description: Detect and remove unused code (imports, functions, variables)
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: haiku
+model: opus
 ---
 
 # Unused Code Cleaner Agent

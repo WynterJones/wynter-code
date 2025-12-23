@@ -2,7 +2,7 @@
 name: the-farmer
 description: Audit and update FARMHOUSE.md with current project metrics
 tools: Read, Grep, Glob, Edit, Bash
-model: haiku
+model: opus
 ---
 
 # The Farmer Agent

@@ -2,7 +2,7 @@
 name: performance-auditor
 description: Find memory leaks, unnecessary re-renders, and anti-patterns
 tools: Read, Grep, Glob, Edit
-model: haiku
+model: opus
 ---
 
 # Performance Auditor Agent

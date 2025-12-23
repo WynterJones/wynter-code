@@ -14,7 +14,7 @@
 | Metric | Count |
 |--------|-------|
 | Commands | 1 |
-| Agents | 10 |
+| Agents | 11 |
 | Justfile Recipes | 10 |
 | Unit Tests | 0 |
 | E2E Tests | 0 |
@@ -41,6 +41,7 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 | Agent | Purpose |
 |-------|---------|
 | `the-farmer` | Audit and update FARMHOUSE.md metrics |
+| `idea-gardener` | Manage Idea Garden and Compost lifecycle |
 | `code-reviewer` | Quality & security code review |
 | `security-auditor` | OWASP vulnerability scanning |
 | `performance-auditor` | Performance anti-patterns |
@@ -70,6 +71,14 @@ All Claude Code commands and agents are documented, phrase triggers are tested a
 |--------|--------|
 | `make a plan for...` | Create plan in _PLANS/ |
 | `let's implement...` | Load plan, create Epic |
+
+### Idea Phrases
+
+| Phrase | Action |
+|--------|--------|
+| `I have an idea for...` | Plant idea in GARDEN.md |
+| `let's plan this idea...` | Graduate idea to _PLANS/ |
+| `compost this...` | Reject idea to COMPOST.md |
 
 ---
 

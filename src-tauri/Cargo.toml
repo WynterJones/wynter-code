@@ -10,7 +10,7 @@ edition = "2021"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon", "image-png"] }
 tauri-plugin-fs = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
@@ -31,6 +31,19 @@ chrono = "0.4"
 notify = "6"
 notify-debouncer-mini = "0.4"
 regex = "1"
+sysinfo = "0.31"
+
+# Live preview server
+tiny_http = "0.12"
+tungstenite = "0.24"
+local-ip-address = "0.6"
+
+# macOS color picker (NSColorSampler)
+[target.'cfg(target_os = "macos")'.dependencies]
+objc = "0.2"
+cocoa = "0.26"
+core-graphics = "0.24"
+block = "0.1"
 
 [features]
 default = ["custom-protocol"]

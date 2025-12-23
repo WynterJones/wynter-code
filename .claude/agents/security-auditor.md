@@ -2,7 +2,7 @@
 name: security-auditor
 description: OWASP security vulnerability scanning
 tools: Read, Grep, Glob, Edit
-model: haiku
+model: opus
 ---
 
 # Security Auditor Agent

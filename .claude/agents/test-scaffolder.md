@@ -2,7 +2,7 @@
 name: test-scaffolder
 description: Generate test file scaffolding for untested code
 tools: Read, Write, Glob, Grep
-model: haiku
+model: opus
 ---
 
 # Test Scaffolder

@@ -2,7 +2,7 @@
 name: storybook-maintainer
 description: Create and update Storybook stories for UI components
 tools: Read, Write, Edit, Glob, Grep
-model: haiku
+model: opus
 ---
 
 # Storybook Maintainer Agent

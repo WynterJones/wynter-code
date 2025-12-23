@@ -40,6 +40,37 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
   const isRefreshing = useRef(false);
 
+  // Refresh contents of expanded folders without collapsing them
+  const refreshExpandedFolders = useCallback(async (expandedPaths: Set<string>) => {
+    for (const folderPath of expandedPaths) {
+      try {
+        const children = await invoke<FileNode[]>("get_file_tree", {
+          path: folderPath,
+          depth: 1,
+        });
+        setFiles((prev) => {
+          const node = findNodeByPath(prev, folderPath);
+          if (node && node.isExpanded) {
+            // Merge new children while preserving nested expanded state
+            const nestedExpanded = node.children
+              ? collectExpandedPaths(node.children)
+              : new Set<string>();
+            const mergedChildren = nestedExpanded.size > 0 && node.children
+              ? mergeTreeState(children, node.children, nestedExpanded)
+              : children;
+            return updateNodeInTree(prev, folderPath, {
+              ...node,
+              children: mergedChildren,
+            });
+          }
+          return prev;
+        });
+      } catch {
+        // Folder may have been deleted, ignore
+      }
+    }
+  }, []);
+
   const loadFiles = useCallback(async (silent = false) => {
     try {
       if (!silent) {
@@ -57,6 +88,10 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
           const expandedPaths = collectExpandedPaths(prevFiles);
           if (expandedPaths.size === 0) {
             return result;
+          }
+          // Also trigger async refresh of expanded folders in background
+          if (expandedPaths.size > 0) {
+            refreshExpandedFolders(expandedPaths);
           }
           return mergeTreeState(result, prevFiles, expandedPaths);
         });
@@ -76,7 +111,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         setLoading(false);
       }
     }
-  }, [projectPath]);
+  }, [projectPath, refreshExpandedFolders]);
 
   useEffect(() => {
     loadFiles();
@@ -330,6 +365,19 @@ function updateNodeInTree(
     }
     return node;
   });
+}
+
+function findNodeByPath(nodes: FileNode[], targetPath: string): FileNode | null {
+  for (const node of nodes) {
+    if (node.path === targetPath) {
+      return node;
+    }
+    if (node.children) {
+      const found = findNodeByPath(node.children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 /**

@@ -2,7 +2,7 @@
 name: code-cleaner
 description: Fast removal of comments, console.logs, and debug code while preserving JSDoc
 tools: Read, Edit, Glob, Grep
-model: haiku
+model: opus
 ---
 
 # Code Cleaner Agent

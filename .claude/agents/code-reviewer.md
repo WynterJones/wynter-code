@@ -2,7 +2,7 @@
 name: code-reviewer
 description: Review code for quality, security, and maintainability
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: opus
 ---
 
 # Code Reviewer Agent

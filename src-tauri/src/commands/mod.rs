@@ -1274,6 +1274,97 @@ pub fn check_system_requirements() -> SystemCheckResults {
     }
 }
 
+// System Resources types and commands
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DiskInfo {
+    pub name: String,
+    pub mount_point: String,
+    pub total_bytes: u64,
+    pub available_bytes: u64,
+    pub used_bytes: u64,
+    pub usage_percent: f32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryInfo {
+    pub total_bytes: u64,
+    pub used_bytes: u64,
+    pub available_bytes: u64,
+    pub usage_percent: f32,
+    pub swap_total_bytes: u64,
+    pub swap_used_bytes: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CpuInfo {
+    pub usage_percent: f32,
+    pub core_count: usize,
+    pub brand: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SystemResourcesInfo {
+    pub memory: MemoryInfo,
+    pub cpu: CpuInfo,
+    pub disks: Vec<DiskInfo>,
+}
+
+#[tauri::command]
+pub fn get_system_resources() -> Result<SystemResourcesInfo, String> {
+    use sysinfo::{System, Disks};
+
+    let mut sys = System::new_all();
+    sys.refresh_all();
+
+    // Memory info
+    let memory = MemoryInfo {
+        total_bytes: sys.total_memory(),
+        used_bytes: sys.used_memory(),
+        available_bytes: sys.available_memory(),
+        usage_percent: if sys.total_memory() > 0 {
+            (sys.used_memory() as f32 / sys.total_memory() as f32) * 100.0
+        } else {
+            0.0
+        },
+        swap_total_bytes: sys.total_swap(),
+        swap_used_bytes: sys.used_swap(),
+    };
+
+    // CPU info
+    let cpu = CpuInfo {
+        usage_percent: sys.global_cpu_usage(),
+        core_count: sys.cpus().len(),
+        brand: sys.cpus().first()
+            .map(|c| c.brand().to_string())
+            .unwrap_or_else(|| "Unknown".to_string()),
+    };
+
+    // Disk info
+    let disks_sys = Disks::new_with_refreshed_list();
+    let disks: Vec<DiskInfo> = disks_sys.iter()
+        .map(|disk| {
+            let total = disk.total_space();
+            let available = disk.available_space();
+            let used = total.saturating_sub(available);
+            DiskInfo {
+                name: disk.name().to_string_lossy().to_string(),
+                mount_point: disk.mount_point().to_string_lossy().to_string(),
+                total_bytes: total,
+                available_bytes: available,
+                used_bytes: used,
+                usage_percent: if total > 0 { (used as f32 / total as f32) * 100.0 } else { 0.0 },
+            }
+        })
+        .collect();
+
+    Ok(SystemResourcesInfo { memory, cpu, disks })
+}
+
 // Claude Code Manager types and commands
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -125,6 +125,38 @@ agents:
     @echo "{{project_root}}/.claude/agents" && cd {{project_root}}/.claude/agents
 
 # ============================================
+# APP TOOLS
+# ============================================
+
+# List all app tools
+tools:
+    @echo "App Tools:" && ls -1 src/components/tools/*.tsx src/components/tools/*/index.ts 2>/dev/null | sed 's|src/components/tools/||' | sed 's|.tsx||' | sed 's|/index.ts||'
+
+# Color Picker tool files
+tool-color-picker:
+    @echo "Color Picker:" && echo "  Frontend: src/components/colorpicker/" && echo "  Backend:  src-tauri/src/color_picker.rs"
+
+# Port Manager tool files
+tool-port-manager:
+    @echo "Port Manager:" && echo "  Component: src/components/tools/PortManagerPopup.tsx" && echo "  Commands:  list_listening_ports, kill_process"
+
+# Node Modules Cleaner tool files
+tool-node-cleaner:
+    @echo "Node Modules Cleaner:" && echo "  Component: src/components/tools/NodeModulesCleanerPopup.tsx" && echo "  Commands:  scan_node_modules, delete_node_modules"
+
+# Localhost Tunnel tool files
+tool-tunnel:
+    @echo "Localhost Tunnel:" && echo "  Component: src/components/tools/LocalhostTunnelPopup.tsx" && echo "  Backend:   src-tauri/src/tunnel.rs" && echo "  Commands:  start_tunnel, stop_tunnel, list_tunnels"
+
+# System Health tool files
+tool-health:
+    @echo "System Health:" && echo "  Components: src/components/tools/system-health/" && ls -1 src/components/tools/system-health/*.tsx | sed 's|src/components/tools/system-health/||' | sed 's|^|    - |' && echo "  Commands:   check_system_requirements, get_system_resources"
+
+# Tools dropdown (where all tools are registered)
+tool-dropdown:
+    @echo "Tools Dropdown:" && echo "  Component: src/components/tools/ToolsDropdown.tsx" && echo "  Mounted:   src/components/layout/ProjectTabBar.tsx"
+
+# ============================================
 # UTILITIES
 # ============================================
 

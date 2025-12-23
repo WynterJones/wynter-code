@@ -49,6 +49,18 @@ Run these in order for a complete development cycle:
 
 ---
 
+### Idea Phrases (Pre-Plan Stage)
+
+| Phrase | Action |
+|--------|--------|
+| **I have an idea for...** | Add new idea to `_AUDIT/GARDEN.md` (title, description, bullets) |
+| **let's plan this idea...** | Graduate idea from GARDEN → create plan in `_PLANS/` |
+| **I dont want to do this idea...** | Reject idea → move from GARDEN to COMPOST |
+| **remove this feature...** | Archive feature idea to COMPOST |
+| **compost this...** | Move idea from GARDEN to COMPOST |
+
+---
+
 ### Farmwork Phrase Details
 
 **open the farm**
@@ -77,6 +89,30 @@ Runs all inspection agents in parallel, then dry run quality gates. No push.
 
 **close the farm**
 - Invoke the `push` skill immediately
+
+---
+
+### Idea Phrase Details
+
+**I have an idea for...**
+1. Launch `idea-gardener` agent
+2. Parse idea title from user input
+3. Ask for short description and bullet points
+4. Add to `_AUDIT/GARDEN.md` under ## Ideas section
+
+**let's plan this idea...**
+1. Launch `idea-gardener` agent
+2. Find the idea in GARDEN.md
+3. Create plan in `_PLANS/` using plan mode
+4. Move to "Graduated to Plans" table
+5. Remove from ## Ideas section
+
+**compost this...** / **I dont want to do this idea...**
+1. Launch `idea-gardener` agent
+2. Find idea in GARDEN.md (or accept new rejection)
+3. Ask for rejection reason
+4. Add to `_AUDIT/COMPOST.md` with reason
+5. Remove from GARDEN.md if it was there
 
 ---
 
@@ -155,3 +191,8 @@ npm run lint    # Check code quality
 npm run build   # Verify compilation
 ```
 
+## Notes:
+
+- Always use OverlayScrollbars for scrollbars for any scrollable container.
+- When we make new tools, add their paths to justfiles for quicker access.
+- Never use emojies always proper icons

@@ -2,7 +2,7 @@
 name: rust-code-auditor
 description: Audit Rust backend for error handling and safety
 tools: Read, Grep, Glob, Edit, Bash
-model: haiku
+model: opus
 ---
 
 # Rust Code Auditor
