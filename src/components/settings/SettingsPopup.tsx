@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,8 @@ import { KEYBOARD_SHORTCUTS, formatShortcut, type KeyboardShortcut } from "@/hoo
 import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
 import { ColorsTab } from "./ColorsTab";
 import { CompressionSettings } from "./CompressionSettings";
+import { AvatarSettings } from "./AvatarSettings";
+import { DataManagementTab } from "./DataManagementTab";
 import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector";
 import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
 import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
@@ -26,7 +28,7 @@ interface SettingsPopupProps {
   onClose: () => void;
 }
 
-type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "about";
+type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "about";
 
 const APP_VERSION = "1.0.0";
 
@@ -83,12 +85,14 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     { id: "compression", label: "Compression", icon: Archive },
     { id: "terminal", label: "Terminal", icon: TerminalSquare },
     { id: "keyboard", label: "Keyboard", icon: Keyboard },
+    { id: "avatar", label: "Avatar", icon: UserCircle },
+    { id: "data", label: "Data", icon: HardDrive },
     { id: "about", label: "About", icon: Info },
   ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
+      <div className="w-full max-w-[960px] bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
         {/* Header - Drags the window */}
         <div
           data-tauri-drag-region
@@ -172,6 +176,8 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
                 />
               )}
               {activeTab === "keyboard" && <KeyboardShortcutsSection />}
+              {activeTab === "avatar" && <AvatarSettings />}
+              {activeTab === "data" && <DataManagementTab />}
               {activeTab === "about" && <AboutSection />}
             </div>
           </ScrollArea>

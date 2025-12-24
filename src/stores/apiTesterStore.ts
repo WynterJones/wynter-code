@@ -71,6 +71,9 @@ interface ApiTesterStore {
   addWebhookRequest: (serverId: string, request: WebhookRequest) => void;
   clearWebhookRequests: (serverId: string) => void;
   getWebhookRequests: (serverId: string) => WebhookRequest[];
+
+  // Reset
+  reset: () => void;
 }
 
 const MAX_HISTORY = 100;
@@ -383,6 +386,19 @@ export const useApiTesterStore = create<ApiTesterStore>()(
 
       getWebhookRequests: (serverId: string) => {
         return get().webhookRequests.get(serverId) || [];
+      },
+
+      reset: () => {
+        set({
+          tabs: new Map(),
+          activeTabId: new Map(),
+          requests: new Map(),
+          responses: new Map(),
+          history: [],
+          webhookServers: [],
+          webhookRequests: new Map(),
+          isLoading: new Map(),
+        });
       },
     }),
     {

@@ -65,6 +65,9 @@ interface DatabaseViewerStore {
   setActiveTab: (tab: "browser" | "sql") => void;
   setSidePanel: (panel: "connections" | "history" | null) => void;
   clearError: () => void;
+
+  // Reset
+  reset: () => void;
 }
 
 const MAX_HISTORY = 50;
@@ -406,6 +409,32 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
 
       clearError: () => {
         set({ error: null });
+      },
+
+      reset: () => {
+        set({
+          connections: [],
+          activeConnectionId: null,
+          isConnected: new Map(),
+          detectedServices: [],
+          detectingServices: false,
+          tables: [],
+          selectedTable: null,
+          tableSchema: null,
+          tableData: [],
+          tableDataLoading: false,
+          pagination: { limit: 50, offset: 0, total: 0 },
+          filters: [],
+          sort: null,
+          currentQuery: "",
+          queryResults: null,
+          queryHistory: [],
+          queryLoading: false,
+          activeTab: "browser",
+          sidePanel: "connections",
+          isLoading: false,
+          error: null,
+        });
       },
     }),
     {

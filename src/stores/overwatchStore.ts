@@ -48,6 +48,9 @@ interface OverwatchStore {
 
   // Helpers
   getApiKeyValue: (apiKeyId: string) => string | undefined;
+
+  // Reset
+  reset: () => void;
 }
 
 export const useOverwatchStore = create<OverwatchStore>()(
@@ -319,6 +322,16 @@ export const useOverwatchStore = create<OverwatchStore>()(
         const envStore = useEnvStore.getState();
         const variable = envStore.globalVariables.find((v) => v.id === apiKeyId);
         return variable?.value;
+      },
+
+      reset: () => {
+        set({
+          services: [],
+          serviceData: new Map(),
+          refreshing: new Set(),
+          autoRefreshEnabled: true,
+          refreshInterval: 60,
+        });
       },
     }),
     {

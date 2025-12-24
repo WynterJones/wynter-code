@@ -26,6 +26,9 @@ interface TerminalStore {
   queueCommand: (sessionId: string, command: string) => void;
   getQueuedCommand: (sessionId: string) => string | null;
   clearQueuedCommand: (sessionId: string) => void;
+
+  // Reset
+  reset: () => void;
 }
 
 const DEFAULT_HEIGHT = 200;
@@ -141,6 +144,14 @@ export const useTerminalStore = create<TerminalStore>()(
           const queuedCommands = new Map(state.queuedCommands);
           queuedCommands.delete(sessionId);
           return { queuedCommands };
+        });
+      },
+
+      reset: () => {
+        set({
+          terminals: new Map(),
+          sessionPtyIds: new Map(),
+          queuedCommands: new Map(),
         });
       },
     }),

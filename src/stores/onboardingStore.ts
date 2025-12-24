@@ -21,6 +21,7 @@ interface OnboardingStore {
   setSystemCheckResults: (results: SystemCheckResults) => void;
   setIsCheckingSystem: (checking: boolean) => void;
   resetOnboarding: () => void;
+  reset: () => void;
 }
 
 export const ONBOARDING_STEPS = [
@@ -73,6 +74,15 @@ export const useOnboardingStore = create<OnboardingStore>()(
       },
 
       resetOnboarding: () => {
+        set({
+          hasCompletedOnboarding: false,
+          currentStep: 1,
+          systemCheckResults: null,
+          isCheckingSystem: false,
+        });
+      },
+
+      reset: () => {
         set({
           hasCompletedOnboarding: false,
           currentStep: 1,

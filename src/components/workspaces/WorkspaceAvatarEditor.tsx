@@ -1,9 +1,11 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Circle, Square, RectangleHorizontal, Upload, X } from "lucide-react";
 import * as LucideIcons from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 import { WORKSPACE_COLORS, type WorkspaceAvatar, type AvatarShape } from "@/types/workspace";
 import { WorkspaceAvatar as WorkspaceAvatarDisplay } from "./WorkspaceAvatar";
+import { FileBrowserPopup, type ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 interface WorkspaceAvatarEditorProps {
   avatar: WorkspaceAvatar;
@@ -60,57 +62,52 @@ export function WorkspaceAvatarEditor({
   onColorChange,
 }: WorkspaceAvatarEditorProps) {
   const [activeTab, setActiveTab] = useState<"icon" | "image">(avatar.type);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showFileBrowser, setShowFileBrowser] = useState(false);
+  const [initialPath, setInitialPath] = useState<string | undefined>(undefined);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith("image/")) {
-      return;
+  const handleOpenFileBrowser = async () => {
+    try {
+      const homeDir = await invoke<string>("get_home_dir");
+      setInitialPath(homeDir);
+    } catch {
+      setInitialPath(undefined);
     }
+    setShowFileBrowser(true);
+  };
 
-    // Read and resize image
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        // Resize to max 128x128 for performance
-        const canvas = document.createElement("canvas");
-        const maxSize = 128;
-        let { width, height } = img;
+  const handleImageSelected = (image: ImageAttachment) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const maxSize = 128;
+      let { width, height } = img;
 
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = (height / width) * maxSize;
-            width = maxSize;
-          } else {
-            width = (width / height) * maxSize;
-            height = maxSize;
-          }
+      if (width > maxSize || height > maxSize) {
+        if (width > height) {
+          height = (height / width) * maxSize;
+          width = maxSize;
+        } else {
+          width = (width / height) * maxSize;
+          height = maxSize;
         }
+      }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx?.drawImage(img, 0, 0, width, height);
 
-        const imageData = canvas.toDataURL("image/png");
-        onAvatarChange({ type: "image", imageData });
-        setActiveTab("image");
-      };
-      img.src = event.target?.result as string;
+      const imageData = canvas.toDataURL("image/png");
+      onAvatarChange({ type: "image", imageData });
+      setActiveTab("image");
     };
-    reader.readAsDataURL(file);
+    img.src = image.data;
+    setShowFileBrowser(false);
   };
 
   const handleRemoveImage = () => {
     onAvatarChange({ type: "icon", imageData: undefined, icon: "Briefcase" });
     setActiveTab("icon");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
   const renderIcon = (iconName: string) => {
@@ -203,18 +200,10 @@ export function WorkspaceAvatarEditor({
       {/* Image Tab */}
       {activeTab === "image" && (
         <div className="space-y-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageUpload}
-            className="hidden"
-          />
-
           {avatar.type === "image" && avatar.imageData ? (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => fileInputRef.current?.click()}
+                onClick={handleOpenFileBrowser}
                 className="flex-1 flex items-center justify-center gap-2 py-2 px-3 text-xs bg-bg-tertiary hover:bg-bg-hover border border-border rounded-md transition-colors"
               >
                 <Upload className="w-3.5 h-3.5" />
@@ -230,7 +219,7 @@ export function WorkspaceAvatarEditor({
             </div>
           ) : (
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={handleOpenFileBrowser}
               className="w-full flex items-center justify-center gap-2 py-3 px-3 text-xs bg-bg-tertiary hover:bg-bg-hover border border-dashed border-border rounded-md transition-colors"
             >
               <Upload className="w-4 h-4" />
@@ -241,6 +230,16 @@ export function WorkspaceAvatarEditor({
           <div className="text-xs text-text-secondary text-center">
             PNG, JPG, or SVG (max 128x128)
           </div>
+
+          <FileBrowserPopup
+            isOpen={showFileBrowser}
+            onClose={() => setShowFileBrowser(false)}
+            initialPath={initialPath}
+            mode="browse"
+            sendToPromptLabel="Select Image"
+            overlayClassName="z-[10000]"
+            onSendToPrompt={handleImageSelected}
+          />
         </div>
       )}
 

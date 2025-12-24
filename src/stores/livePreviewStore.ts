@@ -25,6 +25,9 @@ interface LivePreviewStore {
   setAutoOpenBrowser: (value: boolean) => void;
   setShowQRByDefault: (value: boolean) => void;
   setExpandedServerId: (serverId: string | null) => void;
+
+  // Reset
+  reset: () => void;
 }
 
 export const useLivePreviewStore = create<LivePreviewStore>()(
@@ -86,6 +89,17 @@ export const useLivePreviewStore = create<LivePreviewStore>()(
 
       setExpandedServerId: (serverId: string | null) => {
         set({ expandedServerId: serverId });
+      },
+
+      reset: () => {
+        set({
+          servers: [],
+          detectionResult: null,
+          preferredPort: 9876,
+          autoOpenBrowser: true,
+          showQRByDefault: false,
+          expandedServerId: null,
+        });
       },
     }),
     {

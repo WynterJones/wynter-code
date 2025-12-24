@@ -48,6 +48,9 @@ interface SubscriptionStore {
 
   // Utilities
   getFaviconUrl: (url: string) => string;
+
+  // Reset
+  reset: () => void;
 }
 
 export const useSubscriptionStore = create<SubscriptionStore>()(
@@ -421,6 +424,13 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         } catch {
           return "";
         }
+      },
+
+      reset: () => {
+        set({
+          subscriptions: [],
+          categories: [],
+        });
       },
     }),
     {

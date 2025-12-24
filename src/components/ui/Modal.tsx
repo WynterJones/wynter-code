@@ -10,6 +10,7 @@ export interface ModalProps {
   title?: string;
   children: ReactNode;
   className?: string;
+  overlayClassName?: string;
   size?: "sm" | "md" | "lg" | "xl" | "full";
   showCloseButton?: boolean;
 }
@@ -20,6 +21,7 @@ export function Modal({
   title,
   children,
   className,
+  overlayClassName,
   size = "lg",
   showCloseButton = true,
 }: ModalProps) {
@@ -60,7 +62,10 @@ export function Modal({
   return createPortal(
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150"
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150",
+        overlayClassName
+      )}
       onClick={handleOverlayClick}
     >
       <div

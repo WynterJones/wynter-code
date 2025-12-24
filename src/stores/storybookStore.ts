@@ -28,6 +28,9 @@ interface StorybookStore {
   removeServer: (serverId: string) => void;
   setPreferredPort: (port: number) => void;
   getServerForProject: (projectPath: string) => StorybookServer | undefined;
+
+  // Reset
+  reset: () => void;
 }
 
 export const useStorybookStore = create<StorybookStore>()(
@@ -59,6 +62,13 @@ export const useStorybookStore = create<StorybookStore>()(
 
       getServerForProject: (projectPath) => {
         return get().servers.find((s) => s.projectPath === projectPath);
+      },
+
+      reset: () => {
+        set({
+          servers: [],
+          preferredPort: 6006,
+        });
       },
     }),
     {

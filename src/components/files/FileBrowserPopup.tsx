@@ -27,6 +27,8 @@ interface FileBrowserPopupProps {
   initialPath?: string;
   mode: "selectProject" | "browse";
   selectButtonLabel?: string;
+  sendToPromptLabel?: string;
+  overlayClassName?: string;
   onSelectProject?: (path: string) => void;
   onSendToPrompt?: (image: ImageAttachment) => void;
 }
@@ -58,6 +60,8 @@ export function FileBrowserPopup({
   initialPath,
   mode,
   selectButtonLabel,
+  sendToPromptLabel,
+  overlayClassName,
   onSelectProject,
   onSendToPrompt,
 }: FileBrowserPopupProps) {
@@ -348,7 +352,7 @@ export function FileBrowserPopup({
 
     if (isImageFile(node) && onSendToPrompt && !hasMultipleSelection) {
       items.push({
-        label: "Send to Prompt",
+        label: sendToPromptLabel || "Send to Prompt",
         icon: ImagePlus,
         action: async () => {
           const src = convertFileSrc(node.path);
@@ -572,6 +576,7 @@ export function FileBrowserPopup({
       title={mode === "selectProject" ? "Open Project" : "Browse Files"}
       size="xl"
       className="h-[70vh] flex flex-col"
+      overlayClassName={overlayClassName}
     >
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
         <FileBrowserHeader
@@ -614,6 +619,7 @@ export function FileBrowserPopup({
           mode={mode}
           showQuickLook={showQuickLook}
           selectButtonLabel={selectButtonLabel}
+          sendToPromptLabel={sendToPromptLabel}
           onCopyPath={handleCopyPath}
           onToggleQuickLook={() => setShowQuickLook((prev) => !prev)}
           onSendToPrompt={handleSendToPrompt}

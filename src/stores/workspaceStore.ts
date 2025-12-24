@@ -36,6 +36,9 @@ interface WorkspaceStore {
 
   // Migration
   migrateFromProjectStore: (projects: Project[]) => void;
+
+  // Reset
+  reset: () => void;
 }
 
 const DEFAULT_WORKSPACE_NAME = "Default";
@@ -193,6 +196,14 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           workspaces: [defaultWorkspace],
           activeWorkspaceId: defaultWorkspace.id,
           _migrated: true,
+        });
+      },
+
+      reset: () => {
+        set({
+          workspaces: [],
+          activeWorkspaceId: null,
+          _migrated: false,
         });
       },
     }),

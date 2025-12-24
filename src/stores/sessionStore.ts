@@ -62,6 +62,7 @@ interface SessionStore {
   finishStreaming: (sessionId: string) => void;
   getStreamingState: (sessionId: string) => StreamingState;
   setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => void;
+  reset: () => void;
 }
 
 const defaultStats: StreamingStats = {
@@ -485,6 +486,15 @@ export const useSessionStore = create<SessionStore>()(
             pendingQuestion: question,
           });
           return { streamingState: newStreamingState };
+        });
+      },
+
+      reset: () => {
+        set({
+          sessions: new Map(),
+          activeSessionId: new Map(),
+          messages: new Map(),
+          streamingState: new Map(),
         });
       },
     }),

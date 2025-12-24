@@ -18,6 +18,9 @@ interface ColorPickerStore {
   deleteColor: (id: string) => void;
   clearRecentColors: () => void;
   clearSavedColors: () => void;
+
+  // Reset
+  reset: () => void;
 }
 
 export const useColorPickerStore = create<ColorPickerStore>()(
@@ -98,6 +101,15 @@ export const useColorPickerStore = create<ColorPickerStore>()(
 
       clearSavedColors: () => {
         set({ savedColors: [] });
+      },
+
+      reset: () => {
+        set({
+          currentColor: null,
+          selectedFormat: "hex",
+          recentColors: [],
+          savedColors: [],
+        });
       },
     }),
     {

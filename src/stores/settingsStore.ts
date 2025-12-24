@@ -83,6 +83,9 @@ interface SettingsStore {
   terminalShell: TerminalShell;
   useMultiPanelLayout: boolean;
 
+  // Avatar
+  userAvatar: string | null;
+
   // Radio settings
   audioSourceType: AudioSourceType;
   nightrideStation: NightrideStation;
@@ -109,6 +112,7 @@ interface SettingsStore {
   setCompressionMediaOverwrite: (overwrite: boolean) => void;
   setTerminalShell: (shell: TerminalShell) => void;
   setUseMultiPanelLayout: (use: boolean) => void;
+  setUserAvatar: (avatar: string | null) => void;
 
   // Radio setters
   setAudioSourceType: (type: AudioSourceType) => void;
@@ -142,6 +146,7 @@ export const useSettingsStore = create<SettingsStore>()(
       compressionMediaOverwrite: false,
       terminalShell: "system",
       useMultiPanelLayout: false,
+      userAvatar: null,
 
       // Radio defaults
       audioSourceType: "nightride",
@@ -227,6 +232,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setUseMultiPanelLayout: (useMultiPanelLayout: boolean) => {
         set({ useMultiPanelLayout });
+      },
+
+      setUserAvatar: (userAvatar: string | null) => {
+        set({ userAvatar });
       },
 
       // Radio setters

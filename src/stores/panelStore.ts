@@ -65,6 +65,9 @@ interface PanelStore {
 
   /** Reset layout for a project */
   resetLayout: (projectId: string) => void;
+
+  /** Reset all layouts */
+  reset: () => void;
 }
 
 /** Recursively update a node in the layout tree */
@@ -256,6 +259,10 @@ export const usePanelStore = create<PanelStore>()(
           layouts.set(projectId, createDefaultLayoutState());
           return { layouts };
         });
+      },
+
+      reset: () => {
+        set({ layouts: new Map() });
       },
     }),
     {

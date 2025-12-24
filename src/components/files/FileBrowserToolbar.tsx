@@ -10,6 +10,7 @@ interface FileBrowserToolbarProps {
   mode: "selectProject" | "browse";
   showQuickLook: boolean;
   selectButtonLabel?: string;
+  sendToPromptLabel?: string;
   onCopyPath: () => void;
   onToggleQuickLook: () => void;
   onSendToPrompt: () => void;
@@ -32,6 +33,7 @@ export function FileBrowserToolbar({
   mode,
   showQuickLook,
   selectButtonLabel = "Open as Project",
+  sendToPromptLabel = "Send to Prompt",
   onCopyPath,
   onToggleQuickLook,
   onSendToPrompt,
@@ -82,7 +84,7 @@ export function FileBrowserToolbar({
         {showSendToPrompt && (
           <Button size="sm" variant="ghost" onClick={onSendToPrompt}>
             <ImagePlus className="w-3.5 h-3.5 mr-1.5" />
-            Send to Prompt
+            {sendToPromptLabel}
           </Button>
         )}
 

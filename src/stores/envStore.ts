@@ -45,6 +45,9 @@ interface EnvStore {
   revealValue: (key: string) => void;
   hideValue: (key: string) => void;
   hideAllValues: () => void;
+
+  // Reset
+  reset: () => void;
 }
 
 export const useEnvStore = create<EnvStore>()(
@@ -99,6 +102,13 @@ export const useEnvStore = create<EnvStore>()(
 
       hideAllValues: () => {
         set({ revealedKeys: new Set() });
+      },
+
+      reset: () => {
+        set({
+          globalVariables: [],
+          revealedKeys: new Set(),
+        });
       },
     }),
     {

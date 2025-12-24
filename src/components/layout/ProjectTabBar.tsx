@@ -323,6 +323,7 @@ export function ProjectTabBar({
   const defaultBrowsePath = useSettingsStore((s) => s.defaultBrowsePath);
   const compactProjectTabs = useSettingsStore((s) => s.compactProjectTabs);
   const dimInactiveProjects = useSettingsStore((s) => s.dimInactiveProjects);
+  const userAvatar = useSettingsStore((s) => s.userAvatar);
 
   // Get the active workspace and filter projects
   const activeWorkspace = getActiveWorkspace();
@@ -694,19 +695,6 @@ export function ProjectTabBar({
         </div>
       </DndContext>
 
-      {/* Farmwork Tycoon */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content="Farmwork Tycoon">
-          <IconButton
-            size="sm"
-            onClick={() => setShowFarmworkTycoon(true)}
-            className="text-green-500 hover:text-green-400"
-          >
-            <Tractor className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
-      </div>
-
       {/* Scroll buttons */}
       <div className="flex items-center border-l border-border h-full">
         <button
@@ -829,14 +817,39 @@ export function ProjectTabBar({
           isMeditating && "opacity-30 hover:opacity-100",
         )}
       >
+        <button
+          onClick={() => setShowFarmworkTycoon(true)}
+          className={cn(
+            "flex items-center gap-2 px-3 h-8 rounded-md text-sm",
+            "bg-bg-tertiary border border-border hover:bg-bg-hover transition-colors"
+          )}
+        >
+          <Tractor className="w-3.5 h-3.5 text-green-500" />
+          <span className="text-text-primary text-xs">Farmwork</span>
+        </button>
         {onOpenSubscriptions && (
           <SubscriptionButton onOpenManage={onOpenSubscriptions} />
         )}
-        <Tooltip content="Settings" side="bottom">
-          <IconButton size="sm" onClick={onOpenSettings}>
-            <Settings className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
+{userAvatar ? (
+          <Tooltip content="Settings" side="bottom">
+            <button
+              onClick={onOpenSettings}
+              className="w-7 h-7 rounded-full overflow-hidden border-2 border-border hover:border-accent transition-colors flex-shrink-0"
+            >
+              <img
+                src={userAvatar}
+                alt="User avatar"
+                className="w-full h-full object-cover"
+              />
+            </button>
+          </Tooltip>
+        ) : (
+          <Tooltip content="Settings" side="bottom">
+            <IconButton size="sm" onClick={onOpenSettings}>
+              <Settings className="w-4 h-4" />
+            </IconButton>
+          </Tooltip>
+        )}
       </div>
 
       {/* Context Menu for Project Customization */}
