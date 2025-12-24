@@ -23,6 +23,7 @@ import {
   AtSign,
   MonitorPlay,
   FileCode,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -212,6 +213,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openSeoTools",
     category: "utilities",
   },
+  {
+    id: "gif-recorder",
+    name: "GIF Screen Section Recorder",
+    description: "Record screen region as animated GIF",
+    icon: Image,
+    actionKey: "openGifRecorder",
+    category: "utilities",
+  },
+  {
+    id: "netlify-ftp",
+    name: "Netlify FTP",
+    description: "Deploy static sites with retro FTP vibes",
+    icon: Upload,
+    actionKey: "openNetlifyFtp",
+    category: "infrastructure",
+  },
 ];
 
 interface Tool {
@@ -250,6 +267,8 @@ interface ToolsDropdownProps {
   onOpenSeoTools: () => void;
   onOpenFloatingWebcam: () => void;
   onOpenScreenStudio: () => void;
+  onOpenNetlifyFtp: () => void;
+  onOpenGifRecorder: () => void;
   hasStorybook?: boolean;
 }
 
@@ -273,6 +292,8 @@ export function ToolsDropdown({
   onOpenSeoTools,
   onOpenFloatingWebcam,
   onOpenScreenStudio,
+  onOpenNetlifyFtp,
+  onOpenGifRecorder,
   hasStorybook = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -496,6 +517,28 @@ export function ToolsDropdown({
       category: "utilities",
       onClick: () => {
         onOpenScreenStudio();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "gif-recorder",
+      name: "GIF Screen Section Recorder",
+      description: "Record screen region as animated GIF",
+      icon: <Image className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenGifRecorder();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "netlify-ftp",
+      name: "Netlify FTP",
+      description: "Deploy static sites with retro FTP vibes",
+      icon: <Upload className="w-4 h-4" />,
+      category: "infrastructure",
+      onClick: () => {
+        onOpenNetlifyFtp();
         setIsOpen(false);
       },
     },

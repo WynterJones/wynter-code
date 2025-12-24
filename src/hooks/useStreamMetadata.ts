@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { StreamMetadata } from "@/types/radio";
 
 interface NightrideNowPlaying {
@@ -25,10 +26,10 @@ export function useStreamMetadata(
     if (streamUrl.includes("nightride.fm")) {
       const pollMetadata = async () => {
         try {
-          const response = await fetch(
-            "https://nightride.fm/api/now-playing"
-          );
-          const data: NightrideNowPlaying = await response.json();
+          // Use Tauri's HTTP client to bypass CORS
+          const data = await invoke<NightrideNowPlaying>("http_get_json", {
+            url: "https://nightride.fm/api/now-playing",
+          });
 
           // Extract station name from URL
           const stationMatch = streamUrl.match(/\/(\w+)\.mp3$/);

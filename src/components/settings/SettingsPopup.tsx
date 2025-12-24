@@ -822,10 +822,11 @@ function AboutSection() {
             <li>Text Diff, Lorem Ipsum, Cron Parser, and more</li>
           </ul>
 
-          <h4 className="text-sm font-medium text-accent mb-1">Domain & SEO Tools</h4>
+          <h4 className="text-sm font-medium text-accent mb-1">Domain & SEO Tools (11 Tools)</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
             <li>WHOIS, DNS Lookup, SSL Certificate Checker</li>
             <li>HTTP Headers, IP Geolocation, Redirect Tracker</li>
+            <li>Dead Link Checker, Lighthouse Auditor, Favicon Grabber</li>
           </ul>
 
           <h4 className="text-sm font-medium text-accent mb-1">Webcam & Streaming</h4>

@@ -17,4 +17,4 @@ export { BeadsTrackerPopup } from "./BeadsTrackerPopup";
 export { FaviconGeneratorPopup } from "./favicon-generator";
 export { FarmworkTycoonPopup, MiniGamePlayer } from "./farmwork-tycoon";
 export { ScreenStudioPopup } from "./screen-studio";
-
+export { NetlifyFtpPopup } from "./netlify-ftp";

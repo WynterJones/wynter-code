@@ -226,9 +226,7 @@ export function AudioVisualizer({ variant = "full" }: AudioVisualizerProps) {
     // Check if frequency data is empty/tainted (CORS issue with streams)
     // If all values are 0 or very low, use simulated data
     const hasRealData = frequencyData && frequencyData.some(v => v > 10);
-    if (!hasRealData) {
-      frequencyData = generateSimulatedData(128);
-    }
+    const dataToUse: Uint8Array = hasRealData ? frequencyData : generateSimulatedData(128);
 
     const gradient = ctx.createLinearGradient(0, 0, width, 0);
     gradient.addColorStop(0, themeColorsRef.current.primary);
@@ -238,16 +236,16 @@ export function AudioVisualizer({ variant = "full" }: AudioVisualizerProps) {
     // Draw based on visualizer type
     switch (visualizerType) {
       case "wave":
-        drawWave(ctx, frequencyData, width, height, gradient);
+        drawWave(ctx, dataToUse, width, height, gradient);
         break;
       case "bars":
-        drawBars(ctx, frequencyData, width, height, gradient);
+        drawBars(ctx, dataToUse, width, height, gradient);
         break;
       case "circle":
-        drawCircle(ctx, frequencyData, width, height, gradient);
+        drawCircle(ctx, dataToUse, width, height, gradient);
         break;
       case "line":
-        drawLine(ctx, frequencyData, width, height, gradient);
+        drawLine(ctx, dataToUse, width, height, gradient);
         break;
     }
 

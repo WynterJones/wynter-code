@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod api_tester;
+mod audio_proxy;
 mod beads;
 mod claude_process;
 mod color_picker;
@@ -15,6 +16,7 @@ mod terminal;
 mod tunnel;
 mod watcher;
 mod webcam_window;
+mod gif_recorder_window;
 
 use std::sync::Arc;
 use tauri::{
@@ -204,6 +206,7 @@ fn main() {
         .manage(Arc::new(storybook::StorybookManager::new()))
         .manage(Arc::new(database_viewer::DatabaseManager::new()))
         .manage(Arc::new(claude_process::ClaudeProcessManager::new()))
+        .manage(Arc::new(audio_proxy::AudioProxyManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -337,6 +340,10 @@ fn main() {
             cost_popup::close_cost_popup,
             cost_popup::update_cost_popup_position,
             cost_popup::is_cost_popup_open,
+            // GIF Recorder Window
+            gif_recorder_window::open_gif_region_selector_window,
+            gif_recorder_window::close_gif_region_selector_window,
+            gif_recorder_window::is_gif_region_selector_open,
             // Domain Tools
             domain_tools::whois_lookup,
             domain_tools::dns_lookup,
@@ -345,6 +352,11 @@ fn main() {
             domain_tools::http_head_request,
             domain_tools::http_get_json,
             domain_tools::http_follow_redirects,
+            // Audio Proxy (for radio streams)
+            audio_proxy::start_audio_proxy,
+            audio_proxy::stop_audio_proxy,
+            audio_proxy::get_audio_proxy_url,
+            audio_proxy::is_audio_proxy_running,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

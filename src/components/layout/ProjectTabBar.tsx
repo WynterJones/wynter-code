@@ -67,6 +67,8 @@ import { WebcamToolPopup } from "@/components/tools/webcam";
 import { DomainToolsPopup } from "@/components/tools/domain-tools";
 import { SeoToolsPopup } from "@/components/tools/seo-tools";
 import { ScreenStudioPopup } from "@/components/tools/screen-studio";
+import { GifRecorderPopup } from "@/components/tools/gif-recorder";
+import { NetlifyFtpPopup } from "@/components/tools/netlify-ftp";
 import { useMcpStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
@@ -397,6 +399,8 @@ export function ProjectTabBar({
   const [showDomainTools, setShowDomainTools] = useState(false);
   const [showSeoTools, setShowSeoTools] = useState(false);
   const [showScreenStudio, setShowScreenStudio] = useState(false);
+  const [showGifRecorder, setShowGifRecorder] = useState(false);
+  const [showNetlifyFtp, setShowNetlifyFtp] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -520,6 +524,12 @@ export function ProjectTabBar({
           break;
         case "openScreenStudio":
           setShowScreenStudio(true);
+          break;
+        case "openGifRecorder":
+          setShowGifRecorder(true);
+          break;
+        case "openNetlifyFtp":
+          setShowNetlifyFtp(true);
           break;
       }
     };
@@ -754,6 +764,8 @@ export function ProjectTabBar({
           onOpenSeoTools={() => setShowSeoTools(true)}
           onOpenFloatingWebcam={() => setShowWebcamTool(true)}
           onOpenScreenStudio={() => setShowScreenStudio(true)}
+          onOpenGifRecorder={() => setShowGifRecorder(true)}
+          onOpenNetlifyFtp={() => setShowNetlifyFtp(true)}
           hasStorybook={hasStorybook}
         />
       </div>
@@ -1075,6 +1087,18 @@ export function ProjectTabBar({
       <ScreenStudioPopup
         isOpen={showScreenStudio}
         onClose={() => setShowScreenStudio(false)}
+      />
+
+      {/* GIF Screen Section Recorder */}
+      <GifRecorderPopup
+        isOpen={showGifRecorder}
+        onClose={() => setShowGifRecorder(false)}
+      />
+
+      {/* Netlify FTP */}
+      <NetlifyFtpPopup
+        isOpen={showNetlifyFtp}
+        onClose={() => setShowNetlifyFtp(false)}
       />
 
       {/* Farmwork Mini Player - persists even when popup is closed */}

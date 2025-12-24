@@ -1,4 +1,4 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -28,20 +28,19 @@ export function MeditationAudioController() {
     setIsStream,
     setStreamMetadata,
     setAudioElementRef,
+    setShowVisualizer,
   } = useMeditationStore();
 
   const { audioSourceType, nightrideStation, currentRadioBrowserStation } =
     useSettingsStore();
 
   // Determine audio source based on settings
-  const getAudioSource = (): { url: string; isStream: boolean } => {
+  const getAudioSource = useCallback((): { url: string; isStream: boolean } => {
     // Nightride.fm radio
     if (audioSourceType === "nightride") {
       const station = getNightrideStationBySlug(nightrideStation);
-      return {
-        url: station?.streamUrl || NIGHTRIDE_STATIONS[0].streamUrl,
-        isStream: true,
-      };
+      const url = station?.streamUrl || NIGHTRIDE_STATIONS[0].streamUrl;
+      return { url, isStream: true };
     }
 
     // Radio Browser station
@@ -64,14 +63,17 @@ export function MeditationAudioController() {
         : `/audio/meditation/${track.file || ""}`;
 
     return { url, isStream: false };
-  };
+  }, [audioSourceType, nightrideStation, currentRadioBrowserStation, tracks, currentTrack]);
 
   const { url: audioSrc, isStream } = getAudioSource();
 
-  // Update stream state in store
+  // Update stream state in store and hide visualizer for streams
   useEffect(() => {
     setIsStream(isStream);
-  }, [isStream, setIsStream]);
+    // Hide visualizer for radio streams (CORS prevents Web Audio API analysis)
+    // Show visualizer only for local MP3 files
+    setShowVisualizer(!isStream);
+  }, [isStream, setIsStream, setShowVisualizer]);
 
   // Stream metadata polling (only for streams)
   const metadata = useStreamMetadata(isStream ? audioSrc : null, isPlaying);

@@ -42,6 +42,8 @@ local-ip-address = "0.6"
 # HTTP client for API testing
 reqwest = { version = "0.12", features = ["json"] }
 urlencoding = "2.1"
+url = "2"
+native-tls = "0.2"
 
 # File compression
 zip = "2.2"

@@ -20,11 +20,13 @@ Built with Tauri 2.0, React 18, and TypeScript featuring a VSCode-inspired dark 
 - **Generators**: UUID, QR Code, Timestamps, Number Base Converter
 - **Reference**: HTTP Status Codes, User Agent Parser, IP Address, Byte Size
 
-### Domain & SEO Tools
-- WHOIS Lookup, Domain Availability Checker
-- DNS Lookup, DNS Propagation Checker
-- SSL Certificate Inspector, HTTP Headers Analyzer
-- IP Geolocation, Redirect Chain Tracker
+### Domain & SEO Tools (11 Tools)
+- **Domain Info**: WHOIS Lookup, Domain Availability Checker
+- **DNS**: DNS Lookup, DNS Propagation Checker
+- **Security**: SSL Certificate Inspector, HTTP Headers Analyzer
+- **Network**: IP Geolocation, Redirect Chain Tracker
+- **SEO**: Dead Link Checker, Lighthouse Auditor
+- **Utilities**: Favicon Grabber
 
 ### Webcam & Streaming
 - Floating webcam overlay with desktop pinning

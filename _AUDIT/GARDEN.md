@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-24
-**Active Ideas:** 5
+**Active Ideas:** 3
 
 ---
 
@@ -38,34 +38,16 @@
 - Site settings: build commands, environment variables
 - Great for quick static site updates and prototypes
 
-### Dead Link Checker
-**Location:** `DomainToolsPopup` > SEO category
-- Enter URL to crawl and find broken links
-- Configurable crawl depth (1-5 levels)
-- Check internal and external links
-- Reports 404s, 5xx errors, timeouts, redirects
-- Export results as CSV
-- Highlight anchor text for broken links
-- Useful for site audits and SEO cleanup
-
-### Lighthouse Auditor
-**Location:** `DomainToolsPopup` > SEO category
-- Run Google Lighthouse audits from within the app
-- Performance, Accessibility, SEO, Best Practices scores
-- Mobile and desktop device emulation
-- Detailed metrics: FCP, LCP, CLS, TBT, Speed Index
-- Actionable recommendations list
-- Historical score tracking per URL
-- Export full report as HTML or JSON
-
-### Favicon Grabber
-**Location:** `DomainToolsPopup` > Utilities category (or extend `FaviconGeneratorPopup`)
-- Enter any URL to extract all favicon variations
-- Detect icons from `<link>` tags, manifest.json, apple-touch-icon
-- Preview all sizes found (16x16 to 512x512)
-- Download individual icons or all as ZIP
-- Show source paths for each icon
-- Useful for competitive research or rebuilding assets
+### Bookmarks
+**Location:** `BookmarksPopup` (new standalone tool)
+A bookmarking system to save and organize sites, web apps, and services with categories in a polished UI following existing UI patterns.
+- Save bookmarks to websites, web apps, and services
+- Category/folder organization system
+- Primary use case: tracking AI apps and services
+- App icon gallery display mode (shows favicon/app icons in a grid)
+- Toggle between icon gallery view and list card view
+- Nice visual presentation with app icons prominently featured
+- Follow existing UI patterns (OverlayScrollbars, no emojis, proper icons)
 
 ---
 
@@ -111,3 +93,6 @@
 | EXIF Data Remover | `DevToolkitPopup` > Image category - Strip EXIF metadata from images, batch processing, preview before/after, download individually or as ZIP | 2025-12-24 |
 | Placeholder Image Generator | `DevToolkitPopup` > Generators category - Generate placeholder images with custom dimensions, color picker, multiple formats (PNG/JPG/SVG/WebP), preset sizes, data URI support | 2025-12-24 |
 | Searchable Sidebar | `SearchableToolSidebar` - Reusable search component for DevKit, Domain Tools, and SEO Tools with real-time filtering | 2025-12-24 |
+| Dead Link Checker | `DomainToolsPopup` > SEO category - Crawl website to find broken links, configurable depth (1-5 levels), check internal/external links, reports 404s/5xx/timeouts/redirects, export CSV, highlight anchor text | 2025-12-24 |
+| Lighthouse Auditor | `DomainToolsPopup` > SEO category - Run Google Lighthouse audits via Pagespeed API, Performance/Accessibility/SEO/Best Practices scores, mobile/desktop emulation, Core Web Vitals metrics (FCP, LCP, CLS, TBT, Speed Index), recommendations, export HTML/JSON | 2025-12-24 |
+| Favicon Grabber | `DomainToolsPopup` > Utilities category - Extract favicons from any URL, detect from `<link>` tags/manifest.json/common paths, preview grid (16x16 to 512x512), download individual or ZIP, show source paths | 2025-12-24 |
