@@ -1,6 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, MessageSquare, Pencil, ChevronLeft, ChevronRight, Terminal, StopCircle } from "lucide-react";
-import { IconButton } from "@/components/ui";
+import {
+  Plus,
+  MessageSquare,
+  Pencil,
+  ChevronLeft,
+  ChevronRight,
+  Terminal,
+  StopCircle,
+  Tractor,
+  Waypoints,
+  FolderSearch,
+} from "lucide-react";
+import { Tooltip } from "@/components/ui";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { claudeService } from "@/services/claude";
@@ -14,6 +25,10 @@ interface DropdownPosition {
 
 interface SessionTabBarProps {
   projectId: string;
+  hasBeads?: boolean;
+  onOpenFarmwork?: () => void;
+  onOpenBeads?: () => void;
+  onBrowseFiles?: () => void;
 }
 
 const SESSION_COLORS = [
@@ -27,7 +42,13 @@ const SESSION_COLORS = [
   "#cdd6f4", // White-ish
 ];
 
-export function SessionTabBar({ projectId }: SessionTabBarProps) {
+export function SessionTabBar({
+  projectId,
+  hasBeads,
+  onOpenFarmwork,
+  onOpenBeads,
+  onBrowseFiles
+}: SessionTabBarProps) {
   const {
     getSessionsForProject,
     activeSessionId,
@@ -46,14 +67,23 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [colorPickerSessionId, setColorPickerSessionId] = useState<string | null>(null);
-  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
+  const [colorPickerSessionId, setColorPickerSessionId] = useState<
+    string | null
+  >(null);
+  const [dropdownPosition, setDropdownPosition] = useState<DropdownPosition>({
+    top: 0,
+    left: 0,
+  });
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [showNewDropdown, setShowNewDropdown] = useState(false);
-  const [newDropdownPosition, setNewDropdownPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
-  const [closeConfirmSessionId, setCloseConfirmSessionId] = useState<string | null>(null);
-  const [closeConfirmPosition, setCloseConfirmPosition] = useState<DropdownPosition>({ top: 0, left: 0 });
+  const [newDropdownPosition, setNewDropdownPosition] =
+    useState<DropdownPosition>({ top: 0, left: 0 });
+  const [closeConfirmSessionId, setCloseConfirmSessionId] = useState<
+    string | null
+  >(null);
+  const [closeConfirmPosition, setCloseConfirmPosition] =
+    useState<DropdownPosition>({ top: 0, left: 0 });
 
   const colorPickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,7 +94,8 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
 
   const updateScrollButtons = () => {
     if (scrollContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+      const { scrollLeft, scrollWidth, clientWidth } =
+        scrollContainerRef.current;
       setCanScrollLeft(scrollLeft > 0);
       setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 1);
     }
@@ -105,7 +136,10 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (colorPickerRef.current && !colorPickerRef.current.contains(event.target as Node)) {
+      if (
+        colorPickerRef.current &&
+        !colorPickerRef.current.contains(event.target as Node)
+      ) {
         setColorPickerSessionId(null);
       }
       if (
@@ -116,7 +150,10 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
       ) {
         setShowNewDropdown(false);
       }
-      if (closeConfirmRef.current && !closeConfirmRef.current.contains(event.target as Node)) {
+      if (
+        closeConfirmRef.current &&
+        !closeConfirmRef.current.contains(event.target as Node)
+      ) {
         setCloseConfirmSessionId(null);
       }
     }
@@ -167,33 +204,36 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
     setShowNewDropdown(false);
   };
 
-  const handleSessionClose = useCallback(async (e: React.MouseEvent, sessionId: string, sessionType: string) => {
-    e.stopPropagation();
+  const handleSessionClose = useCallback(
+    async (e: React.MouseEvent, sessionId: string, sessionType: string) => {
+      e.stopPropagation();
 
-    // For terminal sessions, check if PTY is active
-    if (sessionType === "terminal") {
-      const ptyId = getSessionPtyId(sessionId);
-      if (ptyId) {
-        try {
-          const isActive = await invoke<boolean>("is_pty_active", { ptyId });
-          if (isActive) {
-            const button = e.currentTarget as HTMLElement;
-            const rect = button.getBoundingClientRect();
-            setCloseConfirmPosition({
-              top: rect.bottom + 8,
-              left: rect.left - 100,
-            });
-            setCloseConfirmSessionId(sessionId);
-            return;
+      // For terminal sessions, check if PTY is active
+      if (sessionType === "terminal") {
+        const ptyId = getSessionPtyId(sessionId);
+        if (ptyId) {
+          try {
+            const isActive = await invoke<boolean>("is_pty_active", { ptyId });
+            if (isActive) {
+              const button = e.currentTarget as HTMLElement;
+              const rect = button.getBoundingClientRect();
+              setCloseConfirmPosition({
+                top: rect.bottom + 8,
+                left: rect.left - 100,
+              });
+              setCloseConfirmSessionId(sessionId);
+              return;
+            }
+          } catch {
+            // If check fails, just close
           }
-        } catch {
-          // If check fails, just close
         }
       }
-    }
 
-    removeSession(projectId, sessionId);
-  }, [getSessionPtyId, projectId, removeSession]);
+      removeSession(projectId, sessionId);
+    },
+    [getSessionPtyId, projectId, removeSession],
+  );
 
   const handleConfirmSessionClose = useCallback(() => {
     if (closeConfirmSessionId) {
@@ -202,190 +242,255 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
     }
   }, [closeConfirmSessionId, projectId, removeSession]);
 
-  const handleStopClaudeSession = useCallback(async (e: React.MouseEvent, sessionId: string) => {
-    e.stopPropagation();
-    try {
-      await claudeService.terminateSession(sessionId);
-      finishStreaming(sessionId);
-    } catch (error) {
-      console.error("Failed to stop Claude session:", error);
-    }
-  }, [finishStreaming]);
+  const handleStopClaudeSession = useCallback(
+    async (e: React.MouseEvent, sessionId: string) => {
+      e.stopPropagation();
+      try {
+        await claudeService.terminateSession(sessionId);
+        finishStreaming(sessionId);
+      } catch (error) {
+        console.error("Failed to stop Claude session:", error);
+      }
+    },
+    [finishStreaming],
+  );
 
   return (
-    <div className="flex items-center h-9 bg-bg-primary border-b border-border" data-tauri-drag-region>
+    <div
+      className="flex items-center h-9 bg-bg-primary border-b border-border"
+      data-tauri-drag-region
+    >
       {/* Session tabs container */}
       <div
         ref={scrollContainerRef}
+        id="sessionToolbar"
         className="flex items-center flex-1 overflow-x-auto scrollbar-none"
         data-tauri-drag-region
       >
         {sessions.length === 0 ? (
-          <span className="px-4 text-sm text-text-secondary/50 italic" data-tauri-drag-region>
+          <span
+            className="px-4 text-sm text-text-secondary/50 italic"
+            data-tauri-drag-region
+          >
             Add a new session to start working...
           </span>
-        ) : sessions.map((session, index) => (
-          <div
-            key={session.id}
-            onClick={() => setActiveSession(projectId, session.id)}
-            className={cn(
-              "group flex items-center gap-2 px-4 h-9 cursor-pointer transition-colors relative flex-shrink-0",
-              "border-r border-border/50",
-              activeId === session.id
-                ? "bg-bg-secondary text-text-primary"
-                : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
-            )}
-          >
-            {/* Session color indicator - only show when active */}
-            {activeId === session.id && session.color && (
-              <div
-                className="absolute bottom-0 left-0 right-0 h-0.5"
-                style={{ backgroundColor: session.color }}
-              />
-            )}
-
-            {/* Session icon with color picker */}
-            <div className="relative" ref={colorPickerSessionId === session.id ? colorPickerRef : null}>
-              <button
-                onClick={(e) => handleIconClick(e, session.id)}
-                className="p-0.5 rounded hover:bg-bg-tertiary transition-colors"
-              >
-                {session.type === "terminal" ? (
-                  <Terminal
-                    className="w-3.5 h-3.5"
-                    style={{ color: session.color || "currentColor" }}
-                  />
-                ) : (
-                  <MessageSquare
-                    className="w-3.5 h-3.5"
-                    style={{ color: session.color || "currentColor" }}
-                  />
-                )}
-              </button>
-
-              {/* Color picker dropdown - rendered in portal position */}
-              {colorPickerSessionId === session.id && (
+        ) : (
+          sessions.map((session, index) => (
+            <div
+              key={session.id}
+              onClick={() => setActiveSession(projectId, session.id)}
+              className={cn(
+                "group flex items-center gap-2 px-4 h-9 cursor-pointer transition-colors relative flex-shrink-0",
+                "border-r border-border/50",
+                activeId === session.id
+                  ? "bg-bg-secondary text-text-primary"
+                  : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50",
+              )}
+            >
+              {/* Session color indicator - only show when active */}
+              {activeId === session.id && session.color && (
                 <div
-                  className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[140px]"
-                  style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
+                  className="absolute bottom-0 left-0 right-0 h-0.5"
+                  style={{ backgroundColor: session.color }}
+                />
+              )}
+
+              {/* Session icon with color picker */}
+              <div
+                className="relative"
+                ref={
+                  colorPickerSessionId === session.id ? colorPickerRef : null
+                }
+              >
+                <button
+                  onClick={(e) => handleIconClick(e, session.id)}
+                  className="p-0.5 rounded hover:bg-bg-tertiary transition-colors"
                 >
-                  <div className="text-xs text-text-secondary mb-2 font-medium">Session Color</div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {SESSION_COLORS.map((color) => (
+                  {session.type === "terminal" ? (
+                    <Terminal
+                      className="w-3.5 h-3.5"
+                      style={{ color: session.color || "currentColor" }}
+                    />
+                  ) : (
+                    <MessageSquare
+                      className="w-3.5 h-3.5"
+                      style={{ color: session.color || "currentColor" }}
+                    />
+                  )}
+                </button>
+
+                {/* Color picker dropdown - rendered in portal position */}
+                {colorPickerSessionId === session.id && (
+                  <div
+                    className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[140px]"
+                    style={{
+                      top: dropdownPosition.top,
+                      left: dropdownPosition.left,
+                    }}
+                  >
+                    <div className="text-xs text-text-secondary mb-2 font-medium">
+                      Session Color
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {SESSION_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateSessionColor(session.id, color);
+                            setColorPickerSessionId(null);
+                          }}
+                          className={cn(
+                            "w-7 h-7 rounded-full border-2 transition-all hover:scale-110",
+                            session.color === color
+                              ? "border-white ring-2 ring-accent/50"
+                              : "border-transparent hover:border-white/50",
+                          )}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
+                    {session.color && (
                       <button
-                        key={color}
                         onClick={(e) => {
                           e.stopPropagation();
-                          updateSessionColor(session.id, color);
+                          updateSessionColor(session.id, "");
                           setColorPickerSessionId(null);
                         }}
-                        className={cn(
-                          "w-7 h-7 rounded-full border-2 transition-all hover:scale-110",
-                          session.color === color
-                            ? "border-white ring-2 ring-accent/50"
-                            : "border-transparent hover:border-white/50"
-                        )}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
+                        className="w-full mt-2 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+                      >
+                        Remove color
+                      </button>
+                    )}
                   </div>
-                  {session.color && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateSessionColor(session.id, "");
-                        setColorPickerSessionId(null);
-                      }}
-                      className="w-full mt-2 px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
-                    >
-                      Remove color
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Streaming indicator - pulsing green dot */}
-            {session.type === "claude" && getStreamingState(session.id)?.isStreaming && (
-              <div className="relative flex items-center">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <div className="absolute w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75" />
+                )}
               </div>
-            )}
 
-            {/* Session name */}
-            {editingSessionId === session.id ? (
-              <input
-                ref={inputRef}
-                type="text"
-                value={editingName}
-                onChange={(e) => setEditingName(e.target.value)}
-                onBlur={handleFinishEditing}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleFinishEditing();
-                  if (e.key === "Escape") {
-                    setEditingSessionId(null);
-                    setEditingName("");
-                  }
-                }}
-                onClick={(e) => e.stopPropagation()}
-                className="text-sm bg-bg-tertiary border border-border px-1 w-24 outline-none focus:border-accent"
-              />
-            ) : (
-              <span
-                className="text-sm truncate max-w-[100px]"
-                onDoubleClick={(e) => {
-                  e.stopPropagation();
-                  handleStartEditing(session.id, session.name || `Session ${index + 1}`);
-                }}
-              >
-                {session.name || `Session ${index + 1}`}
-              </span>
-            )}
+              {/* Streaming indicator - pulsing green dot */}
+              {session.type === "claude" &&
+                getStreamingState(session.id)?.isStreaming && (
+                  <div className="relative flex items-center">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <div className="absolute w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75" />
+                  </div>
+                )}
 
-            {/* Edit button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleStartEditing(session.id, session.name || `Session ${index + 1}`);
-              }}
-              className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-text-secondary hover:text-accent transition-opacity"
-            >
-              <Pencil className="w-3 h-3" />
-            </button>
-
-            {/* Stop button for streaming Claude sessions */}
-            {session.type === "claude" && getStreamingState(session.id)?.isStreaming && (
-              <button
-                onClick={(e) => handleStopClaudeSession(e, session.id)}
-                className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-accent-red transition-opacity"
-                title="Stop streaming"
-              >
-                <StopCircle className="w-3 h-3" />
-              </button>
-            )}
-
-            {/* Close button */}
-            <button
-              onClick={(e) => handleSessionClose(e, session.id, session.type)}
-              className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-text-secondary hover:text-accent-red transition-opacity"
-            >
-              <svg
-                className="w-3 h-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M6 18L18 6M6 6l12 12"
+              {/* Session name */}
+              {editingSessionId === session.id ? (
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={editingName}
+                  onChange={(e) => setEditingName(e.target.value)}
+                  onBlur={handleFinishEditing}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleFinishEditing();
+                    if (e.key === "Escape") {
+                      setEditingSessionId(null);
+                      setEditingName("");
+                    }
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-sm bg-bg-tertiary border border-border px-1 w-24 outline-none focus:border-accent"
                 />
-              </svg>
+              ) : (
+                <span
+                  className="text-sm truncate max-w-[100px]"
+                  onDoubleClick={(e) => {
+                    e.stopPropagation();
+                    handleStartEditing(
+                      session.id,
+                      session.name || `Session ${index + 1}`,
+                    );
+                  }}
+                >
+                  {session.name || `Session ${index + 1}`}
+                </span>
+              )}
+
+              {/* Edit button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStartEditing(
+                    session.id,
+                    session.name || `Session ${index + 1}`,
+                  );
+                }}
+                className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-text-secondary hover:text-accent transition-opacity"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+
+              {/* Stop button for streaming Claude sessions */}
+              {session.type === "claude" &&
+                getStreamingState(session.id)?.isStreaming && (
+                  <button
+                    onClick={(e) => handleStopClaudeSession(e, session.id)}
+                    className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-accent-red transition-opacity"
+                    title="Stop streaming"
+                  >
+                    <StopCircle className="w-3 h-3" />
+                  </button>
+                )}
+
+              {/* Close button */}
+              <button
+                onClick={(e) => handleSessionClose(e, session.id, session.type)}
+                className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-text-secondary hover:text-accent-red transition-opacity"
+              >
+                <svg
+                  className="w-3 h-3"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Toolbar buttons */}
+      <div className="flex items-center h-full border-l border-border gap-1 px-2">
+        {/* Farmwork */}
+        <Tooltip content="Farmwork">
+          <button
+            onClick={onOpenFarmwork}
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <Tractor className="w-4 h-4 text-green-500" />
+          </button>
+        </Tooltip>
+
+        {/* Beads Tracker */}
+        {hasBeads && (
+          <Tooltip content="Beads Tracker">
+            <button
+              onClick={onOpenBeads}
+              className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+            >
+              <Waypoints className="w-4 h-4" />
             </button>
-          </div>
-        ))}
+          </Tooltip>
+        )}
+
+        {/* Browse Files */}
+        <Tooltip content="Browse Files">
+          <button
+            onClick={onBrowseFiles}
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <FolderSearch className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
 
       {/* Scroll buttons */}
@@ -397,7 +502,7 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
             "p-1.5 transition-colors",
             canScrollLeft
               ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
-              : "text-text-secondary/30 cursor-not-allowed"
+              : "text-text-secondary/30 cursor-not-allowed",
           )}
         >
           <ChevronLeft className="w-4 h-4" />
@@ -409,7 +514,7 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
             "p-1.5 transition-colors",
             canScrollRight
               ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
-              : "text-text-secondary/30 cursor-not-allowed"
+              : "text-text-secondary/30 cursor-not-allowed",
           )}
         >
           <ChevronRight className="w-4 h-4" />
@@ -417,20 +522,25 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
       </div>
 
       <div className="h-full flex items-center border-l border-border px-2 relative">
-        <IconButton
-          ref={plusButtonRef}
-          size="sm"
-          onClick={handlePlusClick}
-        >
-          <Plus className="w-4 h-4" />
-        </IconButton>
+        <Tooltip content="New Session">
+          <button
+            ref={plusButtonRef}
+            onClick={handlePlusClick}
+            className="p-1.5 rounded-md border border-border bg-bg-tertiary hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </Tooltip>
 
         {/* New session dropdown */}
         {showNewDropdown && (
           <div
             ref={newDropdownRef}
             className="fixed p-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[160px]"
-            style={{ top: newDropdownPosition.top, left: newDropdownPosition.left }}
+            style={{
+              top: newDropdownPosition.top,
+              left: newDropdownPosition.left,
+            }}
           >
             <button
               onClick={() => handleCreateSession("claude")}
@@ -455,9 +565,14 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
         <div
           ref={closeConfirmRef}
           className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[200px]"
-          style={{ top: closeConfirmPosition.top, left: closeConfirmPosition.left }}
+          style={{
+            top: closeConfirmPosition.top,
+            left: closeConfirmPosition.left,
+          }}
         >
-          <div className="text-xs text-text-primary font-medium mb-2">Close Terminal?</div>
+          <div className="text-xs text-text-primary font-medium mb-2">
+            Close Terminal?
+          </div>
           <p className="text-xs text-text-secondary mb-3">
             There may be a running process. Close anyway?
           </p>

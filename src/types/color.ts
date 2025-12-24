@@ -28,3 +28,12 @@ export interface ColorResult {
   a: number;
   hex: string;
 }
+
+export interface MagnifierData {
+  pixels: number[];
+  width: number;
+  height: number;
+  centerColor: ColorResult;
+  cursorX: number;
+  cursorY: number;
+}

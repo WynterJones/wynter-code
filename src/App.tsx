@@ -1,21 +1,35 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { ColorPickerWindow } from "@/components/colorpicker/ColorPickerWindow";
+import { MagnifierWindow } from "@/components/colorpicker/MagnifierWindow";
 import { useEffect, useState } from "react";
 import { useAppFont } from "@/hooks/useAppFont";
 
+type WindowType = "main" | "color-picker" | "color-magnifier";
+
 function App() {
   useAppFont();
-  const [isColorPickerWindow, setIsColorPickerWindow] = useState(false);
+  const [windowType, setWindowType] = useState<WindowType>("main");
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
-    // Check if this is the color picker window
-    setIsColorPickerWindow(window.location.pathname === "/color-picker");
+    // Check window type based on path
+    const path = window.location.pathname;
+    if (path === "/color-picker") {
+      setWindowType("color-picker");
+    } else if (path === "/color-magnifier") {
+      setWindowType("color-magnifier");
+    } else {
+      setWindowType("main");
+    }
   }, []);
 
-  // Render color picker window if on that route
-  if (isColorPickerWindow) {
+  // Render appropriate window based on type
+  if (windowType === "color-picker") {
     return <ColorPickerWindow />;
+  }
+
+  if (windowType === "color-magnifier") {
+    return <MagnifierWindow />;
   }
 
   return <AppShell />;

@@ -1,4 +1,15 @@
-import { X, Braces, Binary, Link, Hash } from "lucide-react";
+import {
+  X,
+  Braces,
+  Binary,
+  Link,
+  Hash,
+  Key,
+  Link2,
+  Code2,
+  GitCompare,
+  QrCode,
+} from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/IconButton";
@@ -8,6 +19,11 @@ import { JsonFormatter } from "./tools/JsonFormatter";
 import { Base64Tool } from "./tools/Base64Tool";
 import { UrlEncodeTool } from "./tools/UrlEncodeTool";
 import { HashGenerator } from "./tools/HashGenerator";
+import { JwtDebugger } from "./tools/JwtDebugger";
+import { UrlParser } from "./tools/UrlParser";
+import { HtmlEntityTool } from "./tools/HtmlEntityTool";
+import { TextDiffTool } from "./tools/TextDiffTool";
+import { QrCodeGenerator } from "./tools/QrCodeGenerator";
 import type { MiniTool } from "./types";
 
 interface DevToolkitPopupProps {
@@ -15,32 +31,84 @@ interface DevToolkitPopupProps {
   onClose: () => void;
 }
 
-const MINI_TOOLS: MiniTool[] = [
+interface ToolCategory {
+  name: string;
+  tools: MiniTool[];
+}
+
+const TOOL_CATEGORIES: ToolCategory[] = [
   {
-    id: "json-formatter",
-    name: "JSON Formatter",
-    description: "Format, minify, and validate JSON",
-    icon: Braces,
+    name: "Text Tools",
+    tools: [
+      {
+        id: "json-formatter",
+        name: "JSON Formatter",
+        description: "Format, minify, and validate JSON",
+        icon: Braces,
+      },
+      {
+        id: "base64",
+        name: "Base64",
+        description: "Encode and decode Base64 strings",
+        icon: Binary,
+      },
+      {
+        id: "url-encode",
+        name: "URL Encode",
+        description: "Encode and decode URLs",
+        icon: Link,
+      },
+      {
+        id: "html-entity",
+        name: "HTML Entity",
+        description: "Encode and decode HTML entities",
+        icon: Code2,
+      },
+      {
+        id: "text-diff",
+        name: "Text Diff",
+        description: "Compare two texts and see differences",
+        icon: GitCompare,
+      },
+    ],
   },
   {
-    id: "base64",
-    name: "Base64",
-    description: "Encode and decode Base64 strings",
-    icon: Binary,
+    name: "Security & Auth",
+    tools: [
+      {
+        id: "hash-generator",
+        name: "Hash Generator",
+        description: "Generate MD5, SHA1, SHA256, SHA512 hashes",
+        icon: Hash,
+      },
+      {
+        id: "jwt-debugger",
+        name: "JWT Debugger",
+        description: "Decode and inspect JWT tokens",
+        icon: Key,
+      },
+    ],
   },
   {
-    id: "url-encode",
-    name: "URL Encode",
-    description: "Encode and decode URLs",
-    icon: Link,
-  },
-  {
-    id: "hash-generator",
-    name: "Hash Generator",
-    description: "Generate MD5, SHA1, SHA256, SHA512 hashes",
-    icon: Hash,
+    name: "Web Tools",
+    tools: [
+      {
+        id: "url-parser",
+        name: "URL Parser",
+        description: "Parse URLs and extract components",
+        icon: Link2,
+      },
+      {
+        id: "qr-generator",
+        name: "QR Generator",
+        description: "Generate QR codes from text or URLs",
+        icon: QrCode,
+      },
+    ],
   },
 ];
+
+const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
 export function DevToolkitPopup({ isOpen, onClose }: DevToolkitPopupProps) {
   const [activeTool, setActiveTool] = useState("json-formatter");
@@ -63,7 +131,7 @@ export function DevToolkitPopup({ isOpen, onClose }: DevToolkitPopupProps) {
 
   if (!isOpen) return null;
 
-  const activeToolData = MINI_TOOLS.find((t) => t.id === activeTool);
+  const activeToolData = ALL_TOOLS.find((t) => t.id === activeTool);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
@@ -88,24 +156,28 @@ export function DevToolkitPopup({ isOpen, onClose }: DevToolkitPopupProps) {
         </div>
 
         <div className="flex flex-1 min-h-0">
-          <div className="w-56 border-r border-border bg-bg-secondary p-2 flex flex-col">
-            <div className="text-[10px] text-text-secondary/70 uppercase tracking-wider px-3 py-2">
-              Text Tools
-            </div>
-            {MINI_TOOLS.map((tool) => (
-              <button
-                key={tool.id}
-                onClick={() => setActiveTool(tool.id)}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left",
-                  activeTool === tool.id
-                    ? "bg-bg-hover text-text-primary"
-                    : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
-                )}
-              >
-                <tool.icon className="w-4 h-4 flex-shrink-0" />
-                <span className="truncate">{tool.name}</span>
-              </button>
+          <div className="w-56 border-r border-border bg-bg-secondary p-2 flex flex-col overflow-y-auto">
+            {TOOL_CATEGORIES.map((category) => (
+              <div key={category.name}>
+                <div className="text-[10px] text-text-secondary/70 uppercase tracking-wider px-3 py-2">
+                  {category.name}
+                </div>
+                {category.tools.map((tool) => (
+                  <button
+                    key={tool.id}
+                    onClick={() => setActiveTool(tool.id)}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left",
+                      activeTool === tool.id
+                        ? "bg-bg-hover text-text-primary"
+                        : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
+                    )}
+                  >
+                    <tool.icon className="w-4 h-4 flex-shrink-0" />
+                    <span className="truncate">{tool.name}</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
 
@@ -114,7 +186,12 @@ export function DevToolkitPopup({ isOpen, onClose }: DevToolkitPopupProps) {
               {activeTool === "json-formatter" && <JsonFormatter />}
               {activeTool === "base64" && <Base64Tool />}
               {activeTool === "url-encode" && <UrlEncodeTool />}
+              {activeTool === "html-entity" && <HtmlEntityTool />}
+              {activeTool === "text-diff" && <TextDiffTool />}
               {activeTool === "hash-generator" && <HashGenerator />}
+              {activeTool === "jwt-debugger" && <JwtDebugger />}
+              {activeTool === "url-parser" && <UrlParser />}
+              {activeTool === "qr-generator" && <QrCodeGenerator />}
             </div>
           </ScrollArea>
         </div>

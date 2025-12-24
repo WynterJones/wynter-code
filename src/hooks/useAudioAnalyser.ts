@@ -8,7 +8,7 @@ interface UseAudioAnalyserOptions {
 
 interface UseAudioAnalyserReturn {
   analyserNode: AnalyserNode | null;
-  getFrequencyData: () => Uint8Array | null;
+  getFrequencyData: () => Uint8Array<ArrayBuffer> | null;
   isReady: boolean;
 }
 
@@ -22,7 +22,7 @@ export function useAudioAnalyser({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const frequencyDataRef = useRef<Uint8Array | null>(null);
+  const frequencyDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {

@@ -6,14 +6,11 @@ import {
   ChevronLeft,
   ChevronRight,
   FolderOpen,
-  Moon,
-  FolderSearch,
+  Music,
   GripVertical,
   Rocket,
   Minus,
   Database,
-  CircleDot,
-  Tractor,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -392,7 +389,6 @@ export function ProjectTabBar({
   const [showDevToolkit, setShowDevToolkit] = useState(false);
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
   const [showClaudeCodeStats, setShowClaudeCodeStats] = useState(false);
-  const [hasBeads, setHasBeads] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -447,25 +443,6 @@ export function ProjectTabBar({
     }
   }, [requestImageBrowser]);
 
-  // Check for beads directory when project changes
-  useEffect(() => {
-    const checkBeads = async () => {
-      if (activeProject?.path) {
-        try {
-          const hasInit = await invoke<boolean>("beads_has_init", {
-            projectPath: activeProject.path,
-          });
-          setHasBeads(hasInit);
-        } catch {
-          setHasBeads(false);
-        }
-      } else {
-        setHasBeads(false);
-      }
-    };
-    checkBeads();
-  }, [activeProject?.path]);
-
   // Listen for command palette tool actions
   useEffect(() => {
     const handleCommandPaletteTool = (e: CustomEvent<{ action: string }>) => {
@@ -507,7 +484,7 @@ export function ProjectTabBar({
           setShowOverwatch(true);
           break;
         case "openBeadsTracker":
-          if (hasBeads) setShowBeadsTracker(true);
+          setShowBeadsTracker(true);
           break;
         case "openMcpManager":
           useMcpStore.getState().openPopup();
@@ -726,9 +703,12 @@ export function ProjectTabBar({
       {/* New Project Button */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Open Project">
-          <IconButton size="sm" onClick={handleOpenProject}>
+          <button
+            onClick={handleOpenProject}
+            className="p-1.5 rounded-md border border-border bg-bg-tertiary hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
+          >
             <Plus className="w-4 h-4" />
-          </IconButton>
+          </button>
         </Tooltip>
       </div>
 
@@ -762,25 +742,10 @@ export function ProjectTabBar({
             onClick={() => setMeditationActive(!isMeditating)}
             className={cn(isMeditating && "text-accent bg-accent/10")}
           >
-            <Moon className={cn("w-4 h-4", isMeditating && "fill-accent")} />
+            <Music className={cn("w-4 h-4", isMeditating && "fill-accent")} />
           </IconButton>
         </Tooltip>
       </div>
-
-      {/* Beads Tracker */}
-      {hasBeads && (
-        <div className="border-l border-border px-2 h-full flex items-center">
-          <Tooltip content="Beads Tracker">
-            <IconButton
-              size="sm"
-              onClick={() => setShowBeadsTracker(true)}
-              className={cn(showBeadsTracker && "text-accent bg-accent/10")}
-            >
-              <CircleDot className="w-4 h-4" />
-            </IconButton>
-          </Tooltip>
-        </div>
-      )}
 
       {/* Database Viewer */}
       <div className="border-l border-border px-2 h-full flex items-center">
@@ -800,15 +765,6 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
-      {/* Browse Files */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content="Browse Files">
-          <IconButton size="sm" onClick={handleBrowseFiles}>
-            <FolderSearch className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
-      </div>
-
       {/* Right side controls */}
       <div
         data-tauri-drag-region
@@ -817,16 +773,6 @@ export function ProjectTabBar({
           isMeditating && "opacity-30 hover:opacity-100",
         )}
       >
-        <button
-          onClick={() => setShowFarmworkTycoon(true)}
-          className={cn(
-            "flex items-center gap-2 px-3 h-8 rounded-md text-sm",
-            "bg-bg-tertiary border border-border hover:bg-bg-hover transition-colors"
-          )}
-        >
-          <Tractor className="w-3.5 h-3.5 text-green-500" />
-          <span className="text-text-primary text-xs">Farmwork</span>
-        </button>
         {onOpenSubscriptions && (
           <SubscriptionButton onOpenManage={onOpenSubscriptions} />
         )}

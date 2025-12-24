@@ -5,6 +5,9 @@ use tauri::{AppHandle, Emitter, Manager, WebviewWindowBuilder};
 // Store last window position
 static LAST_POSITION: Mutex<Option<(f64, f64)>> = Mutex::new(None);
 
+// Store magnifier window ID for self-exclusion from screenshots
+static MAGNIFIER_WINDOW_ID: Mutex<Option<u32>> = Mutex::new(None);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorResult {
     pub r: u8,
@@ -19,6 +22,16 @@ impl ColorResult {
         let hex = format!("{:02X}{:02X}{:02X}", r, g, b);
         Self { r, g, b, a, hex }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MagnifierData {
+    pub pixels: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+    pub center_color: ColorResult,
+    pub cursor_x: f64,
+    pub cursor_y: f64,
 }
 
 /// Pick the color at the current cursor position using screen capture
@@ -240,4 +253,197 @@ pub fn request_screen_recording_permission() {
 #[tauri::command]
 pub fn save_color_picker_position(x: f64, y: f64) {
     *LAST_POSITION.lock().unwrap() = Some((x, y));
+}
+
+/// Capture a region of pixels around the cursor for the magnifier
+#[cfg(target_os = "macos")]
+#[tauri::command]
+pub async fn capture_magnifier_region() -> Result<MagnifierData, String> {
+    use cocoa::base::id;
+    use cocoa::foundation::NSPoint;
+    use core_graphics::display::CGDisplay;
+    use core_graphics::geometry::{CGPoint, CGRect, CGSize};
+    use objc::runtime::Class;
+    use objc::{msg_send, sel, sel_impl};
+
+    let capture_size: i32 = 11; // 11x11 pixels for true center
+    let half_size = capture_size / 2;
+
+    unsafe {
+        // Get cursor position
+        let event_class = Class::get("NSEvent").ok_or("NSEvent not found")?;
+        let mouse_location: NSPoint = msg_send![event_class, mouseLocation];
+
+        // Get the main screen to convert coordinates
+        let screen_class = Class::get("NSScreen").ok_or("NSScreen not found")?;
+        let main_screen: id = msg_send![screen_class, mainScreen];
+        let screen_frame: cocoa::foundation::NSRect = msg_send![main_screen, frame];
+
+        // Convert to screen coordinates (macOS uses bottom-left origin, CGDisplay uses top-left)
+        let cursor_x = mouse_location.x;
+        let cursor_y = screen_frame.size.height - mouse_location.y;
+
+        // Calculate capture region (clamped to screen bounds)
+        let x = (cursor_x as i32 - half_size).max(0);
+        let y = (cursor_y as i32 - half_size).max(0);
+
+        let rect = CGRect::new(
+            &CGPoint::new(x as f64, y as f64),
+            &CGSize::new(capture_size as f64, capture_size as f64),
+        );
+
+        // Get magnifier window ID for exclusion (if set)
+        let window_id = MAGNIFIER_WINDOW_ID.lock().unwrap().unwrap_or(0);
+
+        // Capture screenshot, excluding the magnifier window if it exists
+        let list_option = if window_id > 0 {
+            core_graphics::display::kCGWindowListOptionOnScreenBelowWindow
+        } else {
+            core_graphics::display::kCGWindowListOptionOnScreenOnly
+        };
+
+        let image = CGDisplay::screenshot(
+            rect,
+            list_option,
+            window_id,
+            core_graphics::display::kCGWindowImageDefault,
+        )
+        .ok_or("Failed to capture screen region")?;
+
+        // Get pixel data
+        let data = image.data();
+        let bytes = data.bytes();
+        let bytes_per_row = image.bytes_per_row();
+        let actual_width = image.width();
+        let actual_height = image.height();
+
+        // Convert BGRA to RGBA
+        let mut rgba_pixels: Vec<u8> = Vec::with_capacity((actual_width * actual_height * 4) as usize);
+
+        for row in 0..actual_height {
+            for col in 0..actual_width {
+                let offset = (row * bytes_per_row + col * 4) as usize;
+                if offset + 3 < bytes.len() {
+                    let b = bytes[offset];
+                    let g = bytes[offset + 1];
+                    let r = bytes[offset + 2];
+                    let a = bytes[offset + 3];
+                    rgba_pixels.extend_from_slice(&[r, g, b, a]);
+                }
+            }
+        }
+
+        // Get center pixel color
+        let center_offset = ((actual_height / 2) * actual_width + (actual_width / 2)) as usize * 4;
+        let center_color = if center_offset + 3 < rgba_pixels.len() {
+            ColorResult::new(
+                rgba_pixels[center_offset],
+                rgba_pixels[center_offset + 1],
+                rgba_pixels[center_offset + 2],
+                rgba_pixels[center_offset + 3] as f32 / 255.0,
+            )
+        } else {
+            ColorResult::new(128, 128, 128, 1.0)
+        };
+
+        Ok(MagnifierData {
+            pixels: rgba_pixels,
+            width: actual_width as u32,
+            height: actual_height as u32,
+            center_color,
+            cursor_x,
+            cursor_y,
+        })
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub async fn capture_magnifier_region() -> Result<MagnifierData, String> {
+    Err("Magnifier is only available on macOS".to_string())
+}
+
+/// Start color picking mode - creates the magnifier overlay window
+#[tauri::command]
+pub async fn start_color_picking_mode(app: AppHandle) -> Result<(), String> {
+    // Close existing magnifier if any
+    if let Some(window) = app.get_webview_window("color-magnifier") {
+        let _ = window.destroy();
+    }
+
+    // Create magnifier window
+    let window = WebviewWindowBuilder::new(
+        &app,
+        "color-magnifier",
+        tauri::WebviewUrl::App("/color-magnifier".into()),
+    )
+    .title("")
+    .inner_size(140.0, 170.0) // 100px circle + hex label + padding
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .resizable(false)
+    .visible(true)
+    .focused(false)
+    .shadow(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    // Store window ID for screenshot exclusion
+    #[cfg(target_os = "macos")]
+    {
+        use cocoa::base::id;
+        use objc::{msg_send, sel, sel_impl};
+
+        if let Ok(ns_window) = window.ns_window() {
+            unsafe {
+                let ns_window = ns_window as id;
+                let window_number: i64 = msg_send![ns_window, windowNumber];
+                *MAGNIFIER_WINDOW_ID.lock().unwrap() = Some(window_number as u32);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Stop color picking mode - closes magnifier and optionally opens color picker
+#[tauri::command]
+pub async fn stop_color_picking_mode(
+    app: AppHandle,
+    picked_color: Option<ColorResult>,
+) -> Result<(), String> {
+    // Clear magnifier window ID
+    *MAGNIFIER_WINDOW_ID.lock().unwrap() = None;
+
+    // Close magnifier window
+    if let Some(window) = app.get_webview_window("color-magnifier") {
+        window.close().map_err(|e| e.to_string())?;
+    }
+
+    // If a color was picked, open the color picker window with it
+    if let Some(color) = picked_color {
+        open_color_picker_window(app, Some(color)).await?;
+    }
+
+    Ok(())
+}
+
+/// Update magnifier window position to follow cursor
+#[tauri::command]
+pub async fn update_magnifier_position(app: AppHandle, x: f64, y: f64) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("color-magnifier") {
+        // Offset the window so it doesn't appear directly under cursor
+        // Place it 20px to the right and 20px down
+        let offset_x = x + 20.0;
+        let offset_y = y + 20.0;
+
+        window
+            .set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+                x: offset_x as i32,
+                y: offset_y as i32,
+            }))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }

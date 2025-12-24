@@ -1,6 +1,8 @@
 import { useEffect, useCallback, useMemo, useState } from "react";
+import { Radio } from "lucide-react";
 import { PlanetCarousel } from "./PlanetCarousel";
 import { MeditationAudioPlayer } from "./MeditationAudioPlayer";
+import { AudioVisualizer } from "./AudioVisualizer";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 
@@ -191,17 +193,35 @@ export function MeditationScreen() {
           </div>
       )}
 
+      {/* Radio button - center bottom */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
+        <button
+          onClick={() => {
+            window.dispatchEvent(
+              new CustomEvent("open-settings", { detail: { tab: "music" } })
+            );
+          }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-bg-secondary/60 border border-border/30 text-text-secondary hover:text-text-primary hover:bg-bg-secondary/80 hover:border-accent-cyan/30 transition-all duration-300 backdrop-blur-sm group"
+        >
+          <Radio className="w-4 h-4 text-accent-cyan group-hover:animate-pulse" />
+          <span className="text-sm font-medium">Radio</span>
+        </button>
+      </div>
+
       {/* Audio controls - bottom right, subtle */}
       <div className="fixed bottom-6 right-6 z-50 opacity-60 hover:opacity-100 transition-opacity duration-500">
         <MeditationAudioPlayer />
       </div>
 
-      {/* Keyboard hints - bottom left, very subtle */}
-      <div className="fixed bottom-6 left-6 text-white/15 text-xs space-y-1 opacity-40 hover:opacity-100 transition-opacity duration-700">
-        <div>Space - Play/Pause</div>
-        <div>← → - Change Track</div>
-        <div>↑ ↓ - Volume</div>
-        <div>Esc - Close</div>
+      {/* Visualizer and keyboard hints - bottom left */}
+      <div className="fixed bottom-6 left-6 z-50 flex flex-col gap-4">
+        <AudioVisualizer variant="full" />
+        <div className="text-white/15 text-xs space-y-1 opacity-40 hover:opacity-100 transition-opacity duration-700">
+          <div>Space - Play/Pause</div>
+          <div>← → - Change Track</div>
+          <div>↑ ↓ - Volume</div>
+          <div>Esc - Close</div>
+        </div>
       </div>
 
       {/* Vignette effect */}

@@ -10,6 +10,7 @@ import {
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { getNightrideStationBySlug } from "./radioStations";
+import { AudioVisualizer } from "./AudioVisualizer";
 import { cn } from "@/lib/utils";
 
 export function MiniMeditationPlayer() {
@@ -185,6 +186,11 @@ export function MiniMeditationPlayer() {
       >
         <X className="w-3.5 h-3.5" />
       </button>
+
+      {/* Mini visualizer */}
+      <div className="ml-1">
+        <AudioVisualizer variant="mini" />
+      </div>
     </div>
   );
 }

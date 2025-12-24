@@ -124,7 +124,7 @@ fn main() {
                         "pick_color" => {
                             let app_handle = app.clone();
                             tauri::async_runtime::spawn(async move {
-                                let _ = color_picker::pick_color_and_show(app_handle).await;
+                                let _ = color_picker::start_color_picking_mode(app_handle).await;
                             });
                         }
                         "show_picker" => {
@@ -146,10 +146,10 @@ fn main() {
                         ..
                     } = event
                     {
-                        // Left click on tray icon triggers color pick
+                        // Left click on tray icon triggers color pick magnifier
                         let app_handle = tray.app_handle().clone();
                         tauri::async_runtime::spawn(async move {
-                            let _ = color_picker::pick_color_and_show(app_handle).await;
+                            let _ = color_picker::start_color_picking_mode(app_handle).await;
                         });
                     }
                 })
@@ -270,6 +270,10 @@ fn main() {
             color_picker::check_screen_recording_permission,
             color_picker::request_screen_recording_permission,
             color_picker::save_color_picker_position,
+            color_picker::capture_magnifier_region,
+            color_picker::start_color_picking_mode,
+            color_picker::stop_color_picking_mode,
+            color_picker::update_magnifier_position,
             live_preview::detect_project_type,
             live_preview::get_local_ip,
             live_preview::start_preview_server,

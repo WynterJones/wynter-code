@@ -24,16 +24,17 @@ import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector
 import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
 import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
 
+type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "farmwork" | "about";
+
 interface SettingsPopupProps {
   onClose: () => void;
+  initialTab?: SettingsTab;
 }
-
-type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "farmwork" | "about";
 
 const APP_VERSION = "1.0.0";
 
-export function SettingsPopup({ onClose }: SettingsPopupProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopupProps) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

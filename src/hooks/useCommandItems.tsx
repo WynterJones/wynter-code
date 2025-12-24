@@ -8,8 +8,8 @@ import type { CommandItem } from "@/types";
 
 function dispatchToolAction(actionKey: string) {
   if (actionKey === "openColorPicker") {
-    invoke("pick_color_and_show").catch((err) => {
-      console.error("Failed to open color picker:", err);
+    invoke("start_color_picking_mode").catch((err) => {
+      console.error("Failed to start color picking mode:", err);
     });
   } else {
     window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: actionKey } }));

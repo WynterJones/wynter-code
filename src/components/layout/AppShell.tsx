@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { PanelRightClose, PanelLeftClose } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import { ProjectTabBar } from "./ProjectTabBar";
 import { SessionTabBar } from "./SessionTabBar";
 import { Sidebar } from "./Sidebar";
@@ -33,6 +34,7 @@ export function AppShell() {
   const { hasCompletedOnboarding } = useOnboardingStore();
   const sidebarPosition = useSettingsStore((s) => s.sidebarPosition);
   const [showSettings, setShowSettings] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -47,6 +49,7 @@ export function AppShell() {
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const [pendingImage, setPendingImage] = useState<ImageAttachment | null>(null);
   const [requestImageBrowser, setRequestImageBrowser] = useState(false);
+  const [hasBeads, setHasBeads] = useState(false);
 
   const handleSendToPrompt = useCallback((image: ImageAttachment) => {
     setPendingImage(image);
@@ -66,6 +69,37 @@ export function AppShell() {
 
   // Initialize custom music loading
   useCustomMusic();
+
+  // Check for beads directory when project changes
+  useEffect(() => {
+    const checkBeads = async () => {
+      if (activeProject?.path) {
+        try {
+          const hasInit = await invoke<boolean>("beads_has_init", {
+            projectPath: activeProject.path,
+          });
+          setHasBeads(hasInit);
+        } catch {
+          setHasBeads(false);
+        }
+      } else {
+        setHasBeads(false);
+      }
+    };
+    checkBeads();
+  }, [activeProject?.path]);
+
+  const handleOpenFarmwork = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openFarmworkTycoon" } }));
+  }, []);
+
+  const handleOpenBeads = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openBeadsTracker" } }));
+  }, []);
+
+  const handleBrowseFiles = useCallback(() => {
+    setRequestImageBrowser(true);
+  }, []);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -125,6 +159,18 @@ export function AppShell() {
     window.dispatchEvent(new CustomEvent("focus-file-browser"));
   }, [sidebarCollapsed]);
 
+  // Listen for open-settings events (e.g., from meditation Radio button)
+  useEffect(() => {
+    const handleOpenSettings = (e: CustomEvent<{ tab?: string }>) => {
+      setSettingsInitialTab(e.detail?.tab);
+      setShowSettings(true);
+    };
+    window.addEventListener("open-settings", handleOpenSettings as EventListener);
+    return () => {
+      window.removeEventListener("open-settings", handleOpenSettings as EventListener);
+    };
+  }, []);
+
   const openCommandPalette = useCommandPaletteStore((s) => s.open);
 
   // Register global keyboard shortcuts
@@ -152,7 +198,15 @@ export function AppShell() {
         onImageBrowserOpened={handleImageBrowserOpened}
       />
 
-      {showSettings && <SettingsPopup onClose={() => setShowSettings(false)} />}
+      {showSettings && (
+        <SettingsPopup
+          onClose={() => {
+            setShowSettings(false);
+            setSettingsInitialTab(undefined);
+          }}
+          initialTab={settingsInitialTab as "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "farmwork" | "about" | undefined}
+        />
+      )}
       {showSubscriptions && <SubscriptionPopup onClose={() => setShowSubscriptions(false)} />}
       {showShortcuts && <KeyboardShortcutsPopup onClose={() => setShowShortcuts(false)} />}
       {isMeditating && <MeditationScreen />}
@@ -162,7 +216,13 @@ export function AppShell() {
 
       {activeProject ? (
         <div className="flex-1 flex flex-col overflow-hidden">
-          <SessionTabBar projectId={activeProject.id} />
+          <SessionTabBar
+            projectId={activeProject.id}
+            hasBeads={hasBeads}
+            onOpenFarmwork={handleOpenFarmwork}
+            onOpenBeads={handleOpenBeads}
+            onBrowseFiles={handleBrowseFiles}
+          />
 
           <div className={`flex-1 flex overflow-hidden relative ${isResizingSidebar ? "select-none" : ""}`}>
             {sidebarPosition === "left" && (
