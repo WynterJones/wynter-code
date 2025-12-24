@@ -17,6 +17,7 @@ import {
   Blocks,
   Image,
   Hammer,
+  Tractor,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -157,6 +158,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Hammer,
     actionKey: "openDevToolkit",
     category: "utilities",
+  },
+  {
+    id: "farmwork-tycoon",
+    name: "Farmwork Tycoon",
+    description: "Visualize CLI activity as a farm game",
+    icon: Tractor,
+    actionKey: "openFarmworkTycoon",
+    category: "development",
   },
 ];
 

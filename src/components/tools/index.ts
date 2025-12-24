@@ -15,3 +15,4 @@ export { DatabaseViewerPopup } from "./database-viewer";
 export { OverwatchPopup } from "./overwatch";
 export { BeadsTrackerPopup } from "./BeadsTrackerPopup";
 export { FaviconGeneratorPopup } from "./favicon-generator";
+export { FarmworkTycoonPopup, MiniGamePlayer } from "./farmwork-tycoon";

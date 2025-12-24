@@ -13,6 +13,7 @@ import {
   Minus,
   Database,
   CircleDot,
+  Tractor,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -58,7 +59,10 @@ import {
   OverwatchPopup,
   BeadsTrackerPopup,
   FaviconGeneratorPopup,
+  FarmworkTycoonPopup,
+  MiniGamePlayer,
 } from "@/components/tools";
+import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { McpManagerPopup } from "@/components/tools/mcp-manager";
 import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
 import { useMcpStore } from "@/stores";
@@ -384,6 +388,7 @@ export function ProjectTabBar({
   const [showBeadsTracker, setShowBeadsTracker] = useState(false);
   const [showFaviconGenerator, setShowFaviconGenerator] = useState(false);
   const [showDevToolkit, setShowDevToolkit] = useState(false);
+  const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
   const [hasBeads, setHasBeads] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -509,6 +514,9 @@ export function ProjectTabBar({
           break;
         case "openDevToolkit":
           setShowDevToolkit(true);
+          break;
+        case "openFarmworkTycoon":
+          setShowFarmworkTycoon(true);
           break;
       }
     };
@@ -680,6 +688,19 @@ export function ProjectTabBar({
           </SortableContext>
         </div>
       </DndContext>
+
+      {/* Farmwork Tycoon */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Farmwork Tycoon">
+          <IconButton
+            size="sm"
+            onClick={() => setShowFarmworkTycoon(true)}
+            className="text-green-500 hover:text-green-400"
+          >
+            <Tractor className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
 
       {/* Scroll buttons */}
       <div className="flex items-center border-l border-border h-full">
@@ -1030,6 +1051,30 @@ export function ProjectTabBar({
         isOpen={showDevToolkit}
         onClose={() => setShowDevToolkit(false)}
       />
+
+      {/* Farmwork Tycoon */}
+      <FarmworkTycoonPopup
+        isOpen={showFarmworkTycoon}
+        onClose={() => setShowFarmworkTycoon(false)}
+      />
+
+      {/* Farmwork Mini Player - persists even when popup is closed */}
+      <FarmworkMiniPlayerWrapper onExpand={() => setShowFarmworkTycoon(true)} />
     </div>
+  );
+}
+
+function FarmworkMiniPlayerWrapper({ onExpand }: { onExpand: () => void }) {
+  const { showMiniPlayer, hideMiniPlayer } = useFarmworkTycoonStore();
+
+  return (
+    <MiniGamePlayer
+      isOpen={showMiniPlayer}
+      onClose={hideMiniPlayer}
+      onExpand={() => {
+        hideMiniPlayer();
+        onExpand();
+      }}
+    />
   );
 }
