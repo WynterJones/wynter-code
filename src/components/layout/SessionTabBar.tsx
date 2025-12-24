@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Plus, MessageSquare, Pencil, ChevronLeft, ChevronRight, Terminal } from "lucide-react";
+import { Plus, MessageSquare, Pencil, ChevronLeft, ChevronRight, Terminal, StopCircle } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
+import { claudeService } from "@/services/claude";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,8 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
     removeSession,
     updateSessionName,
     updateSessionColor,
+    getStreamingState,
+    finishStreaming,
   } = useSessionStore();
   const { getSessionPtyId } = useTerminalStore();
 
@@ -199,6 +202,16 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
     }
   }, [closeConfirmSessionId, projectId, removeSession]);
 
+  const handleStopClaudeSession = useCallback(async (e: React.MouseEvent, sessionId: string) => {
+    e.stopPropagation();
+    try {
+      await claudeService.terminateSession(sessionId);
+      finishStreaming(sessionId);
+    } catch (error) {
+      console.error("Failed to stop Claude session:", error);
+    }
+  }, [finishStreaming]);
+
   return (
     <div className="flex items-center h-9 bg-bg-primary border-b border-border">
       {/* Session tabs container */}
@@ -291,6 +304,14 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
               )}
             </div>
 
+            {/* Streaming indicator - pulsing green dot */}
+            {session.type === "claude" && getStreamingState(session.id)?.isStreaming && (
+              <div className="relative flex items-center">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <div className="absolute w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75" />
+              </div>
+            )}
+
             {/* Session name */}
             {editingSessionId === session.id ? (
               <input
@@ -331,6 +352,17 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
             >
               <Pencil className="w-3 h-3" />
             </button>
+
+            {/* Stop button for streaming Claude sessions */}
+            {session.type === "claude" && getStreamingState(session.id)?.isStreaming && (
+              <button
+                onClick={(e) => handleStopClaudeSession(e, session.id)}
+                className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-accent-red transition-opacity"
+                title="Stop streaming"
+              >
+                <StopCircle className="w-3 h-3" />
+              </button>
+            )}
 
             {/* Close button */}
             <button

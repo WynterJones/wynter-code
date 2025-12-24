@@ -1,6 +1,7 @@
 import { Sprite, Container, Assets, Texture, Graphics } from "pixi.js";
-import type { Vehicle as VehicleData, Point, VehicleDirection, VehicleType } from "../../types";
+import type { Vehicle as VehicleData, Point, VehicleDirection, VehicleType, VehicleTaskStatus } from "../../types";
 import { VEHICLE_SPRITE_PATHS } from "../../types";
+import { VehicleBadge } from "./VehicleBadge";
 
 const VEHICLE_COLORS: Record<VehicleType, number> = {
   "blue-truck": 0x3b82f6,
@@ -43,6 +44,8 @@ export class VehicleSprite extends Container {
   private currentDirection: VehicleDirection = "up";
   private isCarrying = false;
   private isLoaded = false;
+  private badge: VehicleBadge;
+  private isFinished = false;
 
   constructor(data: VehicleData) {
     super();
@@ -56,11 +59,21 @@ export class VehicleSprite extends Container {
     this.fallbackGraphic.roundRect(-15, -20, 30, 40, 4);
     this.fallbackGraphic.fill(color);
     this.fallbackGraphic.stroke({ color: 0x000000, width: 2 });
+    this.fallbackGraphic.scale.set(0.5);
     this.addChild(this.fallbackGraphic);
 
     this.sprite = new Sprite();
     this.sprite.anchor.set(0.5, 0.5);
+    this.sprite.scale.set(0.5);
     this.addChild(this.sprite);
+
+    this.badge = new VehicleBadge();
+    this.badge.position.set(0, -30);
+    this.badge.setBaseY(-30);
+    this.addChild(this.badge);
+
+    const currentDest = data.route?.[data.currentRouteIndex] ?? data.destination;
+    this.badge.setTask(data.task ?? "entering", currentDest ?? undefined);
 
     this.position.set(data.position.x, data.position.y);
 
@@ -84,23 +97,24 @@ export class VehicleSprite extends Container {
 
     let texture: Texture;
     const filled = this.isCarrying;
+    const baseScale = 0.5;
 
     switch (this.currentDirection) {
       case "up":
         texture = filled ? this.textures.upFilled : this.textures.up;
-        this.sprite.scale.set(1, 1);
+        this.sprite.scale.set(baseScale, baseScale);
         break;
       case "down":
         texture = filled ? this.textures.upFilled : this.textures.up;
-        this.sprite.scale.set(1, -1);
+        this.sprite.scale.set(baseScale, -baseScale);
         break;
       case "left":
         texture = filled ? this.textures.leftFilled : this.textures.left;
-        this.sprite.scale.set(1, 1);
+        this.sprite.scale.set(-baseScale, baseScale); // Flip horizontally for left
         break;
       case "right":
         texture = filled ? this.textures.leftFilled : this.textures.left;
-        this.sprite.scale.set(-1, 1);
+        this.sprite.scale.set(baseScale, baseScale); // No flip for right
         break;
     }
 
@@ -119,6 +133,13 @@ export class VehicleSprite extends Container {
   }
 
   update(dtSeconds: number): boolean {
+    this.badge.update(dtSeconds);
+
+    // If already finished, don't process further
+    if (this.isFinished) {
+      return false;
+    }
+
     // If no path yet, wait (don't mark as arrived)
     if (this.data.path.length === 0) {
       return false;
@@ -170,7 +191,18 @@ export class VehicleSprite extends Container {
   updateData(data: VehicleData): void {
     const carryingChanged = this.isCarrying !== data.carrying;
 
+    // Preserve the current path and pathIndex - don't let store sync overwrite them
+    const currentPath = this.data.path;
+    const currentPathIndex = this.data.pathIndex;
+
     this.data = data;
+
+    // Restore path if we had one (store doesn't track path state)
+    if (currentPath.length > 0) {
+      this.data.path = currentPath;
+      this.data.pathIndex = currentPathIndex;
+    }
+
     this.position.set(data.position.x, data.position.y);
     this.isCarrying = data.carrying;
 
@@ -187,7 +219,53 @@ export class VehicleSprite extends Container {
     }
   }
 
+  setTask(task: VehicleTaskStatus, destination?: string): void {
+    this.data.task = task;
+    this.badge.setTask(task, destination);
+  }
+
+  getTask(): VehicleTaskStatus {
+    return this.data.task;
+  }
+
+  getCurrentDestination(): string | undefined {
+    if (this.data.route && this.data.route.length > 0) {
+      return this.data.route[this.data.currentRouteIndex];
+    }
+    return this.data.destination ?? undefined;
+  }
+
+  advanceRoute(): boolean {
+    if (!this.data.route || this.data.route.length === 0) {
+      return true;
+    }
+
+    this.data.currentRouteIndex++;
+
+    if (this.data.currentRouteIndex >= this.data.route.length) {
+      this.setTask("exiting");
+      return true;
+    }
+
+    const nextDest = this.data.route[this.data.currentRouteIndex];
+    this.setTask("traveling_to_delivery", nextDest);
+    return false;
+  }
+
   isAtDestination(): boolean {
     return this.data.path.length === 0 || this.data.pathIndex >= this.data.path.length;
+  }
+
+  markFinished(): void {
+    this.isFinished = true;
+    this.setTask("finished");
+  }
+
+  isMarkedFinished(): boolean {
+    return this.isFinished;
+  }
+
+  setBadgeVisible(visible: boolean): void {
+    this.badge.visible = visible;
   }
 }

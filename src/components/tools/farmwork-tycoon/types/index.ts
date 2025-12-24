@@ -40,12 +40,26 @@ export interface Building {
 export type VehicleType = "blue-truck" | "white-truck" | "tractor";
 export type VehicleDirection = "up" | "down" | "left" | "right";
 
+export type VehicleTaskStatus =
+  | "entering"
+  | "traveling_to_pickup"
+  | "loading"
+  | "traveling_to_delivery"
+  | "delivering"
+  | "exiting"
+  | "finished";
+
 export interface Vehicle {
   id: string;
   type: VehicleType;
   position: Point;
   destination: string | null;
   returnDestination?: string | null;
+  route: string[];
+  currentRouteIndex: number;
+  task: VehicleTaskStatus;
+  spawnPoint?: string;
+  exitPoint?: string;
   path: Point[];
   pathIndex: number;
   speed: number;
@@ -70,18 +84,35 @@ export interface ActivityEvent {
   buildingId?: string;
 }
 
-export interface AuditScores {
-  security: number;
-  tests: number;
-  performance: number;
-  accessibility: number;
-  codeQuality: number;
-  farmhouse: number;
+export interface AuditItem {
+  text: string;
+  priority?: "high" | "medium" | "low";
 }
+
+export interface AuditMetadata {
+  score: number;
+  lastUpdated: string | null;
+  status: string | null;
+  openItems: AuditItem[];
+}
+
+export interface AuditScores {
+  security: AuditMetadata;
+  tests: AuditMetadata;
+  performance: AuditMetadata;
+  accessibility: AuditMetadata;
+  codeQuality: AuditMetadata;
+  farmhouse: AuditMetadata;
+}
+
+export type AuditKey = keyof AuditScores;
 
 export interface GardenStats {
   activeIdeas: number;
   ideas: string[];
+  planted: number;      // Ideas in Ideas section
+  growing: number;      // Graduated to plans
+  picked: number;       // Implemented
 }
 
 export interface CompostStats {
@@ -147,6 +178,7 @@ export interface FarmworkTycoonState {
   setNavGraph: (graph: NavGraph) => void;
   updateVehiclePosition: (vehicleId: string, position: Point) => void;
   spawnVehicle: (destination: string, returnDestination?: string) => string;
+  spawnVehicleWithRoute: (route: string[]) => string;
   removeVehicle: (vehicleId: string) => void;
   setVehicleCarrying: (vehicleId: string, carrying: boolean) => void;
   startTestRun: () => void;
@@ -263,3 +295,48 @@ export const VEHICLE_SPRITE_PATHS: Record<
     leftFilled: "/tycoon/tractor-left-filled.png",
   },
 };
+
+export const BUILDING_BADGE_ICONS: Record<BuildingType, string> = {
+  security: "Shield",
+  tests: "TestTube2",
+  performance: "Gauge",
+  farmhouse: "Home",
+  office: "Building2",
+  accessibility: "Accessibility",
+  garden: "Sprout",
+  compost: "Trash2",
+  codeQuality: "Code2",
+};
+
+export const VEHICLE_SPEED = {
+  BASE: 180,
+  VARIANCE: 90,
+} as const;
+
+export function getTaskMessage(
+  task: VehicleTaskStatus,
+  destination?: string
+): string {
+  const destName = destination
+    ? BUILDING_NAMES[destination as BuildingType] || destination
+    : "";
+
+  switch (task) {
+    case "entering":
+      return "Arriving...";
+    case "traveling_to_pickup":
+      return `Going to ${destName}`;
+    case "loading":
+      return `Loading at ${destName}`;
+    case "traveling_to_delivery":
+      return `Delivering to ${destName}`;
+    case "delivering":
+      return `Unloading at ${destName}`;
+    case "exiting":
+      return "Task Complete!";
+    case "finished":
+      return "Done!";
+    default:
+      return "";
+  }
+}

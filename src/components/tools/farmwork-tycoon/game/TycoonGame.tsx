@@ -5,6 +5,9 @@ import { navigationSystem } from "./navigation/NavigationSystem";
 import { BuildingSprite } from "./entities/Building";
 import { VehicleSprite } from "./entities/Vehicle";
 import { GardenFlowers } from "./entities/GardenFlowers";
+import { FarmParticleEmitter } from "./particles/FarmParticleEmitter";
+import { BUILDING_POSITIONS, type BuildingType } from "../types";
+import { getRandomSpawnPoint } from "./navigation/SpawnPoints";
 
 const GAME_SIZE = 1000;
 
@@ -12,12 +15,14 @@ interface TycoonGameProps {
   containerWidth?: number;
   containerHeight?: number;
   autoScale?: boolean;
+  isMiniPlayer?: boolean;
 }
 
 export function TycoonGame({
   containerWidth,
   containerHeight,
-  autoScale = true
+  autoScale = true,
+  isMiniPlayer = false
 }: TycoonGameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
@@ -29,6 +34,7 @@ export function TycoonGame({
   const debugGraphicsRef = useRef<Graphics | null>(null);
   const bgSpriteRef = useRef<Sprite | null>(null);
   const gardenFlowersRef = useRef<GardenFlowers | null>(null);
+  const particleEmitterRef = useRef<FarmParticleEmitter | null>(null);
 
   const [scale, setScale] = useState(1);
 
@@ -59,10 +65,16 @@ export function TycoonGame({
     (graphics: Graphics) => {
       graphics.clear();
 
-      if (!showDebug) return;
+      if (!showDebug) {
+        console.log("[Tycoon] Debug overlay cleared (showDebug=false)");
+        return;
+      }
+
+      console.log("[Tycoon] Drawing debug overlay...");
 
       // Draw walkable grid cells (road areas)
       const grid = navigationSystem.getGrid();
+      console.log(`[Tycoon] Grid: ${grid ? `${grid.cols}x${grid.rows}` : 'null'}`);
       if (grid) {
         for (let gy = 0; gy < grid.rows; gy++) {
           for (let gx = 0; gx < grid.cols; gx++) {
@@ -109,15 +121,20 @@ export function TycoonGame({
 
   // Initialize PixiJS app once on mount
   useEffect(() => {
-    if (!containerRef.current || initializedRef.current) return;
+    if (!containerRef.current) return;
 
-    // Mark as initializing immediately to prevent double-init in Strict Mode
-    initializedRef.current = true;
+    // Local cancellation token for this specific effect invocation
+    // This properly handles React Strict Mode's double-invoke pattern
+    let cancelled = false;
+    let localApp: Application | null = null;
+    let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+
     mountedRef.current = true;
-    const app = new Application();
-    appRef.current = app;
 
     const initApp = async () => {
+      const app = new Application();
+      localApp = app;
+
       // Calculate initial display size
       const initialDisplaySize = containerWidth !== undefined && containerHeight !== undefined
         ? Math.min(containerWidth, containerHeight)
@@ -131,18 +148,31 @@ export function TycoonGame({
         resolution: 1,
       });
 
+      // Check if this effect was cancelled during async init
+      if (cancelled || !app.stage) {
+        try { app.destroy(true, { children: true, texture: true }); } catch {}
+        return;
+      }
+
+      // Check if container already has a canvas (race condition protection)
+      if (containerRef.current?.querySelector('canvas')) {
+        try { app.destroy(true, { children: true, texture: true }); } catch {}
+        return;
+      }
+
       // Scale stage to fit the 1000x1000 game in the display size
       const initialScale = initialDisplaySize / GAME_SIZE;
       app.stage.scale.set(initialScale, initialScale);
 
-      // Mark app as ready (renderer now exists)
+      // Store refs and append canvas
+      appRef.current = app;
       appReadyRef.current = true;
-
-      if (!mountedRef.current || !containerRef.current) return;
-      containerRef.current.appendChild(app.canvas);
+      initializedRef.current = true;
+      containerRef.current?.appendChild(app.canvas);
 
       try {
         const bgTexture = await Assets.load("/tycoon/map.png");
+        if (cancelled || !app.stage) return;
         const bg = new Sprite(bgTexture);
         bg.width = 1000;
         bg.height = 1000;
@@ -151,6 +181,8 @@ export function TycoonGame({
       } catch (e) {
         console.warn("Could not load map background:", e);
       }
+
+      if (cancelled || !app.stage) return;
 
       const buildingsContainer = new Container();
       buildingsContainer.label = "buildings";
@@ -165,6 +197,11 @@ export function TycoonGame({
       vehiclesContainer.label = "vehicles";
       app.stage.addChild(vehiclesContainer);
 
+      const particleEmitter = new FarmParticleEmitter();
+      particleEmitter.label = "particles";
+      app.stage.addChild(particleEmitter);
+      particleEmitterRef.current = particleEmitter;
+
       const debugGraphics = new Graphics();
       debugGraphics.label = "debug";
       app.stage.addChild(debugGraphics);
@@ -172,11 +209,14 @@ export function TycoonGame({
 
       for (const buildingData of buildings) {
         const buildingSprite = new BuildingSprite(buildingData);
+        buildingSprite.setDebugMode(useFarmworkTycoonStore.getState().showDebug);
         buildingsContainer.addChild(buildingSprite);
         buildingSpritesRef.current.set(buildingData.id, buildingSprite);
       }
 
       await initializeNavigation();
+
+      if (cancelled) return;
 
       app.ticker.add((ticker) => {
         const dt = ticker.deltaMS / 1000;
@@ -185,49 +225,142 @@ export function TycoonGame({
           gardenFlowersRef.current.update(dt);
         }
 
+        if (particleEmitterRef.current) {
+          particleEmitterRef.current.update(dt);
+        }
+
+        for (const buildingSprite of buildingSpritesRef.current.values()) {
+          buildingSprite.update(dt);
+        }
+
         if (isPaused) return;
 
         for (const vehicleSprite of vehicleSpritesRef.current.values()) {
+          // Skip processing if vehicle is already finished
+          if (vehicleSprite.isMarkedFinished()) {
+            continue;
+          }
+
           const arrived = vehicleSprite.update(dt);
           const data = vehicleSprite.getData();
 
           updateVehiclePosition(data.id, data.position);
 
-          if (arrived && data.destination) {
+          if (arrived) {
+            const currentDest = vehicleSprite.getCurrentDestination();
+            const task = vehicleSprite.getTask();
+
+            // Check if vehicle has arrived at exit point (task is exiting, no more route destinations)
+            if (task === "exiting" && !currentDest) {
+              // Vehicle has exited - remove it
+              vehicleSprite.markFinished();
+              setTimeout(() => {
+                removeVehicle(data.id);
+              }, 100);
+              continue;
+            }
+
+            // Emit particles only on delivery (at farmhouse), not on pickup or exit
+            if (currentDest && particleEmitterRef.current && task === "traveling_to_delivery") {
+              const destBuilding = BUILDING_POSITIONS[currentDest as BuildingType];
+              if (destBuilding) {
+                particleEmitterRef.current.emitCargoDelivery({
+                  x: destBuilding.dockX,
+                  y: destBuilding.dockY,
+                });
+              }
+            }
+
             addActivity({
               type: "vehicle_arrived",
-              message: `Vehicle arrived at ${data.destination}`,
-              buildingId: data.destination,
+              message: `Vehicle arrived at ${currentDest || "destination"}`,
+              buildingId: currentDest || data.destination || undefined,
             });
 
-            setTimeout(() => {
-              removeVehicle(data.id);
-            }, 1000);
-          }
-        }
+            const routeComplete = vehicleSprite.advanceRoute();
+            const nextTask = vehicleSprite.getTask();
 
-        if (debugGraphicsRef.current) {
-          drawDebugOverlay(debugGraphicsRef.current);
+            if (routeComplete && nextTask === "exiting") {
+              // Route complete - vehicle is at farmhouse, wait 200ms then exit
+              vehicleSprite.setCarrying(false);
+
+              // Clear path immediately to prevent re-triggering arrival detection
+              // while waiting for the exit timeout
+              vehicleSprite.setPath([]);
+
+              // Capture sprite reference for timeout closure
+              const sprite = vehicleSprite;
+              const vehicleId = data.id;
+              const currentPos = { ...data.position };
+
+              setTimeout(() => {
+                // Check if vehicle was already removed
+                if (sprite.isMarkedFinished()) return;
+
+                // Pick a random exit point
+                const exitPoint = getRandomSpawnPoint("exit");
+                const exitPath = navigationSystem.findPathToExit(currentPos, exitPoint.id);
+                if (exitPath && exitPath.length > 0) {
+                  sprite.setPath(exitPath);
+                } else {
+                  // If no path found, just remove the vehicle
+                  sprite.markFinished();
+                  setTimeout(() => removeVehicle(vehicleId), 500);
+                }
+              }, 200);
+            } else if (routeComplete) {
+              // Fallback: mark as finished if somehow route is complete but not exiting
+              vehicleSprite.markFinished();
+              setTimeout(() => {
+                removeVehicle(data.id);
+              }, 1000);
+            } else {
+              const nextDest = vehicleSprite.getCurrentDestination();
+
+              if (nextDest) {
+                // If traveling to farmhouse (delivery), set carrying = true
+                if (nextTask === "traveling_to_delivery") {
+                  vehicleSprite.setCarrying(true);
+                }
+
+                const destBuilding = BUILDING_POSITIONS[nextDest as BuildingType];
+                if (destBuilding) {
+                  const from = data.position;
+                  const to = { x: destBuilding.dockX, y: destBuilding.dockY };
+                  const path = navigationSystem.findPath(from, to);
+                  if (path && path.length > 0) {
+                    vehicleSprite.setPath(path);
+                  }
+                }
+              }
+            }
+          }
         }
       });
 
-      const handleKeyDown = (e: KeyboardEvent) => {
+      keydownHandler = (e: KeyboardEvent) => {
         if (e.key.toLowerCase() === "g") {
           useFarmworkTycoonStore.getState().toggleDebug();
         }
       };
-      window.addEventListener("keydown", handleKeyDown);
+      window.addEventListener("keydown", keydownHandler);
     };
 
     initApp();
 
     return () => {
+      cancelled = true;
       mountedRef.current = false;
 
+      // Remove keydown listener
+      if (keydownHandler) {
+        window.removeEventListener("keydown", keydownHandler);
+      }
+
       // Destroy the PixiJS app
-      if (appRef.current) {
+      if (localApp) {
         try {
-          appRef.current.destroy(true, { children: true, texture: true });
+          localApp.destroy(true, { children: true, texture: true });
         } catch (e) {
           console.warn("Error destroying PixiJS app:", e);
         }
@@ -284,6 +417,8 @@ export function TycoonGame({
     if (!appRef.current || !appReadyRef.current) return;
 
     const app = appRef.current;
+    if (!app.stage || !app.renderer) return;
+
     const displaySize = Math.round(GAME_SIZE * scale);
 
     // Resize the renderer to the display size
@@ -303,7 +438,7 @@ export function TycoonGame({
   }, [buildings]);
 
   useEffect(() => {
-    if (!appRef.current) return;
+    if (!appRef.current?.stage) return;
 
     const vehiclesContainer = appRef.current.stage.children.find(
       (c) => c.label === "vehicles"
@@ -325,54 +460,77 @@ export function TycoonGame({
 
       if (!sprite) {
         sprite = new VehicleSprite(vehicleData);
+        sprite.setBadgeVisible(!isMiniPlayer);
         vehiclesContainer.addChild(sprite);
         vehicleSpritesRef.current.set(vehicleData.id, sprite);
 
-        if (vehicleData.destination) {
-          const destBuilding = buildings.find(
-            (b) => b.id === vehicleData.destination
-          );
-          if (destBuilding && navGraph) {
-            const from = vehicleData.position;
+        const firstDest = vehicleData.route?.[0] || vehicleData.destination;
+
+        if (firstDest && navGraph) {
+          const destBuilding = buildings.find((b) => b.id === firstDest);
+          if (destBuilding) {
             const to = { x: destBuilding.position.dockX, y: destBuilding.position.dockY };
-            const path = navigationSystem.findPath(from, to);
+
+            let path: ReturnType<typeof navigationSystem.findPath> = null;
+
+            if (vehicleData.spawnPoint) {
+              path = navigationSystem.findPathFromSpawn(vehicleData.spawnPoint, to);
+            } else {
+              const from = vehicleData.position;
+              path = navigationSystem.findPath(from, to);
+            }
+
             if (path && path.length > 0) {
               sprite.setPath(path);
+              sprite.setTask("traveling_to_pickup", firstDest);
               console.log(`[Tycoon] Vehicle ${vehicleData.id} path set: ${path.length} waypoints`);
             } else {
-              console.warn(`[Tycoon] No path found from (${from.x.toFixed(0)}, ${from.y.toFixed(0)}) to (${to.x.toFixed(0)}, ${to.y.toFixed(0)})`);
+              console.warn(`[Tycoon] No path found for vehicle ${vehicleData.id}`);
             }
-          } else if (!navGraph) {
-            console.warn(`[Tycoon] NavGraph not ready for vehicle ${vehicleData.id}`);
           }
+        } else if (!navGraph) {
+          console.warn(`[Tycoon] NavGraph not ready for vehicle ${vehicleData.id}`);
         }
       } else {
         sprite.updateData(vehicleData);
 
-        // If vehicle has no path yet but has a destination, try to set path now
-        if (vehicleData.destination && sprite.getData().path.length === 0 && navGraph) {
-          const destBuilding = buildings.find(
-            (b) => b.id === vehicleData.destination
-          );
+        if (sprite.getData().path.length === 0 && navGraph) {
+          const firstDest = vehicleData.route?.[0] || vehicleData.destination;
+          const destBuilding = buildings.find((b) => b.id === firstDest);
           if (destBuilding) {
-            const from = vehicleData.position;
             const to = { x: destBuilding.position.dockX, y: destBuilding.position.dockY };
-            const path = navigationSystem.findPath(from, to);
+
+            let path: ReturnType<typeof navigationSystem.findPath> = null;
+
+            if (vehicleData.spawnPoint) {
+              path = navigationSystem.findPathFromSpawn(vehicleData.spawnPoint, to);
+            } else {
+              const from = vehicleData.position;
+              path = navigationSystem.findPath(from, to);
+            }
+
             if (path && path.length > 0) {
               sprite.setPath(path);
+              sprite.setTask("traveling_to_pickup", firstDest || undefined);
               console.log(`[Tycoon] Late path set for ${vehicleData.id}: ${path.length} waypoints`);
             }
           }
         }
       }
     }
-  }, [vehicles, navGraph, buildings]);
+  }, [vehicles, navGraph, buildings, isMiniPlayer]);
 
   useEffect(() => {
+    console.log(`[Tycoon] Debug toggle: showDebug=${showDebug}, hasGraphics=${!!debugGraphicsRef.current}, hasNavGraph=${!!navGraph}`);
     if (debugGraphicsRef.current) {
       drawDebugOverlay(debugGraphicsRef.current);
     }
-  }, [showDebug, drawDebugOverlay]);
+
+    // Toggle building debug squares visibility
+    for (const buildingSprite of buildingSpritesRef.current.values()) {
+      buildingSprite.setDebugMode(showDebug);
+    }
+  }, [showDebug, drawDebugOverlay, navGraph]);
 
   useEffect(() => {
     if (!gardenFlowersRef.current) return;

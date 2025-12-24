@@ -3,10 +3,11 @@ import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 interface TooltipProps {
-  content: string;
+  content: ReactNode;
   children: ReactNode;
   side?: "top" | "bottom" | "left" | "right";
   className?: string;
+  wrapperClassName?: string;
 }
 
 type Position = "top" | "bottom" | "left" | "right";
@@ -16,6 +17,7 @@ export function Tooltip({
   children,
   side = "top",
   className,
+  wrapperClassName,
 }: TooltipProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isPositioned, setIsPositioned] = useState(false);
@@ -85,7 +87,7 @@ export function Tooltip({
   return (
     <div
       ref={containerRef}
-      className="relative inline-flex"
+      className={cn("relative inline-flex", wrapperClassName)}
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
     >
@@ -103,7 +105,7 @@ export function Tooltip({
             className={cn(
               "z-[99999] px-2.5 py-1.5 text-sm font-medium rounded-md shadow-lg",
               "bg-bg-tertiary border border-border text-text-primary",
-              "whitespace-nowrap pointer-events-none",
+              "pointer-events-none max-w-xs",
               className
             )}
           >

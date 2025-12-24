@@ -9,6 +9,9 @@ import type {
   Vehicle,
   ActivityEvent,
   AuditScores,
+  AuditMetadata,
+  AuditItem,
+  AuditKey,
   NavGraph,
   Point,
   BuildingType,
@@ -18,7 +21,12 @@ import {
   BUILDING_NAMES,
   BUILDING_COLORS,
   getVehicleTypeForDestination,
+  VEHICLE_SPEED,
 } from "@/components/tools/farmwork-tycoon/types";
+import {
+  getRandomSpawnPoint,
+  getNearestExitPoint,
+} from "@/components/tools/farmwork-tycoon/game/navigation/SpawnPoints";
 
 const createInitialBuildings = (): Building[] => {
   const buildingTypes: BuildingType[] = [
@@ -44,41 +52,157 @@ const createInitialBuildings = (): Building[] => {
   }));
 };
 
-const parseAuditScore = (content: string): number => {
-  const match = content.match(/\*\*Score:\*\*\s*(\d+(?:\.\d+)?)\s*\/\s*10/i);
-  if (match) return parseFloat(match[1]);
+const createDefaultAuditMetadata = (): AuditMetadata => ({
+  score: 0,
+  lastUpdated: null,
+  status: null,
+  openItems: [],
+});
 
-  const altMatch = content.match(/Score:\s*(\d+(?:\.\d+)?)\s*\/\s*10/i);
-  return altMatch ? parseFloat(altMatch[1]) : 5.0;
-};
+const parseAuditFile = (content: string): AuditMetadata => {
+  const result = createDefaultAuditMetadata();
 
-const parseGardenIdeas = (content: string): string[] => {
-  const ideas: string[] = [];
-  const lines = content.split("\n");
-  let inIdeasSection = false;
+  // Parse score: **Score:** 8.7/10
+  const scoreMatch = content.match(/\*\*Score:\*\*\s*(\d+(?:\.\d+)?)\s*\/\s*10/i);
+  if (scoreMatch) {
+    result.score = parseFloat(scoreMatch[1]);
+  }
 
-  for (const line of lines) {
-    if (line.match(/^##\s*Ideas/i)) {
-      inIdeasSection = true;
-      continue;
-    }
-    if (inIdeasSection && line.startsWith("## ")) {
-      break;
-    }
-    if (inIdeasSection) {
-      const ideaMatch = line.match(/^[-*]\s*\*\*(.+?)\*\*/);
-      if (ideaMatch) {
-        ideas.push(ideaMatch[1]);
+  // Parse last updated: **Last Updated:** 2025-12-22
+  const lastUpdatedMatch = content.match(/\*\*Last Updated:\*\*\s*(\d{4}-\d{2}-\d{2})/i);
+  if (lastUpdatedMatch) {
+    result.lastUpdated = lastUpdatedMatch[1];
+  }
+
+  // Parse status: **Status:** 1 open item OR **Status:** Initial setup
+  const statusMatch = content.match(/\*\*Status:\*\*\s*(.+?)(?:\n|$)/i);
+  if (statusMatch) {
+    result.status = statusMatch[1].trim();
+  }
+
+  // Parse open items from ## Open Items section
+  const openItemsSection = content.match(/## Open Items\s*\n([\s\S]*?)(?=\n---|\n## |$)/i);
+  if (openItemsSection) {
+    const sectionContent = openItemsSection[1];
+    // Skip if it says "None currently" or similar
+    if (!sectionContent.match(/_None|No open items|Empty/i)) {
+      const lines = sectionContent.split("\n");
+      for (const line of lines) {
+        // Match bullet points: - Item text or * Item text
+        const itemMatch = line.match(/^[-*]\s+(.+)/);
+        if (itemMatch) {
+          const text = itemMatch[1].trim();
+          // Check for priority markers
+          let priority: AuditItem["priority"] = undefined;
+          if (text.match(/\[HIGH\]|\(HIGH\)|🔴/i)) priority = "high";
+          else if (text.match(/\[MEDIUM\]|\(MEDIUM\)|🟡/i)) priority = "medium";
+          else if (text.match(/\[LOW\]|\(LOW\)|🟢/i)) priority = "low";
+
+          result.openItems.push({
+            text: text.replace(/\[(HIGH|MEDIUM|LOW)\]|\((HIGH|MEDIUM|LOW)\)|[🔴🟡🟢]/gi, "").trim(),
+            priority
+          });
+        }
       }
     }
   }
 
-  return ideas;
+  return result;
+};
+
+interface GardenParseResult {
+  planted: number;        // Ideas in Ideas section
+  growing: number;        // Graduated to plans
+  picked: number;         // Implemented
+  ideas: string[];
+}
+
+const parseGardenIdeas = (content: string): GardenParseResult => {
+  const ideas: string[] = [];
+  const lines = content.split("\n");
+  let inIdeasSection = false;
+  let inGraduatedSection = false;
+  let inImplementedSection = false;
+
+  let planted = 0;
+  let growing = 0;
+  let picked = 0;
+
+  // First try to parse the header count: **Active Ideas:** N
+  const headerMatch = content.match(/\*\*Active Ideas:\*\*\s*(\d+)/i);
+  const headerCount = headerMatch ? parseInt(headerMatch[1], 10) : null;
+
+  // Parse sections
+  for (const line of lines) {
+    // Detect section headers
+    if (line.match(/^##\s*Ideas\s*$/i)) {
+      inIdeasSection = true;
+      inGraduatedSection = false;
+      inImplementedSection = false;
+      continue;
+    }
+    if (line.match(/^##\s*Graduated to Plans/i)) {
+      inIdeasSection = false;
+      inGraduatedSection = true;
+      inImplementedSection = false;
+      continue;
+    }
+    if (line.match(/^##\s*Implemented/i)) {
+      inIdeasSection = false;
+      inGraduatedSection = false;
+      inImplementedSection = true;
+      continue;
+    }
+    if (line.startsWith("## ") || line.startsWith("---")) {
+      if (line.startsWith("---")) continue;
+      inIdeasSection = false;
+      inGraduatedSection = false;
+      inImplementedSection = false;
+      continue;
+    }
+
+    // Count items in Ideas section
+    if (inIdeasSection) {
+      const ideaMatch = line.match(/^[-*]\s*\*\*(.+?)\*\*/);
+      if (ideaMatch) {
+        ideas.push(ideaMatch[1]);
+        planted++;
+      }
+    }
+
+    // Count rows in Graduated table (lines starting with |, excluding header/separator)
+    if (inGraduatedSection) {
+      if (line.match(/^\|\s*[^|\-\s]/) && !line.match(/^\|\s*Idea\s*\|/i)) {
+        growing++;
+      }
+    }
+
+    // Count rows in Implemented table
+    if (inImplementedSection) {
+      if (line.match(/^\|\s*[^|\-\s]/) && !line.match(/^\|\s*Idea\s*\|/i)) {
+        picked++;
+      }
+    }
+  }
+
+  // Use header count if available for planted, otherwise use counted ideas
+  if (headerCount !== null) {
+    planted = headerCount;
+  }
+
+  return { planted, growing, picked, ideas };
 };
 
 const parseCompostCount = (content: string): number => {
-  const matches = content.match(/^[-*]\s+/gm);
-  return matches ? matches.length : 0;
+  // First try to parse the header count: **Composted Ideas:** N
+  const headerMatch = content.match(/\*\*Composted Ideas:\*\*\s*(\d+)/i);
+  if (headerMatch) {
+    return parseInt(headerMatch[1], 10);
+  }
+
+  // Fall back to counting entries (### headers in Composted Ideas section)
+  const entryMatches = content.match(/^###\s+.+/gm);
+  return entryMatches ? entryMatches.length : 0;
 };
 
 export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => ({
@@ -91,15 +215,15 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   buildings: createInitialBuildings(),
 
   auditScores: {
-    security: 5,
-    tests: 5,
-    performance: 5,
-    accessibility: 5,
-    codeQuality: 5,
-    farmhouse: 5,
+    security: createDefaultAuditMetadata(),
+    tests: createDefaultAuditMetadata(),
+    performance: createDefaultAuditMetadata(),
+    accessibility: createDefaultAuditMetadata(),
+    codeQuality: createDefaultAuditMetadata(),
+    farmhouse: createDefaultAuditMetadata(),
   },
   beadsStats: null,
-  gardenStats: { activeIdeas: 0, ideas: [] },
+  gardenStats: { activeIdeas: 0, ideas: [], planted: 0, growing: 0, picked: 0 },
   compostStats: { rejectedIdeas: 0 },
 
   activityFeed: [],
@@ -151,7 +275,11 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   refreshStats: async () => {
     try {
       const projectPath = window.__FARMWORK_PROJECT_PATH__;
-      if (!projectPath) return;
+      console.log("[Farmwork] refreshStats called, projectPath:", projectPath);
+      if (!projectPath) {
+        console.log("[Farmwork] No project path set, returning");
+        return;
+      }
 
       try {
         const stats = await invoke<BeadsStats>("beads_stats", { projectPath });
@@ -161,15 +289,15 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
       }
 
       const auditScores: AuditScores = {
-        security: 5,
-        tests: 5,
-        performance: 5,
-        accessibility: 5,
-        codeQuality: 5,
-        farmhouse: 5,
+        security: createDefaultAuditMetadata(),
+        tests: createDefaultAuditMetadata(),
+        performance: createDefaultAuditMetadata(),
+        accessibility: createDefaultAuditMetadata(),
+        codeQuality: createDefaultAuditMetadata(),
+        farmhouse: createDefaultAuditMetadata(),
       };
 
-      const auditFiles: [keyof AuditScores, string][] = [
+      const auditFiles: [AuditKey, string][] = [
         ["security", "_AUDIT/SECURITY.md"],
         ["tests", "_AUDIT/TESTS.md"],
         ["performance", "_AUDIT/PERFORMANCE.md"],
@@ -181,64 +309,97 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
       for (const [key, file] of auditFiles) {
         try {
           const filePath = await join(projectPath, file);
+          console.log(`[Farmwork] Reading ${key} from:`, filePath);
           const content = await readTextFile(filePath);
-          auditScores[key] = parseAuditScore(content);
-        } catch {
-          // File doesn't exist, use default
+          console.log(`[Farmwork] ${key} content length:`, content.length);
+          const parsed = parseAuditFile(content);
+          console.log(`[Farmwork] ${key} parsed:`, parsed);
+          auditScores[key] = parsed;
+        } catch (err) {
+          console.log(`[Farmwork] Error reading ${key}:`, err);
+          // File doesn't exist, use default (0)
         }
       }
 
+      console.log("[Farmwork] Final auditScores:", auditScores);
       set({ auditScores });
 
+      // Parse garden stats
+      let gardenCount = 0;
+      let gardenIdeas: string[] = [];
+      let planted = 0;
+      let growing = 0;
+      let picked = 0;
+      try {
+        const gardenPath = await join(projectPath, "_AUDIT/GARDEN.md");
+        console.log("[Farmwork] Reading garden from:", gardenPath);
+        const gardenContent = await readTextFile(gardenPath);
+        console.log("[Farmwork] Garden content length:", gardenContent.length);
+        const result = parseGardenIdeas(gardenContent);
+        console.log("[Farmwork] Garden parsed:", result);
+        gardenCount = result.planted;
+        gardenIdeas = result.ideas;
+        planted = result.planted;
+        growing = result.growing;
+        picked = result.picked;
+        set({
+          gardenStats: {
+            activeIdeas: gardenCount,
+            ideas: gardenIdeas,
+            planted,
+            growing,
+            picked,
+          },
+        });
+      } catch (err) {
+        console.log("[Farmwork] Error reading garden:", err);
+        // GARDEN.md doesn't exist
+      }
+
+      // Parse compost stats
+      let compostCount = 0;
+      try {
+        const compostPath = await join(projectPath, "_AUDIT/COMPOST.md");
+        const compostContent = await readTextFile(compostPath);
+        compostCount = parseCompostCount(compostContent);
+        set({ compostStats: { rejectedIdeas: compostCount } });
+      } catch {
+        // COMPOST.md doesn't exist
+      }
+
+      // Update all buildings with their respective scores/counts
       set((state) => ({
         buildings: state.buildings.map((b) => {
-          let score = 5;
+          let score = 0;
           switch (b.type) {
             case "security":
-              score = auditScores.security;
+              score = auditScores.security.score;
               break;
             case "tests":
-              score = auditScores.tests;
+              score = auditScores.tests.score;
               break;
             case "performance":
-              score = auditScores.performance;
+              score = auditScores.performance.score;
               break;
             case "accessibility":
-              score = auditScores.accessibility;
+              score = auditScores.accessibility.score;
               break;
             case "codeQuality":
-              score = auditScores.codeQuality;
+              score = auditScores.codeQuality.score;
               break;
             case "farmhouse":
-              score = auditScores.farmhouse;
+              score = auditScores.farmhouse.score;
+              break;
+            case "garden":
+              score = gardenCount;
+              break;
+            case "compost":
+              score = compostCount;
               break;
           }
           return { ...b, score };
         }),
       }));
-
-      try {
-        const gardenPath = await join(projectPath, "_AUDIT/GARDEN.md");
-        const gardenContent = await readTextFile(gardenPath);
-        const ideas = parseGardenIdeas(gardenContent);
-        set({
-          gardenStats: {
-            activeIdeas: ideas.length,
-            ideas,
-          },
-        });
-      } catch {
-        // GARDEN.md doesn't exist
-      }
-
-      try {
-        const compostPath = await join(projectPath, "_AUDIT/COMPOST.md");
-        const compostContent = await readTextFile(compostPath);
-        const rejectedIdeas = parseCompostCount(compostContent);
-        set({ compostStats: { rejectedIdeas } });
-      } catch {
-        // COMPOST.md doesn't exist
-      }
     } catch (error) {
       console.error("Failed to refresh farmwork stats:", error);
     }
@@ -254,28 +415,82 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
     }));
   },
 
-  spawnVehicle: (destination: string, returnDestination?: string) => {
+  spawnVehicle: (destination: string) => {
     const id = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     const type = getVehicleTypeForDestination(destination);
 
-    const farmhouse = get().buildings.find((b) => b.type === "farmhouse");
-    const startPos = farmhouse
-      ? { x: farmhouse.position.dockX, y: farmhouse.position.dockY }
-      : { x: 500, y: 500 };
+    const spawnPoint = getRandomSpawnPoint("enter");
 
-    console.log(`[Tycoon] Spawning ${type} vehicle at (${startPos.x}, ${startPos.y}) → ${destination}`);
+    // Get farmhouse position for exit point calculation
+    const farmhouseBuilding = get().buildings.find((b) => b.id === "farmhouse");
+    const farmhousePos = farmhouseBuilding
+      ? { x: farmhouseBuilding.position.dockX, y: farmhouseBuilding.position.dockY }
+      : { x: 500, y: 500 };
+    const exitPoint = getNearestExitPoint(farmhousePos);
+
+    // Route: pickup building → farmhouse (then exit)
+    const route = destination === "farmhouse"
+      ? [destination]
+      : [destination, "farmhouse"];
+
+    console.log(`[Tycoon] Spawning ${type} vehicle from ${spawnPoint.id} → ${route.join(" → ")} → exit`);
 
     const newVehicle: Vehicle = {
       id,
       type,
-      position: startPos,
+      position: { ...spawnPoint.position },
       destination,
-      returnDestination: returnDestination || null,
+      returnDestination: "farmhouse",
+      route,
+      currentRouteIndex: 0,
+      task: "entering",
+      spawnPoint: spawnPoint.id,
+      exitPoint: exitPoint.id,
       path: [],
       pathIndex: 0,
-      speed: 60 + Math.random() * 30,
+      speed: VEHICLE_SPEED.BASE + Math.random() * VEHICLE_SPEED.VARIANCE,
       carrying: false,
-      direction: "up",
+      direction: spawnPoint.edge === "top" ? "down" : "up",
+    };
+
+    set((state) => ({
+      vehicles: [...state.vehicles, newVehicle],
+    }));
+
+    return id;
+  },
+
+  spawnVehicleWithRoute: (route: string[]) => {
+    if (route.length === 0) return "";
+
+    const id = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const type = getVehicleTypeForDestination(route[0]);
+
+    const spawnPoint = getRandomSpawnPoint("enter");
+    const lastDestBuilding = get().buildings.find((b) => b.id === route[route.length - 1]);
+    const lastDestPos = lastDestBuilding
+      ? { x: lastDestBuilding.position.dockX, y: lastDestBuilding.position.dockY }
+      : { x: 500, y: 500 };
+    const exitPoint = getNearestExitPoint(lastDestPos);
+
+    console.log(`[Tycoon] Spawning ${type} vehicle from ${spawnPoint.id} with route: ${route.join(" → ")}`);
+
+    const newVehicle: Vehicle = {
+      id,
+      type,
+      position: { ...spawnPoint.position },
+      destination: route[0],
+      returnDestination: route.length > 1 ? route[route.length - 1] : null,
+      route,
+      currentRouteIndex: 0,
+      task: "entering",
+      spawnPoint: spawnPoint.id,
+      exitPoint: exitPoint.id,
+      path: [],
+      pathIndex: 0,
+      speed: VEHICLE_SPEED.BASE + Math.random() * VEHICLE_SPEED.VARIANCE,
+      carrying: false,
+      direction: spawnPoint.edge === "top" ? "down" : "up",
     };
 
     set((state) => ({
@@ -301,17 +516,20 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
 
   startTestRun: () => {
     const buildings = get().buildings;
+    // All buildings except farmhouse and office can be pickup destinations
     const destinations = buildings
       .filter((b) => b.type !== "farmhouse" && b.type !== "office")
       .map((b) => b.id);
 
     let delay = 0;
+
+    // Spawn vehicles for each building - they will: enter → pickup → farmhouse → exit
     destinations.forEach((dest) => {
       setTimeout(() => {
         get().spawnVehicle(dest);
         get().addActivity({
           type: "vehicle_arrived",
-          message: `Test vehicle dispatched to ${dest}`,
+          message: `Vehicle dispatched: ${BUILDING_NAMES[dest as BuildingType]} → Farmhouse`,
           buildingId: dest,
         });
       }, delay);

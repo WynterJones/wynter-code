@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-23
-**Active Ideas:** 2
+**Active Ideas:** 0
 
 ---
 
@@ -19,36 +19,7 @@
 
 ## Ideas
 
-### MCP Manager Tool
-> View and manage Model Context Protocol servers from a unified UI
-
-- View all MCPs on the system (global + project-specific + local .mcp.json)
-- See which MCPs are currently enabled/active
-- Create new MCP server configurations from UI
-- Edit, delete, and toggle MCP servers
-- Mask sensitive env vars (API keys, secrets)
-
-**Status:** Planning complete, ready for implementation
-
-### Dev Toolkit
-> Full-screen multi-tool popup with 12-15 developer utilities (like DevUtils.com)
-
-- Sidebar navigation with search
-- JSON Format/Validate with error highlighting
-- Base64 Encode/Decode (string and file)
-- JWT Debugger (decode header/payload, verify)
-- URL Encode/Decode and URL Parser
-- UUID/ULID Generator (v1/v4/v7, ULID)
-- Hash Generator (MD5, SHA-1, SHA-256, SHA-512)
-- Unix Time Converter (timestamp to date, date to timestamp)
-- Regex Tester with live matching and explanation
-- String Case Converter (camelCase, snake_case, SCREAMING_CASE, etc.)
-- Color Converter (Hex, RGB, HSL with preview)
-- HTML Entity Encode/Decode
-- Text Diff Checker (side-by-side comparison)
-- Lorem Ipsum Generator
-
-**Status:** New idea
+*No active ideas - garden is empty*
 
 ---
 
@@ -65,6 +36,8 @@
 
 | Idea | Implementation | Date |
 |------|----------------|------|
+| MCP Manager Tool | `McpManagerPopup` - View/manage MCP servers, toggle, create, edit configs | 2025-12-23 |
+| Dev Toolkit | `DevToolkitPopup` - JSON formatter, Base64, JWT debugger, UUID generator, hash generator, regex tester | 2025-12-23 |
 | Multi-Panel Layout | Split view with horizontal/vertical splits, drag sessions between panels, resize, layout presets | 2025-12-23 |
 | Radio Streaming | Meditation player with Nightride.fm stations + Radio Browser API search, favorites, stream metadata | 2025-12-23 |
 | Beads Issue Tracker | `bd` CLI + UI tabs - local SQLite issue tracking with epics, kanban board, dependencies | 2025-12-23 |

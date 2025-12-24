@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
 import type { Session, Message, ClaudeModel, ToolCall, StreamingStats, PermissionMode, SessionType } from "@/types";
+import type { PendingQuestion } from "@/components/output/AskUserQuestionBlock";
 
 interface StreamingState {
   isStreaming: boolean;
@@ -9,6 +10,7 @@ interface StreamingState {
   thinkingText: string;
   pendingToolCalls: ToolCall[];
   stats: StreamingStats;
+  pendingQuestion: PendingQuestion | null;
 }
 
 interface SessionStore {
@@ -59,6 +61,7 @@ interface SessionStore {
   ) => void;
   finishStreaming: (sessionId: string) => void;
   getStreamingState: (sessionId: string) => StreamingState;
+  setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => void;
 }
 
 const defaultStats: StreamingStats = {
@@ -76,6 +79,7 @@ const defaultStreamingState: StreamingState = {
   thinkingText: "",
   pendingToolCalls: [],
   stats: { ...defaultStats },
+  pendingQuestion: null,
 };
 
 export const useSessionStore = create<SessionStore>()(
@@ -297,6 +301,7 @@ export const useSessionStore = create<SessionStore>()(
             thinkingText: "",
             pendingToolCalls: [],
             stats: { ...defaultStats, startTime: Date.now() },
+            pendingQuestion: null,
           });
           return { streamingState: newStreamingState };
         });
@@ -469,6 +474,18 @@ export const useSessionStore = create<SessionStore>()(
 
       getStreamingState: (sessionId: string) => {
         return get().streamingState.get(sessionId) || defaultStreamingState;
+      },
+
+      setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => {
+        set((state) => {
+          const newStreamingState = new Map(state.streamingState);
+          const current = newStreamingState.get(sessionId) || { ...defaultStreamingState };
+          newStreamingState.set(sessionId, {
+            ...current,
+            pendingQuestion: question,
+          });
+          return { streamingState: newStreamingState };
+        });
       },
     }),
     {

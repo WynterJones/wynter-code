@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Copy, Check, Brain } from "lucide-react";
 import { ScrollArea, IconButton } from "@/components/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ToolCallBlock } from "./ToolCallBlock";
 import { StreamingStatus } from "./StreamingStatus";
+import { AskUserQuestionBlock } from "./AskUserQuestionBlock";
 import { useSessionStore } from "@/stores/sessionStore";
+import { claudeService } from "@/services/claude";
 import type { Message, ToolCall } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +15,7 @@ interface OutputWindowProps {
 }
 
 export function OutputWindow({ sessionId }: OutputWindowProps) {
-  const { getMessages, getStreamingState, updateToolCallStatus } =
+  const { getMessages, getStreamingState, updateToolCallStatus, setPendingQuestion } =
     useSessionStore();
   const messages = sessionId ? getMessages(sessionId) : [];
   const streamingState = sessionId ? getStreamingState(sessionId) : null;
@@ -23,20 +25,43 @@ export function OutputWindow({ sessionId }: OutputWindowProps) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingState?.streamingText, streamingState?.thinkingText]);
 
-  const handleApprove = (toolId: string) => {
+  const handleApprove = useCallback(async (toolId: string) => {
     if (sessionId) {
       updateToolCallStatus(sessionId, toolId, "running");
-      setTimeout(() => {
-        updateToolCallStatus(sessionId, toolId, "completed", "Tool executed successfully");
-      }, 1000);
+      try {
+        // Send approval to Claude via stdin
+        await claudeService.sendInput(sessionId, "y\n");
+      } catch (error) {
+        console.error("Failed to send approval:", error);
+        // Still update UI to show we tried
+      }
     }
-  };
+  }, [sessionId, updateToolCallStatus]);
 
-  const handleReject = (toolId: string) => {
+  const handleReject = useCallback(async (toolId: string) => {
     if (sessionId) {
       updateToolCallStatus(sessionId, toolId, "error", "Tool execution rejected by user");
+      try {
+        // Send rejection to Claude via stdin
+        await claudeService.sendInput(sessionId, "n\n");
+      } catch (error) {
+        console.error("Failed to send rejection:", error);
+      }
     }
-  };
+  }, [sessionId, updateToolCallStatus]);
+
+  const handleQuestionSubmit = useCallback(async (selectedOptions: string[]) => {
+    if (sessionId && streamingState?.pendingQuestion) {
+      try {
+        // Send the selected options as JSON response
+        const response = JSON.stringify({ selected: selectedOptions }) + "\n";
+        await claudeService.sendInput(sessionId, response);
+        setPendingQuestion(sessionId, null);
+      } catch (error) {
+        console.error("Failed to send question response:", error);
+      }
+    }
+  }, [sessionId, streamingState?.pendingQuestion, setPendingQuestion]);
 
   if (!sessionId) {
     return (
@@ -86,6 +111,8 @@ export function OutputWindow({ sessionId }: OutputWindowProps) {
             stats={streamingState.stats}
             onApprove={handleApprove}
             onReject={handleReject}
+            pendingQuestion={streamingState.pendingQuestion}
+            onQuestionSubmit={handleQuestionSubmit}
           />
         )}
 
@@ -186,6 +213,8 @@ interface StreamingBlockProps {
   };
   onApprove: (toolId: string) => void;
   onReject: (toolId: string) => void;
+  pendingQuestion?: import("./AskUserQuestionBlock").PendingQuestion | null;
+  onQuestionSubmit?: (selectedOptions: string[]) => void;
 }
 
 function StreamingBlock({
@@ -195,6 +224,8 @@ function StreamingBlock({
   stats,
   onApprove,
   onReject,
+  pendingQuestion,
+  onQuestionSubmit,
 }: StreamingBlockProps) {
   const [showThinking, setShowThinking] = useState(false);
 
@@ -259,6 +290,14 @@ function StreamingBlock({
             />
           ))}
         </div>
+      )}
+
+      {/* Pending question from Claude */}
+      {pendingQuestion && onQuestionSubmit && (
+        <AskUserQuestionBlock
+          question={pendingQuestion}
+          onSubmit={onQuestionSubmit}
+        />
       )}
 
       {/* Empty state while waiting */}

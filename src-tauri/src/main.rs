@@ -2,6 +2,7 @@
 
 mod api_tester;
 mod beads;
+mod claude_process;
 mod color_picker;
 mod commands;
 mod database_viewer;
@@ -199,6 +200,7 @@ fn main() {
         .manage(Arc::new(api_tester::WebhookManager::new()))
         .manage(Arc::new(storybook::StorybookManager::new()))
         .manage(Arc::new(database_viewer::DatabaseManager::new()))
+        .manage(Arc::new(claude_process::ClaudeProcessManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -308,6 +310,12 @@ fn main() {
             commands::delete_mcp_server,
             commands::toggle_mcp_server,
             commands::validate_mcp_command,
+            // Claude Process Management
+            claude_process::start_claude_streaming,
+            claude_process::send_claude_input,
+            claude_process::terminate_claude_session,
+            claude_process::is_claude_session_active,
+            claude_process::list_active_claude_sessions,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

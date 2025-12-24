@@ -541,7 +541,7 @@ impl Default for PermissionMode {
 }
 
 impl PermissionMode {
-    fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             PermissionMode::Default => "default",
             PermissionMode::Plan => "plan",
@@ -635,7 +635,7 @@ pub async fn run_claude_streaming(
     Ok(captured_claude_session_id.unwrap_or_default())
 }
 
-fn create_chunk(chunk_type: &str, session_id: &str) -> StreamChunk {
+pub fn create_chunk(chunk_type: &str, session_id: &str) -> StreamChunk {
     StreamChunk {
         chunk_type: chunk_type.to_string(),
         content: None,
@@ -654,7 +654,7 @@ fn create_chunk(chunk_type: &str, session_id: &str) -> StreamChunk {
     }
 }
 
-fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<StreamChunk> {
+pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<StreamChunk> {
     let msg_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
     let subtype = json.get("subtype").and_then(|v| v.as_str()).unwrap_or("");
 

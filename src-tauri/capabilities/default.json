@@ -12,6 +12,7 @@
     "fs:allow-read-text-file",
     "fs:allow-exists",
     "fs:allow-stat",
+    "fs:scope-home-recursive",
     "shell:default",
     "shell:allow-open",
     "shell:allow-spawn",

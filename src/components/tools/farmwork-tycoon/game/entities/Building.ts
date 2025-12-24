@@ -1,12 +1,31 @@
-import { Graphics, Text, Container } from "pixi.js";
-import type { Building as BuildingData, BuildingActivity } from "../../types";
+import { Graphics, Text, Container, Sprite, Assets, Texture } from "pixi.js";
+import type { Building as BuildingData, BuildingActivity, BuildingType } from "../../types";
+import { BuildingBadge } from "./BuildingBadge";
+
+const BUILDING_SPRITE_PATHS: Partial<Record<BuildingType, string>> = {
+  farmhouse: "/tycoon/building-farmhouse.png",
+  office: "/tycoon/building-office.png",
+  security: "/tycoon/building-security.png",
+  tests: "/tycoon/building-tests.png",
+  performance: "/tycoon/building-performance.png",
+  accessibility: "/tycoon/building-accesibility.png",
+  codeQuality: "/tycoon/building-codequality.png",
+  compost: "/tycoon/building-compost.png",
+};
+
+const buildingTextureCache: Map<BuildingType, Texture> = new Map();
 
 export class BuildingSprite extends Container {
   private data: BuildingData;
   private background: Graphics;
+  private buildingSprite: Sprite | null = null;
   private nameLabel: Text;
   private scoreText: Text;
   private activityIndicator: Graphics;
+  private badge: BuildingBadge;
+
+  private pulsePhase = 0;
+  private activityPulseScale = 1;
 
   constructor(data: BuildingData) {
     super();
@@ -14,10 +33,13 @@ export class BuildingSprite extends Container {
 
     const { x, y, width, height } = data.position;
 
+    // Debug background (hidden by default, shown in debug mode)
     this.background = new Graphics();
     this.drawBackground();
+    this.background.visible = false;
     this.addChild(this.background);
 
+    // Debug labels (hidden by default)
     this.nameLabel = new Text({
       text: data.name,
       style: {
@@ -30,6 +52,7 @@ export class BuildingSprite extends Container {
     });
     this.nameLabel.anchor.set(0.5);
     this.nameLabel.position.set(width / 2, height / 2 - 10);
+    this.nameLabel.visible = false;
     this.addChild(this.nameLabel);
 
     this.scoreText = new Text({
@@ -43,17 +66,80 @@ export class BuildingSprite extends Container {
     });
     this.scoreText.anchor.set(0.5);
     this.scoreText.position.set(width / 2, height / 2 + 10);
+    this.scoreText.visible = false;
     this.addChild(this.scoreText);
 
     this.activityIndicator = new Graphics();
     this.activityIndicator.position.set(width - 15, 10);
+    this.activityIndicator.visible = false;
     this.addChild(this.activityIndicator);
     this.updateActivityIndicator();
+
+    this.badge = new BuildingBadge(data);
+    this.badge.position.set(width / 2, -18);
+    this.badge.setBaseY(-18);
+    this.addChild(this.badge);
 
     // Position at top-left corner
     this.position.set(x, y);
     this.eventMode = "static";
     this.cursor = "pointer";
+
+    // Load building sprite
+    this.loadBuildingSprite();
+  }
+
+  private getBuildingScaleMultiplier(): number {
+    switch (this.data.type) {
+      case "farmhouse":
+        return 2.0;
+      case "office":
+        return 2.0;
+      case "codeQuality":
+        return 2.2;
+      case "compost":
+        return 1.3;
+      default:
+        return 1.6;
+    }
+  }
+
+  private async loadBuildingSprite(): Promise<void> {
+    const spritePath = BUILDING_SPRITE_PATHS[this.data.type];
+    if (!spritePath) return;
+
+    try {
+      let texture = buildingTextureCache.get(this.data.type);
+      if (!texture) {
+        texture = await Assets.load(spritePath) as Texture;
+        buildingTextureCache.set(this.data.type, texture);
+      }
+
+      const { width, height } = this.data.position;
+
+      this.buildingSprite = new Sprite(texture);
+      this.buildingSprite.anchor.set(0.5);
+
+      // Scale sprite to fit within the building area with padding
+      const padding = 10;
+      const maxWidth = width - padding * 2;
+      const maxHeight = height - padding * 2;
+      const scaleX = maxWidth / texture.width;
+      const scaleY = maxHeight / texture.height;
+      const baseScale = Math.min(scaleX, scaleY, 1);
+
+      // Apply building-specific scale multiplier
+      const multiplier = this.getBuildingScaleMultiplier();
+      const scale = baseScale * multiplier;
+
+      this.buildingSprite.scale.set(scale);
+      this.buildingSprite.position.set(width / 2, height / 2);
+
+      // Add sprite behind the badge but in front of debug background
+      this.addChildAt(this.buildingSprite, 1);
+    } catch (e) {
+      console.warn(`Failed to load building sprite for ${this.data.type}:`, e);
+    }
   }
 
   private drawBackground(): void {
@@ -93,11 +179,29 @@ export class BuildingSprite extends Container {
     }
   }
 
+  update(dt: number): void {
+    this.badge.update(dt);
+
+    if (this.data.activity === "working") {
+      this.pulsePhase += dt * 5;
+      this.activityPulseScale = 1 + Math.sin(this.pulsePhase) * 0.3;
+      this.activityIndicator.scale.set(this.activityPulseScale);
+    } else {
+      this.activityIndicator.scale.set(1);
+      this.pulsePhase = 0;
+    }
+  }
+
   updateData(data: BuildingData): void {
+    const scoreChanged = this.data.score !== data.score;
     this.data = data;
     this.drawBackground();
     this.scoreText.text = `${data.score.toFixed(1)}/10`;
     this.updateActivityIndicator();
+
+    if (scoreChanged) {
+      this.badge.updateFromBuilding(data);
+    }
   }
 
   setActivity(activity: BuildingActivity): void {
@@ -110,6 +214,19 @@ export class BuildingSprite extends Container {
       this.background.tint = 0xffffcc;
     } else {
       this.background.tint = 0xffffff;
+    }
+  }
+
+  setDebugMode(enabled: boolean): void {
+    // Debug elements only visible in debug mode
+    this.background.visible = enabled;
+    this.nameLabel.visible = enabled;
+    this.scoreText.visible = enabled;
+    this.activityIndicator.visible = enabled;
+
+    // Building sprite always visible (opposite of debug mode when loaded)
+    if (this.buildingSprite) {
+      this.buildingSprite.visible = !enabled;
     }
   }
 

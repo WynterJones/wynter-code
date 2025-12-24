@@ -7,8 +7,6 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import {
   X,
   Maximize2,
-  Play,
-  Pause,
   GripVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,7 +27,18 @@ interface Position {
 }
 
 export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProps) {
-  const { isPaused, pause, resume } = useFarmworkTycoonStore();
+  const { refreshStats, isInitialized } = useFarmworkTycoonStore();
+
+  // Poll for stats updates every 5 seconds while mini player is open
+  useEffect(() => {
+    if (!isOpen || !isInitialized) return;
+
+    const pollInterval = setInterval(() => {
+      refreshStats();
+    }, 5000);
+
+    return () => clearInterval(pollInterval);
+  }, [isOpen, isInitialized, refreshStats]);
 
   const [position, setPosition] = useState<Position>(() => ({
     x: window.innerWidth - DEFAULT_SIZE - 20,
@@ -147,18 +156,6 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
           <span className="text-xs font-medium text-text-primary">Farmwork Tycoon</span>
         </div>
         <div className="flex items-center gap-0.5">
-          <Tooltip content={isPaused ? "Resume" : "Pause"}>
-            <IconButton
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                isPaused ? resume() : pause();
-              }}
-              className={cn("!p-1", isPaused && "text-amber-400")}
-            >
-              {isPaused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
-            </IconButton>
-          </Tooltip>
           <Tooltip content="Expand">
             <IconButton
               size="sm"
@@ -195,6 +192,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
           <TycoonGame
             containerWidth={size}
             containerHeight={size - 36}
+            isMiniPlayer
           />
         </div>
 
