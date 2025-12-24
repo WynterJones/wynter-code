@@ -49,7 +49,7 @@ export function EmptyPanel({
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6">
+    <div className="h-full w-full flex flex-col items-center justify-center p-6">
       <div className="flex items-center justify-center w-12 h-12 rounded-full bg-bg-tertiary/50 mb-4">
         <Plus className="w-6 h-6 text-text-secondary/50" />
       </div>

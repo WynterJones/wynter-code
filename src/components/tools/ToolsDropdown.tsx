@@ -18,6 +18,7 @@ import {
   Image,
   Hammer,
   Tractor,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -167,6 +168,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openFarmworkTycoon",
     category: "development",
   },
+  {
+    id: "claude-code-stats",
+    name: "Claude Code Stats",
+    description: "View Claude CLI usage analytics and charts",
+    icon: BarChart3,
+    actionKey: "openClaudeCodeStats",
+    category: "development",
+  },
 ];
 
 interface Tool {
@@ -200,6 +209,7 @@ interface ToolsDropdownProps {
   onOpenMcpManager: () => void;
   onOpenFaviconGenerator: () => void;
   onOpenDevToolkit: () => void;
+  onOpenClaudeCodeStats: () => void;
   hasStorybook?: boolean;
 }
 
@@ -218,6 +228,7 @@ export function ToolsDropdown({
   onOpenMcpManager,
   onOpenFaviconGenerator,
   onOpenDevToolkit,
+  onOpenClaudeCodeStats,
   hasStorybook = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -386,6 +397,17 @@ export function ToolsDropdown({
       category: "utilities",
       onClick: () => {
         onOpenDevToolkit();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "claude-code-stats",
+      name: "Claude Code Stats",
+      description: "View Claude CLI usage analytics and charts",
+      icon: <BarChart3 className="w-4 h-4" />,
+      category: "development",
+      onClick: () => {
+        onOpenClaudeCodeStats();
         setIsOpen(false);
       },
     },

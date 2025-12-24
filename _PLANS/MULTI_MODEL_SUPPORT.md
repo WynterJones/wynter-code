@@ -168,3 +168,21 @@ New "AI Providers" section:
 - **Onboarding**: At least one CLI required, primary focus on Claude CLI
 - **Provider Selection**: In session dropdown, only shows installed providers
 - **Default**: Claude is the default if installed
+
+---
+
+## Telemetry & Stats Integration
+
+All three CLIs support OpenTelemetry natively, enabling unified stats tracking:
+
+| CLI | Config | Key Events |
+|-----|--------|------------|
+| Claude | `CLAUDE_CODE_ENABLE_TELEMETRY=1` | `claude_code.user_prompt`, `tool_result`, `api_request` |
+| Gemini | `.gemini/settings.json` | `gemini_cli.tool_call`, `token.usage`, `api_request` |
+| Codex | `[otel]` in config.toml | conversation.id, model, token counts |
+
+**Stats Tracking Tool** (planned in Garden):
+- Will consume OTEL data from whichever provider is active
+- Normalize events into common schema for unified dashboard
+- Provider toggle in stats UI to switch between CLI data
+- See `_AUDIT/GARDEN.md` for "Claude Code Stats Tracking" idea

@@ -87,7 +87,7 @@ export function FileViewerPanel({
   // No file selected - show file path input
   if (!filePath) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-4 p-4">
+      <div className="h-full w-full flex flex-col items-center justify-center gap-4 p-4">
         <FileCode className="w-10 h-10 text-text-secondary/50" />
         <p className="text-sm text-text-secondary">Enter a file path to view</p>
         <div className="flex items-center gap-2 w-full max-w-md">
@@ -127,7 +127,7 @@ export function FileViewerPanel({
   }, [filePath, onPanelUpdate]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {/* File header */}
       <div className="flex items-center justify-between px-2 py-1 border-b border-border/30 bg-bg-tertiary/50">
         <div className="flex items-center gap-1.5 text-xs text-text-secondary truncate flex-1 min-w-0">

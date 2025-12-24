@@ -3338,3 +3338,21 @@ pub fn validate_mcp_command(command: String) -> Result<bool, String> {
 
     Ok(output.status.success())
 }
+
+#[tauri::command]
+pub fn read_claude_stats() -> Result<serde_json::Value, String> {
+    let home = dirs::home_dir()
+        .ok_or_else(|| "Could not find home directory".to_string())?;
+
+    let stats_path = home.join(".claude").join("stats-cache.json");
+
+    if !stats_path.exists() {
+        return Err("Stats file not found. Claude Code CLI may not have generated stats yet.".to_string());
+    }
+
+    let content = fs::read_to_string(&stats_path)
+        .map_err(|e| format!("Failed to read stats file: {}", e))?;
+
+    serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse stats JSON: {}", e))
+}

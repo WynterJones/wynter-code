@@ -2,6 +2,7 @@ import { useEffect, useCallback, useMemo, useState } from "react";
 import { PlanetCarousel } from "./PlanetCarousel";
 import { MeditationAudioPlayer } from "./MeditationAudioPlayer";
 import { useMeditationStore } from "@/stores/meditationStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 export function MeditationScreen() {
   const {
@@ -13,8 +14,10 @@ export function MeditationScreen() {
     setVolume,
   } = useMeditationStore();
 
+  const compactProjectTabs = useSettingsStore((s) => s.compactProjectTabs);
+  const headerHeight = compactProjectTabs ? 36 : 44;
+
   const [ambientPhase, setAmbientPhase] = useState(0);
-  const [supernovaActive, setSupernovaActive] = useState(false);
   const [activePhrase, setActivePhrase] = useState<string | null>(null);
 
   const POSITIVE_PHRASES = [
@@ -27,13 +30,8 @@ export function MeditationScreen() {
     const interval = setInterval(() => {
       setAmbientPhase((p) => (p + 1) % 360);
 
-      // Random events
-      if (Math.random() < 1/200 && !supernovaActive) {
-        setSupernovaActive(true);
-        setTimeout(() => setSupernovaActive(false), 4000); // 4s full duration
-      }
-
-      if (Math.random() < 1/400 && !activePhrase) {
+      // Positive phrase - once every 5-9 minutes (average ~7 min)
+      if (Math.random() < 1/1400 && !activePhrase) {
         const phrase = POSITIVE_PHRASES[Math.floor(Math.random() * POSITIVE_PHRASES.length)];
         setActivePhrase(phrase);
         setTimeout(() => setActivePhrase(null), 6000); // 6s duration
@@ -41,7 +39,7 @@ export function MeditationScreen() {
 
     }, 300); // Complete cycle every ~108 seconds
     return () => clearInterval(interval);
-  }, [supernovaActive, activePhrase]);
+  }, [activePhrase]);
 
   const handleClose = useCallback(() => {
     setActive(false);
@@ -107,7 +105,7 @@ export function MeditationScreen() {
   }, [ambientPhase]);
 
   return (
-    <div className="fixed inset-0 z-40 overflow-hidden" style={{ top: "44px" }}>
+    <div className="fixed inset-0 z-40 overflow-hidden" style={{ top: `${headerHeight}px` }}>
       {/* Base dark background */}
       <div className="absolute inset-0 bg-[#08080f]" />
 
@@ -176,31 +174,6 @@ export function MeditationScreen() {
         }}
       />
 
-      {/* Supernova Effect */}
-      {supernovaActive && (
-        <div 
-            className="absolute"
-            style={{
-                top: '20%',
-                left: '70%',
-                width: '100px',
-                height: '100px',
-                animation: 'supernova-flash 4s ease-out forwards',
-                zIndex: 5
-            }}
-        >
-             <div className="absolute inset-0 bg-white rounded-full blur-xl animate-pulse" />
-             <div className="absolute inset-0 bg-blue-100 rounded-full blur-md" />
-             {/* Rays */}
-            <div className="absolute inset-0 flex items-center justify-center">
-                 <div className="w-[200%] h-[2px] bg-white absolute rotate-0 blur-[1px]" />
-                 <div className="w-[200%] h-[2px] bg-white absolute rotate-45 blur-[1px]" />
-                 <div className="w-[200%] h-[2px] bg-white absolute rotate-90 blur-[1px]" />
-                 <div className="w-[200%] h-[2px] bg-white absolute rotate-135 blur-[1px]" />
-            </div>
-        </div>
-      )}
-
       {/* Planet carousel - full screen movement */}
       <PlanetCarousel />
 
@@ -256,20 +229,6 @@ export function MeditationScreen() {
           25% { transform: translate(15px, -8px) scale(1.03); opacity: 0.18; }
           50% { transform: translate(-8px, 12px) scale(0.98); opacity: 0.12; }
           75% { transform: translate(10px, 5px) scale(1.02); opacity: 0.16; }
-        }
-
-        @keyframes supernova-flash {
-            0% { transform: scale(0); opacity: 0; }
-            10% { transform: scale(1.5); opacity: 1; }
-            30% { transform: scale(1); opacity: 0.8; }
-            100% { transform: scale(0.2); opacity: 0; }
-        }
-
-        @keyframes ufo-flyby {
-            0% { transform: translateX(-20vw) rotate(-5deg); opacity: 0; }
-            10% { opacity: 0.6; }
-            90% { opacity: 0.6; }
-            100% { transform: translateX(120vw) rotate(5deg); opacity: 0; }
         }
 
         @keyframes phrase-fade {

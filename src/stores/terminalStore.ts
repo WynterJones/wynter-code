@@ -11,6 +11,7 @@ interface TerminalState {
 interface TerminalStore {
   terminals: Map<string, TerminalState>;
   sessionPtyIds: Map<string, string>;
+  queuedCommands: Map<string, string>; // sessionId -> command to execute when PTY ready
 
   getTerminalState: (projectId: string) => TerminalState;
   toggleTerminal: (projectId: string) => void;
@@ -22,6 +23,9 @@ interface TerminalStore {
   setMaximized: (projectId: string, isMaximized: boolean) => void;
   getSessionPtyId: (sessionId: string) => string | null;
   setSessionPtyId: (sessionId: string, ptyId: string) => void;
+  queueCommand: (sessionId: string, command: string) => void;
+  getQueuedCommand: (sessionId: string) => string | null;
+  clearQueuedCommand: (sessionId: string) => void;
 }
 
 const DEFAULT_HEIGHT = 200;
@@ -37,6 +41,7 @@ export const useTerminalStore = create<TerminalStore>()(
     (set, get) => ({
       terminals: new Map(),
       sessionPtyIds: new Map(),
+      queuedCommands: new Map(),
 
       getTerminalState: (projectId: string) => {
         const state = get().terminals.get(projectId);
@@ -118,6 +123,26 @@ export const useTerminalStore = create<TerminalStore>()(
           return { sessionPtyIds };
         });
       },
+
+      queueCommand: (sessionId: string, command: string) => {
+        set((state) => {
+          const queuedCommands = new Map(state.queuedCommands);
+          queuedCommands.set(sessionId, command);
+          return { queuedCommands };
+        });
+      },
+
+      getQueuedCommand: (sessionId: string) => {
+        return get().queuedCommands.get(sessionId) || null;
+      },
+
+      clearQueuedCommand: (sessionId: string) => {
+        set((state) => {
+          const queuedCommands = new Map(state.queuedCommands);
+          queuedCommands.delete(sessionId);
+          return { queuedCommands };
+        });
+      },
     }),
     {
       name: "terminal-storage",
@@ -139,8 +164,9 @@ export const useTerminalStore = create<TerminalStore>()(
             state: {
               ...parsed.state,
               terminals,
-              // Don't restore session ptyIds - they're ephemeral
+              // Don't restore session ptyIds or queued commands - they're ephemeral
               sessionPtyIds: new Map(),
+              queuedCommands: new Map(),
             },
           };
         },
@@ -154,8 +180,9 @@ export const useTerminalStore = create<TerminalStore>()(
             state: {
               ...value.state,
               terminals,
-              // Don't persist session ptyIds
+              // Don't persist session ptyIds or queued commands
               sessionPtyIds: [],
+              queuedCommands: [],
             },
           };
           localStorage.setItem(name, JSON.stringify(serialized));

@@ -213,14 +213,15 @@ export function SessionTabBar({ projectId }: SessionTabBarProps) {
   }, [finishStreaming]);
 
   return (
-    <div className="flex items-center h-9 bg-bg-primary border-b border-border">
+    <div className="flex items-center h-9 bg-bg-primary border-b border-border" data-tauri-drag-region>
       {/* Session tabs container */}
       <div
         ref={scrollContainerRef}
         className="flex items-center flex-1 overflow-x-auto scrollbar-none"
+        data-tauri-drag-region
       >
         {sessions.length === 0 ? (
-          <span className="px-4 text-sm text-text-secondary/50 italic">
+          <span className="px-4 text-sm text-text-secondary/50 italic" data-tauri-drag-region>
             Add a new session to start working...
           </span>
         ) : sessions.map((session, index) => (

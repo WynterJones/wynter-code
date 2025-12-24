@@ -77,9 +77,10 @@ export function LayoutNode({ node, projectId, projectPath, panels }: LayoutNodeP
         )}
       >
         <div
-          className="overflow-hidden flex"
+          className="overflow-hidden flex min-h-0 min-w-0"
           style={{
             [isHorizontal ? "width" : "height"]: firstSize,
+            [isHorizontal ? "height" : "width"]: "100%",
             flexShrink: 0,
           }}
         >
@@ -98,9 +99,10 @@ export function LayoutNode({ node, projectId, projectPath, panels }: LayoutNodeP
         />
 
         <div
-          className="overflow-hidden flex flex-1"
+          className="overflow-hidden flex flex-1 min-h-0 min-w-0"
           style={{
             [isHorizontal ? "width" : "height"]: secondSize,
+            [isHorizontal ? "height" : "width"]: "100%",
           }}
         >
           <LayoutNode

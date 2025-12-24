@@ -65,8 +65,8 @@ export function OutputWindow({ sessionId }: OutputWindowProps) {
 
   if (!sessionId) {
     return (
-      <div className="h-full flex items-center justify-center text-text-secondary">
-        <div className="text-center">
+      <div className="h-full flex items-center justify-center text-text-secondary blueprint-grid">
+        <div className="text-center opacity-60">
           <p className="text-sm">No session selected</p>
           <p className="text-xs mt-1">Select or create a session to get started</p>
         </div>

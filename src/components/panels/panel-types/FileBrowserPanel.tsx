@@ -152,7 +152,7 @@ export function FileBrowserPanel({
   const selectedFile = files.find((f) => selectedPaths.has(f.path)) || null;
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       <FileBrowserHeader
         currentPath={currentPath}
         canGoBack={historyIndex > 0}

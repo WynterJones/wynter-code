@@ -1,6 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { useProjectStore } from "@/stores";
+import { useSessionStore } from "@/stores/sessionStore";
+import { useTerminalStore } from "@/stores/terminalStore";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { TycoonGame } from "./game/TycoonGame";
 import { StatsSidebar } from "./sidebar/StatsSidebar";
@@ -19,6 +21,9 @@ import {
   Trash2,
   Tractor,
   ExternalLink,
+  Copy,
+  Check,
+  Terminal,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +39,8 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
     () => (activeProjectId ? getProject(activeProjectId) : undefined),
     [activeProjectId, getProject]
   );
+  const { createSession } = useSessionStore();
+  const { queueCommand } = useTerminalStore();
   const {
     isInitialized,
     isPaused,
@@ -50,6 +57,26 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
 
   const [containerSize, setContainerSize] = useState({ width: 600, height: 600 });
   const [farmworkStatus, setFarmworkStatus] = useState<"checking" | "installed" | "not_installed">("checking");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCommand = async () => {
+    await navigator.clipboard.writeText("npm install -g farmwork");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleInstall = () => {
+    if (!activeProjectId) return;
+
+    // Create a new terminal session
+    const sessionId = createSession(activeProjectId, "terminal");
+
+    // Queue the install command to run when the terminal is ready
+    queueCommand(sessionId, "npm install -g farmwork");
+
+    // Close the popup
+    onClose();
+  };
 
   // Check if .farmwork.json exists in the project
   const checkFarmworkConfig = useCallback(async (projectPath: string) => {
@@ -125,24 +152,57 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
         title="Farmwork Tycoon"
         size="md"
       >
-        <div className="flex flex-col items-center justify-center py-16 px-8 text-center">
+        <div className="flex flex-col items-center justify-center py-12 px-8 text-center">
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-lime-500/20 to-emerald-500/20 flex items-center justify-center mb-6">
             <Tractor className="w-10 h-10 text-lime-500" />
           </div>
           <h2 className="text-xl font-semibold text-text-primary mb-3">
-            Farmwork Not Installed
+            Set Up Farmwork
           </h2>
-          <p className="text-sm text-text-secondary max-w-md mb-6">
-            Please install Farmwork.dev to this project to enable Farmwork Tycoon.
-            This will create a <code className="px-1.5 py-0.5 bg-bg-tertiary rounded text-xs font-mono">.farmwork.json</code> config file in your project root.
+          <p className="text-sm text-text-secondary max-w-md mb-2">
+            Farmwork is an agentic development harness that brings AI-assisted workflows to your project.
           </p>
-          <button
-            onClick={handleOpenFarmworkSite}
-            className="btn-primary flex items-center gap-2"
-          >
-            <span>Visit Farmwork.dev</span>
-            <ExternalLink className="w-4 h-4" />
-          </button>
+          <p className="text-sm text-text-secondary max-w-md mb-6">
+            Install globally via npm, then run <code className="px-1.5 py-0.5 bg-bg-tertiary rounded text-xs font-mono">farmwork init</code> in your project to create the config file.
+          </p>
+
+          {/* Terminal-style code block */}
+          <div className="w-full max-w-sm mb-6">
+            <div className="flex items-center justify-between bg-neutral-900 rounded-lg border border-neutral-700 px-4 py-3">
+              <code className="text-sm font-mono text-neutral-100">
+                <span className="text-neutral-500">$ </span>
+                npm install -g farmwork
+              </code>
+              <button
+                onClick={handleCopyCommand}
+                className="ml-3 p-1.5 rounded hover:bg-neutral-700 transition-colors"
+                title="Copy command"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4 text-neutral-400" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleInstall}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Terminal className="w-4 h-4" />
+              <span>Install in Terminal</span>
+            </button>
+            <button
+              onClick={handleOpenFarmworkSite}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <span>Learn More</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </Modal>
     );

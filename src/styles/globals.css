@@ -213,6 +213,115 @@ pre,
   .btn-secondary:disabled {
     @apply opacity-50 cursor-not-allowed;
   }
+
+  /* Blueprint grid empty state background */
+  .blueprint-grid {
+    position: relative;
+    overflow: hidden;
+    background-image:
+      linear-gradient(to right, rgba(99, 102, 241, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(99, 102, 241, 0.06) 1px, transparent 1px);
+    background-size: 32px 32px;
+    background-position: center center;
+  }
+
+  /* Main gradient glow sweep - fades from bottom to top */
+  .blueprint-grid::after {
+    content: '';
+    position: absolute;
+    left: -50%;
+    right: -50%;
+    bottom: -20px;
+    height: 300px;
+    background:
+      radial-gradient(
+        ellipse 60% 100% at 50% 100%,
+        rgba(99, 102, 241, 0.08) 0%,
+        rgba(139, 92, 246, 0.04) 40%,
+        transparent 70%
+      );
+    filter: blur(30px);
+    animation: blueprint-sweep 8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    pointer-events: none;
+    z-index: 0;
+    transform: translateX(-100%);
+  }
+
+  /* Quick shimmer line - rare occurrence */
+  .blueprint-grid::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(139, 92, 246, 0.6) 45%,
+      rgba(255, 255, 255, 0.9) 50%,
+      rgba(99, 102, 241, 0.6) 55%,
+      transparent 100%
+    );
+    background-size: 100% 100%;
+    animation: shimmer-line 25s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 1;
+    transform: translateX(-100%);
+  }
+
+  .blueprint-grid > * {
+    position: relative;
+    z-index: 2;
+  }
+
+  @keyframes blueprint-sweep {
+    0% {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0;
+    }
+    25% {
+      opacity: 1;
+    }
+    50% {
+      transform: translateX(0%);
+      opacity: 1;
+    }
+    75% {
+      opacity: 1;
+    }
+    90% {
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes shimmer-line {
+    0% {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    3% {
+      opacity: 1;
+    }
+    12% {
+      opacity: 1;
+    }
+    15% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
 }
 
 @layer utilities {

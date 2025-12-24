@@ -65,6 +65,7 @@ import {
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { McpManagerPopup } from "@/components/tools/mcp-manager";
 import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
+import { ClaudeCodeStatsPopup } from "@/components/tools/claude-code-stats";
 import { useMcpStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
@@ -389,6 +390,7 @@ export function ProjectTabBar({
   const [showFaviconGenerator, setShowFaviconGenerator] = useState(false);
   const [showDevToolkit, setShowDevToolkit] = useState(false);
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
+  const [showClaudeCodeStats, setShowClaudeCodeStats] = useState(false);
   const [hasBeads, setHasBeads] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -517,6 +519,9 @@ export function ProjectTabBar({
           break;
         case "openFarmworkTycoon":
           setShowFarmworkTycoon(true);
+          break;
+        case "openClaudeCodeStats":
+          setShowClaudeCodeStats(true);
           break;
       }
     };
@@ -756,6 +761,7 @@ export function ProjectTabBar({
           onOpenMcpManager={() => useMcpStore.getState().openPopup()}
           onOpenFaviconGenerator={() => setShowFaviconGenerator(true)}
           onOpenDevToolkit={() => setShowDevToolkit(true)}
+          onOpenClaudeCodeStats={() => setShowClaudeCodeStats(true)}
           hasStorybook={hasStorybook}
         />
       </div>
@@ -1056,6 +1062,12 @@ export function ProjectTabBar({
       <FarmworkTycoonPopup
         isOpen={showFarmworkTycoon}
         onClose={() => setShowFarmworkTycoon(false)}
+      />
+
+      {/* Claude Code Stats */}
+      <ClaudeCodeStatsPopup
+        isOpen={showClaudeCodeStats}
+        onClose={() => setShowClaudeCodeStats(false)}
       />
 
       {/* Farmwork Mini Player - persists even when popup is closed */}

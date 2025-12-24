@@ -65,8 +65,9 @@ export function Modal({
     >
       <div
         className={cn(
-          "bg-bg-secondary rounded-lg border border-border shadow-2xl w-full animate-in zoom-in-95 duration-150",
+          "bg-bg-secondary rounded-lg border border-border shadow-2xl w-full animate-in zoom-in-95 duration-150 flex flex-col",
           sizeClasses[size],
+          size === "full" && "h-[95vh]",
           className
         )}
       >

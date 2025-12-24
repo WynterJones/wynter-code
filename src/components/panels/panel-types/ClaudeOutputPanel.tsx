@@ -118,8 +118,8 @@ export function ClaudeOutputPanel({
 
   if (!sessionId || !currentSession) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-text-secondary p-4">
-        <p className="text-sm">No session linked to this panel</p>
+      <div className="h-full w-full flex flex-col items-center justify-center gap-3 text-text-secondary p-4 blueprint-grid">
+        <p className="text-sm opacity-60">No session linked to this panel</p>
         <button
           onClick={handleCreateSession}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded bg-accent/20 hover:bg-accent/30 text-accent transition-colors"
@@ -132,7 +132,7 @@ export function ClaudeOutputPanel({
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="h-full w-full flex flex-col overflow-hidden">
       {/* Prompt input */}
       <div className="px-3 pt-2 pb-1">
         <EnhancedPromptInput

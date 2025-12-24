@@ -310,6 +310,8 @@ fn main() {
             commands::delete_mcp_server,
             commands::toggle_mcp_server,
             commands::validate_mcp_command,
+            // Claude Code Stats
+            commands::read_claude_stats,
             // Claude Process Management
             claude_process::start_claude_streaming,
             claude_process::send_claude_input,

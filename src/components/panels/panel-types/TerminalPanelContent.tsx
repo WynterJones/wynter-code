@@ -28,7 +28,7 @@ export function TerminalPanelContent({
   }, [onProcessStateChange]);
 
   return (
-    <div className="flex-1 overflow-hidden">
+    <div className="h-full w-full overflow-hidden">
       <Terminal
         key={`panel-terminal-${panelId}`}
         projectPath={projectPath}
