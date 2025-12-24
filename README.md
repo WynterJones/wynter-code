@@ -1,19 +1,40 @@
 # Wynter Code
 
-A beautiful, modern desktop application for Claude Code CLI built with Tauri 2.0, React, and TypeScript. Features a VSCode-inspired dark theme, multi-project tabs, multiple sessions per project, file browsing, Git integration, and more.
+The ultimate toolkit for Wynter's workflow with a plethora of tools, connected directly with Claude Code CLI (soon more).
 
-## Features
+Built with Tauri 2.0, React 18, and TypeScript featuring a VSCode-inspired dark theme with Catppuccin colors.
 
-- **Claude Code Integration** - Full integration with Claude Code CLI for AI-powered coding assistance
-- **Multi-Project Tabs** - Work on multiple projects simultaneously with tabbed interface
-- **Multiple Sessions** - Run multiple Claude sessions per project with inner tabs
-- **File Browser** - Explore project files with a collapsible tree view
-- **Git Integration** - View branch, status, and recent commits at a glance
-- **Node Modules Viewer** - Browse installed packages with search functionality
-- **Model Selector** - Switch between Claude models (Sonnet, Opus, Haiku)
-- **Favorites System** - Star and quickly access your favorite projects
-- **Dark Theme** - Beautiful VSCode-inspired dark theme with Catppuccin colors
-- **SQLite Persistence** - Projects, sessions, and messages are persisted locally
+## Tools & Features
+
+### Development
+- Live Preview, Test Runner, Storybook Viewer
+- API Tester, Beads Tracker, Claude Code Stats
+- Farmwork Tycoon
+
+### Infrastructure
+- Port Manager, Localhost Tunnel
+- Background Services, System Health, Overwatch
+
+### Utilities
+- Node Modules Cleaner, Env Manager, MCP Servers
+- Favicon Generator, Dev Toolkit, Database Viewer
+
+### Core Features
+- Multi-Panel Layouts, Multi-Session Support
+- Git-aware File Browser, Integrated Terminal
+- Command Palette, Git Integration
+
+## Built With
+
+- Tauri 2.0 (Rust + Web)
+- React 18 + TypeScript
+- Tailwind CSS
+- Monaco Editor
+- Xterm.js (Terminal)
+- Zustand (State)
+- SQLx (Multi-database)
+- Recharts + Pixi.js
+- Claude Code CLI
 
 ## Prerequisites
 
@@ -55,114 +76,6 @@ pnpm dev
 pnpm tsc --noEmit
 ```
 
-## Project Structure
-
-```
-wynter-code/
-├── src/                          # React frontend
-│   ├── components/               # UI components
-│   │   ├── ui/                   # Base components (Button, Input, etc.)
-│   │   ├── layout/               # Layout components (AppShell, Sidebar)
-│   │   ├── files/                # File browser components
-│   │   ├── git/                  # Git integration
-│   │   ├── modules/              # Node modules viewer
-│   │   ├── model/                # Model selector
-│   │   ├── prompt/               # Prompt input
-│   │   ├── output/               # Output display
-│   │   └── project/              # Project info
-│   ├── stores/                   # Zustand state stores
-│   ├── services/                 # Backend services
-│   ├── hooks/                    # Custom React hooks
-│   ├── types/                    # TypeScript types
-│   └── lib/                      # Utility functions
-│
-├── src-tauri/                    # Rust backend
-│   ├── src/
-│   │   ├── main.rs               # Tauri entry point
-│   │   └── commands/             # Tauri commands
-│   ├── Cargo.toml                # Rust dependencies
-│   └── tauri.conf.json           # Tauri configuration
-│
-├── package.json                  # Node dependencies
-├── tailwind.config.js            # Tailwind theming
-├── tsconfig.json                 # TypeScript config
-└── vite.config.ts                # Vite config
-```
-
-## Architecture
-
-### Frontend (React + TypeScript)
-
-- **State Management**: Zustand with persistence
-- **Styling**: Tailwind CSS with custom theme
-- **Components**: Modular, reusable component library
-- **Markdown**: react-markdown with syntax highlighting
-
-### Backend (Rust + Tauri)
-
-- **File System**: tauri-plugin-fs for file operations
-- **Shell**: tauri-plugin-shell for Claude CLI and Git
-- **Database**: tauri-plugin-sql with SQLite for persistence
-- **Commands**: Custom Tauri commands for file tree and modules
-
-### Claude Integration
-
-Claude Code CLI is spawned as a subprocess using Tauri's shell plugin. Communication happens via stdout/stdin with JSON output format for reliable parsing.
-
-## Theme
-
-The app uses a VSCode-inspired dark theme with Catppuccin Mocha colors:
-
-| Element | Color |
-|---------|-------|
-| Background | `#1e1e2e` |
-| Secondary | `#181825` |
-| Text | `#cdd6f4` |
-| Accent | `#cba6f7` |
-| Success | `#a6e3a1` |
-| Error | `#f38ba8` |
-| Warning | `#f9e2af` |
-
-## Keyboard Shortcuts
-
-### Navigation
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + 1-9` | Switch to project tab 1-9 |
-| `Cmd/Ctrl + [` | Previous session |
-| `Cmd/Ctrl + ]` | Next session |
-
-### Sessions
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + T` | New session |
-| `Cmd/Ctrl + Shift + W` | Close current session |
-
-### Interface
-| Shortcut | Action |
-|----------|--------|
-| `Cmd/Ctrl + K` | Focus prompt input |
-| `Cmd/Ctrl + B` | Toggle sidebar |
-| `Cmd/Ctrl + ,` | Open settings |
-| `Cmd/Ctrl + E` | Toggle file browser |
-| `Cmd/Ctrl + /` | Show keyboard shortcuts |
-
-### Editing
-| Shortcut | Action |
-|----------|--------|
-| `Enter` | Send prompt |
-| `Shift + Enter` | New line in prompt |
-| `Escape` | Close popup / Cancel |
-
-## Configuration
-
-Settings are stored in `~/.wynter-code/` including:
-
-- Default Claude model
-- Sidebar width
-- Recent projects
-- Favorites
-
 ## Building
 
 ```bash
@@ -175,17 +88,11 @@ pnpm tauri build
 # - Linux: src-tauri/target/release/bundle/appimage/
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the [Polyform Noncommercial License 1.0.0](LICENSE).
+
+You are free to view, fork, and modify this software for any noncommercial purpose. Commercial use requires explicit permission from the author.
 
 ## Acknowledgments
 

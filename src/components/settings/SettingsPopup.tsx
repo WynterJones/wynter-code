@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,7 @@ interface SettingsPopupProps {
   onClose: () => void;
 }
 
-type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "about";
+type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "farmwork" | "about";
 
 const APP_VERSION = "1.0.0";
 
@@ -87,6 +87,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
     { id: "keyboard", label: "Keyboard", icon: Keyboard },
     { id: "avatar", label: "Avatar", icon: UserCircle },
     { id: "data", label: "Data", icon: HardDrive },
+    { id: "farmwork", label: "Farmwork", icon: Sprout },
     { id: "about", label: "About", icon: Info },
   ];
 
@@ -178,6 +179,7 @@ export function SettingsPopup({ onClose }: SettingsPopupProps) {
               {activeTab === "keyboard" && <KeyboardShortcutsSection />}
               {activeTab === "avatar" && <AvatarSettings />}
               {activeTab === "data" && <DataManagementTab />}
+              {activeTab === "farmwork" && <FarmworkTab />}
               {activeTab === "about" && <AboutSection />}
             </div>
           </ScrollArea>
@@ -797,33 +799,123 @@ function AboutSection() {
         <div className="p-4 rounded-lg bg-bg-secondary border border-border">
           <h3 className="font-medium text-text-primary mb-2">About</h3>
           <p className="text-text-secondary leading-relaxed">
-            Wynter Code is a desktop application that provides a beautiful GUI
-            wrapper around Claude Code CLI. It features multi-project tabs,
-            multiple sessions per project, file browsing, and a modern dark
-            theme.
+            The ultimate toolkit for Wynter&apos;s workflow with a plethora of tools,
+            connected directly with Claude Code CLI (soon more).
           </p>
+        </div>
+
+        <div className="p-4 rounded-lg bg-bg-secondary border border-border">
+          <h3 className="font-medium text-text-primary mb-3">Tools & Features</h3>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Development</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>Live Preview, Test Runner, Storybook Viewer</li>
+            <li>API Tester, Beads Tracker, Claude Code Stats</li>
+            <li>Farmwork Tycoon</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Infrastructure</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>Port Manager, Localhost Tunnel</li>
+            <li>Background Services, System Health, Overwatch</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Utilities</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>Node Modules Cleaner, Env Manager, MCP Servers</li>
+            <li>Favicon Generator, Dev Toolkit, Database Viewer</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Core Features</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5">
+            <li>Multi-Panel Layouts, Multi-Session Support</li>
+            <li>Git-aware File Browser, Integrated Terminal</li>
+            <li>Command Palette, Git Integration</li>
+          </ul>
         </div>
 
         <div className="p-4 rounded-lg bg-bg-secondary border border-border">
           <h3 className="font-medium text-text-primary mb-2">Built With</h3>
           <ul className="text-text-secondary space-y-1">
             <li>Tauri 2.0 (Rust + Web)</li>
-            <li>React + TypeScript</li>
+            <li>React 18 + TypeScript</li>
             <li>Tailwind CSS</li>
             <li>Monaco Editor</li>
+            <li>Xterm.js (Terminal)</li>
+            <li>Zustand (State)</li>
+            <li>SQLx (Multi-database)</li>
+            <li>Recharts + Pixi.js</li>
             <li>Claude Code CLI</li>
           </ul>
         </div>
 
         <div className="p-4 rounded-lg bg-bg-secondary border border-border">
           <h3 className="font-medium text-text-primary mb-2">License</h3>
-          <p className="text-text-secondary">MIT License</p>
+          <p className="text-text-secondary">Polyform Noncommercial 1.0.0</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FarmworkTab() {
+  const handleLearnMore = async () => {
+    const { open } = await import("@tauri-apps/plugin-shell");
+    await open("https://farmwork.dev");
+  };
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-lg font-medium text-text-primary mb-4">
+        Farmwork
+      </h2>
+
+      <div className="p-4 rounded-lg bg-bg-secondary border border-border">
+        <p className="text-text-secondary text-sm leading-relaxed">
+          Farmwork is an agentic development harness using farming metaphors to make
+          AI-assisted development workflows more intuitive and memorable.
+        </p>
+      </div>
+
+      <div className="p-4 rounded-lg bg-bg-secondary border border-border">
+        <h3 className="font-medium text-text-primary mb-3">Phrase Commands</h3>
+        <div className="overflow-hidden rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-bg-hover">
+                <th className="text-left py-2 px-3 font-medium text-text-primary border-b border-border">Phrase</th>
+                <th className="text-left py-2 px-3 font-medium text-text-primary border-b border-border">Action</th>
+              </tr>
+            </thead>
+            <tbody className="text-text-secondary">
+              <tr className="border-b border-border">
+                <td className="py-2 px-3 font-mono text-xs">&quot;open the farm&quot;</td>
+                <td className="py-2 px-3">Audit systems, update metrics</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="py-2 px-3 font-mono text-xs">&quot;count the herd&quot;</td>
+                <td className="py-2 px-3">Full code inspection (dry run)</td>
+              </tr>
+              <tr className="border-b border-border">
+                <td className="py-2 px-3 font-mono text-xs">&quot;go to market&quot;</td>
+                <td className="py-2 px-3">i18n + accessibility scan</td>
+              </tr>
+              <tr>
+                <td className="py-2 px-3 font-mono text-xs">&quot;close the farm&quot;</td>
+                <td className="py-2 px-3">Lint, test, build, commit, push</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
-      <div className="text-center text-xs text-text-secondary pt-4">
-        Made with care
-      </div>
+      <button
+        onClick={handleLearnMore}
+        className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-border text-text-primary hover:bg-bg-hover transition-colors"
+      >
+        <span>Learn more at farmwork.dev</span>
+        <ExternalLink className="w-4 h-4" />
+      </button>
     </div>
   );
 }

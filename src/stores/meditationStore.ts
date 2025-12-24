@@ -18,6 +18,10 @@ interface MeditationState {
   isStream: boolean;
   streamMetadata: StreamMetadata | null;
 
+  // Visualizer state
+  showVisualizer: boolean;
+  audioElementRef: HTMLAudioElement | null;
+
   setActive: (active: boolean) => void;
   setMiniPlayerVisible: (visible: boolean) => void;
   setTrack: (track: number) => void;
@@ -33,6 +37,10 @@ interface MeditationState {
   // Stream setters
   setIsStream: (isStream: boolean) => void;
   setStreamMetadata: (metadata: StreamMetadata | null) => void;
+
+  // Visualizer setters
+  setShowVisualizer: (show: boolean) => void;
+  setAudioElementRef: (ref: HTMLAudioElement | null) => void;
 }
 
 export const useMeditationStore = create<MeditationState>((set, get) => ({
@@ -46,6 +54,10 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
   // Stream state defaults
   isStream: false,
   streamMetadata: null,
+
+  // Visualizer state defaults
+  showVisualizer: true,
+  audioElementRef: null,
 
   setActive: (active) => {
     const { isPlaying } = get();
@@ -95,4 +107,8 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
   // Stream setters
   setIsStream: (isStream) => set({ isStream }),
   setStreamMetadata: (streamMetadata) => set({ streamMetadata }),
+
+  // Visualizer setters
+  setShowVisualizer: (showVisualizer) => set({ showVisualizer }),
+  setAudioElementRef: (audioElementRef) => set({ audioElementRef }),
 }));

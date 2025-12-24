@@ -27,6 +27,7 @@ export function MeditationAudioController() {
     setTrack,
     setIsStream,
     setStreamMetadata,
+    setAudioElementRef,
   } = useMeditationStore();
 
   const { audioSourceType, nightrideStation, currentRadioBrowserStation } =
@@ -142,6 +143,16 @@ export function MeditationAudioController() {
       audioRef.current.play().catch(() => setPlaying(false));
     }
   };
+
+  // Expose audio element ref to store for visualizer
+  useEffect(() => {
+    if (audioRef.current) {
+      setAudioElementRef(audioRef.current);
+    }
+    return () => {
+      setAudioElementRef(null);
+    };
+  }, [setAudioElementRef, shouldBeActive, audioSrc]);
 
   // Only render audio element when needed and we have a valid source
   if (!shouldBeActive || !audioSrc) return null;
