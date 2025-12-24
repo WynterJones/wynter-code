@@ -6,6 +6,8 @@ import {
   Volume2,
   VolumeX,
   Radio,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -26,7 +28,7 @@ export function MeditationAudioPlayer() {
     streamMetadata,
   } = useMeditationStore();
 
-  const { audioSourceType, nightrideStation, currentRadioBrowserStation } =
+  const { audioSourceType, nightrideStation, currentRadioBrowserStation, nextNightrideStation, prevNightrideStation } =
     useSettingsStore();
 
   // Determine display info based on audio source
@@ -86,7 +88,18 @@ export function MeditationAudioPlayer() {
 
       {/* Playback controls */}
       <div className="flex items-center justify-center gap-3 mb-4">
-        {/* Hide skip buttons for streams */}
+        {/* Show station navigation for NightRide FM */}
+        {audioSourceType === "nightride" && (
+          <button
+            onClick={prevNightrideStation}
+            className="p-2 rounded-full text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
+            title="Previous station"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Show track navigation for custom music */}
         {!isStream && (
           <button
             onClick={prevTrack}
@@ -118,6 +131,17 @@ export function MeditationAudioPlayer() {
             className="p-2 rounded-full text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
           >
             <SkipForward className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Show station navigation for NightRide FM */}
+        {audioSourceType === "nightride" && (
+          <button
+            onClick={nextNightrideStation}
+            className="p-2 rounded-full text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors"
+            title="Next station"
+          >
+            <ChevronRight className="w-4 h-4" />
           </button>
         )}
       </div>

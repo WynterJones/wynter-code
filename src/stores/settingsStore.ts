@@ -6,6 +6,7 @@ import type {
   NightrideStation,
   RadioBrowserFavorite,
 } from "@/types/radio";
+import { NIGHTRIDE_STATIONS } from "@/components/meditation/radioStations";
 
 export type EditorTheme =
   | "one-dark"
@@ -117,6 +118,8 @@ interface SettingsStore {
   // Radio setters
   setAudioSourceType: (type: AudioSourceType) => void;
   setNightrideStation: (station: NightrideStation) => void;
+  nextNightrideStation: () => void;
+  prevNightrideStation: () => void;
   addRadioBrowserFavorite: (station: RadioBrowserFavorite) => void;
   removeRadioBrowserFavorite: (stationuuid: string) => void;
   setCurrentRadioBrowserStation: (station: RadioBrowserFavorite | null) => void;
@@ -245,6 +248,22 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setNightrideStation: (nightrideStation: NightrideStation) => {
         set({ nightrideStation });
+      },
+
+      nextNightrideStation: () => {
+        set((state) => {
+          const currentIndex = NIGHTRIDE_STATIONS.findIndex(s => s.id === state.nightrideStation);
+          const nextIndex = (currentIndex + 1) % NIGHTRIDE_STATIONS.length;
+          return { nightrideStation: NIGHTRIDE_STATIONS[nextIndex].id as NightrideStation };
+        });
+      },
+
+      prevNightrideStation: () => {
+        set((state) => {
+          const currentIndex = NIGHTRIDE_STATIONS.findIndex(s => s.id === state.nightrideStation);
+          const prevIndex = (currentIndex - 1 + NIGHTRIDE_STATIONS.length) % NIGHTRIDE_STATIONS.length;
+          return { nightrideStation: NIGHTRIDE_STATIONS[prevIndex].id as NightrideStation };
+        });
       },
 
       addRadioBrowserFavorite: (station: RadioBrowserFavorite) => {

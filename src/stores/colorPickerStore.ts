@@ -11,6 +11,11 @@ interface ColorPickerStore {
   recentColors: SavedColor[];
   savedColors: SavedColor[];
 
+  // Settings
+  autoCopyOnPick: boolean;
+  defaultFormat: ColorFormat;
+  openPickerAfterPick: boolean;
+
   setCurrentColor: (color: ColorValue) => void;
   setSelectedFormat: (format: ColorFormat) => void;
   addRecentColor: (color: ColorValue) => void;
@@ -18,6 +23,11 @@ interface ColorPickerStore {
   deleteColor: (id: string) => void;
   clearRecentColors: () => void;
   clearSavedColors: () => void;
+
+  // Settings setters
+  setAutoCopyOnPick: (value: boolean) => void;
+  setDefaultFormat: (format: ColorFormat) => void;
+  setOpenPickerAfterPick: (value: boolean) => void;
 
   // Reset
   reset: () => void;
@@ -30,6 +40,11 @@ export const useColorPickerStore = create<ColorPickerStore>()(
       selectedFormat: "hex",
       recentColors: [],
       savedColors: [],
+
+      // Settings defaults
+      autoCopyOnPick: true,
+      defaultFormat: "hex",
+      openPickerAfterPick: true,
 
       setCurrentColor: (color: ColorValue) => {
         set({ currentColor: color });
@@ -103,12 +118,28 @@ export const useColorPickerStore = create<ColorPickerStore>()(
         set({ savedColors: [] });
       },
 
+      // Settings setters
+      setAutoCopyOnPick: (value: boolean) => {
+        set({ autoCopyOnPick: value });
+      },
+
+      setDefaultFormat: (format: ColorFormat) => {
+        set({ defaultFormat: format, selectedFormat: format });
+      },
+
+      setOpenPickerAfterPick: (value: boolean) => {
+        set({ openPickerAfterPick: value });
+      },
+
       reset: () => {
         set({
           currentColor: null,
           selectedFormat: "hex",
           recentColors: [],
           savedColors: [],
+          autoCopyOnPick: true,
+          defaultFormat: "hex",
+          openPickerAfterPick: true,
         });
       },
     }),

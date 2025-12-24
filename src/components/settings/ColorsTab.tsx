@@ -2,16 +2,35 @@ import { useState } from "react";
 import { Trash2, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useColorPickerStore } from "@/stores/colorPickerStore";
-import type { SavedColor } from "@/types/color";
+import type { SavedColor, ColorFormat } from "@/types/color";
 
 const EXPORT_FORMATS: { id: "json" | "css"; label: string }[] = [
   { id: "json", label: "JSON" },
   { id: "css", label: "CSS Variables" },
 ];
 
+const COLOR_FORMATS: { id: ColorFormat; label: string }[] = [
+  { id: "hex", label: "HEX (#FF5500)" },
+  { id: "rgb", label: "RGB (rgb(255, 85, 0))" },
+  { id: "rgba", label: "RGBA (rgba(255, 85, 0, 1.00))" },
+  { id: "hsl", label: "HSL (hsl(20, 100%, 50%))" },
+  { id: "hsla", label: "HSLA (hsla(20, 100%, 50%, 1.00))" },
+];
+
 export function ColorsTab() {
-  const { recentColors, savedColors, deleteColor, clearRecentColors, clearSavedColors } =
-    useColorPickerStore();
+  const {
+    recentColors,
+    savedColors,
+    deleteColor,
+    clearRecentColors,
+    clearSavedColors,
+    autoCopyOnPick,
+    defaultFormat,
+    openPickerAfterPick,
+    setAutoCopyOnPick,
+    setDefaultFormat,
+    setOpenPickerAfterPick,
+  } = useColorPickerStore();
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showClearConfirm, setShowClearConfirm] = useState<"recent" | "saved" | null>(null);
@@ -75,6 +94,80 @@ export function ColorsTab() {
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-medium text-text-primary mb-4">Colors</h2>
+
+      {/* Color Picker Settings */}
+      <div className="p-4 rounded-lg bg-bg-secondary border border-border space-y-4">
+        <h3 className="text-sm font-medium text-text-primary">Color Picker Settings</h3>
+
+        {/* Auto Copy Toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm text-text-primary">Auto copy to clipboard</span>
+            <p className="text-xs text-text-secondary">
+              Automatically copy color when picked from screen
+            </p>
+          </div>
+          <button
+            onClick={() => setAutoCopyOnPick(!autoCopyOnPick)}
+            className={cn(
+              "w-11 h-6 rounded-full transition-colors relative",
+              autoCopyOnPick ? "bg-accent" : "bg-bg-hover"
+            )}
+          >
+            <div
+              className={cn(
+                "absolute top-1 w-4 h-4 rounded-full bg-white transition-transform",
+                autoCopyOnPick ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
+
+        {/* Open Picker Toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm text-text-primary">Open picker after pick</span>
+            <p className="text-xs text-text-secondary">
+              Show color picker window after picking a color
+            </p>
+          </div>
+          <button
+            onClick={() => setOpenPickerAfterPick(!openPickerAfterPick)}
+            className={cn(
+              "w-11 h-6 rounded-full transition-colors relative",
+              openPickerAfterPick ? "bg-accent" : "bg-bg-hover"
+            )}
+          >
+            <div
+              className={cn(
+                "absolute top-1 w-4 h-4 rounded-full bg-white transition-transform",
+                openPickerAfterPick ? "translate-x-6" : "translate-x-1"
+              )}
+            />
+          </button>
+        </div>
+
+        {/* Default Format */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-sm text-text-primary">Default color format</span>
+            <p className="text-xs text-text-secondary">
+              Format used when copying colors
+            </p>
+          </div>
+          <select
+            value={defaultFormat}
+            onChange={(e) => setDefaultFormat(e.target.value as ColorFormat)}
+            className="bg-bg-primary border border-border rounded-md px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent min-w-[140px]"
+          >
+            {COLOR_FORMATS.map((fmt) => (
+              <option key={fmt.id} value={fmt.id}>
+                {fmt.id.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Stats */}
       <div className="flex items-center gap-4 text-sm text-text-secondary">

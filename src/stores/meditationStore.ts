@@ -6,6 +6,8 @@ import {
 } from "@/components/meditation/tracks";
 import type { StreamMetadata } from "@/types/radio";
 
+export type VisualizerType = "wave" | "bars" | "circle" | "line";
+
 interface MeditationState {
   isActive: boolean;
   miniPlayerVisible: boolean;
@@ -20,6 +22,7 @@ interface MeditationState {
 
   // Visualizer state
   showVisualizer: boolean;
+  visualizerType: VisualizerType;
   audioElementRef: HTMLAudioElement | null;
 
   setActive: (active: boolean) => void;
@@ -40,6 +43,7 @@ interface MeditationState {
 
   // Visualizer setters
   setShowVisualizer: (show: boolean) => void;
+  setVisualizerType: (type: VisualizerType) => void;
   setAudioElementRef: (ref: HTMLAudioElement | null) => void;
 }
 
@@ -57,6 +61,7 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
 
   // Visualizer state defaults
   showVisualizer: true,
+  visualizerType: "wave",
   audioElementRef: null,
 
   setActive: (active) => {
@@ -110,5 +115,6 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
 
   // Visualizer setters
   setShowVisualizer: (showVisualizer) => set({ showVisualizer }),
+  setVisualizerType: (visualizerType) => set({ visualizerType }),
   setAudioElementRef: (audioElementRef) => set({ audioElementRef }),
 }));

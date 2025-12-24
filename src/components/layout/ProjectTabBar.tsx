@@ -63,6 +63,10 @@ import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { McpManagerPopup } from "@/components/tools/mcp-manager";
 import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
 import { ClaudeCodeStatsPopup } from "@/components/tools/claude-code-stats";
+import { WebcamToolPopup } from "@/components/tools/webcam";
+import { DomainToolsPopup } from "@/components/tools/domain-tools";
+import { SeoToolsPopup } from "@/components/tools/seo-tools";
+import { ScreenStudioPopup } from "@/components/tools/screen-studio";
 import { useMcpStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
@@ -389,6 +393,10 @@ export function ProjectTabBar({
   const [showDevToolkit, setShowDevToolkit] = useState(false);
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
   const [showClaudeCodeStats, setShowClaudeCodeStats] = useState(false);
+  const [showWebcamTool, setShowWebcamTool] = useState(false);
+  const [showDomainTools, setShowDomainTools] = useState(false);
+  const [showSeoTools, setShowSeoTools] = useState(false);
+  const [showScreenStudio, setShowScreenStudio] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -500,6 +508,18 @@ export function ProjectTabBar({
           break;
         case "openClaudeCodeStats":
           setShowClaudeCodeStats(true);
+          break;
+        case "openFloatingWebcam":
+          setShowWebcamTool(true);
+          break;
+        case "openDomainTools":
+          setShowDomainTools(true);
+          break;
+        case "openSeoTools":
+          setShowSeoTools(true);
+          break;
+        case "openScreenStudio":
+          setShowScreenStudio(true);
           break;
       }
     };
@@ -730,6 +750,10 @@ export function ProjectTabBar({
           onOpenFaviconGenerator={() => setShowFaviconGenerator(true)}
           onOpenDevToolkit={() => setShowDevToolkit(true)}
           onOpenClaudeCodeStats={() => setShowClaudeCodeStats(true)}
+          onOpenDomainTools={() => setShowDomainTools(true)}
+          onOpenSeoTools={() => setShowSeoTools(true)}
+          onOpenFloatingWebcam={() => setShowWebcamTool(true)}
+          onOpenScreenStudio={() => setShowScreenStudio(true)}
           hasStorybook={hasStorybook}
         />
       </div>
@@ -1027,6 +1051,30 @@ export function ProjectTabBar({
       <ClaudeCodeStatsPopup
         isOpen={showClaudeCodeStats}
         onClose={() => setShowClaudeCodeStats(false)}
+      />
+
+      {/* Floating Webcam Tool */}
+      <WebcamToolPopup
+        isOpen={showWebcamTool}
+        onClose={() => setShowWebcamTool(false)}
+      />
+
+      {/* Domain Tools */}
+      <DomainToolsPopup
+        isOpen={showDomainTools}
+        onClose={() => setShowDomainTools(false)}
+      />
+
+      {/* SEO Tools */}
+      <SeoToolsPopup
+        isOpen={showSeoTools}
+        onClose={() => setShowSeoTools(false)}
+      />
+
+      {/* Screen Studio */}
+      <ScreenStudioPopup
+        isOpen={showScreenStudio}
+        onClose={() => setShowScreenStudio(false)}
       />
 
       {/* Farmwork Mini Player - persists even when popup is closed */}

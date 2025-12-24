@@ -2,7 +2,7 @@
 
 ## Overview
 
-Add support for multiple AI CLI providers (Claude Code, Gemini CLI, Codex CLI) with one CLI per session. User selects provider when creating a session, UI shows provider-specific branding while app structure stays the same.
+Add support for multiple AI CLI providers (Claude Code, Gemini CLI, Codex CLI, Cursor CLI) with one CLI per session. User selects provider when creating a session, UI shows provider-specific branding while app structure stays the same.
 
 ---
 
@@ -12,13 +12,14 @@ Add support for multiple AI CLI providers (Claude Code, Gemini CLI, Codex CLI) w
 
 ```typescript
 // New provider type
-export type AIProvider = "claude" | "gemini" | "codex";
+export type AIProvider = "claude" | "gemini" | "codex" | "cursor";
 
 // Provider-specific models
 export type ClaudeModel = "claude-sonnet-4-20250514" | "claude-opus-4-20250514" | "claude-haiku-3-5-20241022";
 export type GeminiModel = "gemini-2.0-flash" | "gemini-2.0-pro" | "gemini-1.5-pro";
 export type CodexModel = "gpt-4o" | "gpt-4-turbo" | "o1-preview";
-export type AIModel = ClaudeModel | GeminiModel | CodexModel;
+export type CursorModel = "cursor-default";  // Uses Cursor subscription models
+export type AIModel = ClaudeModel | GeminiModel | CodexModel | CursorModel;
 
 // Updated Session interface
 export interface Session {
@@ -37,7 +38,7 @@ Single polymorphic streaming command:
 #[tauri::command]
 pub async fn run_ai_streaming(
     window: tauri::Window,
-    provider: AIProvider,  // "claude" | "gemini" | "codex"
+    provider: AIProvider,  // "claude" | "gemini" | "codex" | "cursor"
     prompt: String,
     cwd: String,
     session_id: String,
@@ -48,6 +49,7 @@ pub async fn run_ai_streaming(
         AIProvider::Claude => run_claude_impl(...),
         AIProvider::Gemini => run_gemini_impl(...),
         AIProvider::Codex => run_codex_impl(...),
+        AIProvider::Cursor => run_cursor_impl(...),
     }
 }
 ```
@@ -56,6 +58,7 @@ pub async fn run_ai_streaming(
 - Claude: `claude -p "prompt" --output-format stream-json --resume <id>`
 - Gemini: `gemini run --model <model> "prompt"`
 - Codex: `codex exec --json --model <model> "prompt"`
+- Cursor: `cursor-agent -p "prompt" --output-format json --resume <id>`
 
 ### 3. Session Store (`src/stores/sessionStore.ts`)
 
@@ -76,13 +79,14 @@ Create SVG icon components:
 - `ClaudeIcon.tsx` - existing from public/claude.svg
 - `GeminiIcon.tsx` - Google Gemini sparkle logo
 - `OpenAIIcon.tsx` - OpenAI logo
+- `CursorIcon.tsx` - Cursor logo
 
 ### 5. UI Components
 
 **ProviderSelector** (`src/components/model/ProviderSelector.tsx`) - NEW
 - Shows installed providers with icons
 - Used when creating new session
-- Shows provider color (Claude: #da7756, Gemini: #4285f4, OpenAI: #10a37f)
+- Shows provider color (Claude: #da7756, Gemini: #4285f4, OpenAI: #10a37f, Cursor: #00d4aa)
 
 **ModelSelector** (`src/components/model/ModelSelector.tsx`) - UPDATE
 - Filter models by current session's provider
@@ -102,9 +106,10 @@ Add CLI detection:
 ```typescript
 { key: "gemini", label: "Gemini CLI", installCommand: "npm i -g @google/genai" }
 { key: "codex", label: "Codex CLI", installCommand: "npm i -g @openai/codex" }
+{ key: "cursor", label: "Cursor CLI", installCommand: "curl https://cursor.com/install -fsSL | bash" }
 ```
 
-Update `check_system_requirements` in Rust to check for all three CLIs.
+Update `check_system_requirements` in Rust to check for all four CLIs.
 
 ### 7. Settings (`src/components/settings/SettingsPopup.tsx`)
 
@@ -127,6 +132,7 @@ New "AI Providers" section:
 | `src/services/claude.ts` | Update to use new command |
 | `src/components/icons/GeminiIcon.tsx` | NEW |
 | `src/components/icons/OpenAIIcon.tsx` | NEW |
+| `src/components/icons/CursorIcon.tsx` | NEW |
 | `src/components/model/ProviderSelector.tsx` | NEW |
 | `src/components/model/ModelSelector.tsx` | Filter by provider |
 | `src/components/output/ClaudeResponseCard.tsx` | Rename, add provider prop |
@@ -186,3 +192,51 @@ All three CLIs support OpenTelemetry natively, enabling unified stats tracking:
 - Normalize events into common schema for unified dashboard
 - Provider toggle in stats UI to switch between CLI data
 - See `_AUDIT/GARDEN.md` for "Claude Code Stats Tracking" idea
+
+---
+
+## Cursor CLI Reference
+
+**Status:** Beta (as of August 2025)
+
+### Installation
+```bash
+curl https://cursor.com/install -fsSL | bash
+```
+
+### Commands
+| Command | Description |
+|---------|-------------|
+| `cursor-agent` | Start interactive session |
+| `cursor-agent chat "prompt"` | Start with initial prompt |
+| `cursor-agent -p "prompt"` | Non-interactive mode (print only) |
+| `cursor-agent ls` | List previous conversations |
+| `cursor-agent resume` | Resume latest session |
+| `cursor-agent --resume="id"` | Resume specific session by ID |
+
+### Key Flags
+| Flag | Description |
+|------|-------------|
+| `-p`, `--print` | Non-interactive mode, prints response to console |
+| `--model "model-name"` | Specify model to use |
+| `--output-format text` | Plain text output |
+| `--output-format json` | Structured JSON output (for parsing) |
+
+### Features
+- **Subscription Models:** Uses any model from Cursor subscription
+- **MCP Support:** Respects `mcp.json` configuration automatically
+- **Rules System:** Loads rules from `.cursor/rules/` directory (same as IDE)
+- **Agent Tools:** File operations, codebase search, shell commands
+- **Security:** Prompts Y/N approval before executing terminal commands
+
+### Implementation Notes
+- Command approval system similar to Claude Code
+- Session IDs can be stored in `providerSessionId` for resume
+- JSON output mode enables structured parsing for streaming
+- No separate API key needed - uses Cursor subscription auth
+- Currently beta - security safeguards still evolving
+
+### Sources
+- [Cursor CLI Docs](https://cursor.com/docs/cli/overview)
+- [Cursor Agent CLI Blog](https://cursor.com/blog/cli)
+- [Getting Started Guide](https://www.codecademy.com/article/getting-started-with-cursor-cli)

@@ -5,13 +5,16 @@ mod beads;
 mod claude_process;
 mod color_picker;
 mod commands;
+mod cost_popup;
 mod database_viewer;
+mod domain_tools;
 mod live_preview;
 mod overwatch;
 mod storybook;
 mod terminal;
 mod tunnel;
 mod watcher;
+mod webcam_window;
 
 use std::sync::Arc;
 use tauri::{
@@ -322,6 +325,26 @@ fn main() {
             claude_process::terminate_claude_session,
             claude_process::is_claude_session_active,
             claude_process::list_active_claude_sessions,
+            // Webcam Window Management
+            webcam_window::create_floating_webcam_window,
+            webcam_window::close_floating_webcam_window,
+            webcam_window::update_floating_webcam_position,
+            webcam_window::update_floating_webcam_size,
+            webcam_window::get_floating_webcam_state,
+            webcam_window::is_floating_webcam_open,
+            // Cost Popup (Screen Recording Invisible)
+            cost_popup::create_cost_popup,
+            cost_popup::close_cost_popup,
+            cost_popup::update_cost_popup_position,
+            cost_popup::is_cost_popup_open,
+            // Domain Tools
+            domain_tools::whois_lookup,
+            domain_tools::dns_lookup,
+            domain_tools::dns_lookup_server,
+            domain_tools::ssl_check,
+            domain_tools::http_head_request,
+            domain_tools::http_get_json,
+            domain_tools::http_follow_redirects,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -11,13 +11,34 @@ Built with Tauri 2.0, React 18, and TypeScript featuring a VSCode-inspired dark 
 - API Tester, Beads Tracker, Claude Code Stats
 - Farmwork Tycoon
 
+### Dev Toolkit (28 Tools)
+- **Encoding**: Base64, URL Encode/Decode, HTML Entities, String Escape
+- **Data Formats**: JSON Formatter, JSON/YAML, CSV/JSON Converter
+- **Crypto**: Hash Generator, HMAC, Bcrypt, Password Generator
+- **Parsing**: JWT Debugger, URL Parser, Regex Tester, Cron Parser
+- **Text**: Lorem Ipsum, Case Converter, Slug Generator, Word Counter, Text Diff
+- **Generators**: UUID, QR Code, Timestamps, Number Base Converter
+- **Reference**: HTTP Status Codes, User Agent Parser, IP Address, Byte Size
+
+### Domain & SEO Tools
+- WHOIS Lookup, Domain Availability Checker
+- DNS Lookup, DNS Propagation Checker
+- SSL Certificate Inspector, HTTP Headers Analyzer
+- IP Geolocation, Redirect Chain Tracker
+
+### Webcam & Streaming
+- Floating webcam overlay with desktop pinning
+- Customizable borders, effects, and shadows
+- Crop selection and aspect ratio controls
+- Decart AI integration for real-time effects
+
 ### Infrastructure
 - Port Manager, Localhost Tunnel
 - Background Services, System Health, Overwatch
 
 ### Utilities
 - Node Modules Cleaner, Env Manager, MCP Servers
-- Favicon Generator, Dev Toolkit, Database Viewer
+- Favicon Generator, Database Viewer
 
 ### Core Features
 - Multi-Panel Layouts, Multi-Session Support

@@ -3,10 +3,14 @@ import type { MagnifierData } from "@/types/color";
 
 interface MagnifierOverlayProps {
   data: MagnifierData | null;
+  isZoomedIn?: boolean;
 }
 
-export function MagnifierOverlay({ data }: MagnifierOverlayProps) {
+export function MagnifierOverlay({ data, isZoomedIn = false }: MagnifierOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Circle size depends on zoom mode
+  const circleSize = isZoomedIn ? 110 : 150;
 
   useEffect(() => {
     if (!canvasRef.current || !data) return;
@@ -16,8 +20,12 @@ export function MagnifierOverlay({ data }: MagnifierOverlayProps) {
     if (!ctx) return;
 
     const { pixels, width, height } = data;
-    const canvasSize = 100; // 100px diameter
+    const canvasSize = circleSize;
     const cellSize = canvasSize / width; // Size of each zoomed pixel
+
+    // Update canvas size
+    canvas.width = canvasSize;
+    canvas.height = canvasSize;
 
     // Clear canvas
     ctx.clearRect(0, 0, canvasSize, canvasSize);
@@ -35,8 +43,9 @@ export function MagnifierOverlay({ data }: MagnifierOverlayProps) {
       }
     }
 
-    // Draw grid lines
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+    // Draw grid lines (more visible when zoomed in)
+    const gridOpacity = isZoomedIn ? 0.3 : 0.15;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${gridOpacity})`;
     ctx.lineWidth = 0.5;
 
     for (let i = 0; i <= width; i++) {
@@ -57,7 +66,7 @@ export function MagnifierOverlay({ data }: MagnifierOverlayProps) {
     const centerX = Math.floor(width / 2);
     const centerY = Math.floor(height / 2);
 
-    ctx.strokeStyle = "white";
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
     ctx.lineWidth = 2;
     ctx.strokeRect(
       centerX * cellSize + 1,
@@ -65,45 +74,58 @@ export function MagnifierOverlay({ data }: MagnifierOverlayProps) {
       cellSize - 2,
       cellSize - 2
     );
-  }, [data]);
+  }, [data, circleSize, isZoomedIn]);
 
   const centerColor = data?.centerColor;
 
+  // Crosshair opacity - more transparent in zoomed out mode
+  const crosshairOpacity = isZoomedIn ? 0.5 : 0.25;
+
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-1">
       {/* Circular magnifier with canvas */}
       <div
-        className="relative rounded-full overflow-hidden border-2 border-white/80"
+        className="relative rounded-full overflow-hidden"
         style={{
-          width: 100,
-          height: 100,
-          boxShadow: "0 4px 20px rgba(0, 0, 0, 0.5)",
+          width: circleSize,
+          height: circleSize,
+          boxShadow: "0 0 0 2px rgba(255,255,255,0.8), 0 4px 20px rgba(0, 0, 0, 0.5)",
         }}
       >
         <canvas
           ref={canvasRef}
-          width={100}
-          height={100}
+          width={circleSize}
+          height={circleSize}
           className="w-full h-full"
+          style={{ borderRadius: "50%" }}
+        />
+        {/* Crosshair overlay - subtle lines */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `
+              linear-gradient(to right, transparent 49.5%, rgba(255,255,255,${crosshairOpacity}) 49.5%, rgba(255,255,255,${crosshairOpacity}) 50.5%, transparent 50.5%),
+              linear-gradient(to bottom, transparent 49.5%, rgba(255,255,255,${crosshairOpacity}) 49.5%, rgba(255,255,255,${crosshairOpacity}) 50.5%, transparent 50.5%)
+            `,
+          }}
         />
       </div>
 
       {/* Color value display */}
       {centerColor && (
         <div
-          className="flex items-center gap-2 px-3 py-1.5 rounded-md"
+          className="flex items-center gap-2 px-2 py-1 rounded"
           style={{
-            backgroundColor: "rgba(0, 0, 0, 0.8)",
-            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
           }}
         >
           <div
-            className="w-4 h-4 rounded-sm border border-white/30"
+            className="w-3 h-3 rounded-sm border border-white/40"
             style={{
               backgroundColor: `rgb(${centerColor.r}, ${centerColor.g}, ${centerColor.b})`,
             }}
           />
-          <span className="font-mono text-xs font-medium text-white">
+          <span className="font-mono text-[11px] font-medium text-white">
             #{centerColor.hex}
           </span>
         </div>

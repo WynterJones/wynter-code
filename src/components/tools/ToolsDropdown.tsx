@@ -19,6 +19,10 @@ import {
   Hammer,
   Tractor,
   BarChart3,
+  Video,
+  AtSign,
+  MonitorPlay,
+  FileCode,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -176,6 +180,38 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openClaudeCodeStats",
     category: "development",
   },
+  {
+    id: "floating-webcam",
+    name: "Floating Webcam",
+    description: "Webcam overlay for screen recordings with AI effects",
+    icon: Video,
+    actionKey: "openFloatingWebcam",
+    category: "utilities",
+  },
+  {
+    id: "screen-studio",
+    name: "Screen Studio",
+    description: "Cinematic screen recorder with tutorial effects",
+    icon: MonitorPlay,
+    actionKey: "openScreenStudio",
+    category: "utilities",
+  },
+  {
+    id: "domain-tools",
+    name: "Domain Tools",
+    description: "WHOIS, DNS, SSL checks and domain analysis",
+    icon: AtSign,
+    actionKey: "openDomainTools",
+    category: "utilities",
+  },
+  {
+    id: "seo-tools",
+    name: "SEO Tools",
+    description: "Meta tags, Open Graph, and structured data generators",
+    icon: FileCode,
+    actionKey: "openSeoTools",
+    category: "utilities",
+  },
 ];
 
 interface Tool {
@@ -210,6 +246,10 @@ interface ToolsDropdownProps {
   onOpenFaviconGenerator: () => void;
   onOpenDevToolkit: () => void;
   onOpenClaudeCodeStats: () => void;
+  onOpenDomainTools: () => void;
+  onOpenSeoTools: () => void;
+  onOpenFloatingWebcam: () => void;
+  onOpenScreenStudio: () => void;
   hasStorybook?: boolean;
 }
 
@@ -229,6 +269,10 @@ export function ToolsDropdown({
   onOpenFaviconGenerator,
   onOpenDevToolkit,
   onOpenClaudeCodeStats,
+  onOpenDomainTools,
+  onOpenSeoTools,
+  onOpenFloatingWebcam,
+  onOpenScreenStudio,
   hasStorybook = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -408,6 +452,50 @@ export function ToolsDropdown({
       category: "development",
       onClick: () => {
         onOpenClaudeCodeStats();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "domain-tools",
+      name: "Domain Tools",
+      description: "WHOIS, DNS, SSL checks and domain analysis",
+      icon: <AtSign className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenDomainTools();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "seo-tools",
+      name: "SEO Tools",
+      description: "Meta tags, Open Graph, and structured data generators",
+      icon: <FileCode className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenSeoTools();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "floating-webcam",
+      name: "Floating Webcam",
+      description: "Webcam overlay for screen recordings with AI effects",
+      icon: <Video className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenFloatingWebcam();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "screen-studio",
+      name: "Screen Studio",
+      description: "Cinematic screen recorder with tutorial effects",
+      icon: <MonitorPlay className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenScreenStudio();
         setIsOpen(false);
       },
     },

@@ -815,6 +815,25 @@ function AboutSection() {
             <li>Farmwork Tycoon</li>
           </ul>
 
+          <h4 className="text-sm font-medium text-accent mb-1">Dev Toolkit (28 Tools)</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>JSON, Base64, URL, Hash, JWT, UUID, QR Code</li>
+            <li>Regex Tester, Bcrypt, HMAC, Password Generator</li>
+            <li>Text Diff, Lorem Ipsum, Cron Parser, and more</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Domain & SEO Tools</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>WHOIS, DNS Lookup, SSL Certificate Checker</li>
+            <li>HTTP Headers, IP Geolocation, Redirect Tracker</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Webcam & Streaming</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>Floating webcam with desktop pinning</li>
+            <li>Custom borders, effects, Decart AI integration</li>
+          </ul>
+
           <h4 className="text-sm font-medium text-accent mb-1">Infrastructure</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
             <li>Port Manager, Localhost Tunnel</li>
@@ -824,7 +843,7 @@ function AboutSection() {
           <h4 className="text-sm font-medium text-accent mb-1">Utilities</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
             <li>Node Modules Cleaner, Env Manager, MCP Servers</li>
-            <li>Favicon Generator, Dev Toolkit, Database Viewer</li>
+            <li>Favicon Generator, Database Viewer</li>
           </ul>
 
           <h4 className="text-sm font-medium text-accent mb-1">Core Features</h4>

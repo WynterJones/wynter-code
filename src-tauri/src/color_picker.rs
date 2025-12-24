@@ -258,34 +258,72 @@ pub fn save_color_picker_position(x: f64, y: f64) {
 /// Capture a region of pixels around the cursor for the magnifier
 #[cfg(target_os = "macos")]
 #[tauri::command]
-pub async fn capture_magnifier_region() -> Result<MagnifierData, String> {
-    use cocoa::base::id;
-    use cocoa::foundation::NSPoint;
+pub async fn capture_magnifier_region(app: AppHandle, zoom_in: bool) -> Result<MagnifierData, String> {
+    use cocoa::base::{id, nil};
+    use cocoa::foundation::{NSArray, NSPoint};
     use core_graphics::display::CGDisplay;
     use core_graphics::geometry::{CGPoint, CGRect, CGSize};
     use objc::runtime::Class;
     use objc::{msg_send, sel, sel_impl};
 
-    let capture_size: i32 = 11; // 11x11 pixels for true center
-    let half_size = capture_size / 2;
+    // Zoomed out (default): larger area, less magnification
+    // Zoomed in (shift): smaller area, more magnification
+    let capture_size: i32 = if zoom_in { 11 } else { 21 }; // 21x21 default, 11x11 when zoomed
 
     unsafe {
-        // Get cursor position
+        // Get cursor position from NSEvent (global screen coordinates)
         let event_class = Class::get("NSEvent").ok_or("NSEvent not found")?;
         let mouse_location: NSPoint = msg_send![event_class, mouseLocation];
 
-        // Get the main screen to convert coordinates
+        // Get all screens and find the one containing the cursor
         let screen_class = Class::get("NSScreen").ok_or("NSScreen not found")?;
-        let main_screen: id = msg_send![screen_class, mainScreen];
-        let screen_frame: cocoa::foundation::NSRect = msg_send![main_screen, frame];
+        let screens: id = msg_send![screen_class, screens];
+        let screen_count: usize = NSArray::count(screens) as usize;
 
-        // Convert to screen coordinates (macOS uses bottom-left origin, CGDisplay uses top-left)
-        let cursor_x = mouse_location.x;
-        let cursor_y = screen_frame.size.height - mouse_location.y;
+        // Find screen containing cursor and get total screen height for Y conversion
+        // macOS coordinate system has origin at bottom-left of the primary screen
+        // CGDisplay coordinate system has origin at top-left
+        let mut containing_screen: id = msg_send![screen_class, mainScreen];
+        let primary_screen: id = if screen_count > 0 {
+            NSArray::objectAtIndex(screens, 0u64)
+        } else {
+            containing_screen
+        };
+        let primary_frame: cocoa::foundation::NSRect = msg_send![primary_screen, frame];
 
-        // Calculate capture region (clamped to screen bounds)
-        let x = (cursor_x as i32 - half_size).max(0);
-        let y = (cursor_y as i32 - half_size).max(0);
+        for i in 0..screen_count {
+            let screen: id = NSArray::objectAtIndex(screens, i as u64);
+            let frame: cocoa::foundation::NSRect = msg_send![screen, frame];
+
+            // Check if cursor is within this screen's frame
+            if mouse_location.x >= frame.origin.x
+                && mouse_location.x < frame.origin.x + frame.size.width
+                && mouse_location.y >= frame.origin.y
+                && mouse_location.y < frame.origin.y + frame.size.height
+            {
+                containing_screen = screen;
+                break;
+            }
+        }
+
+        // Get the frame of the containing screen
+        let _screen_frame: cocoa::foundation::NSRect = msg_send![containing_screen, frame];
+
+        // For CGDisplay, we need to use the primary screen's height for Y flipping
+        // because CGDisplay uses top-left origin relative to the primary display
+        let primary_height = primary_frame.size.height + primary_frame.origin.y;
+
+        // NSEvent.mouseLocation is in the global coordinate system (bottom-left origin)
+        // CGDisplay coordinates are top-left origin
+        // The conversion is: cg_y = primary_screen_max_y - ns_y
+        let cursor_x_cg = mouse_location.x;
+        let cursor_y_cg = primary_height - mouse_location.y;
+
+        // CGDisplay::screenshot works in points (logical coordinates)
+        let half_size = capture_size / 2;
+
+        let x = (cursor_x_cg as i32 - half_size).max(0);
+        let y = (cursor_y_cg as i32 - half_size).max(0);
 
         let rect = CGRect::new(
             &CGPoint::new(x as f64, y as f64),
@@ -310,31 +348,70 @@ pub async fn capture_magnifier_region() -> Result<MagnifierData, String> {
         )
         .ok_or("Failed to capture screen region")?;
 
-        // Get pixel data
+        // Update magnifier window position to center on cursor
+        // Window size depends on zoom mode
+        let window_size = if zoom_in { 130.0 } else { 170.0 };
+        let window_height = window_size + 30.0; // Extra for color label
+
+        if let Some(window) = app.get_webview_window("color-magnifier") {
+            // CG coordinates (top-left origin) can be used directly for window position
+            let win_x = cursor_x_cg - (window_size / 2.0);
+            let win_y = cursor_y_cg - (window_size / 2.0);
+
+            let _ = window.set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                x: win_x,
+                y: win_y,
+            }));
+
+            // Resize window based on zoom mode
+            let _ = window.set_size(tauri::Size::Logical(tauri::LogicalSize {
+                width: window_size,
+                height: window_height,
+            }));
+
+            // Keep focus on the magnifier window
+            let _ = window.set_focus();
+        }
+
+        // Get pixel data from the captured image
         let data = image.data();
         let bytes = data.bytes();
         let bytes_per_row = image.bytes_per_row();
         let actual_width = image.width();
         let actual_height = image.height();
 
-        // Convert BGRA to RGBA
-        let mut rgba_pixels: Vec<u8> = Vec::with_capacity((actual_width * actual_height * 4) as usize);
+        // The screenshot returns physical pixels on Retina displays
+        // We need to sample to get logical pixels (capture_size x capture_size)
+        let output_size = capture_size as usize;
+        let step = if actual_width > capture_size as usize {
+            actual_width as usize / output_size
+        } else {
+            1
+        };
 
-        for row in 0..actual_height {
-            for col in 0..actual_width {
-                let offset = (row * bytes_per_row + col * 4) as usize;
+        let mut rgba_pixels: Vec<u8> = Vec::with_capacity(output_size * output_size * 4);
+
+        for row in 0..output_size {
+            for col in 0..output_size {
+                let src_row = (row * step).min(actual_height as usize - 1);
+                let src_col = (col * step).min(actual_width as usize - 1);
+                let offset = src_row * bytes_per_row as usize + src_col * 4;
+
                 if offset + 3 < bytes.len() {
                     let b = bytes[offset];
                     let g = bytes[offset + 1];
                     let r = bytes[offset + 2];
                     let a = bytes[offset + 3];
                     rgba_pixels.extend_from_slice(&[r, g, b, a]);
+                } else {
+                    rgba_pixels.extend_from_slice(&[128, 128, 128, 255]);
                 }
             }
         }
 
         // Get center pixel color
-        let center_offset = ((actual_height / 2) * actual_width + (actual_width / 2)) as usize * 4;
+        let center = output_size / 2;
+        let center_offset = (center * output_size + center) * 4;
         let center_color = if center_offset + 3 < rgba_pixels.len() {
             ColorResult::new(
                 rgba_pixels[center_offset],
@@ -348,18 +425,18 @@ pub async fn capture_magnifier_region() -> Result<MagnifierData, String> {
 
         Ok(MagnifierData {
             pixels: rgba_pixels,
-            width: actual_width as u32,
-            height: actual_height as u32,
+            width: output_size as u32,
+            height: output_size as u32,
             center_color,
-            cursor_x,
-            cursor_y,
+            cursor_x: cursor_x_cg,
+            cursor_y: cursor_y_cg,
         })
     }
 }
 
 #[cfg(not(target_os = "macos"))]
 #[tauri::command]
-pub async fn capture_magnifier_region() -> Result<MagnifierData, String> {
+pub async fn capture_magnifier_region(_app: AppHandle, _zoom_in: bool) -> Result<MagnifierData, String> {
     Err("Magnifier is only available on macOS".to_string())
 }
 
@@ -371,21 +448,22 @@ pub async fn start_color_picking_mode(app: AppHandle) -> Result<(), String> {
         let _ = window.destroy();
     }
 
-    // Create magnifier window
+    // Create magnifier window with transparency (start with larger zoomed-out size)
     let window = WebviewWindowBuilder::new(
         &app,
         "color-magnifier",
         tauri::WebviewUrl::App("/color-magnifier".into()),
     )
     .title("")
-    .inner_size(140.0, 170.0) // 100px circle + hex label + padding
+    .inner_size(170.0, 200.0) // Default larger size for zoomed-out view
     .decorations(false)
+    .transparent(true) // Enable transparent background
     .always_on_top(true)
     .skip_taskbar(true)
     .resizable(false)
     .visible(true)
-    .focused(false)
-    .shadow(true)
+    .focused(true)
+    .shadow(false) // No shadow for transparent window
     .build()
     .map_err(|e| e.to_string())?;
 
@@ -439,9 +517,9 @@ pub async fn update_magnifier_position(app: AppHandle, x: f64, y: f64) -> Result
         let offset_y = y + 20.0;
 
         window
-            .set_position(tauri::Position::Physical(tauri::PhysicalPosition {
-                x: offset_x as i32,
-                y: offset_y as i32,
+            .set_position(tauri::Position::Logical(tauri::LogicalPosition {
+                x: offset_x,
+                y: offset_y,
             }))
             .map_err(|e| e.to_string())?;
     }
