@@ -219,7 +219,7 @@ export function LighthouseAuditor() {
             className={cn(
               "px-3 py-2 rounded-lg border transition-colors flex items-center gap-2",
               device === "mobile"
-                ? "bg-accent text-white border-accent"
+                ? "bg-accent text-primary-950 border-accent"
                 : "bg-bg-secondary border-border text-text-primary hover:bg-bg-hover"
             )}
           >
@@ -231,7 +231,7 @@ export function LighthouseAuditor() {
             className={cn(
               "px-3 py-2 rounded-lg border transition-colors flex items-center gap-2",
               device === "desktop"
-                ? "bg-accent text-white border-accent"
+                ? "bg-accent text-primary-950 border-accent"
                 : "bg-bg-secondary border-border text-text-primary hover:bg-bg-hover"
             )}
           >

@@ -10,6 +10,8 @@ import {
   FolderPlus,
   Minus,
   Database,
+  Search,
+  Bot,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -69,7 +71,10 @@ import { ScreenStudioPopup } from "@/components/tools/screen-studio";
 import { GifRecorderPopup } from "@/components/tools/gif-recorder";
 import { NetlifyFtpPopup } from "@/components/tools/netlify-ftp";
 import { BookmarksPopup } from "@/components/tools/bookmarks";
+import { ProjectSearchPopup } from "@/components/tools/project-search";
+import { AutoBuildPopup } from "@/components/tools/auto-build";
 import { useMcpStore } from "@/stores";
+import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useStorybookDetection } from "@/hooks/useStorybookDetection";
@@ -302,6 +307,10 @@ export function ProjectTabBar({
   const isMeditating = useMeditationStore((s) => s.isActive);
   const setMeditationActive = useMeditationStore((s) => s.setActive);
 
+  const isAutoBuildOpen = useAutoBuildStore((s) => s.isPopupOpen);
+  const isAutoBuildRunning = useAutoBuildStore((s) => s.status === "running");
+  const openAutoBuildPopup = useAutoBuildStore((s) => s.openPopup);
+
   const {
     workspaces,
     activeWorkspaceId,
@@ -390,6 +399,7 @@ export function ProjectTabBar({
   const [showGifRecorder, setShowGifRecorder] = useState(false);
   const [showNetlifyFtp, setShowNetlifyFtp] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  const [showProjectSearch, setShowProjectSearch] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -522,6 +532,27 @@ export function ProjectTabBar({
           break;
         case "openBookmarks":
           setShowBookmarks(true);
+          break;
+        case "openProjectSearch":
+          setShowProjectSearch(true);
+          break;
+        case "openAutoBuild":
+          openAutoBuildPopup();
+          break;
+        case "openMeditation":
+          setMeditationActive(true);
+          break;
+        case "openDatabaseViewer":
+          setShowDatabaseViewer(true);
+          break;
+        case "openFileFinder":
+          handleBrowseFiles();
+          break;
+        case "openSubscriptions":
+          onOpenSubscriptions?.();
+          break;
+        case "openFarmwork":
+          setShowFarmworkTycoon(true);
           break;
       }
     };
@@ -743,6 +774,15 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
+      {/* Project Search */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Project Search">
+          <IconButton size="sm" onClick={() => setShowProjectSearch(true)}>
+            <Search className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
       {/* Meditation Mode */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content={isMeditating ? "Exit Meditation" : "Meditation Mode"}>
@@ -752,6 +792,19 @@ export function ProjectTabBar({
             className={cn(isMeditating && "text-accent bg-accent/10")}
           >
             <Music className={cn("w-4 h-4", isMeditating && "fill-accent")} />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Auto Build */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Auto Build">
+          <IconButton
+            size="sm"
+            onClick={() => openAutoBuildPopup()}
+            className={cn(isAutoBuildRunning && "text-accent bg-accent/10")}
+          >
+            <Bot className={cn("w-4 h-4", isAutoBuildRunning && "animate-pulse")} />
           </IconButton>
         </Tooltip>
       </div>
@@ -790,6 +843,13 @@ export function ProjectTabBar({
           onOpenGifRecorder={() => setShowGifRecorder(true)}
           onOpenNetlifyFtp={() => setShowNetlifyFtp(true)}
           onOpenBookmarks={() => setShowBookmarks(true)}
+          onOpenProjectSearch={() => setShowProjectSearch(true)}
+          onOpenMeditation={() => setMeditationActive(true)}
+          onOpenDatabaseViewer={() => setShowDatabaseViewer(true)}
+          onOpenProjectTemplates={() => setShowProjectTemplates(true)}
+          onOpenFileFinder={handleBrowseFiles}
+          onOpenSubscriptions={() => onOpenSubscriptions?.()}
+          onOpenFarmwork={() => setShowFarmworkTycoon(true)}
           hasStorybook={hasStorybook}
         />
       </div>
@@ -1031,6 +1091,11 @@ export function ProjectTabBar({
         />
       )}
 
+      {/* Auto Build */}
+      {activeProject?.path && isAutoBuildOpen && (
+        <AutoBuildPopup projectPath={activeProject.path} />
+      )}
+
       {/* MCP Manager */}
       <McpManagerPopup />
 
@@ -1098,6 +1163,12 @@ export function ProjectTabBar({
       <BookmarksPopup
         isOpen={showBookmarks}
         onClose={() => setShowBookmarks(false)}
+      />
+
+      {/* Project Search */}
+      <ProjectSearchPopup
+        isOpen={showProjectSearch}
+        onClose={() => setShowProjectSearch(false)}
       />
 
       {/* Farmwork Mini Player - persists even when popup is closed */}

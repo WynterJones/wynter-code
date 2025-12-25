@@ -188,7 +188,7 @@ export function AddBookmarkModal({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="A short description..."
-            className="w-full px-3 py-2 text-sm bg-bg-primary border border-border rounded-md text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent resize-none"
+            className="w-full px-3 py-2 text-sm font-mono bg-bg-tertiary border border-border rounded-md text-text-primary placeholder:text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 resize-none"
             rows={2}
           />
         </div>
@@ -202,7 +202,12 @@ export function AddBookmarkModal({
           <select
             value={collectionId || ""}
             onChange={(e) => setCollectionId(e.target.value || null)}
-            className="w-full px-3 py-2 text-sm bg-bg-primary border border-border rounded-md text-text-primary focus:outline-none focus:ring-1 focus:ring-accent focus:border-accent"
+            className="h-9 w-full px-3 py-1 text-sm font-mono bg-bg-tertiary border border-border rounded-md text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 appearance-none cursor-pointer"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right 12px center",
+            }}
           >
             <option value="">Uncategorized</option>
             {sortedCollections.map((collection) => (

@@ -146,7 +146,7 @@ export function DecartTab({
               disabled={!isConnected}
               className={`px-3 py-2 rounded-md text-sm transition-colors ${
                 settings.activeEffect === null
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-primary-950"
                   : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary"
               } disabled:opacity-50 disabled:cursor-not-allowed`}
             >
@@ -159,7 +159,7 @@ export function DecartTab({
                 disabled={!isConnected}
                 className={`px-3 py-2 rounded-md text-sm transition-colors ${
                   settings.activeEffect === effect.id
-                    ? "bg-accent text-white"
+                    ? "bg-accent text-primary-950"
                     : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >

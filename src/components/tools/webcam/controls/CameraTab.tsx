@@ -102,7 +102,7 @@ export function CameraTab({
                 onClick={() => onSettingsChange({ aspectRatio: ar.value })}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm transition-colors ${
                   settings.aspectRatio === ar.value
-                    ? "bg-accent text-white"
+                    ? "bg-accent text-primary-950"
                     : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary"
                 }`}
               >

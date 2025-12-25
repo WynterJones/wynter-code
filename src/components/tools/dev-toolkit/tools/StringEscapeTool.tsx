@@ -147,7 +147,7 @@ export function StringEscapeTool() {
               onClick={() => setMode(m.id)}
               className={`px-2 py-1 text-xs rounded transition-colors ${
                 mode === m.id
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-primary-950"
                   : "bg-bg-tertiary text-text-secondary hover:bg-bg-hover"
               }`}
             >

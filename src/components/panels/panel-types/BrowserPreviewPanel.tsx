@@ -83,7 +83,7 @@ export function BrowserPreviewPanel({
           />
           <button
             onClick={handleNavigate}
-            className="px-4 py-2 text-sm rounded-lg bg-accent hover:bg-accent/80 text-white transition-colors"
+            className="px-4 py-2 text-sm rounded-lg bg-accent hover:bg-accent/80 text-primary-950 transition-colors"
           >
             Go
           </button>

@@ -4,6 +4,9 @@ export type { ButtonProps } from "./Button";
 export { Input } from "./Input";
 export type { InputProps } from "./Input";
 
+export { Checkbox } from "./Checkbox";
+export type { CheckboxProps } from "./Checkbox";
+
 export { IconButton } from "./IconButton";
 export type { IconButtonProps } from "./IconButton";
 
@@ -25,3 +28,12 @@ export type { IconPickerProps } from "./IconPicker";
 
 export { ContextMenu } from "./ContextMenu";
 export type { ContextMenuProps, ContextMenuPosition } from "./ContextMenu";
+
+export { Popup } from "./Popup";
+export type {
+  PopupProps,
+  PopupSize,
+  PopupHeaderProps,
+  PopupContentProps,
+  PopupFooterProps,
+} from "./Popup";

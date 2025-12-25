@@ -182,7 +182,7 @@ export function BookmarksPopup({ isOpen, onClose }: BookmarksPopupProps) {
                 className={cn(
                   "p-1.5 transition-colors",
                   viewMode === "list"
-                    ? "bg-accent text-white"
+                    ? "bg-accent text-primary-950"
                     : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
                 )}
               >
@@ -193,7 +193,7 @@ export function BookmarksPopup({ isOpen, onClose }: BookmarksPopupProps) {
                 className={cn(
                   "p-1.5 transition-colors",
                   viewMode === "grid"
-                    ? "bg-accent text-white"
+                    ? "bg-accent text-primary-950"
                     : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
                 )}
               >

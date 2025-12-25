@@ -152,7 +152,7 @@ export function RadioBrowserSearch() {
           <button
             onClick={handleSearch}
             disabled={searching}
-            className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/80 disabled:opacity-50 transition-colors"
+            className="px-4 py-2 rounded-lg bg-accent text-primary-950 text-sm font-medium hover:bg-accent/80 disabled:opacity-50 transition-colors"
           >
             {searching ? (
               <Loader2 className="w-4 h-4 animate-spin" />

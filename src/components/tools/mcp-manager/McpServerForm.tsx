@@ -196,7 +196,7 @@ export function McpServerForm({ server, onClose }: McpServerFormProps) {
                     className={cn(
                       "flex-1 px-3 py-2 rounded-md text-xs font-medium transition-colors",
                       scope === s
-                        ? "bg-accent text-white"
+                        ? "bg-accent text-primary-950"
                         : "bg-bg-tertiary text-text-secondary hover:text-text-primary",
                       s !== "global" &&
                         !activeProject &&

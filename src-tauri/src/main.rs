@@ -2,6 +2,7 @@
 
 mod api_tester;
 mod audio_proxy;
+mod auto_build;
 mod beads;
 mod claude_process;
 mod color_picker;
@@ -213,6 +214,8 @@ fn main() {
             commands::read_file_base64,
             commands::write_file_content,
             commands::find_markdown_files,
+            commands::search::grep_project,
+            commands::search::replace_in_files,
             commands::get_node_modules,
             commands::check_outdated_packages,
             commands::npm_search,
@@ -314,6 +317,13 @@ fn main() {
             beads::beads_close,
             beads::beads_reopen,
             beads::beads_show,
+            // Auto Build
+            auto_build::auto_build_save_session,
+            auto_build::auto_build_load_session,
+            auto_build::auto_build_clear_session,
+            auto_build::auto_build_run_claude,
+            auto_build::auto_build_run_verification,
+            auto_build::auto_build_commit,
             // MCP Server Management
             commands::get_mcp_servers,
             commands::save_mcp_server,

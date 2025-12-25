@@ -145,7 +145,7 @@ export function DnsLookup() {
             className={cn(
               "px-3 py-1 rounded-full text-xs font-medium transition-colors",
               recordType === type
-                ? "bg-accent text-white"
+                ? "bg-accent text-primary-950"
                 : "bg-bg-secondary text-text-secondary hover:bg-bg-hover hover:text-text-primary"
             )}
           >

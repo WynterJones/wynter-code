@@ -160,7 +160,7 @@ export function RegexTester() {
               className={cn(
                 "px-2 py-1 text-xs rounded transition-colors",
                 flags.includes(opt.flag)
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-primary-950"
                   : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"
               )}
             >

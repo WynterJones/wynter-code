@@ -100,7 +100,7 @@ export function HmacGenerator() {
               className={cn(
                 "px-3 py-1 text-xs rounded transition-colors",
                 algorithm === algo
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-primary-950"
                   : "bg-bg-tertiary text-text-secondary hover:bg-bg-hover"
               )}
             >

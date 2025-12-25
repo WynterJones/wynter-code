@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { ExternalLink, Edit2, Trash2, GripVertical } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
-import { FaviconImage } from "@/components/subscriptions/FaviconImage";
+import { BookmarkIcon } from "./BookmarkIcon";
 import { useBookmarkStore, type Bookmark, type ViewMode } from "@/stores/bookmarkStore";
 
 interface BookmarkCardProps {
@@ -13,9 +13,63 @@ interface BookmarkCardProps {
   onEdit: (id: string) => void;
 }
 
+const HOLD_DURATION = 1000; // 1 second
+
 export function BookmarkCard({ bookmark, viewMode, onEdit }: BookmarkCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const [isHoldingDelete, setIsHoldingDelete] = useState(false);
+  const deleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const deleteStartTimeRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   const { deleteBookmark } = useBookmarkStore();
+
+  const clearDeleteTimer = useCallback(() => {
+    if (deleteTimerRef.current) {
+      clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    deleteStartTimeRef.current = null;
+    setDeleteProgress(0);
+    setIsHoldingDelete(false);
+  }, []);
+
+  const updateProgress = useCallback(() => {
+    if (!deleteStartTimeRef.current) return;
+
+    const elapsed = Date.now() - deleteStartTimeRef.current;
+    const progress = Math.min(elapsed / HOLD_DURATION, 1);
+    setDeleteProgress(progress);
+
+    if (progress < 1) {
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
+    }
+  }, []);
+
+  const handleDeleteStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsHoldingDelete(true);
+    deleteStartTimeRef.current = Date.now();
+
+    // Start progress animation
+    animationFrameRef.current = requestAnimationFrame(updateProgress);
+
+    // Set timer for actual deletion
+    deleteTimerRef.current = setTimeout(() => {
+      deleteBookmark(bookmark.id);
+      clearDeleteTimer();
+    }, HOLD_DURATION);
+  }, [bookmark.id, deleteBookmark, clearDeleteTimer, updateProgress]);
+
+  const handleDeleteEnd = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    clearDeleteTimer();
+  }, [clearDeleteTimer]);
 
   const {
     attributes,
@@ -36,12 +90,6 @@ export function BookmarkCard({ bookmark, viewMode, onEdit }: BookmarkCardProps) 
       await open(bookmark.url);
     } catch (err) {
       console.error("Failed to open URL:", err);
-    }
-  };
-
-  const handleDelete = () => {
-    if (confirm("Delete this bookmark?")) {
-      deleteBookmark(bookmark.id);
     }
   };
 
@@ -80,11 +128,11 @@ export function BookmarkCard({ bookmark, viewMode, onEdit }: BookmarkCardProps) 
           <GripVertical className="w-3 h-3 text-text-secondary" />
         </div>
 
-        {/* Favicon */}
+        {/* Icon */}
         <div className="w-12 h-12 flex items-center justify-center mb-2">
-          <FaviconImage
+          <BookmarkIcon
             url={bookmark.url}
-            faviconUrl={bookmark.faviconUrl || null}
+            faviconUrl={bookmark.faviconUrl}
             name={bookmark.title}
             size="lg"
             className="w-8 h-8"
@@ -114,13 +162,25 @@ export function BookmarkCard({ bookmark, viewMode, onEdit }: BookmarkCardProps) 
               <Edit2 className="w-3 h-3" />
             </button>
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete();
-              }}
-              className="p-1.5 text-text-secondary hover:text-accent-red hover:bg-bg-hover rounded-r-md transition-colors"
+              onMouseDown={handleDeleteStart}
+              onMouseUp={handleDeleteEnd}
+              onMouseLeave={handleDeleteEnd}
+              onTouchStart={handleDeleteStart}
+              onTouchEnd={handleDeleteEnd}
+              className={cn(
+                "relative p-1.5 text-text-secondary hover:text-accent-red rounded-r-md transition-colors overflow-hidden",
+                isHoldingDelete && "text-accent-red"
+              )}
+              title="Hold to delete"
             >
-              <Trash2 className="w-3 h-3" />
+              {/* Progress fill */}
+              {isHoldingDelete && (
+                <div
+                  className="absolute inset-0 bg-accent-red/20 origin-left"
+                  style={{ transform: `scaleX(${deleteProgress})` }}
+                />
+              )}
+              <Trash2 className="w-3 h-3 relative z-10" />
             </button>
           </div>
         )}
@@ -152,10 +212,10 @@ export function BookmarkCard({ bookmark, viewMode, onEdit }: BookmarkCardProps) 
         <GripVertical className="w-4 h-4 text-text-secondary" />
       </div>
 
-      {/* Favicon */}
-      <FaviconImage
+      {/* Icon */}
+      <BookmarkIcon
         url={bookmark.url}
-        faviconUrl={bookmark.faviconUrl || null}
+        faviconUrl={bookmark.faviconUrl}
         name={bookmark.title}
         size="md"
       />
@@ -194,13 +254,25 @@ export function BookmarkCard({ bookmark, viewMode, onEdit }: BookmarkCardProps) 
           <Edit2 className="w-3.5 h-3.5" />
         </button>
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete();
-          }}
-          className="p-1.5 text-text-secondary hover:text-accent-red hover:bg-bg-tertiary rounded transition-colors"
+          onMouseDown={handleDeleteStart}
+          onMouseUp={handleDeleteEnd}
+          onMouseLeave={handleDeleteEnd}
+          onTouchStart={handleDeleteStart}
+          onTouchEnd={handleDeleteEnd}
+          className={cn(
+            "relative p-1.5 text-text-secondary hover:text-accent-red hover:bg-bg-tertiary rounded transition-colors overflow-hidden",
+            isHoldingDelete && "text-accent-red bg-bg-tertiary"
+          )}
+          title="Hold to delete"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          {/* Progress fill */}
+          {isHoldingDelete && (
+            <div
+              className="absolute inset-0 bg-accent-red/20 origin-left"
+              style={{ transform: `scaleX(${deleteProgress})` }}
+            />
+          )}
+          <Trash2 className="w-3.5 h-3.5 relative z-10" />
         </button>
       </div>
     </div>

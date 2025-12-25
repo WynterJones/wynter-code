@@ -87,7 +87,7 @@ export function McpManagerPopup() {
                   className={cn(
                     "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
                     activeScope === filter.value
-                      ? "bg-accent text-white"
+                      ? "bg-accent text-primary-950"
                       : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
                   )}
                 >

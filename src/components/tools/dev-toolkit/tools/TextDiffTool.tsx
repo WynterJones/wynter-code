@@ -136,7 +136,7 @@ export function TextDiffTool() {
               className={cn(
                 "px-3 py-1.5 text-xs rounded-md transition-colors capitalize",
                 mode === m
-                  ? "bg-accent text-white"
+                  ? "bg-accent text-primary-950"
                   : "bg-bg-secondary text-text-secondary hover:bg-bg-hover"
               )}
             >

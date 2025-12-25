@@ -172,7 +172,7 @@ export function QrCodeGenerator() {
                     className={cn(
                       "flex-1 px-2 py-1 text-xs rounded transition-colors",
                       errorLevel === level.value
-                        ? "bg-accent text-white"
+                        ? "bg-accent text-primary-950"
                         : "bg-bg-tertiary text-text-secondary hover:bg-bg-hover"
                     )}
                   >

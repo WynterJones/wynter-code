@@ -234,7 +234,7 @@ export function ClaudeCodeStatsPopup({
           <div className="text-text-secondary text-sm">{error}</div>
           <button
             onClick={fetchStats}
-            className="px-3 py-1.5 text-sm bg-accent text-white rounded hover:bg-accent/90 transition-colors"
+            className="px-3 py-1.5 text-sm bg-accent text-primary-950 rounded hover:bg-accent/90 transition-colors"
           >
             Retry
           </button>
