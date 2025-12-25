@@ -1,21 +1,17 @@
 import { useState } from "react";
-import { X, Globe, Settings, ExternalLink, Copy, Check } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Globe, ExternalLink, Copy, Check } from "lucide-react";
+import { open } from "@tauri-apps/plugin-shell";
+import { Modal, Button } from "@/components/ui";
+import { IconButton } from "@/components/ui/IconButton";
 import type { NetlifySite } from "@/types/netlifyFtp";
 
 interface SiteSettingsProps {
   site: NetlifySite;
   onClose: () => void;
-  theme?: "classic" | "terminal" | "amber";
 }
 
-export function SiteSettings({
-  site,
-  onClose,
-  theme = "classic",
-}: SiteSettingsProps) {
+export function SiteSettings({ site, onClose }: SiteSettingsProps) {
   const [copied, setCopied] = useState<string | null>(null);
-  const isTerminalTheme = theme === "terminal" || theme === "amber";
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -23,214 +19,152 @@ export function SiteSettings({
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const handleOpenUrl = async (url: string) => {
+    try {
+      await open(url);
+    } catch (err) {
+      console.error("Failed to open URL:", err);
+    }
+  };
+
   return (
-    <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-      <div className={cn(
-        "retro-raised w-full max-w-md",
-        isTerminalTheme && "bg-[#0a0a0a]"
-      )}>
-        {/* Title bar */}
-        <div className="retro-titlebar">
-          <div className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            <span>Site Settings - {site.name}</span>
-          </div>
-          <div className="retro-titlebar-buttons">
-            <button className="retro-titlebar-button" onClick={onClose}>
-              ×
-            </button>
+    <Modal isOpen={true} onClose={onClose} title={`Site Settings - ${site.name}`} size="md">
+      <div className="p-4 space-y-6">
+        {/* Site Info */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+            Site Information
+          </h4>
+
+          <div className="space-y-2">
+            <InfoRow
+              label="Site ID"
+              value={site.id}
+              onCopy={() => handleCopy(site.id, "id")}
+              copied={copied === "id"}
+            />
+            <InfoRow label="Name" value={site.name} />
+            <InfoRow
+              label="Created"
+              value={new Date(site.created_at).toLocaleDateString()}
+            />
+            <InfoRow
+              label="Updated"
+              value={new Date(site.updated_at).toLocaleDateString()}
+            />
           </div>
         </div>
 
-        {/* Content */}
-        <div className={cn("p-4 space-y-4", isTerminalTheme && "crt-glow")}>
-          {/* Site Info */}
+        {/* URLs */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+            URLs
+          </h4>
+
           <div className="space-y-2">
-            <div className={cn(
-              "text-xs font-bold uppercase tracking-wider",
-              isTerminalTheme ? "opacity-70" : "text-gray-500"
-            )}>
-              Site Information
-            </div>
-            
+            <UrlRow
+              label="Site URL"
+              url={site.ssl_url || site.url}
+              onOpen={handleOpenUrl}
+            />
+            {site.custom_domain && (
+              <UrlRow
+                label="Custom Domain"
+                url={`https://${site.custom_domain}`}
+                onOpen={handleOpenUrl}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Domain Aliases */}
+        {site.domain_aliases && site.domain_aliases.length > 0 && (
+          <div className="space-y-3">
+            <h4 className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
+              Domain Aliases
+            </h4>
             <div className="space-y-1">
-              <InfoRow 
-                label="Site ID" 
-                value={site.id} 
-                onCopy={() => handleCopy(site.id, "id")}
-                copied={copied === "id"}
-                theme={theme}
-              />
-              <InfoRow 
-                label="Name" 
-                value={site.name}
-                theme={theme}
-              />
-              <InfoRow 
-                label="Created" 
-                value={new Date(site.created_at).toLocaleDateString()}
-                theme={theme}
-              />
-              <InfoRow 
-                label="Updated" 
-                value={new Date(site.updated_at).toLocaleDateString()}
-                theme={theme}
-              />
+              {site.domain_aliases.map((alias) => (
+                <div
+                  key={alias}
+                  className="text-xs font-mono p-2 bg-bg-tertiary rounded flex items-center gap-2"
+                >
+                  <Globe className="w-3 h-3 text-text-secondary" />
+                  {alias}
+                </div>
+              ))}
             </div>
           </div>
+        )}
 
-          {/* URLs */}
-          <div className="space-y-2">
-            <div className={cn(
-              "text-xs font-bold uppercase tracking-wider",
-              isTerminalTheme ? "opacity-70" : "text-gray-500"
-            )}>
-              URLs
-            </div>
-            
-            <div className="space-y-1">
-              <UrlRow 
-                label="Site URL" 
-                url={site.ssl_url || site.url}
-                theme={theme}
-              />
-              {site.custom_domain && (
-                <UrlRow 
-                  label="Custom Domain" 
-                  url={`https://${site.custom_domain}`}
-                  theme={theme}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Domain Aliases */}
-          {site.domain_aliases && site.domain_aliases.length > 0 && (
-            <div className="space-y-2">
-              <div className={cn(
-                "text-xs font-bold uppercase tracking-wider",
-                isTerminalTheme ? "opacity-70" : "text-gray-500"
-              )}>
-                Domain Aliases
-              </div>
-              <div className="space-y-1">
-                {site.domain_aliases.map((alias) => (
-                  <div 
-                    key={alias}
-                    className={cn(
-                      "text-xs font-mono p-1 flex items-center gap-2",
-                      isTerminalTheme ? "bg-[#1a1a1a]" : "bg-gray-100"
-                    )}
-                  >
-                    <Globe className="w-3 h-3 opacity-50" />
-                    {alias}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex gap-2 pt-2 border-t border-current/20">
-            <a
-              href={site.admin_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="retro-button flex-1 justify-center"
-            >
-              <ExternalLink className="w-3 h-3" />
-              Open in Netlify
-            </a>
-            <button
-              onClick={onClose}
-              className="retro-button"
-            >
-              Close
-            </button>
-          </div>
+        {/* Actions */}
+        <div className="flex gap-2 pt-4 border-t border-border">
+          <Button
+            variant="default"
+            className="flex-1"
+            onClick={() => handleOpenUrl(site.admin_url)}
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            Open in Netlify
+          </Button>
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-function InfoRow({ 
-  label, 
-  value, 
-  onCopy, 
+function InfoRow({
+  label,
+  value,
+  onCopy,
   copied,
-  theme 
-}: { 
-  label: string; 
-  value: string; 
+}: {
+  label: string;
+  value: string;
   onCopy?: () => void;
   copied?: boolean;
-  theme?: "classic" | "terminal" | "amber";
 }) {
-  const isTerminalTheme = theme === "terminal" || theme === "amber";
-  
   return (
-    <div className={cn(
-      "flex items-center text-xs",
-      isTerminalTheme && "crt-glow"
-    )}>
-      <span className={cn(
-        "w-20 flex-shrink-0",
-        isTerminalTheme ? "opacity-70" : "text-gray-500"
-      )}>
-        {label}:
-      </span>
-      <span className="font-mono truncate flex-1">{value}</span>
+    <div className="flex items-center text-sm">
+      <span className="w-20 flex-shrink-0 text-text-secondary">{label}:</span>
+      <span className="font-mono truncate flex-1 text-text-primary">{value}</span>
       {onCopy && (
-        <button
-          onClick={onCopy}
-          className="ml-2 p-1 opacity-50 hover:opacity-100"
-        >
+        <IconButton size="sm" onClick={onCopy}>
           {copied ? (
-            <Check className="w-3 h-3 text-green-500" />
+            <Check className="w-3 h-3 text-accent-green" />
           ) : (
             <Copy className="w-3 h-3" />
           )}
-        </button>
+        </IconButton>
       )}
     </div>
   );
 }
 
-function UrlRow({ 
-  label, 
+function UrlRow({
+  label,
   url,
-  theme 
-}: { 
-  label: string; 
+  onOpen,
+}: {
+  label: string;
   url: string;
-  theme?: "classic" | "terminal" | "amber";
+  onOpen: (url: string) => void;
 }) {
-  const isTerminalTheme = theme === "terminal" || theme === "amber";
-  
   return (
-    <div className={cn(
-      "flex items-center text-xs",
-      isTerminalTheme && "crt-glow"
-    )}>
-      <span className={cn(
-        "w-20 flex-shrink-0",
-        isTerminalTheme ? "opacity-70" : "text-gray-500"
-      )}>
-        {label}:
-      </span>
-      <a
-        href={url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(
-          "font-mono truncate flex-1 underline",
-          isTerminalTheme ? "hover:opacity-70" : "text-blue-600 hover:text-blue-800"
-        )}
+    <div className="flex items-center text-sm">
+      <span className="w-20 flex-shrink-0 text-text-secondary">{label}:</span>
+      <button
+        onClick={() => onOpen(url)}
+        className="font-mono truncate flex-1 text-accent hover:underline text-left"
       >
         {url}
-      </a>
-      <ExternalLink className="w-3 h-3 ml-2 opacity-50" />
+      </button>
+      <IconButton size="sm" onClick={() => onOpen(url)}>
+        <ExternalLink className="w-3 h-3" />
+      </IconButton>
     </div>
   );
 }

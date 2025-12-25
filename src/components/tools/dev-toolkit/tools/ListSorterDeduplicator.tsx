@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Copy, Check, Trash2, ArrowUpDown, ArrowUp, ArrowDown, RotateCcw } from "lucide-react";
+import { Copy, Check, Trash2, ArrowUp, ArrowDown, RotateCcw } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";

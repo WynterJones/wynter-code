@@ -7,8 +7,7 @@ import {
   ChevronRight,
   FolderOpen,
   Music,
-  GripVertical,
-  Rocket,
+  FolderPlus,
   Minus,
   Database,
 } from "lucide-react";
@@ -69,6 +68,7 @@ import { SeoToolsPopup } from "@/components/tools/seo-tools";
 import { ScreenStudioPopup } from "@/components/tools/screen-studio";
 import { GifRecorderPopup } from "@/components/tools/gif-recorder";
 import { NetlifyFtpPopup } from "@/components/tools/netlify-ftp";
+import { BookmarksPopup } from "@/components/tools/bookmarks";
 import { useMcpStore } from "@/stores";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
@@ -169,6 +169,8 @@ function SortableProjectTab({
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       onClick={() => {
         if (isMinimized) {
           onToggleMinimize();
@@ -177,15 +179,15 @@ function SortableProjectTab({
       }}
       onContextMenu={onContextMenu}
       className={cn(
-        "group relative flex items-center cursor-pointer transition-all min-w-0 flex-shrink-0",
+        "group relative flex items-center cursor-pointer transition-all min-w-[120px] max-w-[200px] flex-shrink-0",
         isMinimized
           ? cn(
-              "px-2.5 gap-1 border-r border-border",
+              "px-2 gap-1 border-r border-border",
               isCompact ? "h-9" : "h-11",
             )
           : isCompact
-            ? "px-2.5 h-full gap-1.5 border-r border-border/50"
-            : "px-4 h-full gap-2 border-r border-border/50",
+            ? "px-2 h-full gap-1.5 border-r border-border/50"
+            : "px-2.5 h-full gap-1.5 border-r border-border/50",
         isActive
           ? "bg-bg-secondary text-text-primary"
           : cn(
@@ -205,23 +207,6 @@ function SortableProjectTab({
         />
       )}
 
-      {/* Drag handle - hidden when minimized */}
-      {!isMinimized && (
-        <div
-          {...attributes}
-          {...listeners}
-          className={cn(
-            "cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-bg-tertiary transition-opacity",
-            "opacity-0 group-hover:opacity-60 hover:!opacity-100",
-            isActive && "opacity-40",
-          )}
-        >
-          <GripVertical
-            className={cn(isCompact ? "w-2.5 h-2.5" : "w-3 h-3")}
-          />
-        </div>
-      )}
-
       {/* Project icon */}
       <div className="flex-shrink-0">{renderIcon()}</div>
 
@@ -230,50 +215,53 @@ function SortableProjectTab({
         <span
           className={cn(
             "truncate",
-            isCompact ? "text-xs max-w-[80px]" : "text-sm max-w-[140px]",
+            isCompact ? "text-xs max-w-[100px]" : "text-sm max-w-[120px]",
           )}
         >
           {project.name}
         </span>
       )}
 
-      {/* Minimize button - only shown on hover when not minimized */}
+      {/* Action buttons - overlay with gradient fade on hover */}
       {!isMinimized && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleMinimize();
-          }}
+        <div
           className={cn(
-            "p-0.5 rounded hover:bg-bg-hover transition-opacity",
-            "text-text-secondary hover:text-text-primary",
-            isActive
-              ? "opacity-0 group-hover:opacity-60 hover:!opacity-100"
-              : "opacity-0 group-hover:opacity-60 hover:!opacity-100",
+            "absolute inset-y-0 right-0 flex items-center pr-1 pl-4",
+            "opacity-0 group-hover:opacity-100 transition-opacity",
           )}
-          title="Minimize"
-        >
-          <Minus className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
-        </button>
-      )}
-
-      {/* Close button - hidden when minimized */}
-      {!isMinimized && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
+          style={{
+            background: isActive
+              ? "linear-gradient(to right, transparent 0%, var(--bg-secondary) 30%)"
+              : "linear-gradient(to right, transparent 0%, var(--bg-primary) 30%)",
           }}
-          className={cn(
-            "p-0.5 rounded hover:bg-bg-hover transition-opacity",
-            "text-text-secondary hover:text-text-primary",
-            isActive
-              ? "opacity-60 hover:opacity-100"
-              : "opacity-0 group-hover:opacity-60 hover:!opacity-100",
-          )}
         >
-          <X className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleMinimize();
+            }}
+            className={cn(
+              "p-0.5 rounded hover:bg-bg-hover/80 transition-colors",
+              "text-text-secondary hover:text-text-primary",
+            )}
+            title="Minimize"
+          >
+            <Minus className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className={cn(
+              "p-0.5 rounded hover:bg-bg-hover/80 transition-colors",
+              "text-text-secondary hover:text-text-primary",
+            )}
+            title="Close"
+          >
+            <X className={cn(isCompact ? "w-3 h-3" : "w-3.5 h-3.5")} />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -401,6 +389,7 @@ export function ProjectTabBar({
   const [showScreenStudio, setShowScreenStudio] = useState(false);
   const [showGifRecorder, setShowGifRecorder] = useState(false);
   const [showNetlifyFtp, setShowNetlifyFtp] = useState(false);
+  const [showBookmarks, setShowBookmarks] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -530,6 +519,9 @@ export function ProjectTabBar({
           break;
         case "openNetlifyFtp":
           setShowNetlifyFtp(true);
+          break;
+        case "openBookmarks":
+          setShowBookmarks(true);
           break;
       }
     };
@@ -730,7 +722,7 @@ export function ProjectTabBar({
         </button>
       </div>
 
-      {/* New Project Button */}
+      {/* Open Project Button */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Open Project">
           <button
@@ -739,6 +731,37 @@ export function ProjectTabBar({
           >
             <Plus className="w-4 h-4" />
           </button>
+        </Tooltip>
+      </div>
+
+      {/* Project Templates (New Project) */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="New Project">
+          <IconButton size="sm" onClick={() => setShowProjectTemplates(true)}>
+            <FolderPlus className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Meditation Mode */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content={isMeditating ? "Exit Meditation" : "Meditation Mode"}>
+          <IconButton
+            size="sm"
+            onClick={() => setMeditationActive(!isMeditating)}
+            className={cn(isMeditating && "text-accent bg-accent/10")}
+          >
+            <Music className={cn("w-4 h-4", isMeditating && "fill-accent")} />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Database Viewer */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Database Viewer">
+          <IconButton size="sm" onClick={() => setShowDatabaseViewer(true)}>
+            <Database className="w-4 h-4" />
+          </IconButton>
         </Tooltip>
       </div>
 
@@ -766,39 +789,9 @@ export function ProjectTabBar({
           onOpenScreenStudio={() => setShowScreenStudio(true)}
           onOpenGifRecorder={() => setShowGifRecorder(true)}
           onOpenNetlifyFtp={() => setShowNetlifyFtp(true)}
+          onOpenBookmarks={() => setShowBookmarks(true)}
           hasStorybook={hasStorybook}
         />
-      </div>
-
-      {/* Meditation Mode */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content={isMeditating ? "Exit Meditation" : "Meditation Mode"}>
-          <IconButton
-            size="sm"
-            onClick={() => setMeditationActive(!isMeditating)}
-            className={cn(isMeditating && "text-accent bg-accent/10")}
-          >
-            <Music className={cn("w-4 h-4", isMeditating && "fill-accent")} />
-          </IconButton>
-        </Tooltip>
-      </div>
-
-      {/* Database Viewer */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content="Database Viewer">
-          <IconButton size="sm" onClick={() => setShowDatabaseViewer(true)}>
-            <Database className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
-      </div>
-
-      {/* Project Templates */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content="New Project">
-          <IconButton size="sm" onClick={() => setShowProjectTemplates(true)}>
-            <Rocket className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
       </div>
 
       {/* Right side controls */}
@@ -1099,6 +1092,12 @@ export function ProjectTabBar({
       <NetlifyFtpPopup
         isOpen={showNetlifyFtp}
         onClose={() => setShowNetlifyFtp(false)}
+      />
+
+      {/* Bookmarks */}
+      <BookmarksPopup
+        isOpen={showBookmarks}
+        onClose={() => setShowBookmarks(false)}
       />
 
       {/* Farmwork Mini Player - persists even when popup is closed */}

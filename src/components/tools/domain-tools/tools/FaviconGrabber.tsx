@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Search, Loader2, Download, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import JSZip from "jszip";
-import { cn } from "@/lib/utils";
 
 interface FaviconInfo {
   url: string;

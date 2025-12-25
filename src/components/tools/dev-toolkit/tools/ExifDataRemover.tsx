@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Upload, Download, Trash2, Image as ImageIcon, FileDown, X } from "lucide-react";
+import { Download, Trash2, Image as ImageIcon, FileDown, X } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";

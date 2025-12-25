@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-24
-**Active Ideas:** 3
+**Active Ideas:** 2
 
 ---
 
@@ -19,34 +19,26 @@
 
 ## Ideas
 
-### GIF Screen Section Recorder
-**Location:** `ScreenStudioPopup` (new standalone tool)
-- Select a region of the screen to record as animated GIF
-- Adjustable frame rate and quality settings
-- Optional cursor capture and click indicators
-- Trim start/end before export
-- Copy to clipboard or save to file
-- Perfect for bug reports, docs, and quick demos
+### Project Search
+**Location:** `ProjectSearchPopup` (new standalone tool)
+A project-wide file search feature inspired by Zed editor's project search, allowing users to search across all files in the current project with results displayed in contextual chunks.
+- Search across all files in the current project
+- Results displayed in 5-line context chunks (showing surrounding lines)
+- Click/jump to file functionality from search results
+- Inspired by Zed editor's project search UX
+- Clean, scannable results view
+- Follow existing UI patterns (OverlayScrollbars, no emojis, proper icons)
 
-### Netlify FTP
-**Location:** `NetlifyFtpPopup` (new standalone tool)
-- FTP-style drag-and-drop interface for Netlify deploys
-- Browse local project files on left, Netlify site on right
-- One-click manual deploys without CI/CD setup
-- Domain management: add custom domains, configure DNS
-- Deploy history with rollback support
-- Site settings: build commands, environment variables
-- Great for quick static site updates and prototypes
-
-### Bookmarks
-**Location:** `BookmarksPopup` (new standalone tool)
-A bookmarking system to save and organize sites, web apps, and services with categories in a polished UI following existing UI patterns.
-- Save bookmarks to websites, web apps, and services
-- Category/folder organization system
-- Primary use case: tracking AI apps and services
-- App icon gallery display mode (shows favicon/app icons in a grid)
-- Toggle between icon gallery view and list card view
-- Nice visual presentation with app icons prominently featured
+### Auto Build
+**Location:** New session tab type
+A new session tab type featuring a Kanban board for automated feature development. Issues/tickets flow through the pipeline automatically via an auto-prompt process that builds features hands-free.
+- New session tab type (alongside existing tab types)
+- Kanban board with 4 columns: Backlog, In Progress, QA, Completed
+- Auto-prompt system that automatically works through tickets
+- Moves issues from Backlog -> In Progress -> QA -> Completed
+- Automated feature building workflow
+- Real-time Kanban updates as work progresses
+- Hands-free development pipeline
 - Follow existing UI patterns (OverlayScrollbars, no emojis, proper icons)
 
 ---
@@ -96,3 +88,6 @@ A bookmarking system to save and organize sites, web apps, and services with cat
 | Dead Link Checker | `DomainToolsPopup` > SEO category - Crawl website to find broken links, configurable depth (1-5 levels), check internal/external links, reports 404s/5xx/timeouts/redirects, export CSV, highlight anchor text | 2025-12-24 |
 | Lighthouse Auditor | `DomainToolsPopup` > SEO category - Run Google Lighthouse audits via Pagespeed API, Performance/Accessibility/SEO/Best Practices scores, mobile/desktop emulation, Core Web Vitals metrics (FCP, LCP, CLS, TBT, Speed Index), recommendations, export HTML/JSON | 2025-12-24 |
 | Favicon Grabber | `DomainToolsPopup` > Utilities category - Extract favicons from any URL, detect from `<link>` tags/manifest.json/common paths, preview grid (16x16 to 512x512), download individual or ZIP, show source paths | 2025-12-24 |
+| GIF Screen Recorder | `GifRecorderPopup` - Select screen region to record as animated GIF, adjustable frame rate/quality, cursor capture, click indicators, copy to clipboard or save | 2025-12-24 |
+| Netlify FTP | `NetlifyFtpPopup` - FTP-style drag-and-drop Netlify deploys, browse local files vs site, one-click deploys, domain management, deploy history with rollback | 2025-12-24 |
+| Bookmarks | `BookmarksPopup` - Save and organize sites/web apps/services, category folders, icon gallery vs list view, favicon display, AI apps tracking | 2025-12-24 |

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { CreditCard, TrendingUp, DollarSign, Calendar, PieChart } from "lucide-react";
+import { CreditCard, TrendingUp, DollarSign, Calendar, PieChart, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -136,14 +136,15 @@ function DonutChart({ data, title, centerLabel, centerValue }: DonutChartProps) 
 interface TopSubscriptionProps {
   subscription: Subscription & { _normalizedMonthly: number };
   rank: number;
+  onDelete: () => void;
 }
 
-function TopSubscription({ subscription, rank }: TopSubscriptionProps) {
+function TopSubscription({ subscription, rank, onDelete }: TopSubscriptionProps) {
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat("en-US", { style: "currency", currency: subscription.currency }).format(amount);
 
   return (
-    <div className="flex items-center gap-3 py-2">
+    <div className="group flex items-center gap-3 py-2 hover:bg-bg-hover/50 -mx-2 px-2 rounded transition-colors">
       <div className="w-6 h-6 rounded-full bg-bg-primary flex items-center justify-center text-xs font-medium text-text-secondary">
         {rank}
       </div>
@@ -159,6 +160,13 @@ function TopSubscription({ subscription, rank }: TopSubscriptionProps) {
         <div className="text-xs text-text-secondary">{subscription.billingCycle}</div>
       </div>
       <div className="text-sm font-mono text-accent-green">{formatCurrency(subscription._normalizedMonthly)}/mo</div>
+      <button
+        onClick={onDelete}
+        className="p-1.5 rounded-md opacity-0 group-hover:opacity-100 hover:bg-red-500/20 text-text-secondary hover:text-red-400 transition-all"
+        title="Delete subscription"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
     </div>
   );
 }
@@ -171,6 +179,7 @@ export function SubscriptionStats() {
     getSubscriptionsByBillingCycle,
     getSubscriptionsByCurrency,
     getTopSubscriptions,
+    deleteSubscription,
     subscriptions,
   } = useSubscriptionStore();
 
@@ -344,7 +353,16 @@ export function SubscriptionStats() {
           <h4 className="text-sm font-medium text-text-primary mb-3">Top Subscriptions by Cost</h4>
           <div className="divide-y divide-border">
             {topSubs.map((sub, index) => (
-              <TopSubscription key={sub.id} subscription={sub} rank={index + 1} />
+              <TopSubscription
+                key={sub.id}
+                subscription={sub}
+                rank={index + 1}
+                onDelete={() => {
+                  if (confirm(`Delete "${sub.name}"? This action cannot be undone.`)) {
+                    deleteSubscription(sub.id);
+                  }
+                }}
+              />
             ))}
           </div>
         </div>

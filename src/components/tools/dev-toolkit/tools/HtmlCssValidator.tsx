@@ -224,7 +224,6 @@ function formatCode(code: string, mode: ValidationMode): string {
       .map((line, index, arr) => {
         const indent = line.match(/^(\s*)/)?.[1]?.length || 0;
         const isClosing = line.includes("</");
-        const isSelfClosing = line.match(/<[^>]+\/>/);
         const nextLine = arr[index + 1];
         const nextIsClosing = nextLine?.includes("</");
 

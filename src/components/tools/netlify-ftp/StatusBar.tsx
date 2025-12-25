@@ -6,7 +6,6 @@ interface StatusBarProps {
   status: ConnectionStatus;
   currentSite: NetlifySite | null;
   error: string | null;
-  theme?: "classic" | "terminal" | "amber";
 }
 
 const STATUS_TEXT: Record<ConnectionStatus, string> = {
@@ -16,44 +15,26 @@ const STATUS_TEXT: Record<ConnectionStatus, string> = {
   error: "Connection Error",
 };
 
-export function StatusBar({
-  status,
-  currentSite,
-  error,
-  theme = "classic",
-}: StatusBarProps) {
-  const isTerminalTheme = theme === "terminal" || theme === "amber";
-
+export function StatusBar({ status, currentSite, error }: StatusBarProps) {
   return (
-    <div className={cn(
-      "retro-statusbar",
-      isTerminalTheme && "crt-glow"
-    )}>
-      <div className="retro-statusbar-section flex items-center gap-2">
-        <div className={cn(
-          "connection-dot",
-          status === "connected" && "connected",
-          status === "disconnected" && "disconnected",
-          status === "connecting" && "connecting",
-          status === "error" && "error"
-        )} />
-        <span className="font-mono text-[10px]">
+    <div className="flex items-center gap-3 px-3 py-1.5 border-t border-border bg-bg-secondary text-xs">
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            "w-2 h-2 rounded-full shrink-0",
+            status === "connected" && "bg-accent-green",
+            status === "disconnected" && "bg-text-secondary",
+            status === "connecting" && "bg-accent-yellow animate-pulse",
+            status === "error" && "bg-accent-red"
+          )}
+        />
+        <span className="font-mono text-text-secondary">
           {error ? error.slice(0, 30) : STATUS_TEXT[status]}
         </span>
       </div>
-      
-      <div className="retro-statusbar-section flex-1 truncate font-mono text-[10px]">
-        {currentSite ? (
-          <>
-            {currentSite.ssl_url || currentSite.url}
-          </>
-        ) : (
-          <span className="opacity-50">No site selected</span>
-        )}
-      </div>
-      
-      <div className="retro-statusbar-section text-[10px] font-mono">
-        {new Date().toLocaleTimeString()}
+
+      <div className="flex-1 truncate font-mono text-text-secondary">
+        {currentSite ? currentSite.ssl_url || currentSite.url : "No site selected"}
       </div>
     </div>
   );

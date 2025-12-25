@@ -1,36 +1,39 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   Plug,
   Plus,
   RefreshCw,
   Settings,
   LogOut,
-  Monitor,
-  Palette,
+  Loader2,
+  Upload,
 } from "lucide-react";
-import { Modal } from "@/components/ui";
+import { Modal, Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useNetlifyFtpStore } from "@/stores/netlifyFtpStore";
-import { RetroDropZone } from "./RetroDropZone";
+import { DropZone } from "./DropZone";
 import { SiteList } from "./SiteList";
 import { DeployHistory } from "./DeployHistory";
 import { StatusBar } from "./StatusBar";
 import { TokenSetup } from "./TokenSetup";
 import { SiteSettings } from "./SiteSettings";
-import "./netlify-ftp.css";
 
 interface NetlifyFtpPopupProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type Theme = "classic" | "terminal" | "amber";
+const MIN_SIDEBAR_WIDTH = 200;
+const MAX_SIDEBAR_WIDTH = 500;
+const DEFAULT_SIDEBAR_WIDTH = 280;
 
 export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
-  const [theme, setTheme] = useState<Theme>("terminal");
   const [showNewSiteDialog, setShowNewSiteDialog] = useState(false);
   const [newSiteName, setNewSiteName] = useState("");
   const [showSiteSettings, setShowSiteSettings] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const {
     apiToken,
@@ -51,7 +54,6 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     selectSite,
     createSite,
     deleteSite,
-    fetchDeploys,
     deployZip,
     rollbackDeploy,
     clearError,
@@ -59,12 +61,12 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
 
   const currentSite = useMemo(
     () => sites.find((s) => s.id === currentSiteId) || null,
-    [sites, currentSiteId]
+    [sites, currentSiteId],
   );
 
   const currentDeploys = useMemo(
     () => (currentSiteId ? deploys[currentSiteId] || [] : []),
-    [deploys, currentSiteId]
+    [deploys, currentSiteId],
   );
 
   // Auto-connect on mount if token exists
@@ -74,12 +76,49 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     }
   }, [isOpen, apiToken, connectionStatus, testConnection]);
 
+  // Sidebar resize handlers
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      setIsResizing(true);
+      resizeRef.current = { startX: e.clientX, startWidth: sidebarWidth };
+    },
+    [sidebarWidth],
+  );
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const deltaX = e.clientX - resizeRef.current.startX;
+      const newWidth = Math.min(
+        MAX_SIDEBAR_WIDTH,
+        Math.max(MIN_SIDEBAR_WIDTH, resizeRef.current.startWidth + deltaX),
+      );
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      resizeRef.current = null;
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isResizing]);
+
   const handleConnect = useCallback(
     async (token: string) => {
       setApiToken(token);
       await testConnection();
     },
-    [setApiToken, testConnection]
+    [setApiToken, testConnection],
   );
 
   const handleDisconnect = useCallback(() => {
@@ -104,7 +143,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
         await deleteSite(siteId);
       }
     },
-    [deleteSite]
+    [deleteSite],
   );
 
   const handleFileDrop = useCallback(
@@ -116,7 +155,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
         });
       }
     },
-    [currentSiteId, deployZip]
+    [currentSiteId, deployZip],
   );
 
   const handleRollback = useCallback(
@@ -125,218 +164,159 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
         await rollbackDeploy(currentSiteId, deployId);
       }
     },
-    [currentSiteId, rollbackDeploy]
+    [currentSiteId, rollbackDeploy],
   );
 
-  const isTerminalTheme = theme === "terminal" || theme === "amber";
   const isConnected = connectionStatus === "connected";
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="xl" showCloseButton={false}>
-      <div
-        className={cn(
-          "netlify-ftp flex flex-col h-[600px]",
-          theme === "terminal" && "theme-terminal",
-          theme === "amber" && "theme-amber"
-        )}
-      >
-        {/* Title Bar */}
-        <div className="retro-titlebar">
-          <div className="flex items-center gap-2">
-            <Monitor className="w-4 h-4" />
-            <span>Netlify FTP Manager v1.0</span>
-          </div>
-          <div className="retro-titlebar-buttons">
-            <button
-              className="retro-titlebar-button"
-              onClick={() => {}}
-              title="Minimize"
-            >
-              _
-            </button>
-            <button
-              className="retro-titlebar-button"
-              onClick={() => {}}
-              title="Maximize"
-            >
-              □
-            </button>
-            <button
-              className="retro-titlebar-button"
-              onClick={onClose}
-              title="Close"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
+    <Modal isOpen={isOpen} onClose={onClose} size="full" title="Netlify FTP">
+      <div className={cn("flex flex-col h-full", isResizing && "select-none")}>
         {/* Toolbar */}
-        <div className="retro-toolbar">
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
           {isConnected ? (
             <>
-              <button
-                className="retro-toolbar-button"
-                onClick={handleDisconnect}
-                title="Disconnect"
-              >
-                <LogOut className="w-3 h-3" />
+              <Button variant="ghost" size="sm" onClick={handleDisconnect}>
+                <LogOut className="w-4 h-4 mr-1.5" />
                 Disconnect
-              </button>
-              <div className="retro-toolbar-separator" />
-              <button
-                className="retro-toolbar-button"
+              </Button>
+              <div className="w-px h-4 bg-border" />
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowNewSiteDialog(true)}
-                title="New Site"
               >
-                <Plus className="w-3 h-3" />
+                <Plus className="w-4 h-4 mr-1.5" />
                 New Site
-              </button>
-              <button
-                className="retro-toolbar-button"
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => fetchSites()}
                 disabled={isLoadingSites}
-                title="Refresh"
               >
                 <RefreshCw
-                  className={cn("w-3 h-3", isLoadingSites && "animate-spin")}
+                  className={cn(
+                    "w-4 h-4 mr-1.5",
+                    isLoadingSites && "animate-spin",
+                  )}
                 />
                 Refresh
-              </button>
+              </Button>
               {currentSite && (
                 <>
-                  <div className="retro-toolbar-separator" />
-                  <button
-                    className="retro-toolbar-button"
+                  <div className="w-px h-4 bg-border" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => setShowSiteSettings(true)}
-                    title="Site Settings"
                   >
-                    <Settings className="w-3 h-3" />
+                    <Settings className="w-4 h-4 mr-1.5" />
                     Settings
-                  </button>
+                  </Button>
                 </>
               )}
             </>
           ) : (
-            <button
-              className="retro-toolbar-button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => apiToken && testConnection()}
               disabled={!apiToken || connectionStatus === "connecting"}
-              title="Connect"
             >
-              <Plug className="w-3 h-3" />
+              <Plug className="w-4 h-4 mr-1.5" />
               Connect
-            </button>
+            </Button>
           )}
-
-          <div className="flex-1" />
-
-          {/* Theme switcher */}
-          <div className="flex items-center gap-1">
-            <Palette className="w-3 h-3 opacity-50" />
-            <select
-              value={theme}
-              onChange={(e) => setTheme(e.target.value as Theme)}
-              className="retro-input text-[10px] py-0"
-            >
-              <option value="classic">Classic</option>
-              <option value="terminal">Terminal</option>
-              <option value="amber">Amber</option>
-            </select>
-          </div>
         </div>
 
         {/* Main Content */}
-        <div className={cn("flex-1 min-h-0", isTerminalTheme && "crt-scanlines")}>
+        <div className="flex-1 min-h-0">
           {!apiToken || connectionStatus === "disconnected" ? (
             <TokenSetup
               onSubmit={handleConnect}
               isConnecting={connectionStatus === "connecting"}
               error={connectionError}
-              theme={theme}
             />
           ) : connectionStatus === "connecting" ? (
-            <div
-              className={cn(
-                "flex items-center justify-center h-full",
-                isTerminalTheme && "crt-glow"
-              )}
-            >
+            <div className="flex items-center justify-center h-full">
               <div className="text-center">
-                <div className="text-sm mb-2">
+                <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-3" />
+                <div className="text-sm text-text-primary mb-1">
                   Connecting to Netlify
-                  <span className="blink">...</span>
                 </div>
-                <div className="text-xs opacity-70">
+                <div className="text-xs text-text-secondary">
                   Establishing secure connection
                 </div>
               </div>
             </div>
           ) : connectionStatus === "error" ? (
             <div className="flex flex-col items-center justify-center h-full p-8">
-              <div
-                className={cn(
-                  "text-red-500 text-sm mb-4",
-                  isTerminalTheme && "crt-glow"
-                )}
-              >
+              <div className="text-accent-red text-sm font-medium mb-2">
                 Connection Failed
               </div>
-              <div className="text-xs mb-4 text-center max-w-md">
+              <div className="text-xs text-text-secondary mb-4 text-center max-w-md">
                 {connectionError}
               </div>
               <div className="flex gap-2">
-                <button
-                  className="retro-button"
-                  onClick={() => testConnection()}
-                >
+                <Button variant="default" onClick={() => testConnection()}>
                   Retry
-                </button>
-                <button
-                  className="retro-button"
+                </Button>
+                <Button
+                  variant="ghost"
                   onClick={() => {
                     clearError();
                     setApiToken(null);
                   }}
                 >
                   Change Token
-                </button>
+                </Button>
               </div>
             </div>
           ) : (
-            <div className="retro-split-pane">
+            <div className="flex flex-1 h-full">
               {/* Left Pane - Sites */}
-              <div className="retro-pane" style={{ maxWidth: "200px" }}>
-                <div className="retro-pane-header">📁 My Sites</div>
-                <div className="retro-pane-content">
-                  <SiteList
-                    sites={sites}
-                    selectedSiteId={currentSiteId}
-                    onSelectSite={selectSite}
-                    onDeleteSite={handleDeleteSite}
-                    isLoading={isLoadingSites}
-                    theme={theme}
-                  />
-                </div>
+              <div
+                className="relative border-r border-border flex flex-col shrink-0 bg-bg-primary"
+                style={{ width: sidebarWidth }}
+              >
+                <SiteList
+                  sites={sites}
+                  selectedSiteId={currentSiteId}
+                  onSelectSite={selectSite}
+                  onDeleteSite={handleDeleteSite}
+                  isLoading={isLoadingSites}
+                />
+
+                {/* Resize handle */}
+                <div
+                  onMouseDown={handleResizeStart}
+                  className={cn(
+                    "absolute top-0 right-0 bottom-0 w-1 cursor-col-resize z-10 hover:bg-accent/50 transition-colors",
+                    isResizing && "bg-accent/50",
+                  )}
+                />
               </div>
 
               {/* Right Pane - Deploy Zone & History */}
-              <div className="retro-pane">
-                <div className="retro-pane-header">
-                  📤 {currentSite ? currentSite.name : "Select a site"}
+              <div className="flex-1 flex flex-col min-w-0">
+                <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
+                  <Upload className="w-4 h-4 text-text-secondary" />
+                  <span className="text-sm font-medium">
+                    {currentSite ? currentSite.name : "Select a site"}
+                  </span>
                 </div>
-                <div className="retro-pane-content flex flex-col">
+                <div className="flex-1 flex flex-col overflow-hidden">
                   {currentSite ? (
                     <>
                       {/* Drop Zone */}
-                      <div className="p-3 border-b border-current/20">
-                        <RetroDropZone
+                      <div className="p-3 border-b border-border">
+                        <DropZone
                           onFileDrop={handleFileDrop}
                           isUploading={isDeploying}
                           progress={deployProgress}
                           message={deployMessage}
                           disabled={!currentSite}
-                          theme={theme}
                         />
                       </div>
 
@@ -346,18 +326,12 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                           deploys={currentDeploys}
                           isLoading={isLoadingDeploys}
                           onRollback={handleRollback}
-                          theme={theme}
                         />
                       </div>
                     </>
                   ) : (
-                    <div
-                      className={cn(
-                        "flex items-center justify-center h-full text-sm",
-                        isTerminalTheme && "crt-glow"
-                      )}
-                    >
-                      ← Select a site to deploy
+                    <div className="flex items-center justify-center h-full text-sm text-text-secondary">
+                      Select a site to deploy
                     </div>
                   )}
                 </div>
@@ -371,7 +345,6 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
           status={connectionStatus}
           currentSite={currentSite}
           error={connectionError}
-          theme={theme}
         />
 
         {/* Site Settings Modal */}
@@ -379,65 +352,52 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
           <SiteSettings
             site={currentSite}
             onClose={() => setShowSiteSettings(false)}
-            theme={theme}
           />
         )}
 
         {/* New Site Dialog */}
         {showNewSiteDialog && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center p-4 z-10">
-            <div
-              className={cn(
-                "retro-raised w-full max-w-sm",
-                isTerminalTheme && "bg-[#0a0a0a]"
-              )}
-            >
-              <div className="retro-titlebar">
-                <span>Create New Site</span>
-                <div className="retro-titlebar-buttons">
-                  <button
-                    className="retro-titlebar-button"
-                    onClick={() => setShowNewSiteDialog(false)}
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
-              <div className={cn("p-4", isTerminalTheme && "crt-glow")}>
-                <div className="text-xs mb-2">Site name (subdomain):</div>
-                <input
-                  type="text"
-                  value={newSiteName}
-                  onChange={(e) => setNewSiteName(e.target.value)}
-                  placeholder="my-awesome-site"
-                  className="retro-input w-full mb-4 font-mono"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleCreateSite();
-                    if (e.key === "Escape") setShowNewSiteDialog(false);
-                  }}
-                />
-                <div className="text-[10px] opacity-70 mb-4">
-                  URL will be: {newSiteName || "my-site"}.netlify.app
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    className="retro-button flex-1"
-                    onClick={handleCreateSite}
-                    disabled={!newSiteName.trim()}
-                  >
-                    Create
-                  </button>
-                  <button
-                    className="retro-button"
-                    onClick={() => setShowNewSiteDialog(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
+          <Modal
+            isOpen={showNewSiteDialog}
+            onClose={() => setShowNewSiteDialog(false)}
+            title="Create New Site"
+            size="sm"
+          >
+            <div className="p-4">
+              <label className="block text-sm text-text-secondary mb-2">
+                Site name (subdomain)
+              </label>
+              <Input
+                value={newSiteName}
+                onChange={(e) => setNewSiteName(e.target.value)}
+                placeholder="my-awesome-site"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateSite();
+                  if (e.key === "Escape") setShowNewSiteDialog(false);
+                }}
+              />
+              <p className="text-xs text-text-secondary mt-2">
+                URL will be: {newSiteName || "my-site"}.netlify.app
+              </p>
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  onClick={handleCreateSite}
+                  disabled={!newSiteName.trim()}
+                >
+                  Create
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowNewSiteDialog(false)}
+                >
+                  Cancel
+                </Button>
               </div>
             </div>
-          </div>
+          </Modal>
         )}
       </div>
     </Modal>

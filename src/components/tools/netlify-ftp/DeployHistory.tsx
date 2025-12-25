@@ -1,12 +1,14 @@
-import { Clock, ExternalLink, RotateCcw } from "lucide-react";
+import { Clock, ExternalLink, RotateCcw, Loader2 } from "lucide-react";
+import { open } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
+import { ScrollArea, Badge } from "@/components/ui";
+import { IconButton } from "@/components/ui/IconButton";
 import type { NetlifyDeploy } from "@/types/netlifyFtp";
 
 interface DeployHistoryProps {
   deploys: NetlifyDeploy[];
   isLoading: boolean;
   onRollback: (deployId: string) => void;
-  theme?: "classic" | "terminal" | "amber";
 }
 
 function getTimeAgo(dateString: string): string {
@@ -27,15 +29,21 @@ export function DeployHistory({
   deploys,
   isLoading,
   onRollback,
-  theme = "classic",
 }: DeployHistoryProps) {
-  const isTerminalTheme = theme === "terminal" || theme === "amber";
+  const handleOpenUrl = async (url: string) => {
+    try {
+      await open(url);
+    } catch (err) {
+      console.error("Failed to open URL:", err);
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className={cn("text-xs", isTerminalTheme && "crt-glow")}>
-          Loading deploys<span className="blink">...</span>
+        <div className="flex items-center gap-2 text-xs text-text-secondary">
+          <Loader2 className="w-4 h-4 animate-spin" />
+          Loading deploys...
         </div>
       </div>
     );
@@ -44,14 +52,9 @@ export function DeployHistory({
   if (deploys.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <Clock className={cn(
-          "w-8 h-8 mb-2 opacity-50",
-          isTerminalTheme && "crt-glow"
-        )} />
-        <div className={cn("text-xs", isTerminalTheme && "crt-glow")}>
-          No deploys yet
-        </div>
-        <div className={cn("text-xs opacity-70", isTerminalTheme && "crt-glow")}>
+        <Clock className="w-8 h-8 mb-2 text-text-secondary opacity-50" />
+        <div className="text-xs text-text-primary mb-1">No deploys yet</div>
+        <div className="text-xs text-text-secondary">
           Drop a ZIP file to deploy
         </div>
       </div>
@@ -59,91 +62,81 @@ export function DeployHistory({
   }
 
   // Find the live deploy (first one with state 'ready' that is published)
-  const liveDeployId = deploys.find(d => d.state === 'ready')?.id;
+  const liveDeployId = deploys.find((d) => d.state === "ready")?.id;
 
   return (
-    <div className="h-full overflow-auto">
-      <div className={cn(
-        "text-[9px] uppercase tracking-wider px-2 py-1 font-bold border-b",
-        isTerminalTheme 
-          ? "border-current opacity-70 crt-glow" 
-          : "border-gray-300 text-gray-500"
-      )}>
+    <ScrollArea className="h-full">
+      <div className="text-xs font-medium text-text-secondary uppercase tracking-wider px-3 py-2 border-b border-border">
         Deploy History
       </div>
-      
+
       {deploys.slice(0, 10).map((deploy, index) => {
         const isLive = deploy.id === liveDeployId && index === 0;
-        
+
         return (
           <div
             key={deploy.id}
-            className={cn(
-              "retro-deploy-item group",
-              isTerminalTheme && "crt-glow"
-            )}
+            className="flex items-center gap-3 px-3 py-2 hover:bg-bg-hover transition-colors group"
           >
-            <div className={cn(
-              "retro-deploy-status",
-              deploy.state === 'ready' && "ready",
-              deploy.state === 'error' && "error",
-              (deploy.state === 'building' || deploy.state === 'processing') && "building"
-            )} />
-            
+            <span
+              className={cn(
+                "w-2 h-2 rounded-full shrink-0",
+                deploy.state === "ready" && "bg-accent-green",
+                deploy.state === "error" && "bg-accent-red",
+                (deploy.state === "building" ||
+                  deploy.state === "processing") &&
+                  "bg-accent-yellow animate-pulse"
+              )}
+            />
+
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[10px]">
+                <span className="text-xs font-mono text-text-primary">
                   v{deploys.length - index}
                 </span>
                 {deploy.title && (
-                  <span className="truncate opacity-70">
+                  <span className="text-xs text-text-secondary truncate">
                     {deploy.title}
                   </span>
                 )}
               </div>
-              <div className="text-[9px] opacity-60">
+              <div className="text-[10px] text-text-secondary">
                 {getTimeAgo(deploy.created_at)}
               </div>
             </div>
 
-            {isLive && (
-              <span className="retro-deploy-live">LIVE</span>
-            )}
+            {isLive && <Badge variant="success">LIVE</Badge>}
 
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
-              <a
-                href={deploy.deploy_ssl_url || deploy.deploy_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-1 hover:bg-blue-500/20 rounded"
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <IconButton
+                size="sm"
+                onClick={() =>
+                  handleOpenUrl(deploy.deploy_ssl_url || deploy.deploy_url)
+                }
                 title="Open deploy preview"
-                onClick={(e) => e.stopPropagation()}
               >
                 <ExternalLink className="w-3 h-3" />
-              </a>
-              
-              {!isLive && deploy.state === 'ready' && (
-                <button
-                  className="p-1 hover:bg-yellow-500/20 rounded"
+              </IconButton>
+
+              {!isLive && deploy.state === "ready" && (
+                <IconButton
+                  size="sm"
                   onClick={() => onRollback(deploy.id)}
                   title="Rollback to this version"
                 >
                   <RotateCcw className="w-3 h-3" />
-                </button>
+                </IconButton>
               )}
             </div>
           </div>
         );
       })}
-      
+
       {deploys.length > 10 && (
-        <div className={cn(
-          "text-center text-[9px] py-2 opacity-50",
-          isTerminalTheme && "crt-glow"
-        )}>
+        <div className="text-center text-xs text-text-secondary py-2">
           + {deploys.length - 10} more deploys
         </div>
       )}
-    </div>
+    </ScrollArea>
   );
 }

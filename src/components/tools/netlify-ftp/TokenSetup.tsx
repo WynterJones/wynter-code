@@ -1,35 +1,18 @@
 import { useState } from "react";
-import { Key, Eye, EyeOff } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Lock, Key, Eye, EyeOff, Plug, Loader2 } from "lucide-react";
+import { open } from "@tauri-apps/plugin-shell";
+import { Button, Input } from "@/components/ui";
+import { IconButton } from "@/components/ui/IconButton";
 
 interface TokenSetupProps {
   onSubmit: (token: string) => void;
   isConnecting: boolean;
   error: string | null;
-  theme?: "classic" | "terminal" | "amber";
 }
 
-const ASCII_LOCK = `
-    ┌───────┐
-    │ ░░░░░ │
-    │ ░░░░░ │
-    └───┬───┘
-  ┌─────┴─────┐
-  │  🔐 API   │
-  │   TOKEN   │
-  └───────────┘
-`;
-
-export function TokenSetup({
-  onSubmit,
-  isConnecting,
-  error,
-  theme = "classic",
-}: TokenSetupProps) {
+export function TokenSetup({ onSubmit, isConnecting, error }: TokenSetupProps) {
   const [token, setToken] = useState("");
   const [showToken, setShowToken] = useState(false);
-  
-  const isTerminalTheme = theme === "terminal" || theme === "amber";
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,98 +23,77 @@ export function TokenSetup({
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8">
-      <pre className={cn(
-        "ascii-box text-center mb-4",
-        isTerminalTheme && "crt-glow"
-      )}>
-        {ASCII_LOCK}
-      </pre>
-      
-      <h3 className={cn(
-        "text-sm font-bold mb-2",
-        isTerminalTheme && "crt-glow"
-      )}>
+      <Lock className="w-12 h-12 text-text-secondary mb-4" />
+
+      <h3 className="text-lg font-semibold text-text-primary mb-2">
         Netlify API Token Required
       </h3>
-      
-      <p className={cn(
-        "text-xs text-center mb-4 max-w-[280px]",
-        isTerminalTheme ? "opacity-70 crt-glow" : "text-gray-600"
-      )}>
-        Enter your Netlify Personal Access Token to connect.
-        <br />
-        <a
-          href="https://app.netlify.com/user/applications#personal-access-tokens"
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            "underline",
-            isTerminalTheme ? "crt-glow" : "text-blue-600"
-          )}
+
+      <p className="text-sm text-text-secondary text-center mb-6 max-w-sm">
+        Enter your Netlify Personal Access Token to connect.{" "}
+        <button
+          type="button"
+          onClick={() => open("https://app.netlify.com/user/applications#personal-access-tokens")}
+          className="text-accent hover:underline"
         >
-          Get your token here →
-        </a>
+          Get your token here
+        </button>
       </p>
 
-      <form onSubmit={handleSubmit} className="w-full max-w-[300px]">
-        <div className="relative mb-3">
-          <div className="absolute left-2 top-1/2 -translate-y-1/2">
-            <Key className="w-3 h-3 opacity-50" />
-          </div>
-          <input
+      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
+        <div className="relative">
+          <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+          <Input
             type={showToken ? "text" : "password"}
             value={token}
             onChange={(e) => setToken(e.target.value)}
             placeholder="nfp_xxxxxxxxxxxx"
-            className={cn(
-              "retro-input w-full pl-7 pr-8 font-mono text-[11px]",
-              isTerminalTheme && "crt-glow"
-            )}
+            className="pl-10 pr-10 font-mono"
             disabled={isConnecting}
           />
-          <button
-            type="button"
+          <IconButton
+            size="sm"
+            className="absolute right-1 top-1/2 -translate-y-1/2"
             onClick={() => setShowToken(!showToken)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-100"
+            type="button"
           >
             {showToken ? (
-              <EyeOff className="w-3 h-3" />
+              <EyeOff className="w-4 h-4" />
             ) : (
-              <Eye className="w-3 h-3" />
+              <Eye className="w-4 h-4" />
             )}
-          </button>
+          </IconButton>
         </div>
 
         {error && (
-          <div className={cn(
-            "text-xs mb-3 p-2 bg-red-100 border border-red-300 text-red-700",
-            isTerminalTheme && "bg-red-900/30 border-red-500 text-red-400 crt-glow"
-          )}>
+          <div className="p-3 text-sm bg-accent-red/10 border border-accent-red/20 text-accent-red rounded-md">
             {error}
           </div>
         )}
 
-        <button
+        <Button
           type="submit"
-          className="retro-button w-full justify-center"
+          variant="primary"
+          className="w-full"
           disabled={!token.trim() || isConnecting}
         >
           {isConnecting ? (
             <>
-              Connecting<span className="blink">...</span>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Connecting...
             </>
           ) : (
-            "🔌 Connect to Netlify"
+            <>
+              <Plug className="w-4 h-4 mr-2" />
+              Connect to Netlify
+            </>
           )}
-        </button>
+        </Button>
       </form>
 
-      <div className={cn(
-        "mt-4 text-[9px] text-center",
-        isTerminalTheme ? "opacity-50 crt-glow" : "text-gray-400"
-      )}>
-        Your token is stored locally and never sent to any server except Netlify.
-      </div>
+      <p className="mt-4 text-xs text-text-secondary text-center">
+        Your token is stored locally and never sent anywhere except Netlify.
+      </p>
     </div>
   );
 }

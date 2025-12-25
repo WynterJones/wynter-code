@@ -16,7 +16,7 @@ mod terminal;
 mod tunnel;
 mod watcher;
 mod webcam_window;
-mod gif_recorder_window;
+mod gif_capture;
 
 use std::sync::Arc;
 use tauri::{
@@ -340,10 +340,10 @@ fn main() {
             cost_popup::close_cost_popup,
             cost_popup::update_cost_popup_position,
             cost_popup::is_cost_popup_open,
-            // GIF Recorder Window
-            gif_recorder_window::open_gif_region_selector_window,
-            gif_recorder_window::close_gif_region_selector_window,
-            gif_recorder_window::is_gif_region_selector_open,
+            // GIF Capture
+            gif_capture::capture_screen_frame,
+            gif_capture::check_gif_recording_permission,
+            gif_capture::request_gif_recording_permission,
             // Domain Tools
             domain_tools::whois_lookup,
             domain_tools::dns_lookup,

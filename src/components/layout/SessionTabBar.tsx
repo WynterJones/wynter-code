@@ -280,7 +280,7 @@ export function SessionTabBar({
               key={session.id}
               onClick={() => setActiveSession(projectId, session.id)}
               className={cn(
-                "group flex items-center gap-2 px-4 h-9 cursor-pointer transition-colors relative flex-shrink-0",
+                "group flex items-center gap-1.5 px-2 h-9 cursor-pointer transition-colors relative min-w-[120px] max-w-[200px] flex-shrink-0",
                 "border-r border-border/50",
                 activeId === session.id
                   ? "bg-bg-secondary text-text-primary"
@@ -297,7 +297,7 @@ export function SessionTabBar({
 
               {/* Session icon with color picker */}
               <div
-                className="relative"
+                className="relative flex-shrink-0"
                 ref={
                   colorPickerSessionId === session.id ? colorPickerRef : null
                 }
@@ -369,7 +369,7 @@ export function SessionTabBar({
               {/* Streaming indicator - pulsing green dot */}
               {session.type === "claude" &&
                 getStreamingState(session.id)?.isStreaming && (
-                  <div className="relative flex items-center">
+                  <div className="relative flex items-center flex-shrink-0">
                     <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                     <div className="absolute w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75" />
                   </div>
@@ -408,51 +408,64 @@ export function SessionTabBar({
                 </span>
               )}
 
-              {/* Edit button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleStartEditing(
-                    session.id,
-                    session.name || `Session ${index + 1}`,
-                  );
-                }}
-                className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-text-secondary hover:text-accent transition-opacity"
-              >
-                <Pencil className="w-3 h-3" />
-              </button>
-
-              {/* Stop button for streaming Claude sessions */}
-              {session.type === "claude" &&
-                getStreamingState(session.id)?.isStreaming && (
-                  <button
-                    onClick={(e) => handleStopClaudeSession(e, session.id)}
-                    className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-accent-red transition-opacity"
-                    title="Stop streaming"
-                  >
-                    <StopCircle className="w-3 h-3" />
-                  </button>
+              {/* Action buttons - overlay with gradient fade on hover */}
+              <div
+                className={cn(
+                  "absolute inset-y-0 right-0 flex items-center pr-1 pl-4",
+                  "opacity-0 group-hover:opacity-100 transition-opacity",
                 )}
-
-              {/* Close button */}
-              <button
-                onClick={(e) => handleSessionClose(e, session.id, session.type)}
-                className="p-0.5 opacity-0 group-hover:opacity-100 hover:bg-bg-primary/50 text-text-secondary hover:text-accent-red transition-opacity"
+                style={{
+                  background: activeId === session.id
+                    ? "linear-gradient(to right, transparent 0%, var(--bg-secondary) 30%)"
+                    : "linear-gradient(to right, transparent 0%, var(--bg-primary) 30%)",
+                }}
               >
-                <svg
-                  className="w-3 h-3"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+                {/* Edit button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStartEditing(
+                      session.id,
+                      session.name || `Session ${index + 1}`,
+                    );
+                  }}
+                  className="p-0.5 rounded hover:bg-bg-hover/80 text-text-secondary hover:text-accent transition-colors"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
+                  <Pencil className="w-3 h-3" />
+                </button>
+
+                {/* Stop button for streaming Claude sessions */}
+                {session.type === "claude" &&
+                  getStreamingState(session.id)?.isStreaming && (
+                    <button
+                      onClick={(e) => handleStopClaudeSession(e, session.id)}
+                      className="p-0.5 rounded hover:bg-bg-hover/80 text-accent-red transition-colors"
+                      title="Stop streaming"
+                    >
+                      <StopCircle className="w-3 h-3" />
+                    </button>
+                  )}
+
+                {/* Close button */}
+                <button
+                  onClick={(e) => handleSessionClose(e, session.id, session.type)}
+                  className="p-0.5 rounded hover:bg-bg-hover/80 text-text-secondary hover:text-accent-red transition-colors"
+                >
+                  <svg
+                    className="w-3 h-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           ))
         )}

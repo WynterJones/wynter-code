@@ -24,6 +24,7 @@ import {
   MonitorPlay,
   FileCode,
   Upload,
+  Bookmark,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -215,7 +216,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     id: "gif-recorder",
-    name: "GIF Screen Section Recorder",
+    name: "GIF Screen Recorder",
     description: "Record screen region as animated GIF",
     icon: Image,
     actionKey: "openGifRecorder",
@@ -228,6 +229,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Upload,
     actionKey: "openNetlifyFtp",
     category: "infrastructure",
+  },
+  {
+    id: "bookmarks",
+    name: "Bookmarks",
+    description: "Organize and manage your bookmarks",
+    icon: Bookmark,
+    actionKey: "openBookmarks",
+    category: "utilities",
   },
 ];
 
@@ -269,6 +278,7 @@ interface ToolsDropdownProps {
   onOpenScreenStudio: () => void;
   onOpenNetlifyFtp: () => void;
   onOpenGifRecorder: () => void;
+  onOpenBookmarks: () => void;
   hasStorybook?: boolean;
 }
 
@@ -294,6 +304,7 @@ export function ToolsDropdown({
   onOpenScreenStudio,
   onOpenNetlifyFtp,
   onOpenGifRecorder,
+  onOpenBookmarks,
   hasStorybook = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -522,7 +533,7 @@ export function ToolsDropdown({
     },
     {
       id: "gif-recorder",
-      name: "GIF Screen Section Recorder",
+      name: "GIF Screen Recorder",
       description: "Record screen region as animated GIF",
       icon: <Image className="w-4 h-4" />,
       category: "utilities",
@@ -539,6 +550,17 @@ export function ToolsDropdown({
       category: "infrastructure",
       onClick: () => {
         onOpenNetlifyFtp();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "bookmarks",
+      name: "Bookmarks",
+      description: "Organize and manage your bookmarks",
+      icon: <Bookmark className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenBookmarks();
         setIsOpen(false);
       },
     },
@@ -665,7 +687,11 @@ export function ToolsDropdown({
             {/* Tools List */}
             <OverlayScrollbarsComponent
               options={{
-                scrollbars: { theme: "os-theme-custom", autoHide: "leave", autoHideDelay: 100 },
+                scrollbars: {
+                  theme: "os-theme-custom",
+                  autoHide: "leave",
+                  autoHideDelay: 100,
+                },
               }}
               className="max-h-[400px] os-theme-custom"
             >
@@ -681,7 +707,8 @@ export function ToolsDropdown({
                       <div
                         className={cn(
                           "px-3 py-1.5 text-[10px] font-semibold text-text-secondary uppercase tracking-wider",
-                          categoryIndex > 0 && "mt-1 border-t border-border pt-2"
+                          categoryIndex > 0 &&
+                            "mt-1 border-t border-border pt-2",
                         )}
                       >
                         {category.label}
@@ -696,13 +723,13 @@ export function ToolsDropdown({
                             "w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors group",
                             tool.disabled
                               ? "opacity-50 cursor-not-allowed"
-                              : "hover:bg-bg-hover"
+                              : "hover:bg-bg-hover",
                           )}
                         >
                           <div
                             className={cn(
                               "flex-shrink-0 text-text-secondary transition-colors",
-                              !tool.disabled && "group-hover:text-accent"
+                              !tool.disabled && "group-hover:text-accent",
                             )}
                           >
                             {tool.icon}

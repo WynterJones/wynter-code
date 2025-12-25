@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Loader2, Download, TrendingUp, Smartphone, Monitor, FileText, FileCode } from "lucide-react";
+import { Search, Loader2, TrendingUp, Smartphone, Monitor, FileText, FileCode } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 

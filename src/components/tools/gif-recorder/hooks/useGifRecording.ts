@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import GIF from "gif.js";
 import type {
   GifRecordingState,
@@ -6,6 +7,12 @@ import type {
   GifRecordingSettings,
   RegionSelection,
 } from "../types";
+
+interface ScreenFrame {
+  pixels: number[];
+  width: number;
+  height: number;
+}
 
 interface UseGifRecordingReturn {
   state: GifRecordingState;
@@ -24,14 +31,12 @@ export function useGifRecording(): UseGifRecordingReturn {
   const [frames, setFrames] = useState<ImageData[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const captureIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
   const regionRef = useRef<RegionSelection | null>(null);
   const settingsRef = useRef<GifRecordingSettings | null>(null);
   const framesRef = useRef<ImageData[]>([]);
+  const isRecordingRef = useRef<boolean>(false);
 
   const clearCaptureInterval = useCallback(() => {
     if (captureIntervalRef.current) {
@@ -41,74 +46,69 @@ export function useGifRecording(): UseGifRecordingReturn {
   }, []);
 
   const startRecording = useCallback(
-    async (region: RegionSelection, settings: GifRecordingSettings) => {
+    async (_region: RegionSelection, settings: GifRecordingSettings) => {
       try {
         setError(null);
-        setState("recording");
-        regionRef.current = region;
         settingsRef.current = settings;
         framesRef.current = [];
         startTimeRef.current = Date.now();
+        isRecordingRef.current = true;
 
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: {
-            displaySurface: "monitor",
-            frameRate: settings.frameRate,
-          },
-          audio: false,
-        });
-
-        mediaStreamRef.current = stream;
-
-        const video = document.createElement("video");
-        video.srcObject = stream;
-        video.autoplay = true;
-        video.playsInline = true;
-        await video.play();
-        videoRef.current = video;
-
-        const canvas = document.createElement("canvas");
-        canvas.width = region.width;
-        canvas.height = region.height;
-        canvasRef.current = canvas;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          throw new Error("Could not get canvas context");
+        // Check permission first
+        const hasPermission = await invoke<boolean>("check_gif_recording_permission");
+        if (!hasPermission) {
+          // Request permission
+          await invoke("request_gif_recording_permission");
+          setError("Screen recording permission required. Please grant permission in System Settings and try again.");
+          setState("idle");
+          return;
         }
 
-        const captureFrame = () => {
-          if (!video || !canvas || !ctx || !regionRef.current) return;
+        // Capture initial frame to get dimensions
+        const initialFrame = await invoke<ScreenFrame>("capture_screen_frame");
+
+        // Store the actual dimensions as the region
+        regionRef.current = {
+          x: 0,
+          y: 0,
+          width: initialFrame.width,
+          height: initialFrame.height,
+        };
+
+        // Convert first frame to ImageData
+        const firstImageData = new ImageData(
+          new Uint8ClampedArray(initialFrame.pixels),
+          initialFrame.width,
+          initialFrame.height
+        );
+        framesRef.current.push(firstImageData);
+
+        // Now set state to recording
+        setState("recording");
+
+        // Start capturing frames at the specified interval
+        const interval = 1000 / settings.frameRate;
+
+        const captureFrame = async () => {
+          if (!isRecordingRef.current) return;
 
           try {
-            ctx.drawImage(
-              video,
-              regionRef.current.x,
-              regionRef.current.y,
-              regionRef.current.width,
-              regionRef.current.height,
-              0,
-              0,
-              regionRef.current.width,
-              regionRef.current.height
+            const frame = await invoke<ScreenFrame>("capture_screen_frame");
+            const imageData = new ImageData(
+              new Uint8ClampedArray(frame.pixels),
+              frame.width,
+              frame.height
             );
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             framesRef.current.push(imageData);
           } catch (err) {
             console.error("Error capturing frame:", err);
           }
         };
 
-        const interval = 1000 / settings.frameRate;
         captureIntervalRef.current = setInterval(captureFrame, interval);
-        captureFrame();
-
-        stream.getVideoTracks()[0].addEventListener("ended", () => {
-          stopRecording();
-        });
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start recording");
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        setError(errorMessage);
         setState("idle");
       }
     },
@@ -116,17 +116,8 @@ export function useGifRecording(): UseGifRecordingReturn {
   );
 
   const stopRecording = useCallback(() => {
+    isRecordingRef.current = false;
     clearCaptureInterval();
-
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-      mediaStreamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-      videoRef.current = null;
-    }
 
     if (framesRef.current.length > 0 && regionRef.current && settingsRef.current) {
       const duration = Date.now() - startTimeRef.current;
@@ -149,6 +140,7 @@ export function useGifRecording(): UseGifRecordingReturn {
   }, [clearCaptureInterval]);
 
   const clearRecording = useCallback(() => {
+    isRecordingRef.current = false;
     clearCaptureInterval();
     setCurrentRecording(null);
     setFrames([]);
@@ -158,7 +150,7 @@ export function useGifRecording(): UseGifRecordingReturn {
 
   const exportGif = useCallback(
     async (trimStart = 0, trimEnd = 0): Promise<Blob> => {
-      if (!currentRecording || !canvasRef.current) {
+      if (!currentRecording) {
         throw new Error("No recording available");
       }
 
@@ -166,8 +158,16 @@ export function useGifRecording(): UseGifRecordingReturn {
 
       return new Promise((resolve, reject) => {
         try {
-          const canvas = canvasRef.current!;
-          const ctx = canvas.getContext("2d")!;
+          // Create a canvas for rendering frames
+          const canvas = document.createElement("canvas");
+          canvas.width = currentRecording.region.width;
+          canvas.height = currentRecording.region.height;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            throw new Error("Could not get canvas context");
+          }
+
           const framesToUse = currentRecording.frames.slice(
             Math.floor((trimStart / 1000) * currentRecording.settings.frameRate),
             trimEnd > 0
@@ -175,6 +175,10 @@ export function useGifRecording(): UseGifRecordingReturn {
                   Math.floor((trimEnd / 1000) * currentRecording.settings.frameRate)
               : undefined
           );
+
+          if (framesToUse.length === 0) {
+            throw new Error("No frames to export");
+          }
 
           const gif = new GIF({
             workers: 2,
@@ -188,7 +192,7 @@ export function useGifRecording(): UseGifRecordingReturn {
 
           framesToUse.forEach((frame) => {
             ctx.putImageData(frame, 0, 0);
-            gif.addFrame(canvas, { delay });
+            gif.addFrame(canvas, { delay, copy: true });
           });
 
           gif.on("finished", (blob) => {
@@ -221,4 +225,3 @@ export function useGifRecording(): UseGifRecordingReturn {
     exportGif,
   };
 }
-

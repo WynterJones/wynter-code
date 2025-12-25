@@ -136,8 +136,8 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
 
   if (!activeWorkspaceId) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
-        <div className="w-full max-w-md bg-bg-primary rounded-xl border border-border shadow-2xl p-8 text-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-[30px] bg-black/80 backdrop-blur-sm">
+        <div className="w-full h-full bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col items-center justify-center p-8 text-center">
           <CreditCard className="w-12 h-12 mx-auto mb-4 text-text-secondary opacity-50" />
           <h2 className="text-lg font-medium text-text-primary mb-2">No Workspace Selected</h2>
           <p className="text-sm text-text-secondary mb-4">
@@ -153,8 +153,8 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/80 backdrop-blur-sm">
-        <div className="w-full max-w-4xl h-[600px] max-h-[80vh] bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-[30px] bg-black/80 backdrop-blur-sm">
+        <div className="w-full h-full bg-bg-primary rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
           {/* Header - Drags the window */}
           <div
             data-tauri-drag-region
