@@ -333,6 +333,8 @@ fn main() {
             // Claude Code Stats
             commands::read_claude_stats,
             // Claude Process Management
+            claude_process::start_claude_session,
+            claude_process::stop_claude_session,
             claude_process::start_claude_streaming,
             claude_process::send_claude_input,
             claude_process::terminate_claude_session,

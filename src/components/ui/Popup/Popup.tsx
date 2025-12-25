@@ -39,6 +39,7 @@ function PopupRoot({
 }: PopupProps) {
   // Use "xl" for Modal to avoid the h-[95vh] that "full" adds
   // We control sizing entirely via className
+  // For "full" size, we want fixed height; for others, auto height
   return (
     <Modal
       isOpen={isOpen}
@@ -46,7 +47,8 @@ function PopupRoot({
       size="xl"
       showCloseButton={false}
       className={cn(
-        "!max-w-none !h-auto flex flex-col overflow-hidden",
+        "!max-w-none flex flex-col overflow-hidden",
+        size !== "full" && "!h-auto",
         SIZE_CLASSES[size],
         className
       )}

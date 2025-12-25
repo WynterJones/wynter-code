@@ -21,7 +21,6 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useCustomMusic } from "@/hooks/useCustomMusic";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
-const SIDEBAR_COLLAPSED_KEY = "wynter-code-sidebar-collapsed";
 const SIDEBAR_WIDTH_KEY = "wynter-code-sidebar-width";
 const MIN_SIDEBAR_WIDTH = 300;
 const MAX_SIDEBAR_WIDTH = 700;
@@ -33,14 +32,12 @@ export function AppShell() {
   const isMeditating = useMeditationStore((s) => s.isActive);
   const { hasCompletedOnboarding } = useOnboardingStore();
   const sidebarPosition = useSettingsStore((s) => s.sidebarPosition);
+  const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed);
+  const setSidebarCollapsed = useSettingsStore((s) => s.setSidebarCollapsed);
   const [showSettings, setShowSettings] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string | undefined>(undefined);
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    return stored === "true";
-  });
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const stored = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return stored ? parseInt(stored, 10) : DEFAULT_SIDEBAR_WIDTH;
@@ -136,14 +133,10 @@ export function AppShell() {
   }, [isResizingSidebar, sidebarPosition]);
 
   useEffect(() => {
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
-  }, [sidebarCollapsed]);
-
-  useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
 
-  const toggleSidebar = useCallback(() => setSidebarCollapsed((prev) => !prev), []);
+  const toggleSidebar = useCallback(() => setSidebarCollapsed(!sidebarCollapsed), [sidebarCollapsed, setSidebarCollapsed]);
 
   const handleFocusPrompt = useCallback(() => {
     // Focus the prompt input - use a custom event that MainContent can listen to
@@ -258,7 +251,7 @@ export function AppShell() {
                 <Tooltip content="Show sidebar" side={sidebarPosition === "right" ? "left" : "right"}>
                   <button
                     onClick={toggleSidebar}
-                    className="p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+                    className="p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors opacity-70 hover:opacity-100"
                   >
                     {sidebarPosition === "right" ? (
                       <PanelRightClose className="w-4 h-4" />

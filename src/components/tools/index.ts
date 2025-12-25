@@ -19,3 +19,4 @@ export { FarmworkTycoonPopup, MiniGamePlayer } from "./farmwork-tycoon";
 export { ScreenStudioPopup } from "./screen-studio";
 export { NetlifyFtpPopup } from "./netlify-ftp";
 export { ProjectSearchPopup } from "./project-search";
+export { JustCommandManagerPopup } from "./just-command-manager";

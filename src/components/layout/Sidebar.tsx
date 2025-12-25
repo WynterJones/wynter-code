@@ -55,6 +55,7 @@ function getFileViewerType(path: string): FileViewerType {
 export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, onResizeStart, width = 400, position = "right" }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<SidebarTab>("files");
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
+  const [openFileLine, setOpenFileLine] = useState<number | undefined>(undefined);
   const [fileViewerType, setFileViewerType] = useState<FileViewerType>(null);
   const [hasNodeModules, setHasNodeModules] = useState(false);
   const [hasPackageJson, setHasPackageJson] = useState(false);
@@ -110,6 +111,16 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
     return () => window.removeEventListener("focus-file-browser", handleFocusFileBrowser);
   }, []);
 
+  // Listen for open-file-at-line event (from project search)
+  useEffect(() => {
+    const handleOpenFileAtLine = (e: CustomEvent<{ path: string; line: number }>) => {
+      const { path, line } = e.detail;
+      handleFileOpen(path, line);
+    };
+    window.addEventListener("open-file-at-line", handleOpenFileAtLine as EventListener);
+    return () => window.removeEventListener("open-file-at-line", handleOpenFileAtLine as EventListener);
+  }, []);
+
   const tabs = useMemo(() => {
     const baseTabs: { id: SidebarTab; icon: typeof Files; label: string }[] = [
       { id: "files", icon: Files, label: "Files" },
@@ -141,14 +152,16 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
     }
   }, [activeTab, hasNodeModules, hasPackageJson]);
 
-  const handleFileOpen = (path: string) => {
+  const handleFileOpen = (path: string, line?: number) => {
     const viewerType = getFileViewerType(path);
     setOpenFilePath(path);
+    setOpenFileLine(line);
     setFileViewerType(viewerType);
   };
 
   const handleCloseViewer = () => {
     setOpenFilePath(null);
+    setOpenFileLine(undefined);
     setFileViewerType(null);
   };
 
@@ -244,7 +257,7 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
       </div>
 
       {openFilePath && fileViewerType === "editor" && (
-        <FileEditorPopup filePath={openFilePath} onClose={handleCloseViewer} onMinimize={handleMinimize} />
+        <FileEditorPopup filePath={openFilePath} initialLine={openFileLine} onClose={handleCloseViewer} onMinimize={handleMinimize} />
       )}
       {openFilePath && fileViewerType === "image" && (
         <ImageViewerPopup filePath={openFilePath} onClose={handleCloseViewer} />

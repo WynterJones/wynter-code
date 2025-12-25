@@ -3,14 +3,24 @@ import { Send, StopCircle } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useSessionStore } from "@/stores/sessionStore";
-import { claudeService } from "@/services/claude";
 
 interface PromptInputProps {
   projectPath: string;
   sessionId?: string;
+  onSendPrompt?: (prompt: string) => void;
+  disabled?: boolean;
 }
 
-export function PromptInput({ projectPath, sessionId }: PromptInputProps) {
+/**
+ * Simple prompt input component.
+ * For full functionality with file attachments and images, use EnhancedPromptInput.
+ */
+export function PromptInput({
+  projectPath,
+  sessionId,
+  onSendPrompt,
+  disabled = false,
+}: PromptInputProps) {
   const [prompt, setPrompt] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const {
@@ -18,17 +28,8 @@ export function PromptInput({ projectPath, sessionId }: PromptInputProps) {
     createSession,
     startStreaming,
     appendStreamingText,
-    appendThinkingText,
-    setThinking,
-    setCurrentTool,
-    updateStats,
-    addPendingToolCall,
-    updateToolCallStatus,
-    appendToolInput,
     finishStreaming,
     getStreamingState,
-    getSession,
-    updateClaudeSessionId,
   } = useSessionStore();
 
   const streamingState = sessionId ? getStreamingState(sessionId) : null;
@@ -39,7 +40,7 @@ export function PromptInput({ projectPath, sessionId }: PromptInputProps) {
   }, [sessionId]);
 
   const handleSubmit = async () => {
-    if (!prompt.trim() || isStreaming) return;
+    if (!prompt.trim() || isStreaming || disabled) return;
 
     let currentSessionId = sessionId;
 
@@ -60,92 +61,23 @@ export function PromptInput({ projectPath, sessionId }: PromptInputProps) {
       content: userMessage,
     });
 
-    // Start streaming state
-    startStreaming(currentSessionId);
-
-    // Get session info for continuity and mode
-    const session = getSession(currentSessionId);
-    const claudeSessionId = session?.claudeSessionId || undefined;
-    const permissionMode = session?.permissionMode || "default";
-
-    try {
-      await claudeService.startStreaming(
-        userMessage,
-        projectPath,
-        currentSessionId,
-        {
-          onInit: (model, _cwd, newClaudeSessionId) => {
-            updateStats(currentSessionId!, { model });
-            if (newClaudeSessionId) {
-              updateClaudeSessionId(currentSessionId!, newClaudeSessionId);
-            }
-          },
-          onText: (text) => {
-            appendStreamingText(currentSessionId!, text);
-          },
-          onThinking: (text) => {
-            appendThinkingText(currentSessionId!, text);
-          },
-          onThinkingStart: () => {
-            setThinking(currentSessionId!, true);
-          },
-          onThinkingEnd: () => {
-            setThinking(currentSessionId!, false);
-          },
-          onToolStart: (toolName, toolId) => {
-            setCurrentTool(currentSessionId!, toolName);
-            addPendingToolCall(currentSessionId!, {
-              id: toolId,
-              name: toolName,
-              input: {},
-              status: "running",
-            });
-          },
-          onToolInputDelta: (toolId, partialJson) => {
-            appendToolInput(currentSessionId!, toolId, partialJson);
-          },
-          onToolEnd: () => {
-            setCurrentTool(currentSessionId!, undefined);
-          },
-          onToolResult: (toolId, content) => {
-            updateToolCallStatus(currentSessionId!, toolId, "completed", content);
-            setCurrentTool(currentSessionId!, undefined);
-          },
-          onUsage: (stats) => {
-            updateStats(currentSessionId!, stats);
-          },
-          onResult: () => {
-            // Result handled by finishStreaming
-          },
-          onError: (error) => {
-            appendStreamingText(currentSessionId!, `\n\nError: ${error}`);
-          },
-          onDone: (exitCode, newClaudeSessionId, finalStats) => {
-            console.log("Claude streaming completed with exit code:", exitCode);
-            if (newClaudeSessionId) {
-              updateClaudeSessionId(currentSessionId!, newClaudeSessionId);
-            }
-            if (finalStats) {
-              updateStats(currentSessionId!, finalStats);
-            }
-            finishStreaming(currentSessionId!);
-          },
-        },
-        claudeSessionId,
-        permissionMode
-      );
-    } catch (error) {
-      console.error("Error starting streaming:", error);
-      appendStreamingText(
-        currentSessionId,
-        `Error: ${error instanceof Error ? error.message : "Failed to send message"}`
-      );
-      finishStreaming(currentSessionId);
+    // If custom handler provided (persistent session mode), use that
+    if (onSendPrompt) {
+      onSendPrompt(userMessage);
+      return;
     }
+
+    // Legacy mode - just show a message that persistent sessions should be used
+    startStreaming(currentSessionId);
+    appendStreamingText(
+      currentSessionId,
+      "Note: Please use ClaudeOutputPanel with Start Session for full Claude CLI integration.\n\n" +
+      "This basic prompt input is for simple use cases only."
+    );
+    finishStreaming(currentSessionId);
   };
 
   const handleStop = () => {
-    claudeService.stopStreaming();
     if (sessionId) {
       finishStreaming(sessionId);
     }
@@ -179,7 +111,7 @@ export function PromptInput({ projectPath, sessionId }: PromptInputProps) {
         onChange={(e) => setPrompt(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Type a prompt..."
-        disabled={isStreaming}
+        disabled={isStreaming || disabled}
         rows={1}
         className={cn(
           "flex-1 bg-transparent text-text-primary placeholder:text-text-secondary",
@@ -204,7 +136,7 @@ export function PromptInput({ projectPath, sessionId }: PromptInputProps) {
         <IconButton
           size="sm"
           onClick={handleSubmit}
-          disabled={!prompt.trim()}
+          disabled={!prompt.trim() || disabled}
           className={cn(
             prompt.trim()
               ? "text-accent hover:text-accent"

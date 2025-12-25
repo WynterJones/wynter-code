@@ -20,7 +20,8 @@ interface BeadsState {
   createIssue: (
     title: string,
     issueType: BeadsIssueType,
-    priority: number
+    priority: number,
+    description?: string
   ) => Promise<string>;
   updateIssue: (id: string, updates: BeadsUpdate) => Promise<void>;
   closeIssue: (id: string, reason: string) => Promise<void>;
@@ -68,7 +69,7 @@ export const useBeadsStore = create<BeadsState>((set, get) => ({
     }
   },
 
-  createIssue: async (title, issueType, priority) => {
+  createIssue: async (title, issueType, priority, description) => {
     const { projectPath, fetchIssues } = get();
     if (!projectPath) throw new Error("No project path set");
 
@@ -79,6 +80,7 @@ export const useBeadsStore = create<BeadsState>((set, get) => ({
         title,
         issueType,
         priority,
+        description: description || null,
       });
       await fetchIssues();
       return id;

@@ -16,9 +16,10 @@ interface TerminalProps {
   projectPath: string;
   ptyId: string | null;
   onPtyCreated: (ptyId: string) => void;
+  isVisible?: boolean;
 }
 
-export function Terminal({ projectPath, ptyId, onPtyCreated }: TerminalProps) {
+export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -205,6 +206,19 @@ export function Terminal({ projectPath, ptyId, onPtyCreated }: TerminalProps) {
       window.removeEventListener("resize", handleResize);
     };
   }, []);
+
+  // Refresh terminal when becoming visible (fixes black screen on tab switch)
+  useEffect(() => {
+    if (isVisible && xtermRef.current && fitAddonRef.current) {
+      // Small delay to ensure DOM is fully rendered
+      const timeoutId = setTimeout(() => {
+        fitAddonRef.current?.fit();
+        xtermRef.current?.refresh(0, xtermRef.current.rows);
+        xtermRef.current?.focus();
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isVisible]);
 
   const handleClick = () => {
     // Focus the terminal when clicked to ensure it receives keyboard input

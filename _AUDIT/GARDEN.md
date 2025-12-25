@@ -2,8 +2,8 @@
 
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
-**Last Updated:** 2025-12-24
-**Active Ideas:** 2
+**Last Updated:** 2025-12-25
+**Active Ideas:** 1
 
 ---
 
@@ -18,16 +18,6 @@
 ---
 
 ## Ideas
-
-### Project Search
-**Location:** `ProjectSearchPopup` (new standalone tool)
-A project-wide file search feature inspired by Zed editor's project search, allowing users to search across all files in the current project with results displayed in contextual chunks.
-- Search across all files in the current project
-- Results displayed in 5-line context chunks (showing surrounding lines)
-- Click/jump to file functionality from search results
-- Inspired by Zed editor's project search UX
-- Clean, scannable results view
-- Follow existing UI patterns (OverlayScrollbars, no emojis, proper icons)
 
 ### Auto Build
 **Location:** New session tab type
@@ -91,3 +81,5 @@ A new session tab type featuring a Kanban board for automated feature developmen
 | GIF Screen Recorder | `GifRecorderPopup` - Select screen region to record as animated GIF, adjustable frame rate/quality, cursor capture, click indicators, copy to clipboard or save | 2025-12-24 |
 | Netlify FTP | `NetlifyFtpPopup` - FTP-style drag-and-drop Netlify deploys, browse local files vs site, one-click deploys, domain management, deploy history with rollback | 2025-12-24 |
 | Bookmarks | `BookmarksPopup` - Save and organize sites/web apps/services, category folders, icon gallery vs list view, favicon display, AI apps tracking | 2025-12-24 |
+| Project Search | `ProjectSearchPopup` - Project-wide file search with context chunks, regex/case-sensitive/whole-word modes, find & replace, click to open file at line, keyboard navigation | 2025-12-24 |
+| Just Command Manager | `JustCommandManagerPopup` - Manage justfile recipes, detect justfile presence, run recipes with embedded terminal, favorites/recents, visual editor to add/edit recipes, help tab with quick reference | 2025-12-25 |

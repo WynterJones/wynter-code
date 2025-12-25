@@ -8,7 +8,17 @@ interface CommandOutput {
   code: number;
 }
 
-export interface ClaudeStreamCallbacks {
+export interface ClaudeSessionInfo {
+  model?: string;
+  claudeSessionId?: string;
+  tools?: string[];
+  cwd?: string;
+}
+
+export interface ClaudeSessionCallbacks {
+  onSessionStarting: () => void;
+  onSessionReady: (info: ClaudeSessionInfo) => void;
+  onSessionEnded: (reason: string) => void;
   onText: (text: string) => void;
   onThinking: (text: string) => void;
   onThinkingStart: () => void;
@@ -21,7 +31,6 @@ export interface ClaudeStreamCallbacks {
   onUsage: (stats: Partial<StreamingStats>) => void;
   onResult: (result: string) => void;
   onError: (error: string) => void;
-  onDone: (exitCode: number, claudeSessionId?: string, stats?: Partial<StreamingStats>) => void;
 }
 
 class ClaudeService {
@@ -29,8 +38,9 @@ class ClaudeService {
 
   // Per-session state Maps
   private _unlistenMap = new Map<string, UnlistenFn>();
-  private _streamingMap = new Map<string, boolean>();
+  private _sessionActiveMap = new Map<string, boolean>();
   private _currentToolIdMap = new Map<string, string | null>();
+  private _callbacksMap = new Map<string, ClaudeSessionCallbacks>();
 
   setModel(model: ClaudeModel) {
     this._currentModel = model;
@@ -40,41 +50,37 @@ class ClaudeService {
     return this._currentModel;
   }
 
-  /** Check if ANY session is currently streaming */
-  get isStreaming() {
-    return Array.from(this._streamingMap.values()).some(v => v);
+  /** Check if a specific session is active */
+  isSessionActive(sessionId: string): boolean {
+    return this._sessionActiveMap.get(sessionId) || false;
   }
 
-  /** Check if a specific session is streaming */
-  isSessionStreaming(sessionId: string): boolean {
-    return this._streamingMap.get(sessionId) || false;
-  }
-
-  /** Get all currently streaming session IDs */
-  getStreamingSessionIds(): string[] {
-    return Array.from(this._streamingMap.entries())
-      .filter(([, streaming]) => streaming)
-      .map(([id]) => id);
-  }
-
-  async startStreaming(
-    prompt: string,
+  /** Start a persistent Claude session */
+  async startSession(
     cwd: string,
     sessionId: string,
-    callbacks: ClaudeStreamCallbacks,
-    claudeSessionId?: string,
-    permissionMode?: PermissionMode
+    callbacks: ClaudeSessionCallbacks,
+    permissionMode?: PermissionMode,
+    resumeSessionId?: string
   ): Promise<void> {
-    // Only check if THIS session is streaming, not globally
-    if (this._streamingMap.get(sessionId)) {
-      throw new Error("Session already streaming");
+    console.log("[ClaudeService] startSession called:", {
+      cwd,
+      sessionId,
+      permissionMode,
+      resumeSessionId,
+    });
+
+    if (this._sessionActiveMap.get(sessionId)) {
+      console.error("[ClaudeService] Session already active:", sessionId);
+      throw new Error("Session already active");
     }
 
-    this._streamingMap.set(sessionId, true);
+    // Store callbacks
+    this._callbacksMap.set(sessionId, callbacks);
     this._currentToolIdMap.set(sessionId, null);
-    let capturedClaudeSessionId: string | undefined = claudeSessionId;
 
-    // Set up event listener before invoking the command
+    // Set up event listener
+    console.log("[ClaudeService] Setting up event listener for session:", sessionId);
     const unlisten = await listen<StreamChunk>("claude-stream", (event) => {
       const chunk = event.payload;
 
@@ -83,75 +89,109 @@ class ClaudeService {
         return;
       }
 
-      // Capture claude session ID from any chunk that has it
-      if (chunk.claude_session_id) {
-        capturedClaudeSessionId = chunk.claude_session_id;
-      }
+      const cb = this._callbacksMap.get(sessionId);
+      if (!cb) return;
 
       const currentToolId = this._currentToolIdMap.get(sessionId);
 
+      console.log("[ClaudeService] Received event:", {
+        type: chunk.chunk_type,
+        hasContent: !!chunk.content,
+      });
+
       switch (chunk.chunk_type) {
+        case "session_starting":
+          cb.onSessionStarting();
+          break;
+
+        case "session_ready":
+          this._sessionActiveMap.set(sessionId, true);
+          // Parse init info from content (it's the full JSON)
+          let info: ClaudeSessionInfo = {
+            model: chunk.model,
+            claudeSessionId: chunk.claude_session_id,
+          };
+          if (chunk.content) {
+            try {
+              const initData = JSON.parse(chunk.content);
+              info = {
+                model: initData.model,
+                claudeSessionId: initData.session_id,
+                tools: initData.tools,
+                cwd: initData.cwd,
+              };
+            } catch {
+              // Use basic info from chunk
+            }
+          }
+          cb.onSessionReady(info);
+          break;
+
+        case "session_ended":
+          this._sessionActiveMap.delete(sessionId);
+          cb.onSessionEnded(chunk.content || "Session ended");
+          this.cleanupSession(sessionId);
+          break;
+
+        case "stderr":
+          if (chunk.content) {
+            cb.onError(`[stderr] ${chunk.content}`);
+          }
+          break;
+
         case "init":
           if (chunk.model) {
-            callbacks.onInit(chunk.model, chunk.content || cwd, chunk.claude_session_id);
+            cb.onInit(chunk.model, chunk.content || cwd, chunk.claude_session_id);
           }
           break;
 
         case "text":
           if (chunk.content) {
-            callbacks.onText(chunk.content);
+            cb.onText(chunk.content);
           }
           break;
 
         case "thinking":
           if (chunk.content) {
-            callbacks.onThinking(chunk.content);
+            cb.onThinking(chunk.content);
           }
           break;
 
         case "thinking_start":
-          callbacks.onThinkingStart();
+          cb.onThinkingStart();
           break;
 
         case "tool_start":
-          if (chunk.tool_name && chunk.tool_id) {
-            this._currentToolIdMap.set(sessionId, chunk.tool_id);
-            callbacks.onToolStart(chunk.tool_name, chunk.tool_id);
-          }
-          break;
-
         case "tool_use":
           if (chunk.tool_name && chunk.tool_id) {
             this._currentToolIdMap.set(sessionId, chunk.tool_id);
-            callbacks.onToolStart(chunk.tool_name, chunk.tool_id);
+            cb.onToolStart(chunk.tool_name, chunk.tool_id);
           }
           break;
 
         case "tool_input_delta":
-          // Accumulate tool input JSON
           if (chunk.content && currentToolId) {
-            callbacks.onToolInputDelta(currentToolId, chunk.content);
+            cb.onToolInputDelta(currentToolId, chunk.content);
           }
           break;
 
         case "tool_result":
           if (chunk.tool_id) {
-            callbacks.onToolResult(chunk.tool_id, chunk.content || "");
+            cb.onToolResult(chunk.tool_id, chunk.content || "");
             this._currentToolIdMap.set(sessionId, null);
           }
           break;
 
         case "block_end":
-          // Could be end of thinking or tool
-          callbacks.onThinkingEnd();
+          cb.onThinkingEnd();
           if (currentToolId) {
-            callbacks.onToolEnd(currentToolId);
+            cb.onToolEnd(currentToolId);
             this._currentToolIdMap.set(sessionId, null);
           }
           break;
 
         case "usage":
-          callbacks.onUsage({
+          cb.onUsage({
             inputTokens: chunk.input_tokens,
             outputTokens: chunk.output_tokens,
             cacheReadTokens: chunk.cache_read_tokens,
@@ -161,10 +201,9 @@ class ClaudeService {
 
         case "result":
           if (chunk.content) {
-            callbacks.onResult(chunk.content);
+            cb.onResult(chunk.content);
           }
-          // Also pass final stats
-          callbacks.onUsage({
+          cb.onUsage({
             inputTokens: chunk.input_tokens,
             outputTokens: chunk.output_tokens,
             costUsd: chunk.cost_usd,
@@ -174,31 +213,18 @@ class ClaudeService {
 
         case "error":
           if (chunk.content) {
-            callbacks.onError(chunk.content);
+            cb.onError(chunk.content);
           }
           break;
 
-        case "done":
-          const exitCodeMatch = chunk.content?.match(/exit_code:(-?\d+)/);
-          const exitCode = exitCodeMatch ? parseInt(exitCodeMatch[1], 10) : 0;
-          callbacks.onDone(exitCode, chunk.claude_session_id || capturedClaudeSessionId, {
-            inputTokens: chunk.input_tokens,
-            outputTokens: chunk.output_tokens,
-            costUsd: chunk.cost_usd,
-            durationMs: chunk.duration_ms,
-          });
-          this.stopSessionStreaming(sessionId);
-          break;
-
-        case "system":
-          // System messages - could show these in a special way
+        case "raw":
           if (chunk.content) {
-            callbacks.onText(`[System] ${chunk.content}`);
+            cb.onText(chunk.content);
           }
           break;
 
         default:
-          // Ignore unknown chunk types
+          console.log("[ClaudeService] Unknown chunk type:", chunk.chunk_type);
           break;
       }
     });
@@ -206,38 +232,41 @@ class ClaudeService {
     this._unlistenMap.set(sessionId, unlisten);
 
     try {
-      // Use the new process manager command
-      await invoke("start_claude_streaming", {
-        prompt,
+      console.log("[ClaudeService] Invoking start_claude_session...");
+      await invoke("start_claude_session", {
         cwd,
         sessionId,
-        claudeSessionId,
         permissionMode,
+        resumeSessionId,
       });
+      console.log("[ClaudeService] start_claude_session invoke succeeded");
     } catch (error) {
-      this.stopSessionStreaming(sessionId);
+      console.error("[ClaudeService] start_claude_session FAILED:", error);
+      this.cleanupSession(sessionId);
       throw error;
     }
   }
 
-  /** Stop streaming for a specific session */
-  stopSessionStreaming(sessionId: string) {
-    this._streamingMap.delete(sessionId);
-    this._currentToolIdMap.delete(sessionId);
-
-    const unlisten = this._unlistenMap.get(sessionId);
-    if (unlisten) {
-      unlisten();
-      this._unlistenMap.delete(sessionId);
+  /** Stop a running Claude session */
+  async stopSession(sessionId: string): Promise<void> {
+    console.log("[ClaudeService] stopSession called:", sessionId);
+    try {
+      await invoke("stop_claude_session", { sessionId });
+    } catch (error) {
+      console.error("[ClaudeService] stopSession failed:", error);
     }
+    this._sessionActiveMap.delete(sessionId);
+    this.cleanupSession(sessionId);
   }
 
-  /** Legacy method - stops all streaming (for backwards compatibility) */
-  stopStreaming() {
-    // Stop all sessions
-    for (const sessionId of this._streamingMap.keys()) {
-      this.stopSessionStreaming(sessionId);
+  /** Send a prompt to a running session */
+  async sendPrompt(sessionId: string, prompt: string): Promise<void> {
+    console.log("[ClaudeService] sendPrompt:", { sessionId, prompt: prompt.substring(0, 50) });
+    if (!this._sessionActiveMap.get(sessionId)) {
+      throw new Error("Session not active. Start a session first.");
     }
+    // Send prompt with newline to execute
+    await invoke("send_claude_input", { sessionId, input: prompt + "\n" });
   }
 
   /** Send input to a running Claude session (for tool approvals, questions) */
@@ -245,20 +274,25 @@ class ClaudeService {
     await invoke("send_claude_input", { sessionId, input });
   }
 
-  /** Terminate a running Claude session */
-  async terminateSession(sessionId: string): Promise<void> {
-    await invoke("terminate_claude_session", { sessionId });
-    this.stopSessionStreaming(sessionId);
-  }
-
-  /** Check if a Claude session is active (running on backend) */
-  async isSessionActive(sessionId: string): Promise<boolean> {
+  /** Check if a Claude session is active on backend */
+  async checkSessionActive(sessionId: string): Promise<boolean> {
     return await invoke<boolean>("is_claude_session_active", { sessionId });
   }
 
   /** Get list of all active Claude sessions from backend */
   async getActiveSessions(): Promise<string[]> {
     return await invoke<string[]>("list_active_claude_sessions");
+  }
+
+  private cleanupSession(sessionId: string) {
+    this._currentToolIdMap.delete(sessionId);
+    this._callbacksMap.delete(sessionId);
+
+    const unlisten = this._unlistenMap.get(sessionId);
+    if (unlisten) {
+      unlisten();
+      this._unlistenMap.delete(sessionId);
+    }
   }
 
   // Non-streaming version for simple queries

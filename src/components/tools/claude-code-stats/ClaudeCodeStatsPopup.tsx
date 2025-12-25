@@ -17,10 +17,15 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
-import { Modal } from "@/components/ui/Modal";
-import { IconButton } from "@/components/ui/IconButton";
-import { Tooltip } from "@/components/ui/Tooltip";
-import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import {
+  Popup,
+  IconButton,
+  Tooltip,
+  HorizontalTabs,
+  HorizontalTabsList,
+  HorizontalTabsTrigger,
+  HorizontalTabsContent,
+} from "@/components/ui";
 import { StatCard } from "./StatCard";
 import { ActivityChart } from "./ActivityChart";
 import { ModelUsageChart } from "./ModelUsageChart";
@@ -48,6 +53,7 @@ const TABS: Tab[] = [
 ];
 
 const formatNumber = (n: number): string => {
+  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toString();
@@ -219,288 +225,274 @@ export function ClaudeCodeStatsPopup({
     );
   };
 
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <RefreshCw className="w-6 h-6 text-accent animate-spin" />
-        </div>
-      );
-    }
+  const renderLoadingState = () => (
+    <div className="flex items-center justify-center h-64">
+      <RefreshCw className="w-6 h-6 text-accent animate-spin" />
+    </div>
+  );
 
-    if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center h-64 gap-3">
-          <div className="text-text-secondary text-sm">{error}</div>
-          <button
-            onClick={fetchStats}
-            className="px-3 py-1.5 text-sm bg-accent text-primary-950 rounded hover:bg-accent/90 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      );
-    }
+  const renderErrorState = () => (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <div className="text-text-secondary text-sm">{error}</div>
+      <button
+        onClick={fetchStats}
+        className="px-3 py-1.5 text-sm bg-accent text-primary-950 rounded hover:bg-accent/90 transition-colors"
+      >
+        Retry
+      </button>
+    </div>
+  );
 
+  const renderOverviewContent = () => {
+    if (loading) return renderLoadingState();
+    if (error) return renderErrorState();
     if (!stats) return null;
 
-    switch (activeTab) {
-      case "overview":
-        return (
-          <div className="space-y-4">
-            {/* Row 1: Core Stats */}
-            <div className="grid grid-cols-4 gap-3">
-              <StatCard
-                icon={MessageSquare}
-                value={formatNumber(stats.totalMessages)}
-                label="Total Messages"
-                color="accent"
-              />
-              <StatCard
-                icon={Layers}
-                value={formatNumber(stats.totalSessions)}
-                label="Sessions"
-                color="blue"
-              />
-              <StatCard
-                icon={Wrench}
-                value={formatNumber(getTotalToolCalls())}
-                label="Tool Calls"
-                color="purple"
-              />
-              <StatCard
-                icon={Calendar}
-                value={getActiveDays().toString()}
-                label="Active Days"
-                color="green"
-              />
-            </div>
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-4 gap-3">
+          <StatCard
+            icon={MessageSquare}
+            value={formatNumber(stats.totalMessages)}
+            label="Total Messages"
+            color="accent"
+          />
+          <StatCard
+            icon={Layers}
+            value={formatNumber(stats.totalSessions)}
+            label="Sessions"
+            color="blue"
+          />
+          <StatCard
+            icon={Wrench}
+            value={formatNumber(getTotalToolCalls())}
+            label="Tool Calls"
+            color="purple"
+          />
+          <StatCard
+            icon={Calendar}
+            value={getActiveDays().toString()}
+            label="Active Days"
+            color="green"
+          />
+        </div>
 
-            {/* Row 2: Fun Stats */}
-            <div className="grid grid-cols-4 gap-3">
-              <StatCard
-                icon={Calendar}
-                value={getJourneyDays().toString()}
-                label="Journey Days"
-                subValue="since first session"
-                color="yellow"
-              />
-              <StatCard
-                icon={Flame}
-                value={getCurrentStreak().toString()}
-                label="Current Streak"
-                subValue="consecutive days"
-                color="accent"
-              />
-              <StatCard
-                icon={Target}
-                value={getAvgMessagesPerSession().toString()}
-                label="Avg/Session"
-                subValue="messages"
-                color="blue"
-              />
-              <StatCard
-                icon={TrendingUp}
-                value={formatNumber(getAvgMessagesPerDay())}
-                label="Avg/Day"
-                subValue="messages"
-                color="green"
-              />
-            </div>
+        <div className="grid grid-cols-4 gap-3">
+          <StatCard
+            icon={Calendar}
+            value={getJourneyDays().toString()}
+            label="Journey Days"
+            subValue="since first session"
+            color="yellow"
+          />
+          <StatCard
+            icon={Flame}
+            value={getCurrentStreak().toString()}
+            label="Current Streak"
+            subValue="consecutive days"
+            color="accent"
+          />
+          <StatCard
+            icon={Target}
+            value={getAvgMessagesPerSession().toString()}
+            label="Avg/Session"
+            subValue="messages"
+            color="blue"
+          />
+          <StatCard
+            icon={TrendingUp}
+            value={formatNumber(getAvgMessagesPerDay())}
+            label="Avg/Day"
+            subValue="messages"
+            color="green"
+          />
+        </div>
 
-            {/* Row 3: Token Stats */}
-            <div className="grid grid-cols-4 gap-3">
-              <StatCard
-                icon={Zap}
-                value={formatNumber(getInputTokens())}
-                label="Input Tokens"
-                color="cyan"
-              />
-              <StatCard
-                icon={Zap}
-                value={formatNumber(getOutputTokens())}
-                label="Output Tokens"
-                color="orange"
-              />
-              <StatCard
-                icon={Database}
-                value={formatNumber(getCacheHits())}
-                label="Cache Hits"
-                subValue="tokens saved"
-                color="green"
-              />
-              <StatCard
-                icon={Cpu}
-                value={getModelsUsed().toString()}
-                label="Models Used"
-                color="purple"
-              />
-            </div>
+        <div className="grid grid-cols-4 gap-3">
+          <StatCard
+            icon={Zap}
+            value={formatNumber(getInputTokens())}
+            label="Input Tokens"
+            color="cyan"
+          />
+          <StatCard
+            icon={Zap}
+            value={formatNumber(getOutputTokens())}
+            label="Output Tokens"
+            color="orange"
+          />
+          <StatCard
+            icon={Database}
+            value={formatNumber(getCacheHits())}
+            label="Cache Hits"
+            subValue="tokens saved"
+            color="green"
+          />
+          <StatCard
+            icon={Cpu}
+            value={getModelsUsed().toString()}
+            label="Models Used"
+            color="purple"
+          />
+        </div>
 
-            {/* Row 4: Records */}
-            <div className="grid grid-cols-4 gap-3">
-              <StatCard
-                icon={Trophy}
-                value={formatDuration(stats.longestSession.duration)}
-                label="Longest Session"
-                subValue={`${formatNumber(stats.longestSession.messageCount)} msgs`}
-                color="yellow"
-              />
-              <StatCard
-                icon={Clock}
-                value={getPeakHour()}
-                label="Peak Hour"
-                subValue="most active"
-                color="red"
-              />
-              <StatCard
-                icon={BarChart3}
-                value={formatNumber(getTotalTokens())}
-                label="Total Tokens"
-                color="cyan"
-              />
-              <StatCard
-                icon={Rocket}
-                value={formatShortDate(stats.firstSessionDate)}
-                label="First Session"
-                subValue={new Date(stats.firstSessionDate).getFullYear().toString()}
-                color="blue"
-              />
-            </div>
-          </div>
-        );
+        <div className="grid grid-cols-4 gap-3">
+          <StatCard
+            icon={Trophy}
+            value={formatDuration(stats.longestSession.duration)}
+            label="Longest Session"
+            subValue={`${formatNumber(stats.longestSession.messageCount)} msgs`}
+            color="yellow"
+          />
+          <StatCard
+            icon={Clock}
+            value={getPeakHour()}
+            label="Peak Hour"
+            subValue="most active"
+            color="red"
+          />
+          <StatCard
+            icon={BarChart3}
+            value={formatNumber(getTotalTokens())}
+            label="Total Tokens"
+            color="cyan"
+          />
+          <StatCard
+            icon={Rocket}
+            value={formatShortDate(stats.firstSessionDate)}
+            label="First Session"
+            subValue={new Date(stats.firstSessionDate).getFullYear().toString()}
+            color="blue"
+          />
+        </div>
+      </div>
+    );
+  };
 
-      case "activity":
-        return (
-          <div className="space-y-4">
-            <div className="bg-bg-secondary rounded-lg p-4">
-              <ActivityChart
-                data={getFilteredActivity()}
-                dateRange={dateRange}
-                onDateRangeChange={setDateRange}
-              />
-            </div>
-            <div className="bg-bg-secondary rounded-lg p-4">
-              <h3 className="text-sm font-medium text-text-primary mb-3">
-                Daily Breakdown
-              </h3>
-              <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                {[...getFilteredActivity()].reverse().map((day) => (
-                  <div
-                    key={day.date}
-                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
-                  >
-                    <span className="text-sm text-text-primary">
-                      {formatDate(day.date)}
-                    </span>
-                    <div className="flex gap-4 text-xs text-text-secondary">
-                      <span className="flex items-center gap-1">
-                        <MessageSquare className="w-3 h-3" />
-                        {formatNumber(day.messageCount)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Layers className="w-3 h-3" />
-                        {day.sessionCount}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Wrench className="w-3 h-3" />
-                        {formatNumber(day.toolCallCount)}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
+  const renderActivityContent = () => {
+    if (loading) return renderLoadingState();
+    if (error) return renderErrorState();
+    if (!stats) return null;
 
-      case "models":
-        return (
-          <div className="bg-bg-secondary rounded-lg p-4">
-            <ModelUsageChart modelUsage={stats.modelUsage} />
-          </div>
-        );
-
-      case "sessions":
-        return (
-          <div className="space-y-4">
-            <div className="bg-bg-secondary rounded-lg p-4">
-              <h3 className="text-sm font-medium text-text-primary mb-3">
-                Hourly Distribution
-              </h3>
-              <HourlyHeatmap hourCounts={stats.hourCounts} />
-            </div>
-
-            <div className="bg-bg-secondary rounded-lg p-4">
-              <h3 className="text-sm font-medium text-text-primary mb-3">
-                Session Stats
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b border-border">
-                  <span className="text-sm text-text-secondary">
-                    Total Sessions
+    return (
+      <div className="space-y-4">
+        <div className="bg-bg-secondary rounded-lg p-4">
+          <ActivityChart
+            data={getFilteredActivity()}
+            dateRange={dateRange}
+            onDateRangeChange={setDateRange}
+          />
+        </div>
+        <div className="bg-bg-secondary rounded-lg p-4">
+          <h3 className="text-sm font-medium text-text-primary mb-3">
+            Daily Breakdown
+          </h3>
+          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+            {[...getFilteredActivity()].reverse().map((day) => (
+              <div
+                key={day.date}
+                className="flex items-center justify-between py-2 border-b border-border last:border-0"
+              >
+                <span className="text-sm text-text-primary">
+                  {formatDate(day.date)}
+                </span>
+                <div className="flex gap-4 text-xs text-text-secondary">
+                  <span className="flex items-center gap-1">
+                    <MessageSquare className="w-3 h-3" />
+                    {formatNumber(day.messageCount)}
                   </span>
-                  <span className="text-sm text-text-primary font-medium">
-                    {formatNumber(stats.totalSessions)}
+                  <span className="flex items-center gap-1">
+                    <Layers className="w-3 h-3" />
+                    {day.sessionCount}
                   </span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b border-border">
-                  <span className="text-sm text-text-secondary">
-                    First Session
-                  </span>
-                  <span className="text-sm text-text-primary">
-                    {formatDate(stats.firstSessionDate)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b border-border">
-                  <span className="text-sm text-text-secondary">
-                    Longest Session
-                  </span>
-                  <span className="text-sm text-text-primary">
-                    {formatDuration(stats.longestSession.duration)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-text-secondary">
-                    Longest Session Messages
-                  </span>
-                  <span className="text-sm text-text-primary">
-                    {formatNumber(stats.longestSession.messageCount)}
+                  <span className="flex items-center gap-1">
+                    <Wrench className="w-3 h-3" />
+                    {formatNumber(day.toolCallCount)}
                   </span>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderModelsContent = () => {
+    if (loading) return renderLoadingState();
+    if (error) return renderErrorState();
+    if (!stats) return null;
+
+    return (
+      <div className="bg-bg-secondary rounded-lg p-4">
+        <ModelUsageChart modelUsage={stats.modelUsage} />
+      </div>
+    );
+  };
+
+  const renderSessionsContent = () => {
+    if (loading) return renderLoadingState();
+    if (error) return renderErrorState();
+    if (!stats) return null;
+
+    return (
+      <div className="space-y-4">
+        <div className="bg-bg-secondary rounded-lg p-4">
+          <h3 className="text-sm font-medium text-text-primary mb-3">
+            Hourly Distribution
+          </h3>
+          <HourlyHeatmap hourCounts={stats.hourCounts} />
+        </div>
+
+        <div className="bg-bg-secondary rounded-lg p-4">
+          <h3 className="text-sm font-medium text-text-primary mb-3">
+            Session Stats
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between py-2 border-b border-border">
+              <span className="text-sm text-text-secondary">
+                Total Sessions
+              </span>
+              <span className="text-sm text-text-primary font-medium">
+                {formatNumber(stats.totalSessions)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-border">
+              <span className="text-sm text-text-secondary">
+                First Session
+              </span>
+              <span className="text-sm text-text-primary">
+                {formatDate(stats.firstSessionDate)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b border-border">
+              <span className="text-sm text-text-secondary">
+                Longest Session
+              </span>
+              <span className="text-sm text-text-primary">
+                {formatDuration(stats.longestSession.duration)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-text-secondary">
+                Longest Session Messages
+              </span>
+              <span className="text-sm text-text-primary">
+                {formatNumber(stats.longestSession.messageCount)}
+              </span>
             </div>
           </div>
-        );
-
-      default:
-        return null;
-    }
+        </div>
+      </div>
+    );
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="full" title="Claude Code Stats">
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border">
-          <div className="flex gap-1">
-            {TABS.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
-                    activeTab === tab.id
-                      ? "bg-accent text-black"
-                      : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
+    <Popup isOpen={isOpen} onClose={onClose} size="full">
+      <Popup.Header
+        icon={BarChart3}
+        title="Claude Code Stats"
+        actions={
           <div className="flex items-center gap-2">
             {stats && (
               <span className="text-xs text-text-tertiary">
@@ -508,32 +500,46 @@ export function ClaudeCodeStatsPopup({
               </span>
             )}
             <Tooltip content="Refresh">
-              <IconButton
-                size="sm"
-                onClick={fetchStats}
-                disabled={loading}
-              >
-                <RefreshCw
-                  className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}
-                />
+              <IconButton size="sm" onClick={fetchStats} disabled={loading}>
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               </IconButton>
             </Tooltip>
           </div>
+        }
+      />
+      <HorizontalTabs
+        value={activeTab}
+        onValueChange={(v) => setActiveTab(v as TabId)}
+        defaultValue="overview"
+        className="flex flex-col flex-1 min-h-0"
+      >
+        <div className="flex items-center px-4 py-2 border-b border-border">
+          <HorizontalTabsList>
+            {TABS.map((tab) => (
+              <HorizontalTabsTrigger
+                key={tab.id}
+                value={tab.id}
+                icon={tab.icon}
+                label={tab.label}
+              />
+            ))}
+          </HorizontalTabsList>
         </div>
-
-        <OverlayScrollbarsComponent
-          options={{
-            scrollbars: {
-              theme: "os-theme-light",
-              autoHide: "leave",
-              autoHideDelay: 100,
-            },
-          }}
-          className="flex-1 overflow-auto"
-        >
-          <div className="p-4">{renderContent()}</div>
-        </OverlayScrollbarsComponent>
-      </div>
-    </Modal>
+        <Popup.Content scrollable padding="md" className="flex-1">
+          <HorizontalTabsContent value="overview">
+            {renderOverviewContent()}
+          </HorizontalTabsContent>
+          <HorizontalTabsContent value="activity">
+            {renderActivityContent()}
+          </HorizontalTabsContent>
+          <HorizontalTabsContent value="models">
+            {renderModelsContent()}
+          </HorizontalTabsContent>
+          <HorizontalTabsContent value="sessions">
+            {renderSessionsContent()}
+          </HorizontalTabsContent>
+        </Popup.Content>
+      </HorizontalTabs>
+    </Popup>
   );
 }

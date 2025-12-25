@@ -65,6 +65,7 @@ interface SettingsStore {
   defaultModel: ClaudeModel;
   sidebarWidth: number;
   sidebarPosition: SidebarPosition;
+  sidebarCollapsed: boolean;
   theme: "dark";
   fontSize: number;
   appFont: AppFont;
@@ -96,6 +97,7 @@ interface SettingsStore {
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
   setFontSize: (size: number) => void;
   setAppFont: (font: AppFont) => void;
   setEditorTheme: (theme: EditorTheme) => void;
@@ -131,6 +133,7 @@ export const useSettingsStore = create<SettingsStore>()(
       defaultModel: "claude-sonnet-4-20250514",
       sidebarWidth: 256,
       sidebarPosition: "right",
+      sidebarCollapsed: false,
       theme: "dark",
       fontSize: 14,
       appFont: "jetbrains-mono",
@@ -167,6 +170,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setSidebarPosition: (sidebarPosition: SidebarPosition) => {
         set({ sidebarPosition });
+      },
+
+      setSidebarCollapsed: (sidebarCollapsed: boolean) => {
+        set({ sidebarCollapsed });
       },
 
       setFontSize: (size: number) => {

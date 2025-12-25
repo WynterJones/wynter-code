@@ -1,13 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
-import Editor, { type Monaco } from "@monaco-editor/react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import Editor, { type Monaco, type OnMount } from "@monaco-editor/react";
 import { X, Save, RotateCcw, Minus } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { IconButton, Tooltip, Badge } from "@/components/ui";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { defineMonacoThemes } from "@/hooks/useMonacoTheme";
 
+type MonacoEditor = Parameters<OnMount>[0];
+
 interface FileEditorPopupProps {
   filePath: string;
+  initialLine?: number;
   onClose: () => void;
   onSave?: (content: string) => void;
   onMinimize?: () => void;
@@ -43,13 +46,14 @@ function getLanguageFromPath(path: string): string {
   return languageMap[ext || ""] || "plaintext";
 }
 
-export function FileEditorPopup({ filePath, onClose, onSave, onMinimize }: FileEditorPopupProps) {
+export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMinimize }: FileEditorPopupProps) {
   const [content, setContent] = useState<string>("");
   const [originalContent, setOriginalContent] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const editorRef = useRef<MonacoEditor | null>(null);
 
   const { editorTheme, editorFontSize, editorWordWrap, editorMinimap } =
     useSettingsStore();
@@ -60,6 +64,18 @@ export function FileEditorPopup({ filePath, onClose, onSave, onMinimize }: FileE
   // Define themes BEFORE mount to prevent white flash
   const handleEditorWillMount = (monaco: Monaco) => {
     defineMonacoThemes(monaco);
+  };
+
+  // Store editor ref and scroll to initial line
+  const handleEditorDidMount: OnMount = (editor) => {
+    editorRef.current = editor;
+    if (initialLine && initialLine > 0) {
+      setTimeout(() => {
+        editor.revealLineInCenter(initialLine);
+        editor.setPosition({ lineNumber: initialLine, column: 1 });
+        editor.focus();
+      }, 100);
+    }
   };
 
   useEffect(() => {
@@ -191,6 +207,7 @@ export function FileEditorPopup({ filePath, onClose, onSave, onMinimize }: FileE
               onChange={handleContentChange}
               theme={editorTheme || "github-dark"}
               beforeMount={handleEditorWillMount}
+              onMount={handleEditorDidMount}
               loading={
                 <div className="flex items-center justify-center h-full bg-bg-tertiary text-text-secondary">
                   Loading editor...

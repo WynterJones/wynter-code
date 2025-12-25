@@ -246,7 +246,7 @@ export function SessionTabBar({
     async (e: React.MouseEvent, sessionId: string) => {
       e.stopPropagation();
       try {
-        await claudeService.terminateSession(sessionId);
+        await claudeService.stopSession(sessionId);
         finishStreaming(sessionId);
       } catch (error) {
         console.error("Failed to stop Claude session:", error);

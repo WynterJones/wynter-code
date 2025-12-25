@@ -818,6 +818,7 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
             Some(chunk)
         }
 
+        // Unknown types - return None (debug info already emitted via debug chunk)
         _ => None
     }
 }

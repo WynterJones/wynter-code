@@ -18,6 +18,19 @@ export type { ScrollAreaProps } from "./ScrollArea";
 
 export { Tabs, TabsList, TabsTrigger, TabsContent } from "./Tabs";
 
+export {
+  HorizontalTabs,
+  HorizontalTabsList,
+  HorizontalTabsTrigger,
+  HorizontalTabsContent,
+} from "./HorizontalTabs";
+export type {
+  HorizontalTabsProps,
+  HorizontalTabsListProps,
+  HorizontalTabsTriggerProps,
+  HorizontalTabsContentProps,
+} from "./HorizontalTabs";
+
 export { Tooltip } from "./Tooltip";
 
 export { Modal } from "./Modal";

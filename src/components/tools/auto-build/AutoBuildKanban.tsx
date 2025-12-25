@@ -1,10 +1,12 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Plus, Inbox, Loader2, FlaskConical, CheckCircle2 } from "lucide-react";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { AutoBuildIssueCard } from "./AutoBuildIssueCard";
+import { AutoBuildNewIssuePopup } from "./AutoBuildNewIssuePopup";
 import { cn } from "@/lib/utils";
 import type { BeadsIssue } from "@/types/beads";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import { Tooltip } from "@/components/ui";
 
 interface AutoBuildKanbanProps {
   issues: BeadsIssue[];
@@ -21,6 +23,7 @@ interface KanbanColumn {
 
 export function AutoBuildKanban({ issues }: AutoBuildKanbanProps) {
   const { queue, completed, currentIssueId, currentPhase, addToQueue, getCachedIssue } = useAutoBuildStore();
+  const [showNewIssuePopup, setShowNewIssuePopup] = useState(false);
 
   // Build columns
   const columns = useMemo<KanbanColumn[]>(() => {
@@ -99,51 +102,67 @@ export function AutoBuildKanban({ issues }: AutoBuildKanbanProps) {
   }, [issues, queue, completed]);
 
   return (
-    <div className="flex h-full gap-4">
-      {columns.map((column) => (
-        <div
-          key={column.id}
-          className="flex w-1/4 min-w-[200px] flex-col rounded-lg border border-border bg-bg-secondary"
-        >
-          {/* Column Header */}
-          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-            <div className={cn("rounded p-1", column.color + "/20")}>
-              <span className={column.color.replace("bg-", "text-")}>{column.icon}</span>
-            </div>
-            <span className="font-medium">{column.title}</span>
-            <span className="ml-auto text-sm text-text-secondary">{column.items.length}</span>
-          </div>
-
-          {/* Column Content */}
-          <OverlayScrollbarsComponent
-            className="flex-1"
-            options={{ scrollbars: { autoHide: "scroll" } }}
+    <>
+      <div className="flex h-full gap-4">
+        {columns.map((column) => (
+          <div
+            key={column.id}
+            className="flex w-1/4 min-w-[200px] flex-col rounded-lg border border-border bg-bg-secondary"
           >
-            <div className="flex flex-col gap-2 p-2">
-              {column.items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-text-secondary">
-                  <span>{column.emptyMessage}</span>
-                </div>
-              ) : (
-                column.items.map((issue) => (
-                  <AutoBuildIssueCard
-                    key={issue.id}
-                    issue={issue}
-                    isActive={issue.id === currentIssueId}
-                    columnId={column.id}
-                  />
-                ))
-              )}
-
-              {/* Add button for backlog column */}
-              {column.id === "backlog" && availableIssues.length > 0 && (
-                <AddIssueDropdown issues={availableIssues} onAdd={addToQueue} />
+            {/* Column Header */}
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+              <div className={cn("rounded p-1", column.color + "/20")}>
+                <span className={column.color.replace("bg-", "text-")}>{column.icon}</span>
+              </div>
+              <span className="font-medium">{column.title}</span>
+              <span className="ml-auto text-sm text-text-secondary">{column.items.length}</span>
+              {column.id === "backlog" && (
+                <Tooltip content="Create new issue">
+                  <button
+                    onClick={() => setShowNewIssuePopup(true)}
+                    className="ml-1 rounded p-1 text-text-secondary transition-colors hover:bg-accent/20 hover:text-accent"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </Tooltip>
               )}
             </div>
-          </OverlayScrollbarsComponent>
-        </div>
-      ))}
-    </div>
+
+            {/* Column Content */}
+            <OverlayScrollbarsComponent
+              className="flex-1"
+              options={{ scrollbars: { autoHide: "scroll" } }}
+            >
+              <div className="flex flex-col gap-2 p-2">
+                {column.items.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-text-secondary">
+                    <span>{column.emptyMessage}</span>
+                  </div>
+                ) : (
+                  column.items.map((issue) => (
+                    <AutoBuildIssueCard
+                      key={issue.id}
+                      issue={issue}
+                      isActive={issue.id === currentIssueId}
+                      columnId={column.id}
+                    />
+                  ))
+                )}
+
+                {/* Add button for backlog column */}
+                {column.id === "backlog" && availableIssues.length > 0 && (
+                  <AddIssueDropdown issues={availableIssues} onAdd={addToQueue} />
+                )}
+              </div>
+            </OverlayScrollbarsComponent>
+          </div>
+        ))}
+      </div>
+
+      {showNewIssuePopup && (
+        <AutoBuildNewIssuePopup onClose={() => setShowNewIssuePopup(false)} />
+      )}
+    </>
   );
 }
 

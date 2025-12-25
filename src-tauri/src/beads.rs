@@ -138,9 +138,10 @@ pub async fn beads_create(
     title: String,
     issue_type: String,
     priority: u8,
+    description: Option<String>,
 ) -> Result<String, String> {
     let priority_str = priority.to_string();
-    let args = vec![
+    let mut args = vec![
         "create",
         &title,
         "-t",
@@ -148,6 +149,15 @@ pub async fn beads_create(
         "-p",
         &priority_str,
     ];
+
+    let desc_owned;
+    if let Some(ref d) = description {
+        if !d.trim().is_empty() {
+            desc_owned = d.clone();
+            args.push("-d");
+            args.push(&desc_owned);
+        }
+    }
 
     let output = run_bd_command(&project_path, &args)?;
 

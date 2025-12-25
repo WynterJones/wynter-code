@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { GripHorizontal, FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns } from "lucide-react";
+import { GripHorizontal, FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns, Play, Square, Loader2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
@@ -14,6 +14,7 @@ import { PanelLayoutContainer } from "@/components/panels";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { claudeService } from "@/services/claude";
 import { cn } from "@/lib/utils";
 import type { Project, PermissionMode } from "@/types";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
@@ -30,17 +31,41 @@ const MAX_ACTIVITY_HEIGHT = 400;
 const DEFAULT_ACTIVITY_HEIGHT = 180;
 
 export function MainContent({ project, pendingImage, onImageConsumed, onRequestImageBrowser }: MainContentProps) {
-  const { activeSessionId, getSessionsForProject, getMessages, getStreamingState, updateToolCallStatus, updateSessionPermissionMode } =
-    useSessionStore();
+  const {
+    activeSessionId,
+    getSessionsForProject,
+    getMessages,
+    getStreamingState,
+    updateToolCallStatus,
+    updateSessionPermissionMode,
+    getClaudeSessionState,
+    setClaudeSessionStarting,
+    setClaudeSessionReady,
+    setClaudeSessionEnded,
+    appendStreamingText,
+    appendThinkingText,
+    setThinking,
+    addPendingToolCall,
+    appendToolInput,
+    updateStats,
+    finishStreaming,
+    startStreaming,
+    updateClaudeSessionId,
+    getSession,
+  } = useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
-  const { useMultiPanelLayout, setUseMultiPanelLayout } = useSettingsStore();
+  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition } = useSettingsStore();
 
   const sessions = getSessionsForProject(project.id);
   const currentSessionId = activeSessionId.get(project.id);
   const currentSession = sessions.find((s) => s.id === currentSessionId);
+  const terminalSessions = sessions.filter((s) => s.type === "terminal");
 
   const messages = currentSessionId ? getMessages(currentSessionId) : [];
   const streamingState = currentSessionId ? getStreamingState(currentSessionId) : null;
+  const claudeSessionState = currentSessionId ? getClaudeSessionState(currentSessionId) : undefined;
+  const isSessionActive = claudeSessionState?.status === "ready";
+  const isSessionStarting = claudeSessionState?.status === "starting";
 
   const [activityHeight, setActivityHeight] = useState(DEFAULT_ACTIVITY_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
@@ -51,22 +76,162 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     ...(streamingState?.pendingToolCalls || []),
   ];
 
+  // Start a persistent Claude session
+  const handleStartSession = useCallback(async () => {
+    if (!currentSessionId) return;
+
+    const session = getSession(currentSessionId);
+    const permissionMode = session?.permissionMode || "default";
+    const resumeSessionId = session?.claudeSessionId || undefined;
+
+    setClaudeSessionStarting(currentSessionId);
+
+    try {
+      await claudeService.startSession(
+        project.path,
+        currentSessionId,
+        {
+          onSessionStarting: () => {
+            console.log("[MainContent] Session starting...");
+          },
+          onSessionReady: (info) => {
+            console.log("[MainContent] Session ready:", info);
+            setClaudeSessionReady(currentSessionId, info);
+            if (info.claudeSessionId) {
+              updateClaudeSessionId(currentSessionId, info.claudeSessionId);
+            }
+          },
+          onSessionEnded: (reason) => {
+            console.log("[MainContent] Session ended:", reason);
+            setClaudeSessionEnded(currentSessionId);
+            finishStreaming(currentSessionId);
+          },
+          onText: (text) => {
+            appendStreamingText(currentSessionId, text);
+          },
+          onThinking: (text) => {
+            appendThinkingText(currentSessionId, text);
+          },
+          onThinkingStart: () => {
+            setThinking(currentSessionId, true);
+          },
+          onThinkingEnd: () => {
+            setThinking(currentSessionId, false);
+          },
+          onToolStart: (toolName, toolId) => {
+            addPendingToolCall(currentSessionId, {
+              id: toolId,
+              name: toolName,
+              input: {},
+              status: "running",
+            });
+          },
+          onToolInputDelta: (toolId, partialJson) => {
+            appendToolInput(currentSessionId, toolId, partialJson);
+          },
+          onToolEnd: () => {},
+          onToolResult: (toolId, content) => {
+            updateToolCallStatus(currentSessionId, toolId, "completed", content);
+          },
+          onInit: (model, _cwd, claudeSessionId) => {
+            updateStats(currentSessionId, { model });
+            if (claudeSessionId) {
+              updateClaudeSessionId(currentSessionId, claudeSessionId);
+            }
+          },
+          onUsage: (stats) => {
+            updateStats(currentSessionId, stats);
+          },
+          onResult: () => {
+            finishStreaming(currentSessionId);
+          },
+          onError: (error) => {
+            console.error("[MainContent] Error:", error);
+            appendStreamingText(currentSessionId, `\nError: ${error}`);
+          },
+        },
+        permissionMode,
+        resumeSessionId
+      );
+    } catch (error) {
+      console.error("[MainContent] Failed to start session:", error);
+      setClaudeSessionEnded(currentSessionId);
+    }
+  }, [
+    currentSessionId,
+    project.path,
+    getSession,
+    setClaudeSessionStarting,
+    setClaudeSessionReady,
+    setClaudeSessionEnded,
+    updateClaudeSessionId,
+    appendStreamingText,
+    appendThinkingText,
+    setThinking,
+    addPendingToolCall,
+    appendToolInput,
+    updateToolCallStatus,
+    updateStats,
+    finishStreaming,
+  ]);
+
+  // Stop the Claude session
+  const handleStopSession = useCallback(async () => {
+    if (!currentSessionId) return;
+    try {
+      await claudeService.stopSession(currentSessionId);
+      setClaudeSessionEnded(currentSessionId);
+      finishStreaming(currentSessionId);
+    } catch (error) {
+      console.error("[MainContent] Failed to stop session:", error);
+    }
+  }, [currentSessionId, setClaudeSessionEnded, finishStreaming]);
+
+  // Send prompt to active session
+  const handleSendPrompt = useCallback(
+    async (prompt: string) => {
+      if (!currentSessionId || !isSessionActive) return;
+
+      startStreaming(currentSessionId);
+
+      try {
+        await claudeService.sendPrompt(currentSessionId, prompt);
+      } catch (error) {
+        console.error("[MainContent] Failed to send prompt:", error);
+        appendStreamingText(currentSessionId, `\nError: ${error}`);
+        finishStreaming(currentSessionId);
+      }
+    },
+    [currentSessionId, isSessionActive, startStreaming, appendStreamingText, finishStreaming]
+  );
+
+  // Handle tool approval - send "y" to Claude stdin
   const handleApprove = useCallback(
-    (toolId: string) => {
+    async (toolId: string) => {
       if (currentSessionId) {
         updateToolCallStatus(currentSessionId, toolId, "running");
-        setTimeout(() => {
-          updateToolCallStatus(currentSessionId, toolId, "completed", "Tool executed successfully");
-        }, 1000);
+        try {
+          await claudeService.sendInput(currentSessionId, "y\n");
+        } catch (error) {
+          console.error("Failed to send approval:", error);
+          updateToolCallStatus(currentSessionId, toolId, "error", "Failed to send approval");
+        }
       }
     },
     [currentSessionId, updateToolCallStatus]
   );
 
+  // Handle tool rejection - send "n" to Claude stdin
   const handleReject = useCallback(
-    (toolId: string) => {
+    async (toolId: string) => {
       if (currentSessionId) {
-        updateToolCallStatus(currentSessionId, toolId, "error", "Tool execution rejected by user");
+        try {
+          await claudeService.sendInput(currentSessionId, "n\n");
+          updateToolCallStatus(currentSessionId, toolId, "error", "Tool execution rejected by user");
+        } catch (error) {
+          console.error("Failed to send rejection:", error);
+          updateToolCallStatus(currentSessionId, toolId, "error", "Failed to send rejection");
+        }
       }
     },
     [currentSessionId, updateToolCallStatus]
@@ -104,23 +269,21 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const isStreaming = streamingState?.isStreaming || false;
   const isTerminalSession = currentSession?.type === "terminal";
 
-  const handleTerminalPtyCreated = async (ptyId: string) => {
-    if (currentSessionId) {
-      setSessionPtyId(currentSessionId, ptyId);
+  const handleTerminalPtyCreated = async (sessionId: string, ptyId: string) => {
+    setSessionPtyId(sessionId, ptyId);
 
-      // Check for queued commands and execute them
-      const queuedCommand = getQueuedCommand(currentSessionId);
-      if (queuedCommand) {
-        // Small delay to ensure terminal is ready
-        setTimeout(async () => {
-          try {
-            await invoke("write_pty", { ptyId, data: queuedCommand + "\n" });
-          } catch (err) {
-            console.error("Failed to execute queued command:", err);
-          }
-          clearQueuedCommand(currentSessionId);
-        }, 100);
-      }
+    // Check for queued commands and execute them
+    const queuedCommand = getQueuedCommand(sessionId);
+    if (queuedCommand) {
+      // Small delay to ensure terminal is ready
+      setTimeout(async () => {
+        try {
+          await invoke("write_pty", { ptyId, data: queuedCommand + "\n" });
+        } catch (err) {
+          console.error("Failed to execute queued command:", err);
+        }
+        clearQueuedCommand(sessionId);
+      }, 100);
     }
   };
 
@@ -133,11 +296,18 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       <div className="h-[45px] px-4 flex items-center justify-between border-b border-border bg-bg-secondary" data-tauri-drag-region>
-        <div className="flex items-center gap-2 text-sm text-text-secondary" data-tauri-drag-region>
+        <div
+          className="flex items-center gap-2 text-sm text-text-secondary transition-[padding] duration-200"
+          data-tauri-drag-region
+          style={{ paddingLeft: sidebarCollapsed && sidebarPosition === "left" ? 28 : 0 }}
+        >
           <FolderOpen className="w-4 h-4 text-text-secondary flex-shrink-0" data-tauri-drag-region />
           <span className="font-mono truncate" data-tauri-drag-region>{project.path}</span>
         </div>
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2 transition-[padding] duration-200"
+          style={{ paddingRight: sidebarCollapsed && sidebarPosition === "right" ? 28 : 0 }}
+        >
           <ModelSelector />
           {currentSession && (
             <PermissionModeToggle
@@ -171,26 +341,41 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         </div>
       </div>
 
-      {/* Multi-panel layout mode */}
-      {useMultiPanelLayout && !isTerminalSession ? (
-        <PanelLayoutContainer projectId={project.id} projectPath={project.path} />
-      ) : isTerminalSession && currentSessionId ? (
-        <div className="flex-1 overflow-hidden">
+      {/* Persistent Terminal Sessions - always mounted, hidden when not active */}
+      {terminalSessions.map((session) => (
+        <div
+          key={session.id}
+          className={cn(
+            "flex-1 overflow-hidden",
+            currentSessionId !== session.id && "hidden"
+          )}
+        >
           <Terminal
-            key={currentSessionId}
             projectPath={project.path}
-            ptyId={getSessionPtyId(currentSessionId)}
-            onPtyCreated={handleTerminalPtyCreated}
+            ptyId={getSessionPtyId(session.id)}
+            onPtyCreated={(ptyId) => handleTerminalPtyCreated(session.id, ptyId)}
+            isVisible={currentSessionId === session.id}
           />
         </div>
-      ) : !currentSessionId ? (
+      ))}
+
+      {/* Multi-panel layout mode */}
+      {useMultiPanelLayout && !isTerminalSession && (
+        <PanelLayoutContainer projectId={project.id} projectPath={project.path} />
+      )}
+
+      {/* Empty state */}
+      {!currentSessionId && (
         <div className="flex-1 flex items-center justify-center text-text-secondary blueprint-grid">
           <div className="text-center opacity-60">
             <p className="text-sm">No session selected</p>
             <p className="text-xs mt-1">Select or create a session to get started</p>
           </div>
         </div>
-      ) : (
+      )}
+
+      {/* Claude session content */}
+      {currentSessionId && !isTerminalSession && !useMultiPanelLayout && (
         <>
           <div className="px-4 pt-3">
             <EnhancedPromptInput

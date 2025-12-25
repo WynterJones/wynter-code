@@ -4,6 +4,14 @@ import { v4 as uuid } from "uuid";
 import type { Session, Message, ClaudeModel, ToolCall, StreamingStats, PermissionMode, SessionType } from "@/types";
 import type { PendingQuestion } from "@/components/output/AskUserQuestionBlock";
 
+export interface ClaudeSessionInfo {
+  model?: string;
+  claudeSessionId?: string;
+  tools?: string[];
+  cwd?: string;
+  status: "starting" | "ready" | "ended";
+}
+
 interface StreamingState {
   isStreaming: boolean;
   streamingText: string;
@@ -18,6 +26,7 @@ interface SessionStore {
   activeSessionId: Map<string, string>;
   messages: Map<string, Message[]>;
   streamingState: Map<string, StreamingState>;
+  claudeSessionState: Map<string, ClaudeSessionInfo>;
 
   createSession: (projectId: string, type?: SessionType, model?: ClaudeModel) => string;
   removeSession: (projectId: string, sessionId: string) => void;
@@ -62,6 +71,14 @@ interface SessionStore {
   finishStreaming: (sessionId: string) => void;
   getStreamingState: (sessionId: string) => StreamingState;
   setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => void;
+
+  // Claude session state (persistent CLI session)
+  setClaudeSessionStarting: (sessionId: string) => void;
+  setClaudeSessionReady: (sessionId: string, info: Partial<ClaudeSessionInfo>) => void;
+  setClaudeSessionEnded: (sessionId: string) => void;
+  getClaudeSessionState: (sessionId: string) => ClaudeSessionInfo | undefined;
+  isClaudeSessionActive: (sessionId: string) => boolean;
+
   reset: () => void;
 }
 
@@ -90,6 +107,7 @@ export const useSessionStore = create<SessionStore>()(
       activeSessionId: new Map(),
       messages: new Map(),
       streamingState: new Map(),
+      claudeSessionState: new Map(),
 
       createSession: (
         projectId: string,
@@ -489,12 +507,52 @@ export const useSessionStore = create<SessionStore>()(
         });
       },
 
+      // Claude session state methods
+      setClaudeSessionStarting: (sessionId: string) => {
+        set((state) => {
+          const newClaudeSessionState = new Map(state.claudeSessionState);
+          newClaudeSessionState.set(sessionId, { status: "starting" });
+          return { claudeSessionState: newClaudeSessionState };
+        });
+      },
+
+      setClaudeSessionReady: (sessionId: string, info: Partial<ClaudeSessionInfo>) => {
+        set((state) => {
+          const newClaudeSessionState = new Map(state.claudeSessionState);
+          const current = newClaudeSessionState.get(sessionId) || { status: "starting" as const };
+          newClaudeSessionState.set(sessionId, {
+            ...current,
+            ...info,
+            status: "ready",
+          });
+          return { claudeSessionState: newClaudeSessionState };
+        });
+      },
+
+      setClaudeSessionEnded: (sessionId: string) => {
+        set((state) => {
+          const newClaudeSessionState = new Map(state.claudeSessionState);
+          newClaudeSessionState.delete(sessionId);
+          return { claudeSessionState: newClaudeSessionState };
+        });
+      },
+
+      getClaudeSessionState: (sessionId: string) => {
+        return get().claudeSessionState.get(sessionId);
+      },
+
+      isClaudeSessionActive: (sessionId: string) => {
+        const state = get().claudeSessionState.get(sessionId);
+        return state?.status === "ready";
+      },
+
       reset: () => {
         set({
           sessions: new Map(),
           activeSessionId: new Map(),
           messages: new Map(),
           streamingState: new Map(),
+          claudeSessionState: new Map(),
         });
       },
     }),

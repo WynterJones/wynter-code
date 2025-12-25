@@ -13,7 +13,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useSessionStore } from "@/stores/sessionStore";
-import { claudeService } from "@/services/claude";
 import { FocusOverlay } from "./FocusOverlay";
 import { ImageThumbnails, type ImageAttachment } from "./ImageThumbnail";
 import { FileTagBadges, type FileReference } from "./FileTagBadge";
@@ -61,6 +60,9 @@ interface EnhancedPromptInputProps {
   pendingImage?: ImageAttachment | null;
   onImageConsumed?: () => void;
   onRequestImageBrowser?: () => void;
+  onSendPrompt?: (prompt: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
 }
 
 export function EnhancedPromptInput({
@@ -70,6 +72,9 @@ export function EnhancedPromptInput({
   pendingImage,
   onImageConsumed,
   onRequestImageBrowser,
+  onSendPrompt,
+  disabled = false,
+  placeholder = "Type a prompt... (@ to add files, paste images)",
 }: EnhancedPromptInputProps) {
   const [prompt, setPrompt] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -91,17 +96,9 @@ export function EnhancedPromptInput({
     createSession,
     startStreaming,
     appendStreamingText,
-    appendThinkingText,
-    setThinking,
-    setCurrentTool,
-    updateStats,
-    addPendingToolCall,
-    updateToolCallStatus,
-    appendToolInput,
     finishStreaming,
     getStreamingState,
     getSession,
-    updateClaudeSessionId,
   } = useSessionStore();
 
   const streamingState = sessionId ? getStreamingState(sessionId) : null;
@@ -320,27 +317,16 @@ export function EnhancedPromptInput({
   const handleSubmit = async () => {
     if (
       (!prompt.trim() && images.length === 0 && files.length === 0) ||
-      isStreaming
+      isStreaming ||
+      disabled
     )
       return;
-
-    let currentSessionId = sessionId;
-
-    if (!currentSessionId) {
-      currentSessionId = createSession(
-        projectPath.split("/").pop() || "project",
-      );
-    }
 
     const userMessage = prompt.trim();
     const currentImages = [...images];
     const currentFiles = [...files];
-    setPrompt("");
-    setImages([]);
-    setFiles([]);
-    setIsFocused(false);
 
-    // Build full prompt with attachments for CLI
+    // Build full prompt with attachments
     let fullPrompt = userMessage;
 
     // Add file references as @ paths (Claude CLI reads these natively)
@@ -355,6 +341,44 @@ export function EnhancedPromptInput({
       fullPrompt = `${imageRefs}\n\n${fullPrompt}`;
     }
 
+    // If we have a custom send handler, use that (persistent session mode)
+    if (onSendPrompt) {
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        currentSessionId = createSession(projectPath.split("/").pop() || "project");
+      }
+
+      // Add user message to history
+      addMessage(currentSessionId, {
+        sessionId: currentSessionId,
+        role: "user",
+        content: userMessage,
+      });
+
+      setPrompt("");
+      setImages([]);
+      setFiles([]);
+      setIsFocused(false);
+
+      // Delegate to external handler
+      onSendPrompt(fullPrompt);
+      return;
+    }
+
+    // Legacy mode: start a new streaming session per prompt
+    let currentSessionId = sessionId;
+
+    if (!currentSessionId) {
+      currentSessionId = createSession(
+        projectPath.split("/").pop() || "project",
+      );
+    }
+
+    setPrompt("");
+    setImages([]);
+    setFiles([]);
+    setIsFocused(false);
+
     addMessage(currentSessionId, {
       sessionId: currentSessionId,
       role: "user",
@@ -368,74 +392,18 @@ export function EnhancedPromptInput({
     const permissionMode = session?.permissionMode || "default";
 
     try {
-      await claudeService.startStreaming(
-        fullPrompt,
+      console.log("[EnhancedPromptInput] Legacy mode - Starting streaming:", {
+        prompt: fullPrompt.substring(0, 100) + "...",
         projectPath,
-        currentSessionId,
-        {
-          onInit: (model, _cwd, newClaudeSessionId) => {
-            updateStats(currentSessionId!, { model });
-            if (newClaudeSessionId) {
-              updateClaudeSessionId(currentSessionId!, newClaudeSessionId);
-            }
-          },
-          onText: (text) => {
-            appendStreamingText(currentSessionId!, text);
-          },
-          onThinking: (text) => {
-            appendThinkingText(currentSessionId!, text);
-          },
-          onThinkingStart: () => {
-            setThinking(currentSessionId!, true);
-          },
-          onThinkingEnd: () => {
-            setThinking(currentSessionId!, false);
-          },
-          onToolStart: (toolName, toolId) => {
-            setCurrentTool(currentSessionId!, toolName);
-            addPendingToolCall(currentSessionId!, {
-              id: toolId,
-              name: toolName,
-              input: {},
-              status: "running",
-            });
-          },
-          onToolInputDelta: (toolId, partialJson) => {
-            appendToolInput(currentSessionId!, toolId, partialJson);
-          },
-          onToolEnd: () => {
-            setCurrentTool(currentSessionId!, undefined);
-          },
-          onToolResult: (toolId, content) => {
-            updateToolCallStatus(
-              currentSessionId!,
-              toolId,
-              "completed",
-              content,
-            );
-            setCurrentTool(currentSessionId!, undefined);
-          },
-          onUsage: (stats) => {
-            updateStats(currentSessionId!, stats);
-          },
-          onResult: () => {},
-          onError: (error) => {
-            appendStreamingText(currentSessionId!, `\n\nError: ${error}`);
-          },
-          onDone: (exitCode, newClaudeSessionId, finalStats) => {
-            console.log("Claude streaming completed with exit code:", exitCode);
-            if (newClaudeSessionId) {
-              updateClaudeSessionId(currentSessionId!, newClaudeSessionId);
-            }
-            if (finalStats) {
-              updateStats(currentSessionId!, finalStats);
-            }
-            finishStreaming(currentSessionId!);
-          },
-        },
+        sessionId: currentSessionId,
         claudeSessionId,
         permissionMode,
-      );
+      });
+
+      // This uses the old per-prompt streaming approach
+      // In persistent session mode, this branch is not used
+      appendStreamingText(currentSessionId, "Note: Legacy per-prompt mode. Consider using persistent session.\n\n");
+      finishStreaming(currentSessionId);
     } catch (error) {
       console.error("Error starting streaming:", error);
       appendStreamingText(
@@ -447,7 +415,8 @@ export function EnhancedPromptInput({
   };
 
   const handleStop = () => {
-    claudeService.stopStreaming();
+    // In persistent session mode, stopping is handled by ClaudeOutputPanel
+    // This is just for legacy mode cleanup
     if (sessionId) {
       finishStreaming(sessionId);
     }
@@ -521,8 +490,8 @@ export function EnhancedPromptInput({
               onKeyDown={handleKeyDown}
               onFocus={handleFocus}
               onPaste={handlePaste}
-              placeholder="Type a prompt... (@ to add files, paste images)"
-              disabled={isStreaming}
+              placeholder={placeholder}
+              disabled={isStreaming || disabled}
               className={cn(
                 "flex-1 bg-transparent text-text-primary placeholder:text-text-secondary",
                 "font-mono resize-none outline-none",

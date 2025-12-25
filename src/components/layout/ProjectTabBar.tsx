@@ -78,6 +78,8 @@ import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useStorybookDetection } from "@/hooks/useStorybookDetection";
+import { useJustfileDetection } from "@/hooks/useJustfileDetection";
+import { JustCommandManagerPopup } from "@/components/tools/just-command-manager";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { WorkspaceSelectorPopup } from "@/components/workspaces";
 import type { Project } from "@/types";
@@ -400,9 +402,11 @@ export function ProjectTabBar({
   const [showNetlifyFtp, setShowNetlifyFtp] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showProjectSearch, setShowProjectSearch] = useState(false);
+  const [showJustCommandManager, setShowJustCommandManager] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
+  const { hasJustfile } = useJustfileDetection();
 
   const activeProject = activeProjectId
     ? getProject(activeProjectId)
@@ -850,7 +854,9 @@ export function ProjectTabBar({
           onOpenFileFinder={handleBrowseFiles}
           onOpenSubscriptions={() => onOpenSubscriptions?.()}
           onOpenFarmwork={() => setShowFarmworkTycoon(true)}
+          onOpenJustCommandManager={() => setShowJustCommandManager(true)}
           hasStorybook={hasStorybook}
+          hasJustfile={hasJustfile}
         />
       </div>
 
@@ -1169,6 +1175,20 @@ export function ProjectTabBar({
       <ProjectSearchPopup
         isOpen={showProjectSearch}
         onClose={() => setShowProjectSearch(false)}
+        onOpenFile={(path, line) => {
+          setShowProjectSearch(false);
+          window.dispatchEvent(
+            new CustomEvent("open-file-at-line", {
+              detail: { path, line },
+            })
+          );
+        }}
+      />
+
+      {/* Just Command Manager */}
+      <JustCommandManagerPopup
+        isOpen={showJustCommandManager}
+        onClose={() => setShowJustCommandManager(false)}
       />
 
       {/* Farmwork Mini Player - persists even when popup is closed */}

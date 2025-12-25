@@ -83,11 +83,13 @@ export interface ToolDefinition {
   icon: LucideIcon;
   actionKey: string;
   category:
-    | "code-testing"
+    | "code"
+    | "testing"
     | "project"
     | "local-system"
     | "production"
-    | "media-design"
+    | "design"
+    | "recording"
     | "web-tools"
     | "productivity"
     | "utilities";
@@ -120,7 +122,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Query SQLite, Postgres, MySQL",
     icon: Database,
     actionKey: "openDatabaseViewer",
-    category: "code-testing",
+    category: "code",
     hiddenInDropdown: true,
   },
   {
@@ -178,22 +180,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     hiddenInDropdown: true,
   },
 
-  // === CODE & TESTING ===
+  // === CODE ===
   {
     id: "live-preview",
     name: "Live Preview",
     description: "Preview in browser",
     icon: Play,
     actionKey: "openLivePreview",
-    category: "code-testing",
-  },
-  {
-    id: "test-runner",
-    name: "Test Runner",
-    description: "Run and view test results",
-    icon: FlaskConical,
-    actionKey: "openTestRunner",
-    category: "code-testing",
+    category: "code",
   },
   {
     id: "storybook-viewer",
@@ -201,15 +195,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Browse Storybook components",
     icon: BookOpen,
     actionKey: "openStorybookViewer",
-    category: "code-testing",
-  },
-  {
-    id: "api-tester",
-    name: "API Tester",
-    description: "Test HTTP APIs",
-    icon: Send,
-    actionKey: "openApiTester",
-    category: "code-testing",
+    category: "code",
   },
   {
     id: "claude-code-stats",
@@ -217,7 +203,25 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "CLI usage analytics",
     icon: BarChart3,
     actionKey: "openClaudeCodeStats",
-    category: "code-testing",
+    category: "code",
+  },
+
+  // === TESTING ===
+  {
+    id: "test-runner",
+    name: "Test Runner",
+    description: "Run and view test results",
+    icon: FlaskConical,
+    actionKey: "openTestRunner",
+    category: "testing",
+  },
+  {
+    id: "api-tester",
+    name: "API Tester",
+    description: "Test HTTP APIs",
+    icon: Send,
+    actionKey: "openApiTester",
+    category: "testing",
   },
 
   // === PROJECT ===
@@ -283,14 +287,24 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     category: "production",
   },
 
-  // === MEDIA & DESIGN ===
+  // === DESIGN ===
+  {
+    id: "favicon-generator",
+    name: "Favicon Generator",
+    description: "Generate favicons",
+    icon: Image,
+    actionKey: "openFaviconGenerator",
+    category: "design",
+  },
+
+  // === RECORDING ===
   {
     id: "floating-webcam",
     name: "Floating Webcam",
     description: "Webcam with AI effects",
     icon: Video,
     actionKey: "openFloatingWebcam",
-    category: "media-design",
+    category: "recording",
   },
   {
     id: "screen-studio",
@@ -298,7 +312,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Cinematic screen recorder",
     icon: MonitorPlay,
     actionKey: "openScreenStudio",
-    category: "media-design",
+    category: "recording",
   },
   {
     id: "gif-recorder",
@@ -306,15 +320,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Record screen as GIF",
     icon: Image,
     actionKey: "openGifRecorder",
-    category: "media-design",
-  },
-  {
-    id: "favicon-generator",
-    name: "Favicon Generator",
-    description: "Generate favicons",
-    icon: Image,
-    actionKey: "openFaviconGenerator",
-    category: "media-design",
+    category: "recording",
   },
 
   // === TOOLKITS ===
@@ -387,6 +393,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openNodeModulesCleaner",
     category: "utilities",
   },
+  {
+    id: "just-command-manager",
+    name: "Just Command Manager",
+    description: "Manage justfile recipes",
+    icon: Play,
+    actionKey: "openJustCommandManager",
+    category: "utilities",
+  },
 
   // === DEV TOOLKIT MINI-TOOLS ===
   { id: "dt-json-formatter", name: "JSON Formatter", description: "Format & validate JSON", icon: Braces, actionKey: "openDevToolkit", category: "web-tools", hiddenInDropdown: true, parentActionKey: "openDevToolkit", subToolId: "json-formatter", group: "Developer Tools" },
@@ -454,11 +468,13 @@ interface Tool {
   icon: React.ReactNode;
   onClick: () => void;
   category:
-    | "code-testing"
+    | "code"
+    | "testing"
     | "project"
     | "local-system"
     | "production"
-    | "media-design"
+    | "design"
+    | "recording"
     | "web-tools"
     | "productivity"
     | "utilities";
@@ -502,7 +518,9 @@ interface ToolsDropdownProps {
   onOpenFileFinder: () => void;
   onOpenSubscriptions: () => void;
   onOpenFarmwork: () => void;
+  onOpenJustCommandManager: () => void;
   hasStorybook?: boolean;
+  hasJustfile?: boolean;
 }
 
 export function ToolsDropdown({
@@ -535,11 +553,14 @@ export function ToolsDropdown({
   onOpenFileFinder,
   onOpenSubscriptions,
   onOpenFarmwork,
+  onOpenJustCommandManager,
   hasStorybook = false,
+  hasJustfile = false,
 }: ToolsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem("tools-dropdown-collapsed");
@@ -551,6 +572,7 @@ export function ToolsDropdown({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const toolButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
   // Persist collapsed state to localStorage
   useEffect(() => {
@@ -580,7 +602,7 @@ export function ToolsDropdown({
       name: "Database Viewer",
       description: "Query SQLite, Postgres, MySQL",
       icon: <Database className="w-4 h-4" />,
-      category: "code-testing",
+      category: "code",
       hiddenInDropdown: true,
       onClick: () => {
         onOpenDatabaseViewer();
@@ -668,26 +690,15 @@ export function ToolsDropdown({
       },
     },
 
-    // === CODE & TESTING ===
+    // === CODE ===
     {
       id: "live-preview",
       name: "Live Preview",
       description: "Preview in browser",
       icon: <Play className="w-4 h-4" />,
-      category: "code-testing",
+      category: "code",
       onClick: () => {
         onOpenLivePreview();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "test-runner",
-      name: "Test Runner",
-      description: "Run and view test results",
-      icon: <FlaskConical className="w-4 h-4" />,
-      category: "code-testing",
-      onClick: () => {
-        onOpenTestRunner();
         setIsOpen(false);
       },
     },
@@ -698,7 +709,7 @@ export function ToolsDropdown({
         ? "Browse Storybook components"
         : "Storybook not detected",
       icon: <BookOpen className="w-4 h-4" />,
-      category: "code-testing",
+      category: "code",
       onClick: () => {
         if (!hasStorybook) return;
         onOpenStorybookViewer();
@@ -707,24 +718,37 @@ export function ToolsDropdown({
       disabled: !hasStorybook,
     },
     {
-      id: "api-tester",
-      name: "API Tester",
-      description: "Test HTTP APIs",
-      icon: <Send className="w-4 h-4" />,
-      category: "code-testing",
-      onClick: () => {
-        onOpenApiTester();
-        setIsOpen(false);
-      },
-    },
-    {
       id: "claude-code-stats",
       name: "Claude Code Stats",
       description: "CLI usage analytics",
       icon: <BarChart3 className="w-4 h-4" />,
-      category: "code-testing",
+      category: "code",
       onClick: () => {
         onOpenClaudeCodeStats();
+        setIsOpen(false);
+      },
+    },
+
+    // === TESTING ===
+    {
+      id: "test-runner",
+      name: "Test Runner",
+      description: "Run and view test results",
+      icon: <FlaskConical className="w-4 h-4" />,
+      category: "testing",
+      onClick: () => {
+        onOpenTestRunner();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "api-tester",
+      name: "API Tester",
+      description: "Test HTTP APIs",
+      icon: <Send className="w-4 h-4" />,
+      category: "testing",
+      onClick: () => {
+        onOpenApiTester();
         setIsOpen(false);
       },
     },
@@ -817,13 +841,26 @@ export function ToolsDropdown({
       },
     },
 
-    // === MEDIA & DESIGN ===
+    // === DESIGN ===
+    {
+      id: "favicon-generator",
+      name: "Favicon Generator",
+      description: "Generate favicons",
+      icon: <Image className="w-4 h-4" />,
+      category: "design",
+      onClick: () => {
+        onOpenFaviconGenerator();
+        setIsOpen(false);
+      },
+    },
+
+    // === RECORDING ===
     {
       id: "floating-webcam",
       name: "Floating Webcam",
       description: "Webcam with AI effects",
       icon: <Video className="w-4 h-4" />,
-      category: "media-design",
+      category: "recording",
       onClick: () => {
         onOpenFloatingWebcam();
         setIsOpen(false);
@@ -834,7 +871,7 @@ export function ToolsDropdown({
       name: "Screen Studio",
       description: "Cinematic screen recorder",
       icon: <MonitorPlay className="w-4 h-4" />,
-      category: "media-design",
+      category: "recording",
       onClick: () => {
         onOpenScreenStudio();
         setIsOpen(false);
@@ -845,20 +882,9 @@ export function ToolsDropdown({
       name: "GIF Screen Recorder",
       description: "Record screen as GIF",
       icon: <Image className="w-4 h-4" />,
-      category: "media-design",
+      category: "recording",
       onClick: () => {
         onOpenGifRecorder();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "favicon-generator",
-      name: "Favicon Generator",
-      description: "Generate favicons",
-      icon: <Image className="w-4 h-4" />,
-      category: "media-design",
-      onClick: () => {
-        onOpenFaviconGenerator();
         setIsOpen(false);
       },
     },
@@ -957,6 +983,21 @@ export function ToolsDropdown({
         setIsOpen(false);
       },
     },
+    {
+      id: "just-command-manager",
+      name: "Just Command Manager",
+      description: hasJustfile
+        ? "Manage justfile recipes"
+        : "Justfile not detected",
+      icon: <Play className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        if (!hasJustfile) return;
+        onOpenJustCommandManager();
+        setIsOpen(false);
+      },
+      disabled: !hasJustfile,
+    },
   ];
 
   // Filter tools based on search query and hiddenInDropdown flag
@@ -979,11 +1020,13 @@ export function ToolsDropdown({
   // Group tools by category
   const categories: ToolCategory[] = useMemo(() => {
     const categoryOrder: Array<{ id: ToolCategory["id"]; label: string }> = [
-      { id: "code-testing", label: "Code & Testing" },
+      { id: "code", label: "Code" },
+      { id: "testing", label: "Testing" },
       { id: "project", label: "Project" },
       { id: "local-system", label: "Local System" },
       { id: "production", label: "Production" },
-      { id: "media-design", label: "Media & Design" },
+      { id: "design", label: "Design" },
+      { id: "recording", label: "Recording" },
       { id: "web-tools", label: "Toolkits" },
       { id: "productivity", label: "Productivity" },
       { id: "utilities", label: "Utilities" },
@@ -996,6 +1039,37 @@ export function ToolsDropdown({
       }))
       .filter((cat) => cat.tools.length > 0);
   }, [filteredTools]);
+
+  // Create flat list of navigable tools (respecting collapsed categories)
+  const navigableTools = useMemo(() => {
+    const result: Tool[] = [];
+    for (const category of categories) {
+      if (!collapsedCategories.has(category.id)) {
+        for (const tool of category.tools) {
+          if (!tool.disabled) {
+            result.push(tool);
+          }
+        }
+      }
+    }
+    return result;
+  }, [categories, collapsedCategories]);
+
+  // Reset highlighted index when search changes or navigable tools change
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [searchQuery, navigableTools.length]);
+
+  // Scroll highlighted tool into view
+  useEffect(() => {
+    if (navigableTools.length > 0 && highlightedIndex >= 0) {
+      const tool = navigableTools[highlightedIndex];
+      if (tool) {
+        const button = toolButtonRefs.current[tool.id];
+        button?.scrollIntoView({ block: "nearest" });
+      }
+    }
+  }, [highlightedIndex, navigableTools]);
 
   // Category collapse logic
   const allCollapsed = collapsedCategories.size === categories.length && categories.length > 0;
@@ -1027,6 +1101,8 @@ export function ToolsDropdown({
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 10);
+      // Reset highlighted index when opening
+      setHighlightedIndex(0);
     } else {
       // Reset search when closing
       setSearchQuery("");
@@ -1047,20 +1123,34 @@ export function ToolsDropdown({
       }
     };
 
-    const handleEscape = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsOpen(false);
+      } else if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((prev) =>
+          prev < navigableTools.length - 1 ? prev + 1 : prev
+        );
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        const tool = navigableTools[highlightedIndex];
+        if (tool && !tool.disabled) {
+          tool.onClick();
+        }
       }
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, highlightedIndex, navigableTools]);
 
   const handleToggle = () => {
     if (!isOpen && buttonRef.current) {
@@ -1165,37 +1255,57 @@ export function ToolsDropdown({
                         </button>
                         {/* Category Tools */}
                         {!isCollapsed && (
-                          <div className="py-1 px-1">
-                            {category.tools.map((tool) => (
-                              <Tooltip
-                                key={tool.id}
-                                content={tool.description}
-                                side="left"
-                              >
-                                <button
-                                  onClick={tool.onClick}
-                                  disabled={tool.disabled}
-                                  className={cn(
-                                    "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded text-left transition-colors group",
-                                    tool.disabled
-                                      ? "opacity-50 cursor-not-allowed"
-                                      : "hover:bg-bg-hover",
-                                  )}
+                          <div className="py-1">
+                            {category.tools.map((tool) => {
+                              const toolIndex = navigableTools.findIndex(
+                                (t) => t.id === tool.id
+                              );
+                              const isHighlighted =
+                                toolIndex !== -1 && toolIndex === highlightedIndex;
+                              return (
+                                <Tooltip
+                                  key={tool.id}
+                                  content={tool.description}
+                                  side="left"
+                                  wrapperClassName="block w-full"
                                 >
-                                  <div
+                                  <button
+                                    ref={(el) => {
+                                      toolButtonRefs.current[tool.id] = el;
+                                    }}
+                                    onClick={tool.onClick}
+                                    disabled={tool.disabled}
+                                    onMouseEnter={() => {
+                                      if (toolIndex !== -1) {
+                                        setHighlightedIndex(toolIndex);
+                                      }
+                                    }}
                                     className={cn(
-                                      "flex-shrink-0 text-text-secondary transition-colors",
-                                      !tool.disabled && "group-hover:text-accent",
+                                      "w-full flex items-center gap-2.5 px-3 py-1.5 text-left transition-colors group",
+                                      tool.disabled
+                                        ? "opacity-50 cursor-not-allowed"
+                                        : "hover:bg-bg-hover",
+                                      isHighlighted &&
+                                        !tool.disabled &&
+                                        "bg-accent/20",
                                     )}
                                   >
-                                    {tool.icon}
-                                  </div>
-                                  <span className="text-[13px] font-medium text-text-primary truncate">
-                                    {tool.name}
-                                  </span>
-                                </button>
-                              </Tooltip>
-                            ))}
+                                    <div
+                                      className={cn(
+                                        "flex-shrink-0 text-text-secondary transition-colors",
+                                        !tool.disabled && "group-hover:text-accent",
+                                        isHighlighted && !tool.disabled && "text-accent",
+                                      )}
+                                    >
+                                      {tool.icon}
+                                    </div>
+                                    <span className="text-[13px] font-medium text-text-primary truncate">
+                                      {tool.name}
+                                    </span>
+                                  </button>
+                                </Tooltip>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
