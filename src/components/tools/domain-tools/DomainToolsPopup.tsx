@@ -32,6 +32,7 @@ import type { DomainTool } from "./types";
 interface DomainToolsPopupProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTool?: string;
 }
 
 interface ToolCategory {
@@ -140,8 +141,15 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 
 const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
-export function DomainToolsPopup({ isOpen, onClose }: DomainToolsPopupProps) {
+export function DomainToolsPopup({ isOpen, onClose, initialTool }: DomainToolsPopupProps) {
   const [activeTool, setActiveTool] = useState("whois");
+
+  // Set initial tool when provided
+  useEffect(() => {
+    if (initialTool && ALL_TOOLS.some(t => t.id === initialTool)) {
+      setActiveTool(initialTool);
+    }
+  }, [initialTool]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

@@ -19,6 +19,7 @@ mod tunnel;
 mod watcher;
 mod webcam_window;
 mod gif_capture;
+mod launcher;
 mod netlify_backup;
 
 use std::sync::Arc;
@@ -28,6 +29,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Emitter, Manager,
 };
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 fn create_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let app_menu = SubmenuBuilder::new(app, "Wynter Code")
@@ -104,6 +106,11 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
         .plugin(
             tauri_plugin_sql::Builder::new()
                 .add_migrations("sqlite:wyntercode.db", commands::get_migrations())
@@ -198,6 +205,26 @@ fn main() {
                     _ => {}
                 }
             });
+
+            // Initialize launcher state
+            launcher::init_launcher();
+
+            // Register global shortcut for launcher (Cmd+Space on macOS, Ctrl+Space on others)
+            // Note: Cmd+Space may conflict with Spotlight - using Option+Space as alternative
+            let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
+
+            if let Err(e) = app.global_shortcut().on_shortcut(shortcut, |app_handle, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    let app = app_handle.clone();
+                    let app_inner = app.clone();
+                    // Must run on main thread for window operations
+                    let _ = app.run_on_main_thread(move || {
+                        let _ = launcher::toggle_launcher_window_sync(app_inner);
+                    });
+                }
+            }) {
+                eprintln!("Failed to register global shortcut: {}", e);
+            }
 
             Ok(())
         })
@@ -383,6 +410,24 @@ fn main() {
             netlify_backup::netlify_fetch_sites,
             netlify_backup::netlify_create_site,
             netlify_backup::netlify_deploy_zip,
+            // Launcher
+            launcher::toggle_launcher_window,
+            launcher::hide_launcher_window,
+            launcher::is_launcher_visible,
+            launcher::search_macos_apps,
+            launcher::get_recent_files,
+            launcher::search_files,
+            launcher::open_application,
+            launcher::reveal_in_finder,
+            launcher::open_file,
+            launcher::get_app_icon_base64,
+            launcher::update_lightcast_hotkey,
+            launcher::enable_lightcast,
+            launcher::disable_lightcast,
+            launcher::enable_autostart,
+            launcher::disable_autostart,
+            launcher::is_autostart_enabled,
+            launcher::open_tool_in_main_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

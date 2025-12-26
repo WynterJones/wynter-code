@@ -14,10 +14,70 @@ import {
   List,
   Code,
   FileText,
+  Bot,
+  Compass,
+  ClipboardList,
+  ShieldCheck,
+  Sparkles,
+  BookOpen,
 } from "lucide-react";
 import { ScrollArea, Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { ToolCall } from "@/types";
+
+// Subagent type detection and metadata
+interface SubagentInfo {
+  isSubagent: boolean;
+  subagentType?: string;
+  displayName?: string;
+  icon?: typeof Bot;
+}
+
+function getSubagentInfo(toolCall: ToolCall): SubagentInfo {
+  const name = toolCall.name.toLowerCase();
+
+  // Check if it's a Task tool (subagent invocation)
+  if (name === "task") {
+    // Extract subagent_type from input
+    const input = toolCall.input;
+    const subagentType = (input.subagent_type as string) || (input.subagent as string) || "";
+
+    // Map subagent types to display names and icons
+    const subagentMap: Record<string, { name: string; icon: typeof Bot }> = {
+      "explore": { name: "Explore", icon: Compass },
+      "plan": { name: "Plan", icon: ClipboardList },
+      "general-purpose": { name: "General", icon: Bot },
+      "code-reviewer": { name: "Code Reviewer", icon: BookOpen },
+      "code-cleanup-agent": { name: "Code Cleanup", icon: Sparkles },
+      "security-auditor": { name: "Security Auditor", icon: ShieldCheck },
+      "performance-auditor": { name: "Performance Auditor", icon: Sparkles },
+      "accessibility-auditor": { name: "A11y Auditor", icon: ShieldCheck },
+      "code-smell-auditor": { name: "Code Quality", icon: BookOpen },
+      "tauri-security-auditor": { name: "Tauri Security", icon: ShieldCheck },
+      "rust-code-auditor": { name: "Rust Auditor", icon: BookOpen },
+      "unused-code-cleaner": { name: "Unused Code Cleaner", icon: Sparkles },
+      "idea-gardener": { name: "Idea Gardener", icon: Sparkles },
+      "the-farmer": { name: "The Farmer", icon: Bot },
+      "storybook-maintainer": { name: "Storybook", icon: BookOpen },
+      "test-scaffolder": { name: "Test Scaffolder", icon: ClipboardList },
+      "file-decomposer": { name: "File Decomposer", icon: Sparkles },
+      "i18n-locale-translator": { name: "i18n Translator", icon: Globe },
+      "claude-code-guide": { name: "Claude Guide", icon: BookOpen },
+    };
+
+    const normalizedType = subagentType.toLowerCase();
+    const mapping = subagentMap[normalizedType];
+
+    return {
+      isSubagent: true,
+      subagentType: subagentType,
+      displayName: mapping?.name || subagentType || "Subagent",
+      icon: mapping?.icon || Bot,
+    };
+  }
+
+  return { isSubagent: false };
+}
 
 interface ActivityFeedProps {
   toolCalls: ToolCall[];
@@ -121,8 +181,17 @@ function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityI
   const isCompleted = toolCall.status === "completed";
   const isError = toolCall.status === "error";
 
-  const Icon = getToolIcon(toolCall.name);
-  const iconColor = getToolColor(toolCall.name);
+  // Check if this is a subagent call
+  const subagentInfo = getSubagentInfo(toolCall);
+
+  // Use subagent icon if applicable, otherwise regular tool icon
+  const Icon = subagentInfo.isSubagent && subagentInfo.icon
+    ? subagentInfo.icon
+    : getToolIcon(toolCall.name);
+  const iconColor = subagentInfo.isSubagent
+    ? "text-accent-purple"
+    : getToolColor(toolCall.name);
+
   const summary = formatToolSummary(toolCall.input);
   const hasDetails = Object.keys(toolCall.input).length > 0 || toolCall.output;
 
@@ -130,8 +199,10 @@ function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityI
     <div
       className={cn(
         "rounded border transition-all duration-150",
-        isRunning && "border-accent/40 bg-accent/5",
-        isCompleted && "border-border/50 bg-transparent",
+        subagentInfo.isSubagent && isRunning && "border-accent-purple/40 bg-accent-purple/5",
+        subagentInfo.isSubagent && isCompleted && "border-accent-purple/30 bg-transparent",
+        !subagentInfo.isSubagent && isRunning && "border-accent/40 bg-accent/5",
+        !subagentInfo.isSubagent && isCompleted && "border-border/50 bg-transparent",
         isError && "border-accent-red/40 bg-accent-red/5",
         isPending && "border-accent-yellow/40 bg-accent-yellow/5"
       )}
@@ -160,13 +231,24 @@ function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityI
         {/* Tool icon */}
         <Icon className={cn("w-3.5 h-3.5 flex-shrink-0", iconColor)} />
 
-        {/* Tool name */}
-        <span className="font-mono text-xs font-medium text-text-primary flex-shrink-0">
-          {toolCall.name}
-        </span>
+        {/* Tool name + Subagent badge */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <span className="font-mono text-xs font-medium text-text-primary">
+            {subagentInfo.isSubagent ? subagentInfo.displayName : toolCall.name}
+          </span>
+          {subagentInfo.isSubagent && (
+            <span className="px-1 py-0.5 text-[8px] font-medium uppercase tracking-wide bg-accent-purple/20 text-accent-purple rounded">
+              Agent
+            </span>
+          )}
+        </div>
 
-        {/* Summary (truncated) */}
-        {summary && (
+        {/* Summary (truncated) - for subagents, show the description from prompt */}
+        {subagentInfo.isSubagent ? (
+          <span className="text-[10px] text-text-secondary/70 font-mono truncate flex-1 min-w-0">
+            {(toolCall.input.description as string) || (toolCall.input.prompt as string)?.slice(0, 50) || ""}
+          </span>
+        ) : summary && (
           <span className="text-[10px] text-text-secondary/70 font-mono truncate flex-1 min-w-0">
             {summary}
           </span>

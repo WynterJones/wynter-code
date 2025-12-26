@@ -29,6 +29,7 @@ import type { SeoTool } from "./types";
 interface SeoToolsPopupProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTool?: string;
 }
 
 interface ToolCategory {
@@ -70,8 +71,15 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 
 const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
-export function SeoToolsPopup({ isOpen, onClose }: SeoToolsPopupProps) {
+export function SeoToolsPopup({ isOpen, onClose, initialTool }: SeoToolsPopupProps) {
   const [activeTool, setActiveTool] = useState("meta-tags");
+
+  // Set initial tool when provided
+  useEffect(() => {
+    if (initialTool && ALL_TOOLS.some(t => t.id === initialTool)) {
+      setActiveTool(initialTool);
+    }
+  }, [initialTool]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

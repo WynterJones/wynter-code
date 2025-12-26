@@ -74,6 +74,7 @@ import type { MiniTool } from "./types";
 interface DevToolkitPopupProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTool?: string;
 }
 
 interface ToolCategory {
@@ -158,8 +159,15 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 
 const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
-export function DevToolkitPopup({ isOpen, onClose }: DevToolkitPopupProps) {
+export function DevToolkitPopup({ isOpen, onClose, initialTool }: DevToolkitPopupProps) {
   const [activeTool, setActiveTool] = useState("json-formatter");
+
+  // Set initial tool when provided
+  useEffect(() => {
+    if (initialTool && ALL_TOOLS.some(t => t.id === initialTool)) {
+      setActiveTool(initialTool);
+    }
+  }, [initialTool]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {

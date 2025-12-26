@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "launcher",
+  "description": "Capabilities for the Lightcast launcher window",
+  "windows": ["launcher"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "global-shortcut:default"
+  ]
+}

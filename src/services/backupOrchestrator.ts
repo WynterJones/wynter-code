@@ -84,8 +84,6 @@ async function deployToNetlify(
   // robots.txt to prevent indexing
   zip.file("robots.txt", `User-agent: *
 Disallow: /
-
-# This is a private encrypted backup - do not index
 `);
 
   // _headers file for proper content types and security
@@ -170,18 +168,31 @@ export async function performBackup(password: string): Promise<boolean> {
 
 /**
  * Extract encrypted payload from recovery HTML
+ * Supports both new format (HTML comment) and legacy format (JS variable)
  */
 function extractPayloadFromHtml(html: string): EncryptedPayload {
-  const match = html.match(
+  // Try new format first: <!-- WYNTER:base64encodedpayload -->
+  const newFormatMatch = html.match(/<!-- WYNTER:([\w+/=]+) -->/);
+  if (newFormatMatch) {
+    try {
+      const decoded = atob(newFormatMatch[1]);
+      return JSON.parse(decoded);
+    } catch {
+      throw new Error("Invalid backup page: could not decode encrypted data");
+    }
+  }
+
+  // Fall back to legacy format: const ENCRYPTED_PAYLOAD = {...};
+  const legacyMatch = html.match(
     /const\s+ENCRYPTED_PAYLOAD\s*=\s*(\{[\s\S]*?\});/
   );
 
-  if (!match) {
+  if (!legacyMatch) {
     throw new Error("Invalid backup page: could not find encrypted data");
   }
 
   try {
-    return JSON.parse(match[1]);
+    return JSON.parse(legacyMatch[1]);
   } catch {
     throw new Error("Invalid backup page: could not parse encrypted data");
   }

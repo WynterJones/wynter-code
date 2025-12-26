@@ -18,6 +18,7 @@ import {
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import {
   DndContext,
   closestCenter,
@@ -382,11 +383,14 @@ export function ProjectTabBar({
   const [showBeadsTracker, setShowBeadsTracker] = useState(false);
   const [showFaviconGenerator, setShowFaviconGenerator] = useState(false);
   const [showDevToolkit, setShowDevToolkit] = useState(false);
+  const [devToolkitInitialTool, setDevToolkitInitialTool] = useState<string | undefined>();
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
   const [showClaudeCodeStats, setShowClaudeCodeStats] = useState(false);
   const [showWebcamTool, setShowWebcamTool] = useState(false);
   const [showDomainTools, setShowDomainTools] = useState(false);
+  const [domainToolsInitialTool, setDomainToolsInitialTool] = useState<string | undefined>();
   const [showSeoTools, setShowSeoTools] = useState(false);
+  const [seoToolsInitialTool, setSeoToolsInitialTool] = useState<string | undefined>();
   const [showScreenStudio, setShowScreenStudio] = useState(false);
   const [showGifRecorder, setShowGifRecorder] = useState(false);
   const [showNetlifyFtp, setShowNetlifyFtp] = useState(false);
@@ -450,7 +454,8 @@ export function ProjectTabBar({
 
   // Listen for command palette tool actions
   useEffect(() => {
-    const handleCommandPaletteTool = (e: CustomEvent<{ action: string }>) => {
+    const handleCommandPaletteTool = (e: CustomEvent<{ action: string; subToolId?: string }>) => {
+      const { subToolId } = e.detail;
       switch (e.detail.action) {
         case "openLivePreview":
           setShowLivePreview(true);
@@ -498,6 +503,7 @@ export function ProjectTabBar({
           setShowFaviconGenerator(true);
           break;
         case "openDevToolkit":
+          setDevToolkitInitialTool(subToolId || undefined);
           setShowDevToolkit(true);
           break;
         case "openFarmworkTycoon":
@@ -510,9 +516,11 @@ export function ProjectTabBar({
           setShowWebcamTool(true);
           break;
         case "openDomainTools":
+          setDomainToolsInitialTool(subToolId || undefined);
           setShowDomainTools(true);
           break;
         case "openSeoTools":
+          setSeoToolsInitialTool(subToolId || undefined);
           setShowSeoTools(true);
           break;
         case "openScreenStudio":
@@ -564,6 +572,30 @@ export function ProjectTabBar({
         "command-palette-tool",
         handleCommandPaletteTool as EventListener,
       );
+    };
+  }, []);
+
+  // Listen for tool actions from the launcher window (via Tauri event)
+  useEffect(() => {
+    interface LauncherToolPayload {
+      action: string;
+      subToolId?: string | null;
+    }
+
+    const unlisten = listen<LauncherToolPayload>("launcher-open-tool", (event) => {
+      // Dispatch local event to trigger tool opening with optional subToolId
+      window.dispatchEvent(
+        new CustomEvent("command-palette-tool", {
+          detail: {
+            action: event.payload.action,
+            subToolId: event.payload.subToolId,
+          },
+        })
+      );
+    });
+
+    return () => {
+      unlisten.then((fn) => fn());
     };
   }, []);
 
@@ -1049,7 +1081,11 @@ export function ProjectTabBar({
       {/* Dev Toolkit */}
       <DevToolkitPopup
         isOpen={showDevToolkit}
-        onClose={() => setShowDevToolkit(false)}
+        onClose={() => {
+          setShowDevToolkit(false);
+          setDevToolkitInitialTool(undefined);
+        }}
+        initialTool={devToolkitInitialTool}
       />
 
       {/* Farmwork Tycoon */}
@@ -1073,13 +1109,21 @@ export function ProjectTabBar({
       {/* Domain Tools */}
       <DomainToolsPopup
         isOpen={showDomainTools}
-        onClose={() => setShowDomainTools(false)}
+        onClose={() => {
+          setShowDomainTools(false);
+          setDomainToolsInitialTool(undefined);
+        }}
+        initialTool={domainToolsInitialTool}
       />
 
       {/* SEO Tools */}
       <SeoToolsPopup
         isOpen={showSeoTools}
-        onClose={() => setShowSeoTools(false)}
+        onClose={() => {
+          setShowSeoTools(false);
+          setSeoToolsInitialTool(undefined);
+        }}
+        initialTool={seoToolsInitialTool}
       />
 
       {/* Screen Studio */}

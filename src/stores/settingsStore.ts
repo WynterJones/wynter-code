@@ -27,6 +27,17 @@ export type AppFont =
 
 export type TerminalShell = "system" | "bash" | "zsh" | "fish" | "sh";
 
+// Lightcast hotkey options
+export type LightcastHotkey = "alt-space" | "cmd-space" | "ctrl-space" | "cmd-shift-space" | "alt-shift-space";
+
+export const LIGHTCAST_HOTKEYS: { id: LightcastHotkey; name: string; display: string }[] = [
+  { id: "alt-space", name: "Option + Space", display: "⌥ Space" },
+  { id: "cmd-space", name: "Command + Space", display: "⌘ Space" },
+  { id: "ctrl-space", name: "Control + Space", display: "⌃ Space" },
+  { id: "cmd-shift-space", name: "Command + Shift + Space", display: "⌘⇧ Space" },
+  { id: "alt-shift-space", name: "Option + Shift + Space", display: "⌥⇧ Space" },
+];
+
 export type MarkdownMaxWidth = "700" | "900" | "1200" | "full";
 
 export const MARKDOWN_MAX_WIDTHS: { id: MarkdownMaxWidth; name: string; value: string }[] = [
@@ -99,6 +110,11 @@ interface SettingsStore {
   radioBrowserFavorites: RadioBrowserFavorite[];
   currentRadioBrowserStation: RadioBrowserFavorite | null;
 
+  // Lightcast settings
+  lightcastHotkey: LightcastHotkey;
+  lightcastEnabled: boolean;
+  launchAtStartup: boolean;
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
@@ -133,6 +149,11 @@ interface SettingsStore {
   addRadioBrowserFavorite: (station: RadioBrowserFavorite) => void;
   removeRadioBrowserFavorite: (stationuuid: string) => void;
   setCurrentRadioBrowserStation: (station: RadioBrowserFavorite | null) => void;
+
+  // Lightcast setters
+  setLightcastHotkey: (hotkey: LightcastHotkey) => void;
+  setLightcastEnabled: (enabled: boolean) => void;
+  setLaunchAtStartup: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -170,6 +191,11 @@ export const useSettingsStore = create<SettingsStore>()(
       nightrideStation: "chillsynth",
       radioBrowserFavorites: [],
       currentRadioBrowserStation: null,
+
+      // Lightcast defaults
+      lightcastHotkey: "alt-space",
+      lightcastEnabled: true,
+      launchAtStartup: false,
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -319,6 +345,19 @@ export const useSettingsStore = create<SettingsStore>()(
         currentRadioBrowserStation: RadioBrowserFavorite | null
       ) => {
         set({ currentRadioBrowserStation });
+      },
+
+      // Lightcast setters
+      setLightcastHotkey: (lightcastHotkey: LightcastHotkey) => {
+        set({ lightcastHotkey });
+      },
+
+      setLightcastEnabled: (lightcastEnabled: boolean) => {
+        set({ lightcastEnabled });
+      },
+
+      setLaunchAtStartup: (launchAtStartup: boolean) => {
+        set({ launchAtStartup });
       },
     }),
     {

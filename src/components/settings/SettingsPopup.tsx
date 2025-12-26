@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -21,11 +21,12 @@ import { CompressionSettings } from "./CompressionSettings";
 import { AvatarSettings } from "./AvatarSettings";
 import { DataManagementTab } from "./DataManagementTab";
 import { WebBackupTab } from "./WebBackupTab";
+import { LightcastTab } from "./LightcastTab";
 import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector";
 import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
 import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
 
-type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "farmwork" | "about";
+type SettingsTab = "general" | "lightcast" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "farmwork" | "about";
 
 interface SettingsPopupProps {
   onClose: () => void;
@@ -86,6 +87,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
     { id: "general", label: "General", icon: FolderOpen },
+    { id: "lightcast", label: "Lightcast", icon: Zap },
     { id: "editor", label: "Editor", icon: Code },
     { id: "markdown", label: "Markdown", icon: FileText },
     { id: "music", label: "Music", icon: Music },
@@ -139,6 +141,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
           {/* Content */}
           <ScrollArea className="flex-1" scrollbarVisibility="visible">
             <div className="p-6">
+              {activeTab === "lightcast" && <LightcastTab />}
               {activeTab === "general" && (
                 <GeneralSettings
                   defaultBrowsePath={defaultBrowsePath}
@@ -426,6 +429,43 @@ function GeneralSettings({
   claudeSafeMode,
   onClaudeSafeModeChange,
 }: GeneralSettingsProps) {
+  const { launchAtStartup, setLaunchAtStartup } = useSettingsStore();
+  const [autostartStatus, setAutostartStatus] = useState<"loading" | "enabled" | "disabled" | "error">("loading");
+
+  // Check autostart status on mount
+  useEffect(() => {
+    const checkAutostartStatus = async () => {
+      try {
+        const enabled = await invoke<boolean>("is_autostart_enabled");
+        setAutostartStatus(enabled ? "enabled" : "disabled");
+        // Sync local state with actual system state
+        if (enabled !== launchAtStartup) {
+          setLaunchAtStartup(enabled);
+        }
+      } catch (error) {
+        console.error("Failed to check autostart status:", error);
+        setAutostartStatus("error");
+      }
+    };
+    checkAutostartStatus();
+  }, [launchAtStartup, setLaunchAtStartup]);
+
+  const handleAutostartChange = async (enabled: boolean) => {
+    setAutostartStatus("loading");
+    try {
+      if (enabled) {
+        await invoke("enable_autostart");
+      } else {
+        await invoke("disable_autostart");
+      }
+      setLaunchAtStartup(enabled);
+      setAutostartStatus(enabled ? "enabled" : "disabled");
+    } catch (error) {
+      console.error("Failed to change autostart:", error);
+      setAutostartStatus("error");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-lg font-medium text-text-primary mb-4">
@@ -527,6 +567,46 @@ function GeneralSettings({
             />
           </button>
         </div>
+      </div>
+
+      {/* Launch at Startup */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+          Startup
+        </h3>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-text-primary">
+              Launch at Startup
+            </label>
+            <p className="text-xs text-text-secondary">
+              Automatically start Wynter Code when you log in
+            </p>
+          </div>
+          <button
+            onClick={() => handleAutostartChange(!launchAtStartup)}
+            disabled={autostartStatus === "loading"}
+            className={cn(
+              "w-11 h-6 rounded-full transition-colors relative",
+              launchAtStartup ? "bg-accent" : "bg-bg-hover",
+              autostartStatus === "loading" && "opacity-50 cursor-not-allowed"
+            )}
+          >
+            <div
+              className={cn(
+                "w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all",
+                launchAtStartup ? "left-5" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
+
+        {autostartStatus === "error" && (
+          <p className="text-xs text-amber-400">
+            Unable to manage startup settings. Try running as administrator.
+          </p>
+        )}
       </div>
 
       {/* App Font */}
