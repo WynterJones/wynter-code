@@ -33,6 +33,7 @@ interface DatabaseViewerStore {
   queryLoading: boolean;
   activeTab: "browser" | "sql";
   sidePanel: "connections" | "history" | null;
+  connectionsSidebarCollapsed: boolean;
   isLoading: boolean;
   error: string | null;
 
@@ -64,6 +65,7 @@ interface DatabaseViewerStore {
 
   setActiveTab: (tab: "browser" | "sql") => void;
   setSidePanel: (panel: "connections" | "history" | null) => void;
+  toggleConnectionsSidebar: () => void;
   clearError: () => void;
 
   // Reset
@@ -94,6 +96,7 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
       queryLoading: false,
       activeTab: "browser",
       sidePanel: "connections",
+      connectionsSidebarCollapsed: false,
       isLoading: false,
       error: null,
 
@@ -407,6 +410,10 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
         set({ sidePanel: panel });
       },
 
+      toggleConnectionsSidebar: () => {
+        set((state) => ({ connectionsSidebarCollapsed: !state.connectionsSidebarCollapsed }));
+      },
+
       clearError: () => {
         set({ error: null });
       },
@@ -432,6 +439,7 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
           queryLoading: false,
           activeTab: "browser",
           sidePanel: "connections",
+          connectionsSidebarCollapsed: false,
           isLoading: false,
           error: null,
         });

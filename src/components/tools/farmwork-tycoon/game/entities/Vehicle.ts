@@ -46,12 +46,18 @@ export class VehicleSprite extends Container {
   private isLoaded = false;
   private badge: VehicleBadge;
   private isFinished = false;
+  private tintColor: number = 0xffffff; // Default: no tint
 
   constructor(data: VehicleData) {
     super();
     this.data = data;
     this.currentDirection = data.direction;
     this.isCarrying = data.carrying;
+
+    // Set tint color from data if provided
+    if (data.tint !== undefined) {
+      this.tintColor = data.tint;
+    }
 
     // Fallback graphic (shown until textures load)
     this.fallbackGraphic = new Graphics();
@@ -60,6 +66,10 @@ export class VehicleSprite extends Container {
     this.fallbackGraphic.fill(color);
     this.fallbackGraphic.stroke({ color: 0x000000, width: 2 });
     this.fallbackGraphic.scale.set(0.5);
+    // Apply tint to fallback if set
+    if (this.tintColor !== 0xffffff) {
+      this.fallbackGraphic.tint = this.tintColor;
+    }
     this.addChild(this.fallbackGraphic);
 
     this.sprite = new Sprite();
@@ -86,10 +96,34 @@ export class VehicleSprite extends Container {
       this.isLoaded = true;
       this.fallbackGraphic.visible = false; // Hide fallback once textures load
       this.updateTexture();
+      // Apply tint to sprite after textures load
+      if (this.tintColor !== 0xffffff) {
+        this.sprite.tint = this.tintColor;
+      }
     } catch (e) {
       console.warn("Failed to load vehicle textures:", e);
       // Keep fallback visible if texture loading fails
     }
+  }
+
+  /**
+   * Set the tint color for the vehicle sprite (used for tool call visualization)
+   */
+  setTint(color: number): void {
+    this.tintColor = color;
+    if (this.sprite) {
+      this.sprite.tint = color;
+    }
+    if (this.fallbackGraphic) {
+      this.fallbackGraphic.tint = color;
+    }
+  }
+
+  /**
+   * Get the current tint color
+   */
+  getTint(): number {
+    return this.tintColor;
   }
 
   private updateTexture(): void {

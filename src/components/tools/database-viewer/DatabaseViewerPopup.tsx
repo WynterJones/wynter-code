@@ -1,17 +1,18 @@
 import { useEffect } from "react";
 import {
   Database,
-  X,
   Table2,
   Code,
   History,
-  Plug,
   AlertCircle,
+  X,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Key,
 } from "lucide-react";
-import { createPortal } from "react-dom";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { useDatabaseViewerStore } from "@/stores/databaseViewerStore";
-import { IconButton, Tooltip } from "@/components/ui";
+import { Popup, IconButton, Tooltip, Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ConnectionManager } from "./ConnectionManager";
 import { TableBrowser } from "./TableBrowser";
@@ -30,52 +31,35 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
     setActiveTab,
     sidePanel,
     setSidePanel,
+    connectionsSidebarCollapsed,
+    toggleConnectionsSidebar,
     error,
     clearError,
     activeConnectionId,
     isConnected,
     connections,
+    detectServices,
   } = useDatabaseViewerStore();
 
+  // Auto-detect local databases when popup opens
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
     if (isOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "hidden";
+      detectServices();
     }
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  }, [isOpen, detectServices]);
 
   const activeConnection = connections.find((c) => c.id === activeConnectionId);
   const connected = activeConnectionId ? isConnected.get(activeConnectionId) : false;
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative w-[95vw] h-[90vh] bg-bg-primary rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        <div
-          data-tauri-drag-region
-          className="flex items-center justify-between px-4 py-3 border-b border-border bg-bg-secondary"
-        >
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Database className="w-5 h-5 text-accent" />
-              <h2 className="text-lg font-semibold">Database Viewer</h2>
-            </div>
-
-            <div className="flex items-center gap-1 ml-4">
+  return (
+    <Popup isOpen={isOpen} onClose={onClose} size="full">
+      <Popup.Header
+        icon={Database}
+        title="Database Viewer"
+        actions={
+          <div className="flex items-center gap-2">
+            {/* Tab Switcher */}
+            <div className="flex items-center gap-1 mr-2">
               <button
                 onClick={() => setActiveTab("browser")}
                 className={cn(
@@ -101,9 +85,8 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
                 SQL Runner
               </button>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
+            {/* Active Connection Badge */}
             {activeConnection && (
               <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-bg-tertiary text-sm">
                 <div
@@ -116,16 +99,22 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
               </div>
             )}
 
-            <Tooltip content="Connections">
+            {/* Sidebar Toggle */}
+            <Tooltip content={connectionsSidebarCollapsed ? "Show Sidebar" : "Hide Sidebar"}>
               <IconButton
                 size="sm"
-                onClick={() => setSidePanel(sidePanel === "connections" ? null : "connections")}
-                className={cn(sidePanel === "connections" && "bg-accent/20 text-accent")}
+                onClick={toggleConnectionsSidebar}
+                className={cn(!connectionsSidebarCollapsed && "bg-accent/20 text-accent")}
               >
-                <Plug className="w-4 h-4" />
+                {connectionsSidebarCollapsed ? (
+                  <PanelLeftOpen className="w-4 h-4" />
+                ) : (
+                  <PanelLeftClose className="w-4 h-4" />
+                )}
               </IconButton>
             </Tooltip>
 
+            {/* Query History */}
             <Tooltip content="Query History">
               <IconButton
                 size="sm"
@@ -135,44 +124,52 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
                 <History className="w-4 h-4" />
               </IconButton>
             </Tooltip>
+          </div>
+        }
+      />
 
-            <Tooltip content="Close">
-              <IconButton size="sm" onClick={onClose}>
+      <Popup.Content scrollable={false} padding="none" className="!overflow-hidden">
+        <div className="h-full flex flex-col">
+          {/* Error Banner */}
+          {error && (
+            <div className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
+              <AlertCircle className="w-4 h-4" />
+              <span className="flex-1">{error}</span>
+              <button onClick={clearError} className="hover:text-red-300">
                 <X className="w-4 h-4" />
-              </IconButton>
-            </Tooltip>
-          </div>
-        </div>
-
-        {error && (
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/20 text-red-400 text-sm">
-            <AlertCircle className="w-4 h-4" />
-            <span className="flex-1">{error}</span>
-            <button onClick={clearError} className="hover:text-red-300">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        <div className="flex-1 flex min-h-0">
-          {sidePanel && (
-            <div className="w-72 border-r border-border bg-bg-secondary flex flex-col">
-              <ConnectionManager isVisible={sidePanel === "connections"} />
-              {sidePanel === "history" && <QueryHistory />}
+              </button>
             </div>
           )}
 
-          <div className="flex-1 flex flex-col min-w-0">
-            {activeTab === "browser" ? (
-              <BrowserTab />
-            ) : (
-              <SqlRunner />
-            )}
+          {/* Main Content - takes remaining height */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left Sidebar - Connections */}
+            <div
+              className={cn(
+                "h-full border-r border-border bg-bg-secondary flex flex-col transition-[width] duration-200 ease-in-out",
+                connectionsSidebarCollapsed ? "w-0 border-r-0 overflow-hidden" : "w-72"
+              )}
+            >
+              {!connectionsSidebarCollapsed && (
+                <>
+                  <ConnectionManager isVisible={true} />
+                  {sidePanel === "history" && <QueryHistory />}
+                </>
+              )}
+            </div>
+
+            {/* Main Area */}
+            <div className="flex-1 h-full overflow-hidden">
+              {activeTab === "browser" ? (
+                <BrowserTab />
+              ) : (
+                <SqlRunner />
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </div>,
-    document.body
+      </Popup.Content>
+    </Popup>
   );
 }
 
@@ -180,25 +177,37 @@ function BrowserTab() {
   const { selectedTable, tableSchema } = useDatabaseViewerStore();
 
   return (
-    <div className="flex-1 flex min-h-0">
-      <div className="w-64 border-r border-border flex flex-col">
+    <div className="h-full flex overflow-hidden">
+      {/* Table List Sidebar */}
+      <div className="w-64 h-full border-r border-border flex flex-col overflow-hidden">
         <TableBrowser />
       </div>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Content Area with Tabs */}
+      <div className="flex-1 h-full flex flex-col overflow-hidden">
         {selectedTable ? (
-          <>
-            {tableSchema && (
-              <div className="border-b border-border">
-                <SchemaViewer schema={tableSchema} />
-              </div>
-            )}
-            <div className="flex-1 min-h-0">
-              <DataGrid />
+          <Tabs defaultValue="data" className="h-full flex flex-col">
+            <div className="flex-shrink-0 border-b border-border bg-bg-secondary">
+              <TabsList className="px-3">
+                <TabsTrigger value="data">
+                  <Table2 className="w-4 h-4 mr-2" />
+                  Data
+                </TabsTrigger>
+                <TabsTrigger value="schema">
+                  <Key className="w-4 h-4 mr-2" />
+                  Schema
+                </TabsTrigger>
+              </TabsList>
             </div>
-          </>
+            <TabsContent value="data" className="flex-1 overflow-hidden m-0">
+              <DataGrid />
+            </TabsContent>
+            <TabsContent value="schema" className="flex-1 overflow-auto m-0">
+              {tableSchema && <SchemaViewer schema={tableSchema} />}
+            </TabsContent>
+          </Tabs>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-text-tertiary">
+          <div className="h-full flex items-center justify-center text-text-tertiary">
             <div className="text-center">
               <Table2 className="w-12 h-12 mx-auto mb-2 opacity-50" />
               <p>Select a table to view data</p>
@@ -214,11 +223,14 @@ function QueryHistory() {
   const { queryHistory, setQuery, setActiveTab } = useDatabaseViewerStore();
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="px-3 py-2 border-b border-border">
+    <div className="flex-1 flex flex-col overflow-hidden border-t border-border">
+      <div className="flex-shrink-0 px-3 py-2 border-b border-border">
         <h3 className="text-sm font-medium">Query History</h3>
       </div>
-      <OverlayScrollbarsComponent className="flex-1 os-theme-custom" options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}>
+      <OverlayScrollbarsComponent
+        className="flex-1 os-theme-custom"
+        options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}
+      >
         <div className="p-2 space-y-1">
           {queryHistory.length === 0 ? (
             <p className="text-sm text-text-tertiary p-2">No queries yet</p>

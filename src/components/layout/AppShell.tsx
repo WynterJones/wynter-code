@@ -19,6 +19,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { Tooltip } from "@/components/ui";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useCustomMusic } from "@/hooks/useCustomMusic";
+import { useBackupScheduler } from "@/hooks/useBackupScheduler";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 const SIDEBAR_WIDTH_KEY = "wynter-code-sidebar-width";
@@ -66,6 +67,14 @@ export function AppShell() {
 
   // Initialize custom music loading
   useCustomMusic();
+
+  // Initialize backup scheduler
+  useBackupScheduler({
+    onBackupNeeded: () => {
+      // Show notification or indicator that backup is due
+      console.log("Backup is due - consider running a backup");
+    },
+  });
 
   // Check for beads directory when project changes
   useEffect(() => {
@@ -201,7 +210,7 @@ export function AppShell() {
             setShowSettings(false);
             setSettingsInitialTab(undefined);
           }}
-          initialTab={settingsInitialTab as "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "farmwork" | "about" | undefined}
+          initialTab={settingsInitialTab as "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "farmwork" | "about" | undefined}
         />
       )}
       {showSubscriptions && <SubscriptionPopup onClose={() => setShowSubscriptions(false)} />}

@@ -10,12 +10,28 @@ import {
   ArrowUp,
   ArrowDown,
   Loader2,
+  Maximize2,
 } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { useDatabaseViewerStore } from "@/stores/databaseViewerStore";
 import { IconButton, Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { RowForm } from "./RowForm";
+import { JsonViewerModal } from "./JsonViewerModal";
+import { CellInspector } from "./CellInspector";
+import type { ColumnInfo } from "@/types";
+
+interface JsonModalState {
+  value: unknown;
+  columnName: string;
+  row: Record<string, unknown>;
+  column: ColumnInfo;
+}
+
+const isJsonColumn = (dataType: string): boolean => {
+  const type = dataType.toLowerCase();
+  return type === "json" || type === "jsonb" || type.includes("json");
+};
 
 export function DataGrid() {
   const {
@@ -27,12 +43,14 @@ export function DataGrid() {
     sort,
     setSort,
     deleteRow,
+    updateRow,
     selectedTable,
   } = useDatabaseViewerStore();
 
   const [editingRow, setEditingRow] = useState<Record<string, unknown> | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [deletingRow, setDeletingRow] = useState<Record<string, unknown> | null>(null);
+  const [jsonModal, setJsonModal] = useState<JsonModalState | null>(null);
 
   const columns = tableSchema?.columns || [];
   const primaryKeys = tableSchema?.primaryKeys || [];
@@ -75,16 +93,40 @@ export function DataGrid() {
     }
   };
 
-  const formatCellValue = (value: unknown): string => {
-    if (value === null || value === undefined) return "NULL";
-    if (typeof value === "boolean") return value ? "true" : "false";
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
+  const formatCellValue = (value: unknown, column?: ColumnInfo): { display: string; isJson: boolean } => {
+    if (value === null || value === undefined) {
+      return { display: "NULL", isJson: false };
+    }
+    if (typeof value === "boolean") {
+      return { display: value ? "true" : "false", isJson: false };
+    }
+
+    const isJson = (column && isJsonColumn(column.dataType)) || typeof value === "object";
+
+    if (isJson && typeof value === "object") {
+      const jsonStr = JSON.stringify(value);
+      const truncated = jsonStr.length > 50 ? jsonStr.substring(0, 47) + "..." : jsonStr;
+      return { display: truncated, isJson: true };
+    }
+
+    return { display: String(value), isJson: false };
+  };
+
+  const handleJsonSave = async (newValue: unknown) => {
+    if (!jsonModal) return;
+
+    const pk = getPrimaryKeyValue(jsonModal.row);
+    const updateData: Record<string, unknown> = {
+      [jsonModal.columnName]: newValue,
+    };
+
+    await updateRow(pk, updateData);
+    setJsonModal(null);
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-bg-secondary">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-b border-border bg-bg-secondary">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">{selectedTable}</span>
           <span className="text-xs text-text-tertiary">
@@ -138,9 +180,6 @@ export function DataGrid() {
                           )
                         )}
                       </div>
-                      <span className="text-xs text-text-tertiary font-normal">
-                        {col.dataType}
-                      </span>
                     </th>
                   ))}
                 </tr>
@@ -184,21 +223,46 @@ export function DataGrid() {
                           </Tooltip>
                         </div>
                       </td>
-                      {columns.map((col) => (
-                        <td
-                          key={col.name}
-                          className="px-3 py-1.5 border-b border-border font-mono text-xs max-w-xs truncate"
-                          title={formatCellValue(row[col.name])}
-                        >
-                          <span
-                            className={cn(
-                              row[col.name] === null && "text-text-tertiary italic"
-                            )}
+                      {columns.map((col) => {
+                        const cellValue = row[col.name];
+                        const formatted = formatCellValue(cellValue, col);
+
+                        return (
+                          <td
+                            key={col.name}
+                            className="px-3 py-1.5 border-b border-border font-mono text-xs"
                           >
-                            {formatCellValue(row[col.name])}
-                          </span>
-                        </td>
-                      ))}
+                            <div className="flex items-center gap-1 max-w-xs">
+                              <CellInspector value={cellValue} isJson={formatted.isJson}>
+                                <span
+                                  className={cn(
+                                    "truncate block max-w-[200px]",
+                                    cellValue === null && "text-text-tertiary italic"
+                                  )}
+                                >
+                                  {formatted.display}
+                                </span>
+                              </CellInspector>
+                              {formatted.isJson && cellValue !== null && (
+                                <Tooltip content="Edit JSON">
+                                  <IconButton
+                                    size="sm"
+                                    className="p-0.5 flex-shrink-0"
+                                    onClick={() => setJsonModal({
+                                      value: cellValue,
+                                      columnName: col.name,
+                                      row,
+                                      column: col,
+                                    })}
+                                  >
+                                    <Maximize2 className="w-3 h-3" />
+                                  </IconButton>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </td>
+                        );
+                      })}
                     </tr>
                   );
                 })}
@@ -208,7 +272,7 @@ export function DataGrid() {
         </OverlayScrollbarsComponent>
       </div>
 
-      <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-bg-secondary">
+      <div className="flex-shrink-0 flex items-center justify-between px-3 py-2 border-t border-border bg-bg-secondary">
         <div className="flex items-center gap-2">
           <span className="text-xs text-text-tertiary">Rows per page:</span>
           <select
@@ -279,6 +343,17 @@ export function DataGrid() {
           initialData={editingRow}
           primaryKeys={primaryKeys}
           onClose={() => setEditingRow(null)}
+        />
+      )}
+
+      {jsonModal && (
+        <JsonViewerModal
+          isOpen={true}
+          onClose={() => setJsonModal(null)}
+          value={jsonModal.value}
+          columnName={jsonModal.columnName}
+          isEditable={primaryKeys.length > 0}
+          onSave={handleJsonSave}
         />
       )}
     </div>

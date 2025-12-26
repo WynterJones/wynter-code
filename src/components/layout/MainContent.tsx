@@ -19,6 +19,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { claudeService } from "@/services/claude";
+import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
 import type { Project, PermissionMode, ToolCall } from "@/types";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
@@ -162,6 +163,8 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
               input: {},
               status: needsPermission ? "pending" : "running",
             });
+            // Notify Farmwork Tycoon bridge
+            farmworkBridge.onToolStart(toolName, toolId);
           },
           onToolInputDelta: (toolId, partialJson) => {
             appendToolInput(currentSessionId, toolId, partialJson);
@@ -173,6 +176,8 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
             updateToolCallStatus(currentSessionId, toolId, status, content, isError);
             // Add separator so subsequent text appears as new block
             appendStreamingText(currentSessionId, "\n\n");
+            // Notify Farmwork Tycoon bridge
+            farmworkBridge.onToolComplete(toolId, isError ?? false);
           },
           onAskUserQuestion: (toolId, input) => {
             const questions = input.questions.map((q, idx) => ({

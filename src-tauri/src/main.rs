@@ -18,6 +18,7 @@ mod tunnel;
 mod watcher;
 mod webcam_window;
 mod gif_capture;
+mod netlify_backup;
 
 use std::sync::Arc;
 use tauri::{
@@ -370,6 +371,11 @@ fn main() {
             audio_proxy::stop_audio_proxy,
             audio_proxy::get_audio_proxy_url,
             audio_proxy::is_audio_proxy_running,
+            // Netlify Backup (CORS proxy)
+            netlify_backup::netlify_test_connection,
+            netlify_backup::netlify_fetch_sites,
+            netlify_backup::netlify_create_site,
+            netlify_backup::netlify_deploy_zip,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

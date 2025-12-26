@@ -288,6 +288,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openNetlifyFtp",
     category: "production",
   },
+  {
+    id: "web-backup",
+    name: "Web Backup",
+    description: "Encrypted cloud backup settings",
+    icon: Lock,
+    actionKey: "openWebBackup",
+    category: "production",
+  },
 
   // === DESIGN ===
   {

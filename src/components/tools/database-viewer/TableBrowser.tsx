@@ -41,8 +41,8 @@ export function TableBrowser() {
   }
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 px-3 py-2 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-medium">Tables</h3>
         <Tooltip content="Refresh">
           <IconButton size="sm" onClick={loadTables} disabled={isLoading}>
@@ -51,7 +51,7 @@ export function TableBrowser() {
         </Tooltip>
       </div>
 
-      <div className="px-2 py-2 border-b border-border">
+      <div className="flex-shrink-0 px-2 py-2 border-b border-border">
         <div className="relative">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
           <input
@@ -64,7 +64,7 @@ export function TableBrowser() {
         </div>
       </div>
 
-      <OverlayScrollbarsComponent className="flex-1 os-theme-custom" options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}>
+      <OverlayScrollbarsComponent className="flex-1 overflow-auto os-theme-custom" options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}>
         <div className="p-2">
           {isLoading && tables.length === 0 ? (
             <div className="flex items-center justify-center py-8">

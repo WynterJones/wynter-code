@@ -229,6 +229,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   activityFeed: [],
   navGraph: null,
   simulatedFlowerCount: null,
+  celebrationQueue: [],
 
   initialize: async (_projectPath: string) => {
     await get().refreshStats();
@@ -368,38 +369,72 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
       }
 
       // Update all buildings with their respective scores/counts
+      // and detect 10/10 celebrations
+      const currentBuildings = get().buildings;
+      const newCelebrations: string[] = [];
+
       set((state) => ({
         buildings: state.buildings.map((b) => {
-          let score = 0;
+          let newScore = 0;
           switch (b.type) {
             case "security":
-              score = auditScores.security.score;
+              newScore = auditScores.security.score;
               break;
             case "tests":
-              score = auditScores.tests.score;
+              newScore = auditScores.tests.score;
               break;
             case "performance":
-              score = auditScores.performance.score;
+              newScore = auditScores.performance.score;
               break;
             case "accessibility":
-              score = auditScores.accessibility.score;
+              newScore = auditScores.accessibility.score;
               break;
             case "codeQuality":
-              score = auditScores.codeQuality.score;
+              newScore = auditScores.codeQuality.score;
               break;
             case "farmhouse":
-              score = auditScores.farmhouse.score;
+              newScore = auditScores.farmhouse.score;
               break;
             case "garden":
-              score = gardenCount;
+              newScore = gardenCount;
               break;
             case "compost":
-              score = compostCount;
+              newScore = compostCount;
               break;
           }
-          return { ...b, score };
+
+          // Detect when a building hits 10/10 (only for audit buildings)
+          const oldBuilding = currentBuildings.find((ob) => ob.id === b.id);
+          const oldScore = oldBuilding?.score ?? 0;
+          if (
+            newScore >= 10 &&
+            oldScore < 10 &&
+            ["security", "tests", "performance", "accessibility", "codeQuality", "farmhouse"].includes(b.type)
+          ) {
+            newCelebrations.push(b.id);
+          }
+
+          return { ...b, score: newScore };
         }),
       }));
+
+      // Add celebrations to queue and activity feed
+      if (newCelebrations.length > 0) {
+        const buildings = get().buildings;
+        for (const buildingId of newCelebrations) {
+          const building = buildings.find((b) => b.id === buildingId);
+          if (building) {
+            get().addActivity({
+              type: "celebration",
+              message: `${building.name} achieved perfect score!`,
+              buildingId,
+            });
+          }
+        }
+        set((state) => ({
+          celebrationQueue: [...state.celebrationQueue, ...newCelebrations],
+        }));
+      }
     } catch (error) {
       console.error("Failed to refresh farmwork stats:", error);
     }
@@ -451,6 +486,52 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
       speed: VEHICLE_SPEED.BASE + Math.random() * VEHICLE_SPEED.VARIANCE,
       carrying: false,
       direction: spawnPoint.edge === "top" ? "down" : "up",
+    };
+
+    set((state) => ({
+      vehicles: [...state.vehicles, newVehicle],
+    }));
+
+    return id;
+  },
+
+  spawnVehicleWithTint: (destination: string, tint: number) => {
+    const id = `vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const type = getVehicleTypeForDestination(destination);
+
+    const spawnPoint = getRandomSpawnPoint("enter");
+
+    // Get farmhouse position for exit point calculation
+    const farmhouseBuilding = get().buildings.find((b) => b.id === "farmhouse");
+    const farmhousePos = farmhouseBuilding
+      ? { x: farmhouseBuilding.position.dockX, y: farmhouseBuilding.position.dockY }
+      : { x: 500, y: 500 };
+    const exitPoint = getNearestExitPoint(farmhousePos);
+
+    // Route: pickup building → farmhouse (then exit)
+    const route = destination === "farmhouse"
+      ? [destination]
+      : [destination, "farmhouse"];
+
+    console.log(`[Tycoon] Spawning tinted ${type} vehicle (0x${tint.toString(16)}) from ${spawnPoint.id} → ${route.join(" → ")} → exit`);
+
+    const newVehicle: Vehicle = {
+      id,
+      type,
+      position: { ...spawnPoint.position },
+      destination,
+      returnDestination: "farmhouse",
+      route,
+      currentRouteIndex: 0,
+      task: "entering",
+      spawnPoint: spawnPoint.id,
+      exitPoint: exitPoint.id,
+      path: [],
+      pathIndex: 0,
+      speed: VEHICLE_SPEED.BASE + Math.random() * VEHICLE_SPEED.VARIANCE,
+      carrying: false,
+      direction: spawnPoint.edge === "top" ? "down" : "up",
+      tint,
     };
 
     set((state) => ({
@@ -578,6 +659,10 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
 
   setSimulatedFlowerCount: (count: number | null) => {
     set({ simulatedFlowerCount: count });
+  },
+
+  clearCelebrationQueue: () => {
+    set({ celebrationQueue: [] });
   },
 }));
 

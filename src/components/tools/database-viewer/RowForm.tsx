@@ -1,9 +1,14 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { useDatabaseViewerStore } from "@/stores/databaseViewerStore";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import type { ColumnInfo } from "@/types";
+
+const isJsonColumn = (dataType: string): boolean => {
+  const type = dataType.toLowerCase();
+  return type === "json" || type === "jsonb" || type.includes("json");
+};
 
 interface RowFormProps {
   mode: "insert" | "update";
@@ -21,13 +26,21 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
     for (const col of columns) {
       if (initialData && initialData[col.name] !== undefined) {
         const val = initialData[col.name];
-        data[col.name] = val === null ? "" : String(val);
+        if (val === null) {
+          data[col.name] = "";
+        } else if (isJsonColumn(col.dataType) && typeof val === "object") {
+          data[col.name] = JSON.stringify(val, null, 2);
+        } else {
+          data[col.name] = String(val);
+        }
       } else {
         data[col.name] = "";
       }
     }
     return data;
   });
+
+  const [jsonErrors, setJsonErrors] = useState<Record<string, string>>({});
 
   const [isNull, setIsNull] = useState<Record<string, boolean>>(() => {
     const nulls: Record<string, boolean> = {};
@@ -40,10 +53,33 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = (column: string, value: string) => {
+  const handleChange = (column: string, value: string, col?: ColumnInfo) => {
     setFormData((prev) => ({ ...prev, [column]: value }));
     if (value) {
       setIsNull((prev) => ({ ...prev, [column]: false }));
+    }
+
+    // Validate JSON on change
+    if (col && isJsonColumn(col.dataType) && value.trim()) {
+      try {
+        JSON.parse(value);
+        setJsonErrors((prev) => {
+          const next = { ...prev };
+          delete next[column];
+          return next;
+        });
+      } catch (e) {
+        setJsonErrors((prev) => ({
+          ...prev,
+          [column]: e instanceof Error ? e.message : "Invalid JSON",
+        }));
+      }
+    } else if (col && isJsonColumn(col.dataType)) {
+      setJsonErrors((prev) => {
+        const next = { ...prev };
+        delete next[column];
+        return next;
+      });
     }
   };
 
@@ -58,6 +94,17 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
     if (!value && nullable) return null;
 
     const type = dataType.toUpperCase();
+
+    // Handle JSON/JSONB columns
+    if (isJsonColumn(dataType)) {
+      if (!value.trim()) return nullable ? null : {};
+      try {
+        return JSON.parse(value);
+      } catch {
+        return value; // Return as string if invalid JSON
+      }
+    }
+
     if (type.includes("INT") || type.includes("SERIAL")) {
       return parseInt(value) || 0;
     }
@@ -123,9 +170,11 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
           {columns.map((col) => {
             const isPrimaryKey = primaryKeys.includes(col.name);
             const disabled = mode === "update" && isPrimaryKey;
+            const isJson = isJsonColumn(col.dataType);
+            const hasJsonError = jsonErrors[col.name];
 
             return (
-              <div key={col.name} className={cn(disabled && "opacity-50")}>
+              <div key={col.name} className={cn(disabled && "opacity-50", isJson && "col-span-2")}>
                 <label className="block text-sm font-medium mb-1">
                   <span className={cn(col.primaryKey && "text-accent")}>
                     {col.name}
@@ -137,21 +186,46 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
                     <span className="text-red-400 ml-1">*</span>
                   )}
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={isNull[col.name] ? "" : formData[col.name]}
-                    onChange={(e) => handleChange(col.name, e.target.value)}
-                    disabled={disabled || isNull[col.name]}
-                    placeholder={isNull[col.name] ? "NULL" : col.defaultValue || ""}
-                    className={cn(
-                      "flex-1 px-3 py-2 rounded-md bg-bg-tertiary border border-border",
-                      "focus:border-accent focus:outline-none disabled:opacity-50",
-                      isNull[col.name] && "italic text-text-tertiary"
-                    )}
-                  />
+                <div className="flex items-start gap-2">
+                  {isJson ? (
+                    <div className="flex-1">
+                      <textarea
+                        value={isNull[col.name] ? "" : formData[col.name]}
+                        onChange={(e) => handleChange(col.name, e.target.value, col)}
+                        disabled={disabled || isNull[col.name]}
+                        placeholder={isNull[col.name] ? "NULL" : '{"key": "value"}'}
+                        rows={6}
+                        spellCheck={false}
+                        className={cn(
+                          "w-full px-3 py-2 rounded-md bg-bg-tertiary border font-mono text-sm",
+                          "focus:border-accent focus:outline-none disabled:opacity-50 resize-y",
+                          isNull[col.name] && "italic text-text-tertiary",
+                          hasJsonError ? "border-red-500" : "border-border"
+                        )}
+                      />
+                      {hasJsonError && (
+                        <div className="flex items-center gap-1 mt-1 text-xs text-red-400">
+                          <AlertCircle className="w-3 h-3" />
+                          {hasJsonError}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={isNull[col.name] ? "" : formData[col.name]}
+                      onChange={(e) => handleChange(col.name, e.target.value)}
+                      disabled={disabled || isNull[col.name]}
+                      placeholder={isNull[col.name] ? "NULL" : col.defaultValue || ""}
+                      className={cn(
+                        "flex-1 px-3 py-2 rounded-md bg-bg-tertiary border border-border",
+                        "focus:border-accent focus:outline-none disabled:opacity-50",
+                        isNull[col.name] && "italic text-text-tertiary"
+                      )}
+                    />
+                  )}
                   {col.nullable && (
-                    <label className="flex items-center gap-1 text-xs">
+                    <label className="flex items-center gap-1 text-xs mt-2">
                       <input
                         type="checkbox"
                         checked={isNull[col.name]}

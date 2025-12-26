@@ -2,7 +2,7 @@ import { Container } from "pixi.js";
 import { ParticlePool, type ParticleConfig } from "./ParticlePool";
 import type { Point, BuildingType } from "../../types";
 
-export type ParticleType = "hay" | "leaves" | "stars" | "dust" | "sparkle";
+export type ParticleType = "hay" | "leaves" | "stars" | "dust" | "sparkle" | "confetti";
 
 export interface EmitterConfig {
   type: ParticleType;
@@ -19,6 +19,7 @@ const PARTICLE_COLORS: Record<ParticleType, number[]> = {
   stars: [0xffd700, 0xffff00, 0xfffacd],
   dust: [0xd2b48c, 0xc4a96c, 0x8b7355],
   sparkle: [0xffffff, 0xffd700, 0x87ceeb],
+  confetti: [0xef4444, 0xf97316, 0xeab308, 0x22c55e, 0x3b82f6, 0xa855f7, 0xec4899], // Rainbow
 };
 
 export class FarmParticleEmitter extends Container {
@@ -31,10 +32,12 @@ export class FarmParticleEmitter extends Container {
   }
 
   private initPools(): void {
-    const types: ParticleType[] = ["hay", "leaves", "stars", "dust", "sparkle"];
+    const types: ParticleType[] = ["hay", "leaves", "stars", "dust", "sparkle", "confetti"];
 
     for (const type of types) {
-      const pool = new ParticlePool(this, [], 50, true);
+      // Confetti needs more particles for big celebrations
+      const poolSize = type === "confetti" ? 100 : 50;
+      const pool = new ParticlePool(this, [], poolSize, true);
       this.pools.set(type, pool);
     }
   }
@@ -147,6 +150,53 @@ export class FarmParticleEmitter extends Container {
       lifetime: 0.6,
       speed: 40,
     });
+  }
+
+  /**
+   * Emit a big celebration effect when a building achieves 10/10 score
+   */
+  emitCelebration(position: Point): void {
+    // Big confetti burst
+    this.emitParticles({
+      type: "confetti",
+      position,
+      count: 30,
+      spread: 60,
+      lifetime: 2.5,
+      speed: 150,
+    });
+
+    // Sparkle burst
+    this.emitParticles({
+      type: "sparkle",
+      position,
+      count: 20,
+      spread: 40,
+      lifetime: 1.5,
+      speed: 80,
+    });
+
+    // Rising stars
+    this.emitParticles({
+      type: "stars",
+      position,
+      count: 15,
+      spread: 30,
+      lifetime: 2.0,
+      speed: 100,
+    });
+
+    // Second wave of confetti after a short delay simulation
+    setTimeout(() => {
+      this.emitParticles({
+        type: "confetti",
+        position,
+        count: 20,
+        spread: 50,
+        lifetime: 2.0,
+        speed: 120,
+      });
+    }, 200);
   }
 
   update(dt: number): void {

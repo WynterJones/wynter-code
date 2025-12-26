@@ -137,5 +137,5 @@ export function TabsContent({ value, children, className }: TabsContentProps) {
     return null;
   }
 
-  return <div className={cn("flex-1 overflow-hidden", className)}>{children}</div>;
+  return <div className={cn("flex-1 min-h-0 overflow-hidden", className)}>{children}</div>;
 }

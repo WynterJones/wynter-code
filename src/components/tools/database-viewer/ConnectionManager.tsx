@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   Plus,
   Trash2,
@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { useDatabaseViewerStore } from "@/stores/databaseViewerStore";
-import { IconButton, Tooltip } from "@/components/ui";
+import { Button, IconButton, Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ConnectionForm } from "./ConnectionForm";
 import type { ConnectionConfig } from "@/types";
@@ -38,11 +38,6 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
 
   const [showForm, setShowForm] = useState(false);
   const [editingConnection, setEditingConnection] = useState<ConnectionConfig | null>(null);
-
-  // Auto-detect on mount
-  useEffect(() => {
-    detectServices();
-  }, []);
 
   if (!isVisible) return null;
 
@@ -84,10 +79,10 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="px-3 py-2 border-b border-border flex items-center justify-between">
-        <h3 className="text-sm font-medium">Connections</h3>
-        <div className="flex items-center gap-1">
+    <div className="h-full flex flex-col overflow-hidden">
+      <div className="flex-shrink-0 p-3 border-b border-border space-y-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-medium">Connections</h3>
           <Tooltip content="Detect Local Databases">
             <IconButton size="sm" onClick={detectServices} disabled={detectingServices}>
               {detectingServices ? (
@@ -97,15 +92,14 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
               )}
             </IconButton>
           </Tooltip>
-          <Tooltip content="Add Connection">
-            <IconButton size="sm" onClick={() => setShowForm(true)}>
-              <Plus className="w-4 h-4" />
-            </IconButton>
-          </Tooltip>
         </div>
+        <Button variant="primary" className="w-full" onClick={() => setShowForm(true)}>
+          <Plus className="w-4 h-4 mr-2" />
+          New Connection
+        </Button>
       </div>
 
-      <OverlayScrollbarsComponent className="flex-1 os-theme-custom" options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}>
+      <OverlayScrollbarsComponent className="flex-1 overflow-auto os-theme-custom" options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}>
         <div className="p-2 space-y-1">
           {/* Detected Services */}
           {detectedServices.length > 0 && (
@@ -174,9 +168,10 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                     "p-2 rounded-md border transition-colors",
                     isActive
                       ? "border-accent bg-accent/10"
-                      : "border-transparent hover:bg-bg-hover"
+                      : "border-border hover:bg-bg-hover"
                   )}
                 >
+                  {/* Row 1: Name + Edit/Delete */}
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <div
@@ -190,20 +185,6 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Tooltip content={connected ? "Disconnect" : "Connect"}>
-                        <IconButton
-                          size="sm"
-                          onClick={() => handleConnect(connection.id)}
-                          disabled={isLoading}
-                          className="p-1"
-                        >
-                          {connected ? (
-                            <PlugZap className="w-3.5 h-3.5 text-green-500" />
-                          ) : (
-                            <Plug className="w-3.5 h-3.5" />
-                          )}
-                        </IconButton>
-                      </Tooltip>
                       <Tooltip content="Edit">
                         <IconButton size="sm" onClick={() => handleEdit(connection)} className="p-1">
                           <Edit2 className="w-3.5 h-3.5" />
@@ -221,7 +202,9 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                       </Tooltip>
                     </div>
                   </div>
-                  <div className="text-xs text-text-tertiary">
+
+                  {/* Row 2: Type + Host */}
+                  <div className="text-xs text-text-tertiary mb-2">
                     <span className="px-1.5 py-0.5 rounded bg-bg-tertiary">
                       {getTypeIcon(connection.type)}
                     </span>
@@ -235,6 +218,27 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                       </span>
                     )}
                   </div>
+
+                  {/* Row 3: Connect/Disconnect Button */}
+                  <Button
+                    variant={connected ? "outline" : "primary"}
+                    size="sm"
+                    className="w-full"
+                    onClick={() => handleConnect(connection.id)}
+                    disabled={isLoading}
+                  >
+                    {connected ? (
+                      <>
+                        <PlugZap className="w-3.5 h-3.5 mr-1.5 text-green-500" />
+                        Disconnect
+                      </>
+                    ) : (
+                      <>
+                        <Plug className="w-3.5 h-3.5 mr-1.5" />
+                        Connect
+                      </>
+                    )}
+                  </Button>
                 </div>
               );
             })}

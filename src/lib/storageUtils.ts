@@ -155,4 +155,12 @@ export const DATA_CATEGORIES: DataCategory[] = [
     canExport: false,
     canClear: true,
   },
+  {
+    id: "backup",
+    name: "Backup Config",
+    description: "Encrypted web backup configuration (Netlify token, site info)",
+    keys: ["wynter-code-web-backup"],
+    canExport: false,
+    canClear: true,
+  },
 ];

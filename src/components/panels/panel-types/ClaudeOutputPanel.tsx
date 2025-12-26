@@ -9,6 +9,7 @@ import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { claudeService } from "@/services/claude";
+import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps } from "@/types/panel";
 import type { PermissionMode, ToolCall } from "@/types";
@@ -175,6 +176,8 @@ export function ClaudeOutputPanel({
               input: {},
               status: needsPermission ? "pending" : "running",
             });
+            // Notify Farmwork Tycoon bridge
+            farmworkBridge.onToolStart(toolName, toolId);
           },
           onToolInputDelta: (toolId, partialJson) => {
             appendToolInput(sessionId, toolId, partialJson);
@@ -186,6 +189,8 @@ export function ClaudeOutputPanel({
             updateToolCallStatus(sessionId, toolId, status, content, isError);
             // Add separator so subsequent text appears as new block
             appendStreamingText(sessionId, "\n\n");
+            // Notify Farmwork Tycoon bridge
+            farmworkBridge.onToolComplete(toolId, isError ?? false);
           },
           onAskUserQuestion: (toolId, input) => {
             // Convert to PendingQuestionSet format

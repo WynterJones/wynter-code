@@ -6,3 +6,4 @@ export { SchemaViewer } from "./SchemaViewer";
 export { DataGrid } from "./DataGrid";
 export { RowForm } from "./RowForm";
 export { SqlRunner } from "./SqlRunner";
+export { JsonViewerModal } from "./JsonViewerModal";

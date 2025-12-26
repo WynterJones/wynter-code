@@ -50,6 +50,8 @@ export function TycoonGame({
     addActivity,
     gardenStats,
     simulatedFlowerCount,
+    celebrationQueue,
+    clearCelebrationQueue,
   } = useFarmworkTycoonStore();
 
   const initializeNavigation = useCallback(async () => {
@@ -427,6 +429,27 @@ export function TycoonGame({
     // Scale the stage so the 1000x1000 game fits in the display size
     app.stage.scale.set(scale, scale);
   }, [scale]);
+
+  // Handle celebration queue - emit confetti for buildings that hit 10/10
+  useEffect(() => {
+    if (celebrationQueue.length === 0 || !particleEmitterRef.current) return;
+
+    // Emit celebration particles for each building in queue
+    for (const buildingId of celebrationQueue) {
+      const building = buildings.find((b) => b.id === buildingId);
+      if (building) {
+        const position = {
+          x: BUILDING_POSITIONS[building.type as BuildingType].dockX,
+          y: BUILDING_POSITIONS[building.type as BuildingType].dockY - 30, // Above the dock
+        };
+        console.log(`[Tycoon] Celebrating ${building.name} at`, position);
+        particleEmitterRef.current.emitCelebration(position);
+      }
+    }
+
+    // Clear the celebration queue
+    clearCelebrationQueue();
+  }, [celebrationQueue, buildings, clearCelebrationQueue]);
 
   useEffect(() => {
     for (const buildingData of buildings) {

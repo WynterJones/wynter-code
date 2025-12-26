@@ -624,7 +624,7 @@ export const useSessionStore = create<SessionStore>()(
             const migrated = sessions.map((s) => ({
               ...s,
               type: s.type || "claude" as const,
-              permissionMode: s.permissionMode || "default" as const,
+              permissionMode: s.permissionMode || "acceptEdits" as const,
               color: s.color || undefined,
             }));
             migratedSessions.set(projectId, migrated);

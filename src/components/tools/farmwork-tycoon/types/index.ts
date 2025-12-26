@@ -65,6 +65,7 @@ export interface Vehicle {
   speed: number;
   carrying: boolean;
   direction: VehicleDirection;
+  tint?: number; // Hex color for PixiJS sprite tinting (tool call visualization)
 }
 
 export type ActivityEventType =
@@ -74,7 +75,12 @@ export type ActivityEventType =
   | "audit_updated"
   | "vehicle_arrived"
   | "idea_added"
-  | "idea_composted";
+  | "idea_composted"
+  | "tool_started"
+  | "tool_completed"
+  | "subagent_started"
+  | "subagent_completed"
+  | "celebration";
 
 export interface ActivityEvent {
   id: string;
@@ -163,6 +169,7 @@ export interface FarmworkTycoonState {
 
   navGraph: NavGraph | null;
   simulatedFlowerCount: number | null;
+  celebrationQueue: string[]; // Building IDs that just hit 10/10
 
   initialize: (projectPath: string) => Promise<void>;
   pause: () => void;
@@ -178,12 +185,14 @@ export interface FarmworkTycoonState {
   setNavGraph: (graph: NavGraph) => void;
   updateVehiclePosition: (vehicleId: string, position: Point) => void;
   spawnVehicle: (destination: string, returnDestination?: string) => string;
+  spawnVehicleWithTint: (destination: string, tint: number) => string;
   spawnVehicleWithRoute: (route: string[]) => string;
   removeVehicle: (vehicleId: string) => void;
   setVehicleCarrying: (vehicleId: string, carrying: boolean) => void;
   startTestRun: () => void;
   clearAllVehicles: () => void;
   setSimulatedFlowerCount: (count: number | null) => void;
+  clearCelebrationQueue: () => void;
 }
 
 export const BUILDING_COLORS: Record<BuildingType, string> = {

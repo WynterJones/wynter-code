@@ -524,6 +524,10 @@ export function ProjectTabBar({
         case "openNetlifyFtp":
           setShowNetlifyFtp(true);
           break;
+        case "openWebBackup":
+          // Open settings to the backup tab
+          window.dispatchEvent(new CustomEvent("open-settings", { detail: { tab: "backup" } }));
+          break;
         case "openBookmarks":
           setShowBookmarks(true);
           break;

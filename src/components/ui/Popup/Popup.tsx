@@ -139,7 +139,7 @@ function PopupContent({
   return (
     <div
       className={cn(
-        "overflow-auto",
+        "flex-1 min-h-0 overflow-auto",
         PADDING_CLASSES[padding],
         className
       )}

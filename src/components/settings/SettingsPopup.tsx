@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -20,11 +20,12 @@ import { ColorsTab } from "./ColorsTab";
 import { CompressionSettings } from "./CompressionSettings";
 import { AvatarSettings } from "./AvatarSettings";
 import { DataManagementTab } from "./DataManagementTab";
+import { WebBackupTab } from "./WebBackupTab";
 import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector";
 import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
 import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
 
-type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "farmwork" | "about";
+type SettingsTab = "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "farmwork" | "about";
 
 interface SettingsPopupProps {
   onClose: () => void;
@@ -94,6 +95,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     { id: "keyboard", label: "Keyboard", icon: Keyboard },
     { id: "avatar", label: "Avatar", icon: UserCircle },
     { id: "data", label: "Data", icon: HardDrive },
+    { id: "backup", label: "Backup", icon: CloudUpload },
     { id: "farmwork", label: "Farmwork", icon: Sprout },
     { id: "about", label: "About", icon: Info },
   ];
@@ -192,6 +194,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
               {activeTab === "keyboard" && <KeyboardShortcutsSection />}
               {activeTab === "avatar" && <AvatarSettings />}
               {activeTab === "data" && <DataManagementTab />}
+              {activeTab === "backup" && <WebBackupTab />}
               {activeTab === "farmwork" && <FarmworkTab />}
               {activeTab === "about" && <AboutSection />}
             </div>
