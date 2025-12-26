@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ShieldCheck, ShieldAlert, FileText, ChevronDown, Check } from "lucide-react";
+import { ShieldCheck, ShieldAlert, FileText, ChevronDown, Check, ShieldQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PermissionMode } from "@/types";
 
@@ -17,8 +17,15 @@ interface ModeOption {
   description: string;
 }
 
-// Order: Auto first (default), Bypass, Plan last
+// Order: Manual, Auto, Bypass, Plan
 const modeOptions: ModeOption[] = [
+  {
+    value: "manual",
+    icon: ShieldQuestion,
+    label: "Manual",
+    color: "text-accent-blue",
+    description: "Approve each tool manually",
+  },
   {
     value: "acceptEdits",
     icon: ShieldCheck,

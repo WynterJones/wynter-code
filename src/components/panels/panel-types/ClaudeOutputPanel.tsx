@@ -12,7 +12,7 @@ import { claudeService } from "@/services/claude";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps } from "@/types/panel";
-import type { PermissionMode, ToolCall } from "@/types";
+import type { PermissionMode, ToolCall, McpPermissionRequest } from "@/types";
 
 // In stream-json mode, there's no interactive tool approval.
 // The CLI auto-approves or auto-rejects based on --permission-mode:
@@ -60,12 +60,14 @@ export function ClaudeOutputPanel({
     updateClaudeSessionId,
     getSession,
     setPendingQuestionSet,
+    updateSessionPermissionMode,
   } = useSessionStore();
   const { claudeSafeMode } = useSettingsStore();
 
   const [activityHeight, setActivityHeight] = useState(DEFAULT_ACTIVITY_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
   const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
+  const [pendingMcpRequest, setPendingMcpRequest] = useState<McpPermissionRequest | null>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
 
   // Use panel's sessionId if set, otherwise fall back to active session
@@ -79,6 +81,7 @@ export function ClaudeOutputPanel({
   const isStreaming = streamingState?.isStreaming || false;
   const isSessionActive = claudeSessionState?.status === "ready";
   const isSessionStarting = claudeSessionState?.status === "starting";
+  const isPlanMode = currentSession?.permissionMode === "plan";
 
   // Update process running state
   useEffect(() => {
@@ -224,6 +227,10 @@ export function ClaudeOutputPanel({
             console.error("[ClaudeOutputPanel] Error:", error);
             appendStreamingText(sessionId, `\nError: ${error}`);
           },
+          onPermissionRequest: (request) => {
+            console.log("[ClaudeOutputPanel] MCP Permission request:", request);
+            setPendingMcpRequest(request);
+          },
         },
         permissionMode,
         resumeSessionId,
@@ -314,6 +321,138 @@ export function ClaudeOutputPanel({
     [sessionId, updateToolCallStatus]
   );
 
+  // MCP Permission handlers (for manual mode)
+  const handleMcpApprove = useCallback(async () => {
+    if (!pendingMcpRequest) return;
+    try {
+      await claudeService.respondToPermission(pendingMcpRequest.id, true);
+      setPendingMcpRequest(null);
+    } catch (error) {
+      console.error("Failed to approve MCP permission:", error);
+    }
+  }, [pendingMcpRequest]);
+
+  const handleMcpReject = useCallback(async () => {
+    if (!pendingMcpRequest) return;
+    try {
+      await claudeService.respondToPermission(pendingMcpRequest.id, false);
+      setPendingMcpRequest(null);
+    } catch (error) {
+      console.error("Failed to reject MCP permission:", error);
+    }
+  }, [pendingMcpRequest]);
+
+  // Execute Plan - switch from plan mode to acceptEdits and restart session
+  const handleExecutePlan = useCallback(async () => {
+    if (!sessionId || !projectPath || !isPlanMode) return;
+
+    try {
+      // Stop current session
+      await claudeService.stopSession(sessionId);
+      setClaudeSessionEnded(sessionId);
+
+      // Update permission mode to acceptEdits
+      updateSessionPermissionMode(sessionId, "acceptEdits");
+
+      // Wait a bit for cleanup
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Restart session with new mode
+      const session = getSession(sessionId);
+      const resumeSessionId = session?.claudeSessionId || undefined;
+
+      setClaudeSessionStarting(sessionId);
+
+      await claudeService.startSession(
+        projectPath,
+        sessionId,
+        {
+          onSessionStarting: () => {
+            console.log("[ClaudeOutputPanel] Session starting (execute plan)...");
+          },
+          onSessionReady: (info) => {
+            console.log("[ClaudeOutputPanel] Session ready (execute plan):", info);
+            setClaudeSessionReady(sessionId, info);
+            if (info.claudeSessionId) {
+              updateClaudeSessionId(sessionId, info.claudeSessionId);
+            }
+          },
+          onSessionEnded: (reason) => {
+            console.log("[ClaudeOutputPanel] Session ended (execute plan):", reason);
+            setClaudeSessionEnded(sessionId);
+            finishStreaming(sessionId);
+          },
+          onText: (text) => appendStreamingText(sessionId, text),
+          onThinking: (text) => appendThinkingText(sessionId, text),
+          onThinkingStart: () => setThinking(sessionId, true),
+          onThinkingEnd: () => setThinking(sessionId, false),
+          onToolStart: (toolName, toolId) => {
+            addPendingToolCall(sessionId, {
+              id: toolId,
+              name: toolName,
+              input: {},
+              status: "running",
+            });
+            farmworkBridge.onToolStart(toolName, toolId);
+          },
+          onToolInputDelta: (toolId, partialJson) => appendToolInput(sessionId, toolId, partialJson),
+          onToolEnd: () => {},
+          onToolResult: (toolId, content, isError) => {
+            updateToolCallStatus(sessionId, toolId, isError ? "error" : "completed", content, isError);
+            appendStreamingText(sessionId, "\n\n");
+            farmworkBridge.onToolComplete(toolId, isError ?? false);
+          },
+          onAskUserQuestion: (toolId, input) => {
+            const questions = input.questions.map((q, idx) => ({
+              id: `${toolId}-q${idx}`,
+              header: q.header || `Question ${idx + 1}`,
+              question: q.question,
+              options: q.options,
+              multiSelect: q.multiSelect,
+            }));
+            setPendingQuestionSet(sessionId, { id: uuid(), toolId, questions });
+          },
+          onInit: (model, _cwd, claudeSessionId) => {
+            updateStats(sessionId, { model });
+            if (claudeSessionId) updateClaudeSessionId(sessionId, claudeSessionId);
+          },
+          onUsage: (stats) => updateStats(sessionId, stats),
+          onResult: () => finishStreaming(sessionId),
+          onError: (error) => {
+            console.error("[ClaudeOutputPanel] Error (execute plan):", error);
+            appendStreamingText(sessionId, `\nError: ${error}`);
+          },
+        },
+        "acceptEdits",
+        resumeSessionId,
+        claudeSafeMode
+      );
+    } catch (error) {
+      console.error("[ClaudeOutputPanel] Failed to execute plan:", error);
+      setClaudeSessionEnded(sessionId);
+    }
+  }, [
+    sessionId,
+    projectPath,
+    isPlanMode,
+    setClaudeSessionEnded,
+    updateSessionPermissionMode,
+    getSession,
+    setClaudeSessionStarting,
+    setClaudeSessionReady,
+    updateClaudeSessionId,
+    finishStreaming,
+    appendStreamingText,
+    appendThinkingText,
+    setThinking,
+    addPendingToolCall,
+    appendToolInput,
+    updateToolCallStatus,
+    updateStats,
+    setPendingQuestionSet,
+    claudeSafeMode,
+  ]);
+
   const handleQuestionSubmit = useCallback(
     async (answers: Record<string, string[]>) => {
       if (!sessionId || !pendingQuestionSet) return;
@@ -400,18 +539,30 @@ export function ClaudeOutputPanel({
             Starting...
           </div>
         ) : (
-          <button
-            onClick={handleStopSession}
-            className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors"
-          >
-            <Square className="w-3 h-3" />
-            Stop Session
-          </button>
+          <>
+            <button
+              onClick={handleStopSession}
+              className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors"
+            >
+              <Square className="w-3 h-3" />
+              Stop Session
+            </button>
+            {isPlanMode && (
+              <button
+                onClick={handleExecutePlan}
+                className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-accent-green/20 hover:bg-accent-green/30 text-accent-green transition-colors"
+              >
+                <Play className="w-3 h-3" />
+                Execute Plan
+              </button>
+            )}
+          </>
         )}
 
         {isSessionActive && claudeSessionState && (
           <span className="text-[10px] text-text-secondary/60">
             {claudeSessionState.model || "Claude"} • Session Active
+            {isPlanMode && " (Plan Mode)"}
           </span>
         )}
       </div>
@@ -496,6 +647,20 @@ export function ClaudeOutputPanel({
           toolCall={pendingApprovalTool}
           onApprove={() => handleApprove(pendingApprovalTool.id)}
           onReject={() => handleReject(pendingApprovalTool.id)}
+        />
+      )}
+
+      {/* MCP Permission modal - for manual mode permission requests */}
+      {pendingMcpRequest && (
+        <PermissionApprovalModal
+          toolCall={{
+            id: pendingMcpRequest.id,
+            name: pendingMcpRequest.toolName,
+            input: pendingMcpRequest.input,
+            status: "pending",
+          }}
+          onApprove={handleMcpApprove}
+          onReject={handleMcpReject}
         />
       )}
 

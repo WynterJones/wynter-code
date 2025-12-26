@@ -1,6 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import type { StreamChunk, ClaudeModel, StreamingStats, PermissionMode } from "@/types";
+import type { StreamChunk, ClaudeModel, StreamingStats, PermissionMode, McpPermissionRequest } from "@/types";
+
+export interface McpPermissionEvent {
+  request: McpPermissionRequest;
+}
 
 interface CommandOutput {
   stdout: string;
@@ -42,6 +46,7 @@ export interface ClaudeSessionCallbacks {
   onUsage: (stats: Partial<StreamingStats>) => void;
   onResult: (result: string) => void;
   onError: (error: string) => void;
+  onPermissionRequest?: (request: McpPermissionRequest) => void;
 }
 
 class ClaudeService {
@@ -49,6 +54,8 @@ class ClaudeService {
 
   // Per-session state Maps
   private _unlistenMap = new Map<string, UnlistenFn>();
+  private _mcpUnlistenMap = new Map<string, UnlistenFn>();
+  private _mcpPortMap = new Map<string, number>();
   private _sessionActiveMap = new Map<string, boolean>();
   private _currentToolIdMap = new Map<string, string | null>();
   private _currentToolNameMap = new Map<string, string | null>();
@@ -66,6 +73,53 @@ class ClaudeService {
   /** Check if a specific session is active */
   isSessionActive(sessionId: string): boolean {
     return this._sessionActiveMap.get(sessionId) || false;
+  }
+
+  /** Start the MCP permission server for manual mode */
+  async startMcpPermissionServer(sessionId: string): Promise<number> {
+    const port = await invoke<number>("start_mcp_permission_server", { sessionId });
+    this._mcpPortMap.set(sessionId, port);
+    console.log("[ClaudeService] MCP permission server started on port:", port);
+    return port;
+  }
+
+  /** Stop the MCP permission server */
+  async stopMcpPermissionServer(): Promise<void> {
+    await invoke("stop_mcp_permission_server");
+  }
+
+  /** Respond to an MCP permission request */
+  async respondToPermission(
+    requestId: string,
+    approved: boolean,
+    updatedInput?: Record<string, unknown>
+  ): Promise<void> {
+    await invoke("respond_to_mcp_permission", {
+      requestId,
+      approved,
+      updatedInput: updatedInput ? JSON.stringify(updatedInput) : null,
+    });
+  }
+
+  /** Set up MCP permission event listener for a session */
+  private async setupMcpPermissionListener(sessionId: string): Promise<void> {
+    const unlisten = await listen<McpPermissionEvent>("mcp-permission-request", (event) => {
+      const { request } = event.payload;
+
+      // Only process requests for this session
+      if (request.sessionId !== sessionId) {
+        return;
+      }
+
+      console.log("[ClaudeService] MCP permission request:", request);
+
+      const cb = this._callbacksMap.get(sessionId);
+      if (cb?.onPermissionRequest) {
+        cb.onPermissionRequest(request);
+      }
+    });
+
+    this._mcpUnlistenMap.set(sessionId, unlisten);
   }
 
   /** Start a persistent Claude session */
@@ -281,6 +335,14 @@ class ClaudeService {
     this._unlistenMap.set(sessionId, unlisten);
 
     try {
+      // For manual mode, start MCP permission server first
+      let mcpPermissionPort: number | undefined;
+      if (permissionMode === "manual") {
+        console.log("[ClaudeService] Starting MCP permission server for manual mode...");
+        mcpPermissionPort = await this.startMcpPermissionServer(sessionId);
+        await this.setupMcpPermissionListener(sessionId);
+      }
+
       console.log("[ClaudeService] Invoking start_claude_session...");
       await invoke("start_claude_session", {
         cwd,
@@ -288,6 +350,7 @@ class ClaudeService {
         permissionMode,
         resumeSessionId,
         safeMode,
+        mcpPermissionPort,
       });
       console.log("[ClaudeService] start_claude_session invoke succeeded");
     } catch (error) {
@@ -349,6 +412,19 @@ class ClaudeService {
     if (unlisten) {
       unlisten();
       this._unlistenMap.delete(sessionId);
+    }
+
+    // Clean up MCP permission resources
+    const mcpUnlisten = this._mcpUnlistenMap.get(sessionId);
+    if (mcpUnlisten) {
+      mcpUnlisten();
+      this._mcpUnlistenMap.delete(sessionId);
+    }
+
+    if (this._mcpPortMap.has(sessionId)) {
+      this._mcpPortMap.delete(sessionId);
+      // Stop the MCP permission server (fire and forget)
+      this.stopMcpPermissionServer().catch(console.error);
     }
   }
 

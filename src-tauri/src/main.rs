@@ -11,6 +11,7 @@ mod cost_popup;
 mod database_viewer;
 mod domain_tools;
 mod live_preview;
+mod mcp_permission_server;
 mod overwatch;
 mod storybook;
 mod terminal;
@@ -208,6 +209,7 @@ fn main() {
         .manage(Arc::new(storybook::StorybookManager::new()))
         .manage(Arc::new(database_viewer::DatabaseManager::new()))
         .manage(Arc::new(claude_process::ClaudeProcessManager::new()))
+        .manage(Arc::new(mcp_permission_server::McpPermissionManager::new()))
         .manage(Arc::new(audio_proxy::AudioProxyManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
@@ -342,6 +344,11 @@ fn main() {
             claude_process::terminate_claude_session,
             claude_process::is_claude_session_active,
             claude_process::list_active_claude_sessions,
+            // MCP Permission Server
+            mcp_permission_server::start_mcp_permission_server,
+            mcp_permission_server::stop_mcp_permission_server,
+            mcp_permission_server::respond_to_mcp_permission,
+            mcp_permission_server::get_mcp_permission_port,
             // Webcam Window Management
             webcam_window::create_floating_webcam_window,
             webcam_window::close_floating_webcam_window,

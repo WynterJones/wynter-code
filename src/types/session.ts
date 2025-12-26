@@ -59,7 +59,7 @@ export interface StreamingChunk {
   sessionId?: string;
 }
 
-export type PermissionMode = "default" | "plan" | "acceptEdits" | "bypassPermissions";
+export type PermissionMode = "default" | "plan" | "acceptEdits" | "bypassPermissions" | "manual";
 
 export type ResultSubtype = 'success' | 'error_max_turns' | 'error_during_execution';
 
@@ -113,4 +113,17 @@ export interface ToolApproval {
   toolName: string;
   toolInput: Record<string, unknown>;
   status: "pending" | "approved" | "rejected";
+}
+
+export interface McpPermissionRequest {
+  id: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  sessionId: string;
+}
+
+export interface McpPermissionResponse {
+  behavior: "allow" | "deny";
+  updatedInput?: Record<string, unknown>;
+  message?: string;
 }

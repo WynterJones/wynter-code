@@ -544,6 +544,8 @@ pub enum PermissionMode {
     AcceptEdits,
     #[serde(rename = "bypassPermissions")]
     BypassPermissions,
+    #[serde(rename = "manual")]
+    Manual,
 }
 
 impl Default for PermissionMode {
@@ -559,6 +561,7 @@ impl PermissionMode {
             PermissionMode::Plan => "plan",
             PermissionMode::AcceptEdits => "acceptEdits",
             PermissionMode::BypassPermissions => "bypassPermissions",
+            PermissionMode::Manual => "manual",
         }
     }
 }

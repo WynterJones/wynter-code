@@ -44,6 +44,7 @@ pub async fn start_claude_session(
     permission_mode: Option<PermissionMode>,
     resume_session_id: Option<String>,
     safe_mode: Option<bool>,
+    mcp_permission_port: Option<u16>,
 ) -> Result<String, String> {
     // Check if session is already running
     {
@@ -64,10 +65,22 @@ pub async fn start_claude_session(
         mode = PermissionMode::AcceptEdits;
     }
 
+    // For Manual mode, we use permission-prompt-tool with our MCP server
+    // This requires setting up MCP config and passing the port
+    let is_manual_mode = mode == PermissionMode::Manual;
+
     // Build args for streaming JSON mode with persistent stdin
     // Note: In stream-json mode, there's no interactive tool approval.
     // Tools are either auto-approved (based on permission-mode) or auto-rejected.
     // The result message includes `permission_denials` for rejected tools.
+    // For Manual mode, we use permission-prompt-tool to intercept all tool calls.
+    let effective_mode = if is_manual_mode {
+        // In manual mode, we use "default" permission mode but intercept via MCP
+        PermissionMode::Default
+    } else {
+        mode.clone()
+    };
+
     let mut args = vec![
         "-p".to_string(),              // Print mode (required for stream-json)
         "--input-format".to_string(),
@@ -76,8 +89,14 @@ pub async fn start_claude_session(
         "stream-json".to_string(),     // JSON output via stdout
         "--verbose".to_string(),       // Required for stream-json
         "--permission-mode".to_string(),
-        mode.as_str().to_string(),
+        effective_mode.as_str().to_string(),
     ];
+
+    // For manual mode, add permission-prompt-tool flag
+    if is_manual_mode {
+        args.push("--permission-prompt-tool".to_string());
+        args.push("mcp__wynter__approve_tool".to_string());
+    }
 
     // If we have a Claude session ID to resume, add it
     if let Some(ref claude_sid) = resume_session_id {
@@ -96,6 +115,59 @@ pub async fn start_claude_session(
 
     eprintln!("[Claude] Starting persistent session with args: {:?}", args);
     eprintln!("[Claude] Working directory: {}", cwd);
+    if is_manual_mode {
+        eprintln!("[Claude] Manual mode enabled with MCP permission server");
+    }
+
+    // Create MCP config for manual mode
+    let mcp_config_path = if is_manual_mode {
+        let port = mcp_permission_port.ok_or("MCP permission port required for manual mode")?;
+
+        // Get the path to our MCP script
+        let exe_path = std::env::current_exe().map_err(|e| format!("Failed to get exe path: {}", e))?;
+        let app_dir = exe_path.parent().ok_or("Failed to get app directory")?;
+
+        // For development, the script is in the project root's scripts folder
+        // For production, it should be bundled with the app
+        let script_path = if cfg!(debug_assertions) {
+            // Development: use project scripts folder
+            std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .join("scripts")
+                .join("mcp-permission-server.mjs")
+        } else {
+            // Production: use bundled script
+            app_dir.join("scripts").join("mcp-permission-server.mjs")
+        };
+
+        let mcp_config = serde_json::json!({
+            "mcpServers": {
+                "wynter": {
+                    "command": "node",
+                    "args": [script_path.to_string_lossy()],
+                    "env": {
+                        "WYNTER_MCP_PORT": port.to_string()
+                    }
+                }
+            }
+        });
+
+        // Write config to temp file
+        let config_path = std::env::temp_dir().join(format!("wynter-mcp-config-{}.json", session_id));
+        std::fs::write(&config_path, serde_json::to_string_pretty(&mcp_config).unwrap())
+            .map_err(|e| format!("Failed to write MCP config: {}", e))?;
+
+        Some(config_path)
+    } else {
+        None
+    };
+
+    // Add MCP config path if in manual mode
+    if let Some(ref config_path) = mcp_config_path {
+        args.push("--mcp-config".to_string());
+        args.push(config_path.to_string_lossy().to_string());
+    }
 
     let mut child = Command::new("claude")
         .args(&args)
@@ -404,6 +476,7 @@ pub async fn start_claude_streaming(
         permission_mode,
         claude_session_id,
         None, // safe_mode defaults to true
+        None, // mcp_permission_port not used in deprecated function
     )
     .await?;
 
