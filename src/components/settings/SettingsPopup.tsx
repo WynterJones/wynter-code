@@ -63,6 +63,8 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     compactProjectTabs,
     dimInactiveProjects,
     terminalShell,
+    terminalFontSize,
+    terminalCursorBlink,
     setEditorTheme,
     setEditorFontSize,
     setEditorWordWrap,
@@ -75,6 +77,8 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     setCompactProjectTabs,
     setDimInactiveProjects,
     setTerminalShell,
+    setTerminalFontSize,
+    setTerminalCursorBlink,
   } = useSettingsStore();
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
@@ -174,7 +178,11 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
               {activeTab === "terminal" && (
                 <TerminalSettings
                   terminalShell={terminalShell}
+                  terminalFontSize={terminalFontSize}
+                  terminalCursorBlink={terminalCursorBlink}
                   onTerminalShellChange={setTerminalShell}
+                  onTerminalFontSizeChange={setTerminalFontSize}
+                  onTerminalCursorBlinkChange={setTerminalCursorBlink}
                 />
               )}
               {activeTab === "keyboard" && <KeyboardShortcutsSection />}
@@ -712,12 +720,20 @@ function MusicSettings({
 
 interface TerminalSettingsProps {
   terminalShell: TerminalShell;
+  terminalFontSize: number;
+  terminalCursorBlink: boolean;
   onTerminalShellChange: (shell: TerminalShell) => void;
+  onTerminalFontSizeChange: (size: number) => void;
+  onTerminalCursorBlinkChange: (blink: boolean) => void;
 }
 
 function TerminalSettings({
   terminalShell,
+  terminalFontSize,
+  terminalCursorBlink,
   onTerminalShellChange,
+  onTerminalFontSizeChange,
+  onTerminalCursorBlinkChange,
 }: TerminalSettingsProps) {
   return (
     <div className="space-y-6">
@@ -767,14 +783,61 @@ function TerminalSettings({
         </div>
       </div>
 
+      {/* Font Size */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-text-primary">
+            Font Size
+          </label>
+          <span className="text-sm text-text-secondary">{terminalFontSize}px</span>
+        </div>
+        <input
+          type="range"
+          min="10"
+          max="24"
+          value={terminalFontSize}
+          onChange={(e) => onTerminalFontSizeChange(Number(e.target.value))}
+          className="w-full accent-accent"
+        />
+        <div className="flex justify-between text-xs text-text-secondary">
+          <span>10px</span>
+          <span>24px</span>
+        </div>
+      </div>
+
+      {/* Cursor Blink */}
+      <div className="flex items-center justify-between">
+        <div>
+          <label className="text-sm font-medium text-text-primary">
+            Cursor Blink
+          </label>
+          <p className="text-xs text-text-secondary">
+            Enable blinking cursor animation
+          </p>
+        </div>
+        <button
+          onClick={() => onTerminalCursorBlinkChange(!terminalCursorBlink)}
+          className={cn(
+            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+            terminalCursorBlink ? "bg-accent" : "bg-bg-tertiary border border-border"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+              terminalCursorBlink ? "translate-x-6" : "translate-x-1"
+            )}
+          />
+        </button>
+      </div>
+
       <div className="p-4 rounded-lg bg-bg-secondary border border-border">
         <h3 className="text-sm font-medium text-text-primary mb-2">
           Note
         </h3>
         <p className="text-xs text-text-secondary">
-          Changes apply to new terminal sessions. Close and reopen the terminal
-          to use the new shell. &quot;System Default&quot; uses your operating system&apos;s
-          default shell (usually set in $SHELL).
+          Shell changes apply to new terminal sessions. Close and reopen the terminal
+          to use the new shell. Font size and cursor settings apply immediately to new terminals.
         </p>
       </div>
     </div>

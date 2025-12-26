@@ -54,11 +54,15 @@ pub async fn start_claude_session(
 
     let mode = permission_mode.unwrap_or_default();
 
-    // Build args for INTERACTIVE mode (no -p flag)
+    // Build args for streaming JSON mode with persistent stdin
+    // Note: --output-format and --input-format only work with -p (print) mode
     let mut args = vec![
+        "-p".to_string(), // Print mode (required for stream-json)
+        "--input-format".to_string(),
+        "stream-json".to_string(), // JSON input via stdin
         "--output-format".to_string(),
-        "stream-json".to_string(),
-        "--verbose".to_string(),
+        "stream-json".to_string(), // JSON output via stdout
+        "--verbose".to_string(),   // Required for stream-json
         "--permission-mode".to_string(),
         mode.as_str().to_string(),
     ];
@@ -87,21 +91,16 @@ pub async fn start_claude_session(
         .env("HOME", &home)
         .env("PATH", &enhanced_path)
         .env("TERM", "xterm-256color")
+        .env("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "200000")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to spawn Claude CLI: {} (PATH={})", e, enhanced_path))?;
 
-    let stdout = child
-        .stdout
-        .take()
-        .ok_or("Failed to capture stdout")?;
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
 
-    let stderr = child
-        .stderr
-        .take()
-        .ok_or("Failed to capture stderr")?;
+    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
 
     let stdin = child.stdin.take();
 
@@ -122,6 +121,15 @@ pub async fn start_claude_session(
     {
         let mut chunk = create_chunk("session_starting", &session_id);
         chunk.content = Some(format!("Starting Claude session in {}", cwd));
+        let _ = window.emit("claude-stream", &chunk);
+    }
+
+    // In stream-json mode, Claude CLI doesn't output init JSON until the first message is received.
+    // So we emit session_ready immediately after spawning - the session IS ready to receive messages.
+    {
+        let mut chunk = create_chunk("session_ready", &session_id);
+        chunk.content = Some(format!("Session ready in {}", cwd));
+        chunk.model = Some("claude".to_string()); // Will be updated when we get actual init
         let _ = window.emit("claude-stream", &chunk);
     }
 
@@ -148,17 +156,25 @@ pub async fn start_claude_session(
     let session_for_reader = session_id.clone();
 
     std::thread::spawn(move || {
-        eprintln!("[Claude] Stdout reader thread started for session: {}", session_for_reader);
+        eprintln!(
+            "[Claude] Stdout reader thread started for session: {}",
+            session_for_reader
+        );
+        eprintln!("[Claude] About to create BufReader...");
         let reader = BufReader::new(stdout);
+        eprintln!("[Claude] BufReader created, starting to read lines...");
         let mut captured_claude_session_id: Option<String> = resume_session_id.clone();
         let mut line_count = 0;
         let mut session_ready = false;
 
         for line in reader.lines() {
+            eprintln!("[Claude] Got a line from reader...");
             match line {
                 Ok(line) if !line.is_empty() => {
                     line_count += 1;
-                    eprintln!("[Claude STDOUT #{}] {}", line_count, &line[..std::cmp::min(200, line.len())]);
+                    // Safely truncate at char boundary for logging
+                    let log_preview: String = line.chars().take(200).collect();
+                    eprintln!("[Claude STDOUT #{}] {}", line_count, log_preview);
 
                     // Try to parse as JSON
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
@@ -173,11 +189,17 @@ pub async fn start_claude_session(
 
                         if subtype == "init" || (msg_type == "system" && subtype == "init") {
                             session_ready = true;
-                            eprintln!("[Claude] Session ready! Claude session ID: {:?}", captured_claude_session_id);
+                            eprintln!(
+                                "[Claude] Session ready! Claude session ID: {:?}",
+                                captured_claude_session_id
+                            );
 
                             // Emit session_ready event with full init info
                             let mut chunk = create_chunk("session_ready", &session_for_reader);
-                            chunk.model = json.get("model").and_then(|v| v.as_str()).map(|s| s.to_string());
+                            chunk.model = json
+                                .get("model")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
                             chunk.content = Some(line.clone()); // Include full init JSON
                             chunk.claude_session_id = captured_claude_session_id.clone();
                             let _ = window_clone.emit("claude-stream", &chunk);
@@ -208,7 +230,10 @@ pub async fn start_claude_session(
         }
 
         // Process has ended
-        eprintln!("[Claude] Stdout reader finished. Total lines: {}. Session ready: {}", line_count, session_ready);
+        eprintln!(
+            "[Claude] Stdout reader finished. Total lines: {}. Session ready: {}",
+            line_count, session_ready
+        );
 
         let mut chunk = create_chunk("session_ended", &session_for_reader);
         chunk.content = Some(format!("Session ended after {} lines", line_count));
@@ -224,6 +249,8 @@ pub async fn start_claude_session(
 }
 
 /// Send input to a running Claude session (prompts, tool approvals, etc.)
+/// For prompts, we format as JSON: {"type":"user","message":{"role":"user","content":"..."}}
+/// For raw input (like tool approvals), pass is_raw=true via send_claude_raw_input
 #[tauri::command]
 pub async fn send_claude_input(
     state: State<'_, Arc<ClaudeProcessManager>>,
@@ -234,9 +261,23 @@ pub async fn send_claude_input(
 
     if let Some(instance) = instances.get_mut(&session_id) {
         if let Some(ref mut stdin) = instance.stdin {
-            eprintln!("[Claude] Sending input to session {}: {}", session_id, &input[..std::cmp::min(50, input.len())]);
+            // Format as streaming JSON user message
+            let json_input = serde_json::json!({
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": input.trim_end_matches('\n')
+                }
+            });
+            let formatted = format!("{}\n", json_input);
+
+            eprintln!(
+                "[Claude] Sending JSON input to session {}: {}",
+                session_id,
+                &formatted[..std::cmp::min(100, formatted.len())]
+            );
             stdin
-                .write_all(input.as_bytes())
+                .write_all(formatted.as_bytes())
                 .map_err(|e| format!("Failed to write to Claude stdin: {}", e))?;
             stdin
                 .flush()
@@ -260,14 +301,12 @@ pub async fn stop_claude_session(
     let mut instances = state.instances.lock().unwrap();
 
     if let Some(mut instance) = instances.remove(&session_id) {
-        // Try to send /exit command first for graceful shutdown
-        if let Some(ref mut stdin) = instance.stdin {
-            let _ = stdin.write_all(b"/exit\n");
-            let _ = stdin.flush();
-        }
+        // In stream-json mode, we can't send /exit - just close stdin and kill
+        // Drop stdin to close it
+        drop(instance.stdin.take());
 
-        // Give it a moment, then force kill if still running
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        // Give it a moment to exit gracefully, then force kill
+        std::thread::sleep(std::time::Duration::from_millis(200));
         let _ = instance.child.kill();
 
         // Emit session_ended event
@@ -321,7 +360,8 @@ pub async fn start_claude_streaming(
         session_id.clone(),
         permission_mode,
         claude_session_id,
-    ).await?;
+    )
+    .await?;
 
     // Send the prompt
     send_claude_input(state, session_id.clone(), format!("{}\n", prompt)).await?;

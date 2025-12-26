@@ -44,9 +44,18 @@ importers:
       '@types/gif.js':
         specifier: ^0.2.5
         version: 0.2.5
+      '@xterm/addon-canvas':
+        specifier: ^0.7.0
+        version: 0.7.0(@xterm/xterm@5.5.0)
       '@xterm/addon-fit':
         specifier: ^0.10.0
         version: 0.10.0(@xterm/xterm@5.5.0)
+      '@xterm/addon-search':
+        specifier: ^0.16.0
+        version: 0.16.0
+      '@xterm/addon-unicode11':
+        specifier: ^0.9.0
+        version: 0.9.0
       '@xterm/addon-web-links':
         specifier: ^0.11.0
         version: 0.11.0(@xterm/xterm@5.5.0)
@@ -1689,10 +1698,21 @@ packages:
     resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
     engines: {node: '>=10.0.0'}
 
+  '@xterm/addon-canvas@0.7.0':
+    resolution: {integrity: sha512-LF5LYcfvefJuJ7QotNRdRSPc9YASAVDeoT5uyXS/nZshZXjYplGXRECBGiznwvhNL2I8bq1Lf5MzRwstsYQ2Iw==}
+    peerDependencies:
+      '@xterm/xterm': ^5.0.0
+
   '@xterm/addon-fit@0.10.0':
     resolution: {integrity: sha512-UFYkDm4HUahf2lnEyHvio51TNGiLK66mqP2JoATy7hRZeXaGMRDr00JiSF7m63vR5WKATF605yEggJKsw0JpMQ==}
     peerDependencies:
       '@xterm/xterm': ^5.0.0
+
+  '@xterm/addon-search@0.16.0':
+    resolution: {integrity: sha512-9OeuBFu0/uZJPu+9AHKY6g/w0Czyb/Ut0A5t79I4ULoU4IfU5BEpPFVGQxP4zTTMdfZEYkVIRYbHBX1xWwjeSA==}
+
+  '@xterm/addon-unicode11@0.9.0':
+    resolution: {integrity: sha512-FxDnYcyuXhNl+XSqGZL/t0U9eiNb/q3EWT5rYkQT/zuig8Gz/VagnQANKHdDWFM2lTMk9ly0EFQxxxtZUoRetw==}
 
   '@xterm/addon-web-links@0.11.0':
     resolution: {integrity: sha512-nIHQ38pQI+a5kXnRaTgwqSHnX7KE6+4SVoceompgHL26unAxdfP6IPqUTSYPQgSwM56hsElfoNrrW5V7BUED/Q==}
@@ -5431,9 +5451,17 @@ snapshots:
 
   '@xmldom/xmldom@0.8.11': {}
 
+  '@xterm/addon-canvas@0.7.0(@xterm/xterm@5.5.0)':
+    dependencies:
+      '@xterm/xterm': 5.5.0
+
   '@xterm/addon-fit@0.10.0(@xterm/xterm@5.5.0)':
     dependencies:
       '@xterm/xterm': 5.5.0
+
+  '@xterm/addon-search@0.16.0': {}
+
+  '@xterm/addon-unicode11@0.9.0': {}
 
   '@xterm/addon-web-links@0.11.0(@xterm/xterm@5.5.0)':
     dependencies:

@@ -1,16 +1,55 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import { GripHorizontal, Plus, Play, Square, Loader2 } from "lucide-react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import { GripHorizontal, Plus, Play, Square, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
+import { PermissionApprovalModal } from "@/components/output/PermissionApprovalModal";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { useSessionStore } from "@/stores/sessionStore";
 import { claudeService } from "@/services/claude";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps } from "@/types/panel";
+import type { PermissionMode, ToolCall } from "@/types";
+
+// Tools that typically need permission in default mode
+const TOOLS_REQUIRING_PERMISSION = [
+  "bash", "shell", "exec", "execute",
+  "edit", "write", "delete", "remove",
+  "task", "mcp__", "skill",
+];
+
+// Tools that are always auto-approved
+const AUTO_APPROVED_TOOLS = [
+  "read", "glob", "grep", "todowrite", "websearch", "webfetch",
+];
+
+function toolNeedsPermission(toolName: string, permissionMode: PermissionMode): boolean {
+  const nameLower = toolName.toLowerCase();
+
+  // bypassPermissions mode - nothing needs approval
+  if (permissionMode === "bypassPermissions") {
+    return false;
+  }
+
+  // Check if tool is always auto-approved
+  if (AUTO_APPROVED_TOOLS.some(t => nameLower.includes(t))) {
+    return false;
+  }
+
+  // acceptEdits mode - only bash/exec needs approval
+  if (permissionMode === "acceptEdits") {
+    return nameLower.includes("bash") ||
+           nameLower.includes("shell") ||
+           nameLower.includes("exec");
+  }
+
+  // default/plan mode - check against permission-requiring tools
+  return TOOLS_REQUIRING_PERMISSION.some(t => nameLower.includes(t));
+}
 
 const MIN_ACTIVITY_HEIGHT = 80;
 const MAX_ACTIVITY_HEIGHT = 300;
 const DEFAULT_ACTIVITY_HEIGHT = 120;
+const COLLAPSED_ACTIVITY_HEIGHT = 28;
 
 export function ClaudeOutputPanel({
   panelId: _panelId,
@@ -46,6 +85,7 @@ export function ClaudeOutputPanel({
 
   const [activityHeight, setActivityHeight] = useState(DEFAULT_ACTIVITY_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
+  const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
 
   // Use panel's sessionId if set, otherwise fall back to active session
@@ -85,6 +125,11 @@ export function ClaudeOutputPanel({
     ...messages.flatMap((m) => m.toolCalls || []),
     ...(streamingState?.pendingToolCalls || []),
   ];
+
+  // Find the first pending tool call that needs approval
+  const pendingApprovalTool = useMemo<ToolCall | null>(() => {
+    return allToolCalls.find(tc => tc.status === "pending") || null;
+  }, [allToolCalls]);
 
   const handleStartSession = useCallback(async () => {
     if (!sessionId || !projectPath) return;
@@ -128,11 +173,13 @@ export function ClaudeOutputPanel({
             setThinking(sessionId, false);
           },
           onToolStart: (toolName, toolId) => {
+            // Determine if this tool needs permission approval
+            const needsPermission = toolNeedsPermission(toolName, permissionMode);
             addPendingToolCall(sessionId, {
               id: toolId,
               name: toolName,
               input: {},
-              status: "running",
+              status: needsPermission ? "pending" : "running",
             });
           },
           onToolInputDelta: (toolId, partialJson) => {
@@ -141,6 +188,8 @@ export function ClaudeOutputPanel({
           onToolEnd: () => {},
           onToolResult: (toolId, content) => {
             updateToolCallStatus(sessionId, toolId, "completed", content);
+            // Add separator so subsequent text appears as new block
+            appendStreamingText(sessionId, "\n\n");
           },
           onInit: (model, _cwd, claudeSessionId) => {
             updateStats(sessionId, { model });
@@ -354,8 +403,6 @@ export function ClaudeOutputPanel({
             thinkingText={streamingState?.thinkingText || ""}
             pendingToolCalls={streamingState?.pendingToolCalls || []}
             isStreaming={isStreaming}
-            onApprove={handleApprove}
-            onReject={handleReject}
           />
         </div>
 
@@ -375,23 +422,44 @@ export function ClaudeOutputPanel({
         {/* Activity feed */}
         <div
           className="flex-shrink-0 rounded border border-border/50 bg-bg-tertiary/30 overflow-hidden"
-          style={{ height: activityHeight }}
+          style={{ height: isActivityCollapsed ? COLLAPSED_ACTIVITY_HEIGHT : activityHeight }}
         >
-          <div className="flex items-center justify-between px-2 py-1 border-b border-border/30 bg-bg-tertiary/50">
-            <span className="text-[10px] font-medium text-text-secondary">Activity</span>
+          <button
+            onClick={() => setIsActivityCollapsed(!isActivityCollapsed)}
+            className="w-full flex items-center justify-between px-2 py-1 border-b border-border/30 bg-bg-tertiary/50 hover:bg-bg-hover transition-colors cursor-pointer"
+          >
+            <div className="flex items-center gap-1.5">
+              {isActivityCollapsed ? (
+                <ChevronUp className="w-3 h-3 text-text-secondary/60" />
+              ) : (
+                <ChevronDown className="w-3 h-3 text-text-secondary/60" />
+              )}
+              <span className="text-[10px] font-medium text-text-secondary">Activity</span>
+            </div>
             <span className="text-[10px] text-text-secondary/60">
               {allToolCalls.length} call{allToolCalls.length !== 1 ? "s" : ""}
             </span>
-          </div>
-          <div style={{ height: activityHeight - 24 }}>
-            <ActivityFeed
-              toolCalls={allToolCalls}
-              onApprove={handleApprove}
-              onReject={handleReject}
-            />
-          </div>
+          </button>
+          {!isActivityCollapsed && (
+            <div style={{ height: activityHeight - 24 }}>
+              <ActivityFeed
+                toolCalls={allToolCalls}
+                onApprove={handleApprove}
+                onReject={handleReject}
+              />
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Permission approval modal - blocks UI until user approves/rejects */}
+      {pendingApprovalTool && (
+        <PermissionApprovalModal
+          toolCall={pendingApprovalTool}
+          onApprove={() => handleApprove(pendingApprovalTool.id)}
+          onReject={() => handleReject(pendingApprovalTool.id)}
+        />
+      )}
     </div>
   );
 }

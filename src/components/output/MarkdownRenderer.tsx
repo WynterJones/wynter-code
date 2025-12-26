@@ -1,3 +1,4 @@
+import { Children, isValidElement, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -6,6 +7,25 @@ import { CodeBlock } from "./CodeBlock";
 
 interface MarkdownRendererProps {
   content: string;
+}
+
+// Recursively extract text from React children (handles nested elements)
+function extractTextFromChildren(children: ReactNode): string {
+  if (typeof children === "string") return children;
+  if (typeof children === "number") return String(children);
+  if (children == null || typeof children === "boolean") return "";
+
+  if (Array.isArray(children)) {
+    return children.map(extractTextFromChildren).join("");
+  }
+
+  if (isValidElement(children)) {
+    return extractTextFromChildren(children.props?.children);
+  }
+
+  // Handle other iterables
+  const childArray = Children.toArray(children);
+  return childArray.map(extractTextFromChildren).join("");
 }
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
@@ -66,9 +86,8 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             );
           }
 
-          return (
-            <CodeBlock language={match[1]}>{String(children).replace(/\n$/, "")}</CodeBlock>
-          );
+          const codeText = extractTextFromChildren(children).replace(/\n$/, "");
+          return <CodeBlock language={match[1]}>{codeText}</CodeBlock>;
         },
         pre: ({ children }) => <>{children}</>,
         a: ({ href, children }) => (

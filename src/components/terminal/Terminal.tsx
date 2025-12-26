@@ -2,9 +2,13 @@ import { useEffect, useRef } from "react";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import { SearchAddon } from "@xterm/addon-search";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { CanvasAddon } from "@xterm/addon-canvas";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { useSettingsStore, TERMINAL_SHELLS, type TerminalShell } from "@/stores/settingsStore";
+import { terminalTheme } from "@/lib/terminalTheme";
 import "@xterm/xterm/css/xterm.css";
 
 function getShellPath(shell: TerminalShell): string | null {
@@ -17,24 +21,32 @@ interface TerminalProps {
   ptyId: string | null;
   onPtyCreated: (ptyId: string) => void;
   isVisible?: boolean;
+  onSearchAddonReady?: (searchAddon: SearchAddon) => void;
 }
 
-export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true }: TerminalProps) {
+export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, onSearchAddonReady }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
 
-  // Get the configured shell setting
+  // Get terminal settings
   const terminalShell = useSettingsStore((s) => s.terminalShell);
+  const terminalFontSize = useSettingsStore((s) => s.terminalFontSize);
+  const terminalCursorBlink = useSettingsStore((s) => s.terminalCursorBlink);
 
   // Stable refs to capture initial values - effect only runs once on mount
   const initialPtyId = useRef(ptyId);
   const initialProjectPath = useRef(projectPath);
   const initialShellPath = useRef(getShellPath(terminalShell));
+  const initialFontSize = useRef(terminalFontSize);
+  const initialCursorBlink = useRef(terminalCursorBlink);
   const onPtyCreatedRef = useRef(onPtyCreated);
+  const onSearchAddonReadyRef = useRef(onSearchAddonReady);
 
-  // Keep callback ref updated
+  // Keep callback refs updated
   onPtyCreatedRef.current = onPtyCreated;
+  onSearchAddonReadyRef.current = onSearchAddonReady;
 
   useEffect(() => {
     if (!terminalRef.current) return;
@@ -45,46 +57,38 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true }:
     let createdPtyId: string | null = null;
 
     const term = new XTerm({
-      cursorBlink: true,
-      fontSize: 13,
+      cursorBlink: initialCursorBlink.current,
+      fontSize: initialFontSize.current,
       fontFamily: '"JetBrains Mono", "Fira Code", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Menlo, monospace',
-      theme: {
-        background: "#0a0a0a",
-        foreground: "#e4e4e7",
-        cursor: "#e4e4e7",
-        cursorAccent: "#0a0a0a",
-        selectionBackground: "#27272a",
-        selectionForeground: "#e4e4e7",
-        black: "#18181b",
-        red: "#ef4444",
-        green: "#22c55e",
-        yellow: "#eab308",
-        blue: "#3b82f6",
-        magenta: "#a855f7",
-        cyan: "#06b6d4",
-        white: "#e4e4e7",
-        brightBlack: "#52525b",
-        brightRed: "#f87171",
-        brightGreen: "#4ade80",
-        brightYellow: "#facc15",
-        brightBlue: "#60a5fa",
-        brightMagenta: "#c084fc",
-        brightCyan: "#22d3ee",
-        brightWhite: "#fafafa",
-      },
+      theme: terminalTheme,
       allowProposedApi: true,
       scrollback: 10000,
     });
 
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
+    const searchAddon = new SearchAddon();
+    const unicodeAddon = new Unicode11Addon();
+    const canvasAddon = new CanvasAddon();
 
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
+    term.loadAddon(searchAddon);
+    term.loadAddon(unicodeAddon);
+    term.loadAddon(canvasAddon);
     term.open(terminalRef.current);
+
+    // Enable Unicode 11 for proper character width handling
+    term.unicode.activeVersion = "11";
 
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
+    searchAddonRef.current = searchAddon;
+
+    // Notify parent that search addon is ready
+    if (onSearchAddonReadyRef.current) {
+      onSearchAddonReadyRef.current(searchAddon);
+    }
 
     // Initial fit and focus
     setTimeout(() => {
@@ -183,6 +187,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true }:
       term.dispose();
       xtermRef.current = null;
       fitAddonRef.current = null;
+      searchAddonRef.current = null;
     };
     // Empty dependency array - effect only runs once on mount
     // Uses refs to capture initial values
@@ -228,7 +233,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true }:
   return (
     <div
       ref={terminalRef}
-      className="w-full h-full bg-[#0a0a0a]"
+      className="w-full h-full bg-bg-tertiary"
       style={{ padding: "4px 8px" }}
       onClick={handleClick}
     />

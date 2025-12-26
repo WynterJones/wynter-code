@@ -1,7 +1,6 @@
-import { useRef, useState, useEffect, useMemo } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { IconButton, ScrollArea } from "@/components/ui";
-import { UserMessageCard } from "./UserMessageCard";
 import { ClaudeResponseCard } from "./ClaudeResponseCard";
 import { cn } from "@/lib/utils";
 import type { Message, ToolCall } from "@/types";
@@ -17,8 +16,52 @@ interface ResponseCarouselProps {
   thinkingText?: string;
   pendingToolCalls?: ToolCall[];
   isStreaming?: boolean;
-  onApprove: (toolId: string) => void;
-  onReject: (toolId: string) => void;
+}
+
+// Collapsible user message status bar
+function UserMessageBar({ content }: { content: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className={cn(
+          "w-full flex items-center gap-2 px-3 py-1.5",
+          "bg-bg-hover/80 border border-border/50",
+          "hover:bg-bg-hover transition-colors cursor-pointer text-left",
+          // Fully rounded when collapsed, top-rounded when expanded
+          isExpanded ? "rounded-t-lg border-b-0" : "rounded-full"
+        )}
+      >
+        <span className="text-accent font-mono text-xs">$</span>
+        {/* Only show text preview when collapsed */}
+        {!isExpanded && (
+          <span className="flex-1 text-xs text-text-secondary font-mono truncate">
+            {content.split("\n")[0]}
+          </span>
+        )}
+        {isExpanded && <span className="flex-1" />}
+        {isExpanded ? (
+          <ChevronUp className="w-3 h-3 text-text-secondary/60 flex-shrink-0" />
+        ) : (
+          <ChevronDown className="w-3 h-3 text-text-secondary/60 flex-shrink-0" />
+        )}
+      </button>
+      {isExpanded && (
+        <div
+          className={cn(
+            "px-3 py-2 rounded-b-lg border border-border/50 border-t-0",
+            "bg-bg-hover/60 max-h-[300px] overflow-auto"
+          )}
+        >
+          <p className="text-xs text-text-primary font-mono whitespace-pre-wrap leading-relaxed">
+            {content}
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ResponseCarousel({
@@ -27,12 +70,17 @@ export function ResponseCarousel({
   thinkingText = "",
   pendingToolCalls = [],
   isStreaming = false,
-  onApprove,
-  onReject,
 }: ResponseCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Check if we have streaming content
+  const hasStreamingContent =
+    isStreaming || streamingText || pendingToolCalls.length > 0;
+
+  // Build message pairs - only include pairs that have assistant responses
+  // Unless it's the last user message and we're NOT streaming (then show it alone)
   const messagePairs = useMemo(() => {
     const pairs: MessagePair[] = [];
     let i = 0;
@@ -40,34 +88,49 @@ export function ResponseCarousel({
     while (i < messages.length) {
       if (messages[i].role === "user") {
         const pair: MessagePair = { user: messages[i] };
+
+        // Check if next message is assistant response
         if (i + 1 < messages.length && messages[i + 1].role === "assistant") {
           pair.assistant = messages[i + 1];
+          pairs.push(pair);
           i += 2;
         } else {
+          // User message without assistant response
+          // Only add it if NOT streaming (streaming slide will handle it)
+          if (!hasStreamingContent) {
+            pairs.push(pair);
+          }
           i += 1;
         }
-        pairs.push(pair);
       } else {
+        // Skip orphan assistant messages
         i += 1;
       }
     }
 
     return pairs;
-  }, [messages]);
+  }, [messages, hasStreamingContent]);
 
-  const hasStreamingContent =
-    isStreaming || streamingText || pendingToolCalls.length > 0;
+  // Get the last user message for streaming slide
+  const lastUserMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        return messages[i];
+      }
+    }
+    return null;
+  }, [messages]);
 
   const totalSlides = messagePairs.length + (hasStreamingContent ? 1 : 0);
 
+  // Auto-navigate to latest slide when content changes
   useEffect(() => {
-    if (hasStreamingContent) {
+    if (totalSlides > 0) {
       setCurrentIndex(totalSlides - 1);
-    } else if (messagePairs.length > 0) {
-      setCurrentIndex(messagePairs.length - 1);
     }
-  }, [messagePairs.length, hasStreamingContent, totalSlides]);
+  }, [totalSlides]);
 
+  // Scroll to current slide
   useEffect(() => {
     if (scrollRef.current) {
       const slideWidth = scrollRef.current.offsetWidth;
@@ -78,13 +141,38 @@ export function ResponseCarousel({
     }
   }, [currentIndex]);
 
-  const goToPrevious = () => {
+  const goToPrevious = useCallback(() => {
     setCurrentIndex((i) => Math.max(0, i - 1));
-  };
+  }, []);
 
-  const goToNext = () => {
+  const goToNext = useCallback(() => {
     setCurrentIndex((i) => Math.min(totalSlides - 1, i + 1));
-  };
+  }, [totalSlides]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if this container or its children are focused, or no specific element is focused
+      const activeElement = document.activeElement;
+      const isInputFocused =
+        activeElement?.tagName === "INPUT" ||
+        activeElement?.tagName === "TEXTAREA" ||
+        activeElement?.getAttribute("contenteditable") === "true";
+
+      if (isInputFocused) return;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goToPrevious();
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goToNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goToPrevious, goToNext]);
 
   if (totalSlides === 0) {
     return (
@@ -98,7 +186,7 @@ export function ResponseCarousel({
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div ref={containerRef} className="h-full flex flex-col" tabIndex={0}>
       <div className="relative flex-1 overflow-hidden">
         <div
           ref={scrollRef}
@@ -108,62 +196,43 @@ export function ResponseCarousel({
           )}
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
+          {/* Completed message pairs */}
           {messagePairs.map((pair) => (
             <div
               key={pair.user.id}
-              className="flex-shrink-0 w-full h-full snap-center px-2"
+              className="flex-shrink-0 w-full h-full snap-center px-10"
             >
               <ScrollArea className="h-full">
-                <div className="space-y-4 py-2">
-                  <div className="relative">
-                    <div className="transform -translate-y-2 scale-95 opacity-70 hover:opacity-100 hover:scale-100 transition-all duration-200">
-                      <UserMessageCard content={pair.user.content} isBackground />
-                    </div>
-                    {pair.assistant && (
-                      <div className="relative -mt-4">
-                        <ClaudeResponseCard
-                          content={pair.assistant.content}
-                          toolCalls={pair.assistant.toolCalls}
-                          onApprove={onApprove}
-                          onReject={onReject}
-                        />
-                      </div>
-                    )}
-                  </div>
+                <div className="py-2">
+                  <UserMessageBar content={pair.user.content} />
+                  {pair.assistant && (
+                    <ClaudeResponseCard content={pair.assistant.content} />
+                  )}
                 </div>
               </ScrollArea>
             </div>
           ))}
 
+          {/* Streaming slide */}
           {hasStreamingContent && (
-            <div className="flex-shrink-0 w-full h-full snap-center px-2">
+            <div className="flex-shrink-0 w-full h-full snap-center px-10">
               <ScrollArea className="h-full">
-                <div className="space-y-4 py-2">
-                  {messages.length > 0 &&
-                    messages[messages.length - 1]?.role === "user" && (
-                      <div className="transform -translate-y-2 scale-95 opacity-70">
-                        <UserMessageCard
-                          content={messages[messages.length - 1].content}
-                          isBackground
-                        />
-                      </div>
-                    )}
-                  <div className="relative -mt-4">
-                    <ClaudeResponseCard
-                      content={streamingText}
-                      toolCalls={pendingToolCalls}
-                      thinkingText={thinkingText}
-                      isStreaming={isStreaming}
-                      onApprove={onApprove}
-                      onReject={onReject}
-                    />
-                  </div>
+                <div className="py-2">
+                  {lastUserMessage && (
+                    <UserMessageBar content={lastUserMessage.content} />
+                  )}
+                  <ClaudeResponseCard
+                    content={streamingText}
+                    thinkingText={thinkingText}
+                    isStreaming={isStreaming}
+                  />
                 </div>
               </ScrollArea>
             </div>
           )}
         </div>
 
+        {/* Navigation arrows */}
         {totalSlides > 1 && (
           <>
             <IconButton
@@ -171,7 +240,7 @@ export function ResponseCarousel({
               onClick={goToPrevious}
               disabled={currentIndex === 0}
               className={cn(
-                "absolute left-2 top-1/2 -translate-y-1/2 z-10",
+                "absolute left-1 top-1/2 -translate-y-1/2 z-10",
                 "bg-bg-tertiary/90 border border-border shadow-sm",
                 "disabled:opacity-30"
               )}
@@ -183,7 +252,7 @@ export function ResponseCarousel({
               onClick={goToNext}
               disabled={currentIndex === totalSlides - 1}
               className={cn(
-                "absolute right-2 top-1/2 -translate-y-1/2 z-10",
+                "absolute right-1 top-1/2 -translate-y-1/2 z-10",
                 "bg-bg-tertiary/90 border border-border shadow-sm",
                 "disabled:opacity-30"
               )}
@@ -194,6 +263,7 @@ export function ResponseCarousel({
         )}
       </div>
 
+      {/* Pagination pips */}
       {totalSlides > 1 && (
         <div className="flex justify-center gap-1.5 py-2">
           {Array.from({ length: totalSlides }).map((_, index) => (

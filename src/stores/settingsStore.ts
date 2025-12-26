@@ -83,6 +83,8 @@ interface SettingsStore {
   compressionArchiveOverwrite: boolean;
   compressionMediaOverwrite: boolean;
   terminalShell: TerminalShell;
+  terminalFontSize: number;
+  terminalCursorBlink: boolean;
   useMultiPanelLayout: boolean;
 
   // Avatar
@@ -114,6 +116,8 @@ interface SettingsStore {
   setCompressionArchiveOverwrite: (overwrite: boolean) => void;
   setCompressionMediaOverwrite: (overwrite: boolean) => void;
   setTerminalShell: (shell: TerminalShell) => void;
+  setTerminalFontSize: (size: number) => void;
+  setTerminalCursorBlink: (blink: boolean) => void;
   setUseMultiPanelLayout: (use: boolean) => void;
   setUserAvatar: (avatar: string | null) => void;
 
@@ -151,6 +155,8 @@ export const useSettingsStore = create<SettingsStore>()(
       compressionArchiveOverwrite: false,
       compressionMediaOverwrite: false,
       terminalShell: "system",
+      terminalFontSize: 13,
+      terminalCursorBlink: true,
       useMultiPanelLayout: false,
       userAvatar: null,
 
@@ -238,6 +244,14 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setTerminalShell: (terminalShell: TerminalShell) => {
         set({ terminalShell });
+      },
+
+      setTerminalFontSize: (terminalFontSize: number) => {
+        set({ terminalFontSize });
+      },
+
+      setTerminalCursorBlink: (terminalCursorBlink: boolean) => {
+        set({ terminalCursorBlink });
       },
 
       setUseMultiPanelLayout: (useMultiPanelLayout: boolean) => {

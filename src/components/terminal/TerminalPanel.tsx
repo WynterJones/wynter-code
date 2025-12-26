@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Terminal as TerminalIcon, X, GripHorizontal, Maximize2, Minimize2 } from "lucide-react";
+import { Terminal as TerminalIcon, X, GripHorizontal, Maximize2, Minimize2, Search } from "lucide-react";
+import type { SearchAddon } from "@xterm/addon-search";
 import { Terminal } from "./Terminal";
+import { TerminalSearchBar } from "./TerminalSearchBar";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,8 @@ export function TerminalPanel({ projectId, projectPath }: TerminalPanelProps) {
   const [isResizing, setIsResizing] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [heightBeforeMaximize, setHeightBeforeMaximize] = useState<number | null>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchAddon, setSearchAddon] = useState<SearchAddon | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +33,27 @@ export function TerminalPanel({ projectId, projectPath }: TerminalPanelProps) {
     },
     [projectId, setPtyId]
   );
+
+  const handleSearchAddonReady = useCallback((addon: SearchAddon) => {
+    setSearchAddon(addon);
+  }, []);
+
+  const toggleSearch = useCallback(() => {
+    setShowSearch(prev => !prev);
+  }, []);
+
+  // Keyboard shortcut for search (Ctrl+Shift+F)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "f" && terminalState.isOpen) {
+        e.preventDefault();
+        toggleSearch();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [terminalState.isOpen, toggleSearch]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -162,6 +187,16 @@ export function TerminalPanel({ projectId, projectPath }: TerminalPanelProps) {
           <span className="text-xs font-medium text-text-secondary">Terminal</span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={toggleSearch}
+            className={cn(
+              "p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors",
+              showSearch && "bg-bg-tertiary text-text-primary"
+            )}
+            title="Search (Ctrl+Shift+F)"
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
           {terminalState.isMaximized ? (
             <button
               onClick={handleMinimize}
@@ -189,12 +224,19 @@ export function TerminalPanel({ projectId, projectPath }: TerminalPanelProps) {
         </div>
       </div>
 
+      <TerminalSearchBar
+        searchAddon={searchAddon}
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+      />
+
       <div className="flex-1 overflow-hidden">
         <Terminal
           key={`panel-${projectId}`}
           projectPath={projectPath}
           ptyId={terminalState.ptyId}
           onPtyCreated={handlePtyCreated}
+          onSearchAddonReady={handleSearchAddonReady}
         />
       </div>
     </div>

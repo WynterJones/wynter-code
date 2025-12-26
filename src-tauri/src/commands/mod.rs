@@ -752,12 +752,34 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
             None
         }
 
-        // Handle tool result
+        // Handle tool result (old format)
         "tool_result" => {
             let mut chunk = create_chunk("tool_result", session_id);
             chunk.tool_id = json.get("tool_use_id").and_then(|v| v.as_str()).map(|s| s.to_string());
             chunk.content = json.get("content").and_then(|v| v.as_str()).map(|s| s.to_string());
             Some(chunk)
+        }
+
+        // Handle user message (contains tool_result in stream-json format)
+        "user" => {
+            if let Some(message) = json.get("message") {
+                if let Some(content) = message.get("content").and_then(|c| c.as_array()) {
+                    for block in content {
+                        if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
+                            if block_type == "tool_result" {
+                                let mut chunk = create_chunk("tool_result", session_id);
+                                chunk.tool_id = block.get("tool_use_id").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                // The content can be a string or might be in tool_use_result
+                                if let Some(content_str) = block.get("content").and_then(|v| v.as_str()) {
+                                    chunk.content = Some(content_str.to_string());
+                                }
+                                return Some(chunk);
+                            }
+                        }
+                    }
+                }
+            }
+            None
         }
 
         // Handle assistant message
