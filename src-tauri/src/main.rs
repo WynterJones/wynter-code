@@ -337,6 +337,7 @@ fn main() {
             claude_process::stop_claude_session,
             claude_process::start_claude_streaming,
             claude_process::send_claude_input,
+            claude_process::send_claude_raw_input,
             claude_process::terminate_claude_session,
             claude_process::is_claude_session_active,
             claude_process::list_active_claude_sessions,

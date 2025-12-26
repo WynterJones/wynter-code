@@ -1,8 +1,10 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { GripHorizontal, Plus, Play, Square, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { v4 as uuid } from "uuid";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
 import { PermissionApprovalModal } from "@/components/output/PermissionApprovalModal";
+import { AskUserQuestionModal } from "@/components/output/AskUserQuestionModal";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { useSessionStore } from "@/stores/sessionStore";
 import { claudeService } from "@/services/claude";
@@ -81,6 +83,7 @@ export function ClaudeOutputPanel({
     startStreaming,
     updateClaudeSessionId,
     getSession,
+    setPendingQuestionSet,
   } = useSessionStore();
 
   const [activityHeight, setActivityHeight] = useState(DEFAULT_ACTIVITY_HEIGHT);
@@ -131,6 +134,15 @@ export function ClaudeOutputPanel({
     return allToolCalls.find(tc => tc.status === "pending") || null;
   }, [allToolCalls]);
 
+  // Debug: Log when pendingApprovalTool changes
+  useEffect(() => {
+    console.log("[ClaudeOutputPanel] pendingApprovalTool changed:", pendingApprovalTool);
+    console.log("[ClaudeOutputPanel] allToolCalls:", allToolCalls);
+  }, [pendingApprovalTool, allToolCalls]);
+
+  // Get pending question set
+  const pendingQuestionSet = streamingState?.pendingQuestionSet || null;
+
   const handleStartSession = useCallback(async () => {
     if (!sessionId || !projectPath) return;
 
@@ -175,6 +187,12 @@ export function ClaudeOutputPanel({
           onToolStart: (toolName, toolId) => {
             // Determine if this tool needs permission approval
             const needsPermission = toolNeedsPermission(toolName, permissionMode);
+            console.log("[ClaudeOutputPanel] onToolStart:", {
+              toolName,
+              toolId,
+              permissionMode,
+              needsPermission,
+            });
             addPendingToolCall(sessionId, {
               id: toolId,
               name: toolName,
@@ -190,6 +208,21 @@ export function ClaudeOutputPanel({
             updateToolCallStatus(sessionId, toolId, "completed", content);
             // Add separator so subsequent text appears as new block
             appendStreamingText(sessionId, "\n\n");
+          },
+          onAskUserQuestion: (toolId, input) => {
+            // Convert to PendingQuestionSet format
+            const questions = input.questions.map((q, idx) => ({
+              id: `${toolId}-q${idx}`,
+              header: q.header || `Question ${idx + 1}`,
+              question: q.question,
+              options: q.options,
+              multiSelect: q.multiSelect,
+            }));
+            setPendingQuestionSet(sessionId, {
+              id: uuid(),
+              toolId,
+              questions,
+            });
           },
           onInit: (model, _cwd, claudeSessionId) => {
             updateStats(sessionId, { model });
@@ -268,7 +301,8 @@ export function ClaudeOutputPanel({
       if (sessionId) {
         updateToolCallStatus(sessionId, toolId, "running");
         try {
-          await claudeService.sendInput(sessionId, "y\n");
+          // Use raw input for tool approvals - don't wrap in JSON
+          await claudeService.sendRawInput(sessionId, "y\n");
         } catch (error) {
           console.error("Failed to send approval:", error);
           updateToolCallStatus(sessionId, toolId, "error", "Failed to send approval");
@@ -282,7 +316,8 @@ export function ClaudeOutputPanel({
     async (toolId: string) => {
       if (sessionId) {
         try {
-          await claudeService.sendInput(sessionId, "n\n");
+          // Use raw input for tool rejections - don't wrap in JSON
+          await claudeService.sendRawInput(sessionId, "n\n");
           updateToolCallStatus(sessionId, toolId, "error", "Tool execution rejected by user");
         } catch (error) {
           console.error("Failed to send rejection:", error);
@@ -291,6 +326,23 @@ export function ClaudeOutputPanel({
       }
     },
     [sessionId, updateToolCallStatus]
+  );
+
+  const handleQuestionSubmit = useCallback(
+    async (answers: Record<string, string[]>) => {
+      if (!sessionId || !pendingQuestionSet) return;
+
+      try {
+        // Format the response as JSON for Claude CLI
+        const response = JSON.stringify({ answers }) + "\n";
+        await claudeService.sendInput(sessionId, response);
+        // Clear the pending question
+        setPendingQuestionSet(sessionId, null);
+      } catch (error) {
+        console.error("Failed to send question response:", error);
+      }
+    },
+    [sessionId, pendingQuestionSet, setPendingQuestionSet]
   );
 
   const handleMouseDown = useCallback(() => {
@@ -458,6 +510,14 @@ export function ClaudeOutputPanel({
           toolCall={pendingApprovalTool}
           onApprove={() => handleApprove(pendingApprovalTool.id)}
           onReject={() => handleReject(pendingApprovalTool.id)}
+        />
+      )}
+
+      {/* Ask user question modal - for plan mode questions */}
+      {pendingQuestionSet && (
+        <AskUserQuestionModal
+          questionSet={pendingQuestionSet}
+          onSubmit={handleQuestionSubmit}
         />
       )}
     </div>

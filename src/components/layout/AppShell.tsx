@@ -247,11 +247,11 @@ export function AppShell() {
               />
             )}
             {sidebarCollapsed && (
-              <div className={`absolute top-0 ${sidebarPosition === "right" ? "right-0" : "left-0"} z-50 p-2`}>
+              <div className={`absolute top-2 ${sidebarPosition === "right" ? "right-2" : "left-2"} z-50`}>
                 <Tooltip content="Show sidebar" side={sidebarPosition === "right" ? "left" : "right"}>
                   <button
                     onClick={toggleSidebar}
-                    className="p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors opacity-70 hover:opacity-100"
+                    className="p-1.5 rounded bg-bg-secondary border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors shadow-sm"
                   >
                     {sidebarPosition === "right" ? (
                       <PanelRightClose className="w-4 h-4" />

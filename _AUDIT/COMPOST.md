@@ -2,8 +2,8 @@
 
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
-**Last Updated:** 2025-12-23
-**Composted Ideas:** 33
+**Last Updated:** 2025-12-25
+**Composted Ideas:** 34
 
 ---
 
@@ -18,6 +18,10 @@
 ---
 
 ## Composted Ideas
+
+### Plugin Architecture
+Refactor 25+ tools into a plugin system with manifests, dynamic registration, and lazy loading.
+> **Why rejected:** Without third-party contributors, the effort outweighs the benefits. Current monolith works fine for solo dev. Plan kept in `_PLANS/PLUGIN_ARCHITECTURE.md` for future reference.
 
 ### Git Stash Manager
 Visual stash management - list stashes, apply/pop/drop, partial stash, compare with current.

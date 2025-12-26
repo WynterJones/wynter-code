@@ -15,6 +15,15 @@ export interface ClaudeSessionInfo {
   cwd?: string;
 }
 
+export interface AskUserQuestionInput {
+  questions: Array<{
+    question: string;
+    header?: string;
+    options: Array<{ label: string; description?: string }>;
+    multiSelect: boolean;
+  }>;
+}
+
 export interface ClaudeSessionCallbacks {
   onSessionStarting: () => void;
   onSessionReady: (info: ClaudeSessionInfo) => void;
@@ -27,6 +36,7 @@ export interface ClaudeSessionCallbacks {
   onToolInputDelta: (toolId: string, partialJson: string) => void;
   onToolEnd: (toolId: string) => void;
   onToolResult: (toolId: string, content: string) => void;
+  onAskUserQuestion: (toolId: string, input: AskUserQuestionInput) => void;
   onInit: (model: string, cwd: string, claudeSessionId?: string) => void;
   onUsage: (stats: Partial<StreamingStats>) => void;
   onResult: (result: string) => void;
@@ -40,6 +50,8 @@ class ClaudeService {
   private _unlistenMap = new Map<string, UnlistenFn>();
   private _sessionActiveMap = new Map<string, boolean>();
   private _currentToolIdMap = new Map<string, string | null>();
+  private _currentToolNameMap = new Map<string, string | null>();
+  private _toolInputAccumulator = new Map<string, string>();
   private _callbacksMap = new Map<string, ClaudeSessionCallbacks>();
 
   setModel(model: ClaudeModel) {
@@ -163,14 +175,26 @@ class ClaudeService {
 
         case "tool_start":
         case "tool_use":
-          if (chunk.tool_name && chunk.tool_id) {
+          console.log("[ClaudeService] tool_use received:", {
+            tool_name: chunk.tool_name,
+            tool_id: chunk.tool_id,
+            has_input: !!chunk.tool_input,
+          });
+          if (chunk.tool_id) {
+            // Use tool name if available, otherwise extract from input or use placeholder
+            const toolName = chunk.tool_name || "unknown_tool";
             this._currentToolIdMap.set(sessionId, chunk.tool_id);
-            cb.onToolStart(chunk.tool_name, chunk.tool_id);
+            this._currentToolNameMap.set(sessionId, toolName);
+            this._toolInputAccumulator.set(sessionId, chunk.tool_input || "");
+            cb.onToolStart(toolName, chunk.tool_id);
           }
           break;
 
         case "tool_input_delta":
           if (chunk.content && currentToolId) {
+            // Accumulate input for AskUserQuestion detection
+            const currentAccum = this._toolInputAccumulator.get(sessionId) || "";
+            this._toolInputAccumulator.set(sessionId, currentAccum + chunk.content);
             cb.onToolInputDelta(currentToolId, chunk.content);
           }
           break;
@@ -185,8 +209,21 @@ class ClaudeService {
         case "block_end":
           cb.onThinkingEnd();
           if (currentToolId) {
+            // Check if this was AskUserQuestion tool
+            const toolName = this._currentToolNameMap.get(sessionId);
+            if (toolName === "AskUserQuestion") {
+              const accumulatedInput = this._toolInputAccumulator.get(sessionId) || "";
+              try {
+                const parsed = JSON.parse(accumulatedInput) as AskUserQuestionInput;
+                cb.onAskUserQuestion(currentToolId, parsed);
+              } catch (e) {
+                console.error("[ClaudeService] Failed to parse AskUserQuestion input:", e);
+              }
+            }
             cb.onToolEnd(currentToolId);
             this._currentToolIdMap.set(sessionId, null);
+            this._currentToolNameMap.set(sessionId, null);
+            this._toolInputAccumulator.set(sessionId, "");
           }
           break;
 
@@ -269,9 +306,14 @@ class ClaudeService {
     await invoke("send_claude_input", { sessionId, input: prompt + "\n" });
   }
 
-  /** Send input to a running Claude session (for tool approvals, questions) */
+  /** Send input to a running Claude session (formatted as JSON user message) */
   async sendInput(sessionId: string, input: string): Promise<void> {
     await invoke("send_claude_input", { sessionId, input });
+  }
+
+  /** Send raw input to a running Claude session (for tool approvals like "y" or "n") */
+  async sendRawInput(sessionId: string, input: string): Promise<void> {
+    await invoke("send_claude_raw_input", { sessionId, input });
   }
 
   /** Check if a Claude session is active on backend */
@@ -286,6 +328,8 @@ class ClaudeService {
 
   private cleanupSession(sessionId: string) {
     this._currentToolIdMap.delete(sessionId);
+    this._currentToolNameMap.delete(sessionId);
+    this._toolInputAccumulator.delete(sessionId);
     this._callbacksMap.delete(sessionId);
 
     const unlisten = this._unlistenMap.get(sessionId);

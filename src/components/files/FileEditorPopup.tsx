@@ -101,7 +101,7 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
     setHasChanges(newContent !== originalContent);
   }, [originalContent]);
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       setIsSaving(true);
       await invoke("write_file_content", { path: filePath, content });
@@ -115,7 +115,7 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [filePath, content, onSave]);
 
   const handleReset = () => {
     setContent(originalContent);
@@ -132,7 +132,7 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
         handleSave();
       }
     }
-  }, [onClose, hasChanges]);
+  }, [onClose, hasChanges, handleSave]);
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);

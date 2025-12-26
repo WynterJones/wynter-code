@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { GripHorizontal, FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns, Play, Square, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { v4 as uuid } from "uuid";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
 import { PermissionApprovalModal } from "@/components/output/PermissionApprovalModal";
+import { AskUserQuestionModal } from "@/components/output/AskUserQuestionModal";
 import { StreamingToolbar } from "@/components/output/StreamingToolbar";
 import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
@@ -90,6 +92,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     startStreaming,
     updateClaudeSessionId,
     getSession,
+    setPendingQuestionSet,
   } = useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
   const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition } = useSettingsStore();
@@ -102,6 +105,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const messages = currentSessionId ? getMessages(currentSessionId) : [];
   const streamingState = currentSessionId ? getStreamingState(currentSessionId) : null;
   const claudeSessionState = currentSessionId ? getClaudeSessionState(currentSessionId) : undefined;
+  const pendingQuestionSet = streamingState?.pendingQuestionSet || null;
   const isSessionActive = claudeSessionState?.status === "ready";
   const isSessionStarting = claudeSessionState?.status === "starting";
 
@@ -119,6 +123,12 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const pendingApprovalTool = useMemo<ToolCall | null>(() => {
     return allToolCalls.find(tc => tc.status === "pending") || null;
   }, [allToolCalls]);
+
+  // Debug: Log when pendingApprovalTool changes
+  useEffect(() => {
+    console.log("[MainContent] pendingApprovalTool changed:", pendingApprovalTool);
+    console.log("[MainContent] allToolCalls:", allToolCalls);
+  }, [pendingApprovalTool, allToolCalls]);
 
   // Start a persistent Claude session
   const handleStartSession = useCallback(async () => {
@@ -165,6 +175,12 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           onToolStart: (toolName, toolId) => {
             // Determine if this tool needs permission approval
             const needsPermission = toolNeedsPermission(toolName, permissionMode);
+            console.log("[MainContent] onToolStart:", {
+              toolName,
+              toolId,
+              permissionMode,
+              needsPermission,
+            });
             addPendingToolCall(currentSessionId, {
               id: toolId,
               name: toolName,
@@ -180,6 +196,20 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
             updateToolCallStatus(currentSessionId, toolId, "completed", content);
             // Add separator so subsequent text appears as new block
             appendStreamingText(currentSessionId, "\n\n");
+          },
+          onAskUserQuestion: (toolId, input) => {
+            const questions = input.questions.map((q, idx) => ({
+              id: `${toolId}-q${idx}`,
+              header: q.header || `Question ${idx + 1}`,
+              question: q.question,
+              options: q.options,
+              multiSelect: q.multiSelect,
+            }));
+            setPendingQuestionSet(currentSessionId, {
+              id: uuid(),
+              toolId,
+              questions,
+            });
           },
           onInit: (model, _cwd, claudeSessionId) => {
             updateStats(currentSessionId, { model });
@@ -221,6 +251,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     updateToolCallStatus,
     updateStats,
     finishStreaming,
+    setPendingQuestionSet,
   ]);
 
   // Stop the Claude session
@@ -253,13 +284,14 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     [currentSessionId, isSessionActive, startStreaming, appendStreamingText, finishStreaming]
   );
 
-  // Handle tool approval - send "y" to Claude stdin
+  // Handle tool approval - send raw "y" to Claude stdin
   const handleApprove = useCallback(
     async (toolId: string) => {
       if (currentSessionId) {
         updateToolCallStatus(currentSessionId, toolId, "running");
         try {
-          await claudeService.sendInput(currentSessionId, "y\n");
+          // Use raw input for tool approvals - don't wrap in JSON
+          await claudeService.sendRawInput(currentSessionId, "y\n");
         } catch (error) {
           console.error("Failed to send approval:", error);
           updateToolCallStatus(currentSessionId, toolId, "error", "Failed to send approval");
@@ -269,12 +301,13 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     [currentSessionId, updateToolCallStatus]
   );
 
-  // Handle tool rejection - send "n" to Claude stdin
+  // Handle tool rejection - send raw "n" to Claude stdin
   const handleReject = useCallback(
     async (toolId: string) => {
       if (currentSessionId) {
         try {
-          await claudeService.sendInput(currentSessionId, "n\n");
+          // Use raw input for tool rejections - don't wrap in JSON
+          await claudeService.sendRawInput(currentSessionId, "n\n");
           updateToolCallStatus(currentSessionId, toolId, "error", "Tool execution rejected by user");
         } catch (error) {
           console.error("Failed to send rejection:", error);
@@ -283,6 +316,46 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
       }
     },
     [currentSessionId, updateToolCallStatus]
+  );
+
+  // Handle question submission - format answers as JSON and send to Claude stdin
+  const handleQuestionSubmit = useCallback(
+    async (answers: Record<string, string[]>) => {
+      if (!currentSessionId || !pendingQuestionSet) return;
+
+      // Format the answers for Claude CLI
+      const answerPayload = {
+        answers: Object.entries(answers).reduce(
+          (acc, [questionId, selected]) => {
+            // Extract question index from ID (format: toolId-qN)
+            const match = questionId.match(/-q(\d+)$/);
+            if (match) {
+              const idx = parseInt(match[1], 10);
+              const question = pendingQuestionSet.questions[idx];
+              if (question) {
+                acc[question.header] = selected.join(", ");
+              }
+            }
+            return acc;
+          },
+          {} as Record<string, string>
+        ),
+      };
+
+      try {
+        // Send formatted JSON response to Claude stdin
+        await claudeService.sendInput(
+          currentSessionId,
+          JSON.stringify(answerPayload) + "\n"
+        );
+      } catch (error) {
+        console.error("Failed to send question answers:", error);
+      }
+
+      // Clear the pending question set
+      setPendingQuestionSet(currentSessionId, null);
+    },
+    [currentSessionId, pendingQuestionSet, setPendingQuestionSet]
   );
 
   const handleMouseDown = useCallback(() => {
@@ -347,14 +420,14 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         <div
           className="flex items-center gap-2 text-sm text-text-secondary transition-[padding] duration-200"
           data-tauri-drag-region
-          style={{ paddingLeft: sidebarCollapsed && sidebarPosition === "left" ? 28 : 0 }}
+          style={{ paddingLeft: sidebarPosition === "left" ? (sidebarCollapsed ? 28 : 16) : 0 }}
         >
           <FolderOpen className="w-4 h-4 text-text-secondary flex-shrink-0" data-tauri-drag-region />
           <span className="font-mono truncate" data-tauri-drag-region>{project.path}</span>
         </div>
         <div
           className="flex items-center gap-2 transition-[padding] duration-200"
-          style={{ paddingRight: sidebarCollapsed && sidebarPosition === "right" ? 28 : 0 }}
+          style={{ paddingRight: sidebarPosition === "right" ? (sidebarCollapsed ? 28 : 16) : 0 }}
         >
           <ModelSelector />
           {currentSession && currentSession.type === "claude" && !useMultiPanelLayout && (
@@ -547,6 +620,14 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           toolCall={pendingApprovalTool}
           onApprove={() => handleApprove(pendingApprovalTool.id)}
           onReject={() => handleReject(pendingApprovalTool.id)}
+        />
+      )}
+
+      {/* AskUserQuestion modal - for Claude plan mode questions */}
+      {pendingQuestionSet && (
+        <AskUserQuestionModal
+          questionSet={pendingQuestionSet}
+          onSubmit={handleQuestionSubmit}
         />
       )}
     </div>

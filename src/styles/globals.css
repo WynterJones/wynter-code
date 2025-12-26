@@ -546,3 +546,48 @@ pre,
   text-decoration: line-through;
   color: var(--text-secondary);
 }
+
+/* ============================================
+   Terminal (xterm.js) Overrides
+   ============================================ */
+
+/* Ensure proper character rendering in terminal */
+.xterm {
+  letter-spacing: normal !important;
+  word-spacing: normal !important;
+  font-variant-ligatures: none !important;
+  font-feature-settings: "liga" 0, "calt" 0 !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+.xterm-screen {
+  letter-spacing: normal !important;
+}
+
+/* Ensure canvas elements don't have any transforms affecting rendering */
+.xterm .xterm-screen canvas {
+  image-rendering: auto;
+}
+
+/* Viewport scroll container */
+.xterm-viewport {
+  overflow-y: auto;
+}
+
+/* Custom scrollbar for terminal */
+.xterm-viewport::-webkit-scrollbar {
+  width: 8px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, 0.3);
+  border-radius: 4px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.5);
+}

@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import { IconButton, ScrollArea } from "@/components/ui";
 import { ClaudeResponseCard } from "./ClaudeResponseCard";
 import { cn } from "@/lib/utils";
@@ -21,9 +21,22 @@ interface ResponseCarouselProps {
 // Collapsible user message status bar
 function UserMessageBar({ content }: { content: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(content);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
-    <div className="mb-2">
+    <div
+      className="mb-2"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <button
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
@@ -42,6 +55,21 @@ function UserMessageBar({ content }: { content: string }) {
           </span>
         )}
         {isExpanded && <span className="flex-1" />}
+        {/* Copy button - show on hover */}
+        <span
+          onClick={handleCopy}
+          className={cn(
+            "p-1 rounded hover:bg-bg-tertiary transition-all",
+            isHovered ? "opacity-100" : "opacity-0"
+          )}
+          title="Copy to clipboard"
+        >
+          {copied ? (
+            <Check className="w-3 h-3 text-green-400" />
+          ) : (
+            <Copy className="w-3 h-3 text-text-secondary" />
+          )}
+        </span>
         {isExpanded ? (
           <ChevronUp className="w-3 h-3 text-text-secondary/60 flex-shrink-0" />
         ) : (

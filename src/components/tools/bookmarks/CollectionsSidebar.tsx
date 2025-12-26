@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   Folder,
   FolderOpen,
@@ -9,6 +9,7 @@ import {
   Trash2,
   GripVertical,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import {
   DndContext,
@@ -26,7 +27,6 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { cn } from "@/lib/utils";
 import { useBookmarkStore, type Collection } from "@/stores/bookmarkStore";
 import * as LucideIcons from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -34,6 +34,8 @@ import type { LucideIcon } from "lucide-react";
 interface CollectionsSidebarProps {
   onEditCollection: (id: string) => void;
 }
+
+const HOLD_DURATION = 1000; // 1 second
 
 interface SortableCollectionItemProps {
   collection: Collection;
@@ -58,6 +60,58 @@ function SortableCollectionItem({
   onDelete,
   getIcon,
 }: SortableCollectionItemProps) {
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const [isHoldingDelete, setIsHoldingDelete] = useState(false);
+  const deleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const deleteStartTimeRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  const clearDeleteTimer = useCallback(() => {
+    if (deleteTimerRef.current) {
+      clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = null;
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    deleteStartTimeRef.current = null;
+    setDeleteProgress(0);
+    setIsHoldingDelete(false);
+  }, []);
+
+  const updateProgress = useCallback(() => {
+    if (!deleteStartTimeRef.current) return;
+
+    const elapsed = Date.now() - deleteStartTimeRef.current;
+    const progress = Math.min(elapsed / HOLD_DURATION, 1);
+    setDeleteProgress(progress);
+
+    if (progress < 1) {
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
+    }
+  }, []);
+
+  const handleDeleteStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setIsHoldingDelete(true);
+    deleteStartTimeRef.current = Date.now();
+
+    animationFrameRef.current = requestAnimationFrame(updateProgress);
+
+    deleteTimerRef.current = setTimeout(() => {
+      onDelete();
+      clearDeleteTimer();
+      setContextMenuId(null);
+    }, HOLD_DURATION);
+  }, [onDelete, clearDeleteTimer, updateProgress, setContextMenuId]);
+
+  const handleDeleteEnd = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    clearDeleteTimer();
+  }, [clearDeleteTimer]);
+
   const {
     attributes,
     listeners,
@@ -138,7 +192,7 @@ function SortableCollectionItem({
             className="fixed inset-0 z-10"
             onClick={() => setContextMenuId(null)}
           />
-          <div className="absolute right-0 top-full mt-1 z-20 bg-bg-secondary border border-border rounded-md shadow-lg py-1 min-w-[120px]">
+          <div className="absolute right-0 top-full mt-1 z-20 bg-bg-secondary border border-border rounded-md shadow-lg py-1 min-w-[140px]">
             <button
               onClick={() => {
                 onEdit();
@@ -150,11 +204,26 @@ function SortableCollectionItem({
               Edit
             </button>
             <button
-              onClick={onDelete}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-accent-red hover:bg-bg-hover"
+              onMouseDown={handleDeleteStart}
+              onMouseUp={handleDeleteEnd}
+              onMouseLeave={handleDeleteEnd}
+              onTouchStart={handleDeleteStart}
+              onTouchEnd={handleDeleteEnd}
+              className={cn(
+                "relative w-full flex items-center gap-2 px-3 py-1.5 text-sm text-accent-red hover:bg-bg-hover overflow-hidden",
+                isHoldingDelete && "bg-bg-hover"
+              )}
+              title="Hold to delete"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              Delete
+              {/* Progress fill */}
+              {isHoldingDelete && (
+                <div
+                  className="absolute inset-0 bg-accent-red/20 origin-left"
+                  style={{ transform: `scaleX(${deleteProgress})` }}
+                />
+              )}
+              <Trash2 className="w-3.5 h-3.5 relative z-10" />
+              <span className="relative z-10">Hold to delete</span>
             </button>
           </div>
         </>
@@ -192,10 +261,7 @@ export function CollectionsSidebar({ onEditCollection }: CollectionsSidebarProps
   const uncategorizedCount = getBookmarkCount("uncategorized");
 
   const handleDeleteCollection = (id: string) => {
-    if (confirm("Delete this collection? Bookmarks will be moved to Uncategorized.")) {
-      deleteCollection(id, true);
-    }
-    setContextMenuId(null);
+    deleteCollection(id, true);
   };
 
   const getCollectionIcon = (collection: Collection) => {

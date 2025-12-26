@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
 import type { Session, Message, ClaudeModel, ToolCall, StreamingStats, PermissionMode, SessionType } from "@/types";
-import type { PendingQuestion } from "@/components/output/AskUserQuestionBlock";
+import type { PendingQuestion, PendingQuestionSet } from "@/components/output/AskUserQuestionBlock";
 
 export interface ClaudeSessionInfo {
   model?: string;
@@ -19,6 +19,7 @@ interface StreamingState {
   pendingToolCalls: ToolCall[];
   stats: StreamingStats;
   pendingQuestion: PendingQuestion | null;
+  pendingQuestionSet: PendingQuestionSet | null;
 }
 
 interface SessionStore {
@@ -71,6 +72,7 @@ interface SessionStore {
   finishStreaming: (sessionId: string) => void;
   getStreamingState: (sessionId: string) => StreamingState;
   setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => void;
+  setPendingQuestionSet: (sessionId: string, questionSet: PendingQuestionSet | null) => void;
 
   // Claude session state (persistent CLI session)
   setClaudeSessionStarting: (sessionId: string) => void;
@@ -98,6 +100,7 @@ const defaultStreamingState: StreamingState = {
   pendingToolCalls: [],
   stats: { ...defaultStats },
   pendingQuestion: null,
+  pendingQuestionSet: null,
 };
 
 export const useSessionStore = create<SessionStore>()(
@@ -321,6 +324,7 @@ export const useSessionStore = create<SessionStore>()(
             pendingToolCalls: [],
             stats: { ...defaultStats, startTime: Date.now() },
             pendingQuestion: null,
+            pendingQuestionSet: null,
           });
           return { streamingState: newStreamingState };
         });
@@ -421,9 +425,19 @@ export const useSessionStore = create<SessionStore>()(
           const current = newStreamingState.get(sessionId) || {
             ...defaultStreamingState,
           };
-          const updatedToolCalls = current.pendingToolCalls.map((tc) =>
-            tc.id === toolId ? { ...tc, status, output } : tc
-          );
+          const updatedToolCalls = current.pendingToolCalls.map((tc) => {
+            if (tc.id !== toolId) return tc;
+
+            // Don't allow transitioning directly from "pending" to "completed"
+            // This can happen when Claude CLI sends its own tool_result for permission handling
+            // Only user approval (pending → running) or execution finish (running → completed) should work
+            if (tc.status === "pending" && status === "completed") {
+              console.log("[SessionStore] Blocked pending→completed transition for tool:", tc.name, "- output:", output?.substring(0, 100));
+              return tc; // Keep as pending
+            }
+
+            return { ...tc, status, output };
+          });
           newStreamingState.set(sessionId, {
             ...current,
             pendingToolCalls: updatedToolCalls,
@@ -471,6 +485,23 @@ export const useSessionStore = create<SessionStore>()(
         const streamingState =
           state.streamingState.get(sessionId) || defaultStreamingState;
 
+        // Check for tool calls that are still pending approval - don't finish until approved
+        const pendingApprovals = streamingState.pendingToolCalls.filter(
+          (tc) => tc.status === "pending"
+        );
+
+        // If there are pending approvals, don't finish streaming yet
+        if (pendingApprovals.length > 0) {
+          console.log("[SessionStore] finishStreaming blocked - waiting for tool approvals:", pendingApprovals.map(tc => tc.name));
+          return;
+        }
+
+        // If there's a pending question set (AskUserQuestion), don't finish yet
+        if (streamingState.pendingQuestionSet) {
+          console.log("[SessionStore] finishStreaming blocked - waiting for question response");
+          return;
+        }
+
         // If there's streaming text, convert it to a message
         if (streamingState.streamingText.trim()) {
           state.addMessage(sessionId, {
@@ -502,6 +533,18 @@ export const useSessionStore = create<SessionStore>()(
           newStreamingState.set(sessionId, {
             ...current,
             pendingQuestion: question,
+          });
+          return { streamingState: newStreamingState };
+        });
+      },
+
+      setPendingQuestionSet: (sessionId: string, questionSet: PendingQuestionSet | null) => {
+        set((state) => {
+          const newStreamingState = new Map(state.streamingState);
+          const current = newStreamingState.get(sessionId) || { ...defaultStreamingState };
+          newStreamingState.set(sessionId, {
+            ...current,
+            pendingQuestionSet: questionSet,
           });
           return { streamingState: newStreamingState };
         });

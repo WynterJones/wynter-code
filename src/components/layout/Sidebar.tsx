@@ -192,18 +192,23 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
           )}
         />
       )}
-      <div className="flex items-center py-2 border-b border-border" style={{ minWidth: width }}>
-        {position === "left" && (
-          <Tooltip content="Hide sidebar" side="right">
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 ml-2 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-            >
-              <PanelLeftOpen className="w-4 h-4" />
-            </button>
-          </Tooltip>
+      <div className="relative flex items-center py-2 border-b border-border" style={{ minWidth: width }}>
+        {position === "right" && (
+          <div className="absolute -left-3 top-1/2 -translate-y-1/2 z-20">
+            <Tooltip content="Hide sidebar" side="left">
+              <button
+                onClick={onToggleCollapse}
+                className="p-1.5 rounded-md bg-[#0d0d0d] border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors shadow-sm"
+              >
+                <PanelRightOpen className="w-4 h-4" />
+              </button>
+            </Tooltip>
+          </div>
         )}
-        <div className="flex items-center justify-evenly flex-1">
+        <div className={cn(
+          "flex items-center justify-evenly flex-1",
+          position === "left" ? "pr-4" : "pl-4"
+        )}>
           {tabs.map((tab) => (
             <Tooltip key={tab.id} content={tab.label} side="bottom">
               <button
@@ -223,15 +228,17 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
             </Tooltip>
           ))}
         </div>
-        {position === "right" && (
-          <Tooltip content="Hide sidebar" side="left">
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 mr-2 rounded text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-            >
-              <PanelRightOpen className="w-4 h-4" />
-            </button>
-          </Tooltip>
+        {position === "left" && (
+          <div className="absolute -right-3 top-1/2 -translate-y-1/2 z-20">
+            <Tooltip content="Hide sidebar" side="right">
+              <button
+                onClick={onToggleCollapse}
+                className="p-1.5 rounded-md bg-[#0d0d0d] border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors shadow-sm"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            </Tooltip>
+          </div>
         )}
       </div>
 

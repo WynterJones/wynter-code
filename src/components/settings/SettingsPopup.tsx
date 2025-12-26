@@ -833,12 +833,16 @@ function TerminalSettings({
 
       <div className="p-4 rounded-lg bg-bg-secondary border border-border">
         <h3 className="text-sm font-medium text-text-primary mb-2">
-          Note
+          Notes
         </h3>
-        <p className="text-xs text-text-secondary">
-          Shell changes apply to new terminal sessions. Close and reopen the terminal
-          to use the new shell. Font size and cursor settings apply immediately to new terminals.
-        </p>
+        <ul className="text-xs text-text-secondary space-y-1">
+          <li>- Shell changes apply to new terminal sessions</li>
+          <li>- GPU-accelerated rendering (WebGL) is used when available</li>
+          <li>- For best results with Claude Code ASCII art, install a Nerd Font:</li>
+          <li className="pl-3">
+            <code className="bg-bg-tertiary px-1 rounded">brew install --cask font-jetbrains-mono-nerd-font</code>
+          </li>
+        </ul>
       </div>
     </div>
   );

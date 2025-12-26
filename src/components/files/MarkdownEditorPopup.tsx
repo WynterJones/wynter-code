@@ -113,7 +113,7 @@ export function MarkdownEditorPopup({
     [originalContent]
   );
 
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     try {
       setIsSaving(true);
       await invoke("write_file_content", { path: filePath, content });
@@ -127,7 +127,7 @@ export function MarkdownEditorPopup({
     } finally {
       setIsSaving(false);
     }
-  };
+  }, [filePath, content, onSave]);
 
   const handleReset = () => {
     setContent(originalContent);
@@ -272,7 +272,7 @@ export function MarkdownEditorPopup({
         }
       }
     },
-    [onClose, hasChanges, showFindBar, viewMode]
+    [onClose, hasChanges, showFindBar, viewMode, handleSave]
   );
 
   useEffect(() => {

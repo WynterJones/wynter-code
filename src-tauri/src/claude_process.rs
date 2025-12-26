@@ -291,6 +291,38 @@ pub async fn send_claude_input(
     }
 }
 
+/// Send raw input to Claude session (for tool approvals like "y" or "n")
+/// This doesn't wrap in JSON - sends directly to stdin
+#[tauri::command]
+pub async fn send_claude_raw_input(
+    state: State<'_, Arc<ClaudeProcessManager>>,
+    session_id: String,
+    input: String,
+) -> Result<(), String> {
+    let mut instances = state.instances.lock().unwrap();
+
+    if let Some(instance) = instances.get_mut(&session_id) {
+        if let Some(ref mut stdin) = instance.stdin {
+            eprintln!(
+                "[Claude] Sending RAW input to session {}: {:?}",
+                session_id,
+                &input
+            );
+            stdin
+                .write_all(input.as_bytes())
+                .map_err(|e| format!("Failed to write to Claude stdin: {}", e))?;
+            stdin
+                .flush()
+                .map_err(|e| format!("Failed to flush Claude stdin: {}", e))?;
+            Ok(())
+        } else {
+            Err("Claude stdin not available".to_string())
+        }
+    } else {
+        Err("Claude session not found".to_string())
+    }
+}
+
 /// Stop a running Claude session gracefully
 #[tauri::command]
 pub async fn stop_claude_session(

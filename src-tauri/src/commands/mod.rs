@@ -704,6 +704,7 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
                         let mut chunk = create_chunk("tool_start", session_id);
                         chunk.tool_name = content_block.get("name").and_then(|n| n.as_str()).map(|s| s.to_string());
                         chunk.tool_id = content_block.get("id").and_then(|n| n.as_str()).map(|s| s.to_string());
+                        println!("[RUST] Parsed content_block_start tool_use: name={:?}, id={:?}", chunk.tool_name, chunk.tool_id);
                         return Some(chunk);
                     }
                     "thinking" => {
@@ -799,6 +800,7 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
                                     chunk.tool_name = block.get("name").and_then(|n| n.as_str()).map(|s| s.to_string());
                                     chunk.tool_id = block.get("id").and_then(|n| n.as_str()).map(|s| s.to_string());
                                     chunk.tool_input = block.get("input").map(|i| i.to_string());
+                                    println!("[RUST] Parsed assistant tool_use: name={:?}, id={:?}", chunk.tool_name, chunk.tool_id);
                                     return Some(chunk);
                                 }
                                 _ => {}

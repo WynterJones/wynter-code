@@ -301,20 +301,22 @@ interface BookmarkIconProps {
   url: string | null;
   faviconUrl?: string | null;
   name: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }
 
 const sizeClasses = {
   sm: "w-4 h-4 text-[10px]",
-  md: "w-5 h-5 text-xs",
-  lg: "w-6 h-6 text-sm",
+  md: "w-6 h-6 text-xs",
+  lg: "w-8 h-8 text-sm",
+  xl: "w-10 h-10 text-base",
 };
 
 const iconSizes = {
   sm: 16,
-  md: 20,
-  lg: 24,
+  md: 24,
+  lg: 32,
+  xl: 40,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -24,12 +24,18 @@ interface BookmarksListProps {
   bookmarks: Bookmark[];
   viewMode: ViewMode;
   onEditBookmark: (id: string) => void;
+  bulkEditMode?: boolean;
+  selectedBookmarkIds?: Set<string>;
+  onToggleSelection?: (id: string) => void;
 }
 
 export function BookmarksList({
   bookmarks,
   viewMode,
   onEditBookmark,
+  bulkEditMode = false,
+  selectedBookmarkIds = new Set(),
+  onToggleSelection,
 }: BookmarksListProps) {
   const { reorderBookmarks } = useBookmarkStore();
 
@@ -91,13 +97,16 @@ export function BookmarksList({
           strategy={viewMode === "grid" ? rectSortingStrategy : verticalListSortingStrategy}
         >
           {viewMode === "grid" ? (
-            <div className="p-4 grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
+            <div className="p-4 grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
               {bookmarks.map((bookmark) => (
                 <BookmarkCard
                   key={bookmark.id}
                   bookmark={bookmark}
                   viewMode={viewMode}
                   onEdit={onEditBookmark}
+                  bulkEditMode={bulkEditMode}
+                  isSelected={selectedBookmarkIds.has(bookmark.id)}
+                  onToggleSelection={onToggleSelection}
                 />
               ))}
             </div>
@@ -109,6 +118,9 @@ export function BookmarksList({
                   bookmark={bookmark}
                   viewMode={viewMode}
                   onEdit={onEditBookmark}
+                  bulkEditMode={bulkEditMode}
+                  isSelected={selectedBookmarkIds.has(bookmark.id)}
+                  onToggleSelection={onToggleSelection}
                 />
               ))}
             </div>

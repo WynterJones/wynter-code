@@ -34,6 +34,8 @@ interface BookmarkStore {
   selectedCollectionId: string | null;
   viewMode: ViewMode;
   searchQuery: string;
+  bulkEditMode: boolean;
+  selectedBookmarkIds: Set<string>;
 
   // Actions - Bookmarks
   addBookmark: (bookmark: Omit<Bookmark, "id" | "createdAt" | "updatedAt" | "order">) => void;
@@ -41,6 +43,10 @@ interface BookmarkStore {
   deleteBookmark: (id: string) => void;
   moveBookmark: (bookmarkId: string, collectionId: string | null) => void;
   reorderBookmarks: (activeId: string, overId: string) => void;
+
+  // Actions - Bulk Operations
+  bulkDeleteBookmarks: (ids: string[]) => void;
+  bulkMoveBookmarks: (ids: string[], collectionId: string | null) => void;
 
   // Actions - Collections
   addCollection: (collection: Omit<Collection, "id" | "createdAt" | "order">) => void;
@@ -52,6 +58,10 @@ interface BookmarkStore {
   setSelectedCollection: (id: string | null) => void;
   setViewMode: (mode: ViewMode) => void;
   setSearchQuery: (query: string) => void;
+  setBulkEditMode: (enabled: boolean) => void;
+  toggleBookmarkSelection: (id: string) => void;
+  selectAllBookmarks: (ids: string[]) => void;
+  clearBookmarkSelection: () => void;
 
   // Import/Export
   importBookmarks: (data: ImportData) => { imported: number; collectionsCreated: number };
@@ -83,6 +93,8 @@ export const useBookmarkStore = create<BookmarkStore>()(
       selectedCollectionId: null,
       viewMode: "list",
       searchQuery: "",
+      bulkEditMode: false,
+      selectedBookmarkIds: new Set(),
 
       // Bookmark actions
       addBookmark: (bookmark) => {
@@ -148,6 +160,27 @@ export const useBookmarkStore = create<BookmarkStore>()(
         });
       },
 
+      // Bulk operations
+      bulkDeleteBookmarks: (ids) => {
+        const idsSet = new Set(ids);
+        set((state) => ({
+          bookmarks: state.bookmarks.filter((b) => !idsSet.has(b.id)),
+          selectedBookmarkIds: new Set(),
+        }));
+      },
+
+      bulkMoveBookmarks: (ids, collectionId) => {
+        const idsSet = new Set(ids);
+        set((state) => ({
+          bookmarks: state.bookmarks.map((b) =>
+            idsSet.has(b.id)
+              ? { ...b, collectionId, updatedAt: Date.now() }
+              : b
+          ),
+          selectedBookmarkIds: new Set(),
+        }));
+      },
+
       // Collection actions
       addCollection: (collection) => {
         const { collections } = get();
@@ -207,6 +240,33 @@ export const useBookmarkStore = create<BookmarkStore>()(
 
       setSearchQuery: (query) => {
         set({ searchQuery: query });
+      },
+
+      setBulkEditMode: (enabled) => {
+        set({
+          bulkEditMode: enabled,
+          selectedBookmarkIds: enabled ? new Set() : new Set(),
+        });
+      },
+
+      toggleBookmarkSelection: (id) => {
+        set((state) => {
+          const newSelection = new Set(state.selectedBookmarkIds);
+          if (newSelection.has(id)) {
+            newSelection.delete(id);
+          } else {
+            newSelection.add(id);
+          }
+          return { selectedBookmarkIds: newSelection };
+        });
+      },
+
+      selectAllBookmarks: (ids) => {
+        set({ selectedBookmarkIds: new Set(ids) });
+      },
+
+      clearBookmarkSelection: () => {
+        set({ selectedBookmarkIds: new Set() });
       },
 
       // Import bookmarks
