@@ -25,9 +25,9 @@ function usePopupContext() {
 }
 
 const SIZE_CLASSES: Record<PopupSize, string> = {
-  small: "w-[360px] max-h-[90vh]",
-  medium: "w-[760px] max-h-[90vh]",
-  full: "w-[calc(100vw-60px)] h-[calc(100vh-60px)]",
+  small: "!w-[360px] max-h-[90vh]",
+  medium: "!w-[760px] max-h-[90vh]",
+  full: "!w-[calc(100vw-60px)] h-[calc(100vh-60px)]",
 };
 
 function PopupRoot({

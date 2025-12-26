@@ -19,7 +19,6 @@ export type SplitDirection = "horizontal" | "vertical";
 
 /** Predefined layout template identifiers */
 export type LayoutTemplateId =
-  | "single"
   | "split-h"
   | "split-v"
   | "triple-h"

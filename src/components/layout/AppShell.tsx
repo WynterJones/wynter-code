@@ -94,6 +94,10 @@ export function AppShell() {
     window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openBeadsTracker" } }));
   }, []);
 
+  const handleOpenLivePreview = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openLivePreview" } }));
+  }, []);
+
   const handleBrowseFiles = useCallback(() => {
     setRequestImageBrowser(true);
   }, []);
@@ -215,6 +219,7 @@ export function AppShell() {
             onOpenFarmwork={handleOpenFarmwork}
             onOpenBeads={handleOpenBeads}
             onBrowseFiles={handleBrowseFiles}
+            onOpenLivePreview={handleOpenLivePreview}
           />
 
           <div className={`flex-1 flex overflow-hidden relative ${isResizingSidebar ? "select-none" : ""}`}>

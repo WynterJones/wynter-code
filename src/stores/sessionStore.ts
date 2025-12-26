@@ -10,6 +10,8 @@ export interface ClaudeSessionInfo {
   tools?: string[];
   cwd?: string;
   status: "starting" | "ready" | "ended";
+  // New fields from init message
+  permissionMode?: PermissionMode;
 }
 
 interface StreamingState {
@@ -62,7 +64,8 @@ interface SessionStore {
     sessionId: string,
     toolId: string,
     status: ToolCall["status"],
-    output?: string
+    output?: string,
+    isError?: boolean
   ) => void;
   appendToolInput: (
     sessionId: string,
@@ -127,7 +130,7 @@ export const useSessionStore = create<SessionStore>()(
           claudeSessionId: null,
           isActive: true,
           createdAt: new Date(),
-          permissionMode: "default",
+          permissionMode: "acceptEdits",
         };
 
         set((state) => {
@@ -418,7 +421,8 @@ export const useSessionStore = create<SessionStore>()(
         sessionId: string,
         toolId: string,
         status: ToolCall["status"],
-        output?: string
+        output?: string,
+        isError?: boolean
       ) => {
         set((state) => {
           const newStreamingState = new Map(state.streamingState);
@@ -436,7 +440,7 @@ export const useSessionStore = create<SessionStore>()(
               return tc; // Keep as pending
             }
 
-            return { ...tc, status, output };
+            return { ...tc, status, output, isError: isError ?? tc.isError };
           });
           newStreamingState.set(sessionId, {
             ...current,

@@ -10,6 +10,7 @@ interface ProjectStore {
   addProject: (path: string) => void;
   removeProject: (id: string) => void;
   setActiveProject: (id: string) => void;
+  updateProjectName: (id: string, name: string) => void;
   updateProjectColor: (id: string, color: string) => void;
   updateProjectIcon: (id: string, icon: string) => void;
   toggleMinimized: (id: string) => void;
@@ -65,6 +66,14 @@ export const useProjectStore = create<ProjectStore>()(
           activeProjectId: id,
           projects: state.projects.map((p) =>
             p.id === id ? { ...p, lastOpenedAt: new Date() } : p
+          ),
+        }));
+      },
+
+      updateProjectName: (id: string, name: string) => {
+        set((state) => ({
+          projects: state.projects.map((p) =>
+            p.id === id ? { ...p, name } : p
           ),
         }));
       },

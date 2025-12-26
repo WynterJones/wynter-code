@@ -7,45 +7,20 @@ import { PermissionApprovalModal } from "@/components/output/PermissionApprovalM
 import { AskUserQuestionModal } from "@/components/output/AskUserQuestionModal";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { claudeService } from "@/services/claude";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps } from "@/types/panel";
 import type { PermissionMode, ToolCall } from "@/types";
 
-// Tools that typically need permission in default mode
-const TOOLS_REQUIRING_PERMISSION = [
-  "bash", "shell", "exec", "execute",
-  "edit", "write", "delete", "remove",
-  "task", "mcp__", "skill",
-];
-
-// Tools that are always auto-approved
-const AUTO_APPROVED_TOOLS = [
-  "read", "glob", "grep", "todowrite", "websearch", "webfetch",
-];
-
-function toolNeedsPermission(toolName: string, permissionMode: PermissionMode): boolean {
-  const nameLower = toolName.toLowerCase();
-
-  // bypassPermissions mode - nothing needs approval
-  if (permissionMode === "bypassPermissions") {
-    return false;
-  }
-
-  // Check if tool is always auto-approved
-  if (AUTO_APPROVED_TOOLS.some(t => nameLower.includes(t))) {
-    return false;
-  }
-
-  // acceptEdits mode - only bash/exec needs approval
-  if (permissionMode === "acceptEdits") {
-    return nameLower.includes("bash") ||
-           nameLower.includes("shell") ||
-           nameLower.includes("exec");
-  }
-
-  // default/plan mode - check against permission-requiring tools
-  return TOOLS_REQUIRING_PERMISSION.some(t => nameLower.includes(t));
+// In stream-json mode, there's no interactive tool approval.
+// The CLI auto-approves or auto-rejects based on --permission-mode:
+// - "default": File edits rejected, user sees permission_denials in result
+// - "acceptEdits": File edits auto-approved, Bash still needs approval (rejected)
+// - "bypassPermissions": Everything auto-approved
+// GUI doesn't need to check permissions - CLI handles it
+function toolNeedsPermission(_toolName: string, _permissionMode: PermissionMode): boolean {
+  return false; // CLI handles permissions in stream-json mode
 }
 
 const MIN_ACTIVITY_HEIGHT = 80;
@@ -85,6 +60,7 @@ export function ClaudeOutputPanel({
     getSession,
     setPendingQuestionSet,
   } = useSessionStore();
+  const { claudeSafeMode } = useSettingsStore();
 
   const [activityHeight, setActivityHeight] = useState(DEFAULT_ACTIVITY_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
@@ -204,8 +180,10 @@ export function ClaudeOutputPanel({
             appendToolInput(sessionId, toolId, partialJson);
           },
           onToolEnd: () => {},
-          onToolResult: (toolId, content) => {
-            updateToolCallStatus(sessionId, toolId, "completed", content);
+          onToolResult: (toolId, content, isError) => {
+            // If tool had an error, mark as error status; otherwise completed
+            const status = isError ? "error" : "completed";
+            updateToolCallStatus(sessionId, toolId, status, content, isError);
             // Add separator so subsequent text appears as new block
             appendStreamingText(sessionId, "\n\n");
           },
@@ -243,7 +221,8 @@ export function ClaudeOutputPanel({
           },
         },
         permissionMode,
-        resumeSessionId
+        resumeSessionId,
+        claudeSafeMode
       );
     } catch (error) {
       console.error("[ClaudeOutputPanel] Failed to start session:", error);
@@ -265,6 +244,8 @@ export function ClaudeOutputPanel({
     updateToolCallStatus,
     updateStats,
     finishStreaming,
+    claudeSafeMode,
+    setPendingQuestionSet,
   ]);
 
   const handleStopSession = useCallback(async () => {

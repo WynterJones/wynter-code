@@ -49,6 +49,7 @@ export interface ToolCall {
   input: Record<string, unknown>;
   output?: string;
   status: "pending" | "running" | "completed" | "error";
+  isError?: boolean; // Tool execution resulted in error
 }
 
 export interface StreamingChunk {
@@ -57,6 +58,10 @@ export interface StreamingChunk {
   toolCall?: ToolCall;
   sessionId?: string;
 }
+
+export type PermissionMode = "default" | "plan" | "acceptEdits" | "bypassPermissions";
+
+export type ResultSubtype = 'success' | 'error_max_turns' | 'error_during_execution';
 
 export interface StreamChunk {
   chunk_type: string;
@@ -73,9 +78,17 @@ export interface StreamChunk {
   duration_ms?: number;
   tool_id?: string;
   claude_session_id?: string;
+  // Result message fields
+  subtype?: ResultSubtype | 'init';
+  is_error?: boolean;
+  num_turns?: number;
+  duration_api_ms?: number;
+  // Init message fields
+  permission_mode?: PermissionMode;
+  tools?: string[];
+  // Tool result fields
+  tool_is_error?: boolean;
 }
-
-export type PermissionMode = "default" | "plan" | "acceptEdits" | "bypassPermissions";
 
 export interface StreamingStats {
   model?: string;
@@ -85,9 +98,14 @@ export interface StreamingStats {
   cacheWriteTokens: number;
   costUsd?: number;
   durationMs?: number;
+  durationApiMs?: number;
   startTime: number;
   isThinking: boolean;
   currentTool?: string;
+  // New fields
+  numTurns?: number;
+  resultSubtype?: ResultSubtype;
+  isError?: boolean;
 }
 
 export interface ToolApproval {

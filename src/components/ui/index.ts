@@ -50,3 +50,6 @@ export type {
   PopupContentProps,
   PopupFooterProps,
 } from "./Popup";
+
+export { TabContextMenu } from "./TabContextMenu";
+export type { TabContextMenuProps } from "./TabContextMenu";

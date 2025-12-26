@@ -1,4 +1,4 @@
-import { MessageSquare, Terminal, FolderOpen, FileCode, Globe, Plus } from "lucide-react";
+import { MessageSquare, Terminal, FolderOpen, FileCode, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps, PanelType } from "@/types/panel";
 
@@ -7,31 +7,31 @@ const PANEL_OPTIONS: { type: PanelType; name: string; icon: React.ComponentType<
     type: "claude-output",
     name: "Claude Output",
     icon: MessageSquare,
-    description: "AI conversation and responses",
+    description: "AI responses",
   },
   {
     type: "terminal",
     name: "Terminal",
     icon: Terminal,
-    description: "Command line interface",
+    description: "Command line",
   },
   {
     type: "file-browser",
-    name: "File Browser",
+    name: "Files",
     icon: FolderOpen,
-    description: "Browse and navigate directories",
+    description: "Browse files",
   },
   {
     type: "file-viewer",
-    name: "File Viewer",
+    name: "Viewer",
     icon: FileCode,
-    description: "Preview a specific file",
+    description: "Preview file",
   },
   {
     type: "browser-preview",
-    name: "Browser Preview",
+    name: "Browser",
     icon: Globe,
-    description: "Embedded web browser",
+    description: "Web preview",
   },
 ];
 
@@ -49,35 +49,30 @@ export function EmptyPanel({
   };
 
   return (
-    <div className="h-full w-full flex flex-col items-center justify-center p-6">
-      <div className="flex items-center justify-center w-12 h-12 rounded-full bg-bg-tertiary/50 mb-4">
-        <Plus className="w-6 h-6 text-text-secondary/50" />
+    <div className="h-full w-full flex flex-col p-4">
+      <div className="mb-3">
+        <p className="text-[11px] uppercase tracking-wider text-text-secondary/50 font-medium">
+          Select Panel Type
+        </p>
       </div>
-      <h3 className="text-sm font-medium text-text-primary mb-1">Empty Panel</h3>
-      <p className="text-xs text-text-secondary mb-6 text-center">
-        Choose what to display in this panel
-      </p>
 
-      <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
+      <div className="flex flex-col gap-1">
         {PANEL_OPTIONS.map(({ type, name, icon: Icon, description }) => (
           <button
             key={type}
             onClick={() => handleSelectType(type)}
             className={cn(
-              "flex flex-col items-center gap-2 p-3 rounded-lg",
-              "bg-bg-tertiary/30 hover:bg-bg-tertiary/60 border border-border/30",
-              "hover:border-accent/30 transition-all",
+              "flex items-center gap-3 px-2.5 py-2 rounded-md",
+              "hover:bg-bg-hover transition-colors",
               "text-left group"
             )}
           >
-            <div className="flex items-center justify-center w-8 h-8 rounded-md bg-bg-secondary group-hover:bg-accent/10 transition-colors">
-              <Icon className="w-4 h-4 text-text-secondary group-hover:text-accent transition-colors" />
-            </div>
-            <div className="text-center">
-              <div className="text-xs font-medium text-text-primary">{name}</div>
-              <div className="text-[10px] text-text-secondary/70 mt-0.5 line-clamp-2">
+            <Icon className="w-4 h-4 text-text-secondary/60 group-hover:text-accent flex-shrink-0 transition-colors" />
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-medium text-text-primary truncate">{name}</span>
+              <span className="text-[10px] text-text-secondary/40 truncate hidden sm:inline">
                 {description}
-              </div>
+              </span>
             </div>
           </button>
         ))}

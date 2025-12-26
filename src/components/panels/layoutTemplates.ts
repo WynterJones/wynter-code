@@ -48,16 +48,6 @@ export function createDefaultLayout(panelIds: string[]): LayoutNode {
  * - Factory function to create the layout structure
  */
 export const LAYOUT_TEMPLATES: Record<LayoutTemplateId, LayoutTemplate> = {
-  /** Single full-width panel */
-  single: {
-    id: "single",
-    name: "Single",
-    icon: "Square",
-    description: "Full width single panel",
-    defaultPanelTypes: ["claude-output"],
-    createLayout: (panelIds) => panelNode(panelIds[0]),
-  },
-
   /** Two panels side by side (horizontal split) */
   "split-h": {
     id: "split-h",

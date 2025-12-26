@@ -507,6 +507,16 @@ pub struct StreamChunk {
     pub tool_id: Option<String>,
     // Claude's session ID for conversation continuity
     pub claude_session_id: Option<String>,
+    // Result message fields
+    pub subtype: Option<String>,      // success, error_max_turns, error_during_execution
+    pub is_error: Option<bool>,       // Error flag for result/tool_result
+    pub num_turns: Option<u32>,       // Turn count
+    pub duration_api_ms: Option<u64>, // API call duration
+    // Init message fields
+    pub permission_mode: Option<String>,
+    pub tools: Option<Vec<String>>,   // Available tools list
+    // Tool result fields
+    pub tool_is_error: Option<bool>,  // Tool execution error flag
 }
 
 #[tauri::command]
@@ -524,7 +534,7 @@ pub async fn run_claude(prompt: String, cwd: String) -> Result<CommandOutput, St
     })
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PermissionMode {
     #[serde(rename = "default")]
     Default,
@@ -653,6 +663,14 @@ pub fn create_chunk(chunk_type: &str, session_id: &str) -> StreamChunk {
         duration_ms: None,
         tool_id: None,
         claude_session_id: None,
+        // New fields
+        subtype: None,
+        is_error: None,
+        num_turns: None,
+        duration_api_ms: None,
+        permission_mode: None,
+        tools: None,
+        tool_is_error: None,
     }
 }
 
@@ -665,6 +683,19 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
         let mut chunk = create_chunk("init", session_id);
         chunk.model = json.get("model").and_then(|v| v.as_str()).map(|s| s.to_string());
         chunk.content = json.get("cwd").and_then(|v| v.as_str()).map(|s| s.to_string());
+        chunk.subtype = Some("init".to_string());
+        chunk.permission_mode = json.get("permissionMode").and_then(|v| v.as_str()).map(|s| s.to_string());
+
+        // Parse tools list
+        if let Some(tools) = json.get("tools").and_then(|v| v.as_array()) {
+            chunk.tools = Some(
+                tools
+                    .iter()
+                    .filter_map(|t| t.as_str().map(|s| s.to_string()))
+                    .collect()
+            );
+        }
+
         return Some(chunk);
     }
 
@@ -758,6 +789,7 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
             let mut chunk = create_chunk("tool_result", session_id);
             chunk.tool_id = json.get("tool_use_id").and_then(|v| v.as_str()).map(|s| s.to_string());
             chunk.content = json.get("content").and_then(|v| v.as_str()).map(|s| s.to_string());
+            chunk.tool_is_error = json.get("is_error").and_then(|v| v.as_bool());
             Some(chunk)
         }
 
@@ -770,6 +802,7 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
                             if block_type == "tool_result" {
                                 let mut chunk = create_chunk("tool_result", session_id);
                                 chunk.tool_id = block.get("tool_use_id").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                chunk.tool_is_error = block.get("is_error").and_then(|v| v.as_bool());
                                 // The content can be a string or might be in tool_use_result
                                 if let Some(content_str) = block.get("content").and_then(|v| v.as_str()) {
                                     chunk.content = Some(content_str.to_string());
@@ -817,9 +850,21 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
             let mut chunk = create_chunk("result", session_id);
             chunk.content = json.get("result").and_then(|r| r.as_str()).map(|s| s.to_string());
 
+            // Parse result subtype (success, error_max_turns, error_during_execution)
+            chunk.subtype = json.get("subtype").and_then(|v| v.as_str()).map(|s| s.to_string());
+            chunk.is_error = json.get("is_error").and_then(|v| v.as_bool());
+            chunk.num_turns = json.get("num_turns").and_then(|v| v.as_u64()).map(|n| n as u32);
+            chunk.duration_api_ms = json.get("duration_api_ms").and_then(|v| v.as_u64());
+
             // Extract cost info if present
             if let Some(cost) = json.get("cost_usd").and_then(|v| v.as_f64()) {
                 chunk.cost_usd = Some(cost);
+            }
+            // Also check total_cost_usd (SDK uses this field name)
+            if chunk.cost_usd.is_none() {
+                if let Some(cost) = json.get("total_cost_usd").and_then(|v| v.as_f64()) {
+                    chunk.cost_usd = Some(cost);
+                }
             }
             if let Some(duration) = json.get("duration_ms").and_then(|v| v.as_u64()) {
                 chunk.duration_ms = Some(duration);
@@ -827,6 +872,8 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
             if let Some(usage) = json.get("usage") {
                 chunk.input_tokens = usage.get("input_tokens").and_then(|v| v.as_u64());
                 chunk.output_tokens = usage.get("output_tokens").and_then(|v| v.as_u64());
+                chunk.cache_read_tokens = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64());
+                chunk.cache_write_tokens = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64());
             }
 
             Some(chunk)

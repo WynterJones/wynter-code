@@ -2,8 +2,8 @@
 
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
-**Last Updated:** 2025-12-25
-**Active Ideas:** 1
+**Last Updated:** 2025-12-26
+**Active Ideas:** 4
 
 ---
 
@@ -30,6 +30,42 @@ A new session tab type featuring a Kanban board for automated feature developmen
 - Real-time Kanban updates as work progresses
 - Hands-free development pipeline
 - Follow existing UI patterns (OverlayScrollbars, no emojis, proper icons)
+
+### System-Wide Raycast-Style Launcher
+**Location:** System-level feature (outside main app)
+A Raycast-style popup window that opens outside the main Wynter Code app as a system-level feature. Provides quick access to search and actions from anywhere on your desktop.
+- Opens via global hotkey (configurable)
+- Search Google directly from launcher
+- Search user's local files and folders
+- Search features within Wynter Code app (like command palette but system-wide)
+- Quick launcher UI similar to Raycast/Alfred aesthetic
+- Fast, minimal popup that appears over any app
+- Keyboard-driven navigation
+- Recent searches and favorites
+
+### System-Wide Whispr Flow Clone
+**Location:** System-level feature (outside main app)
+A system-wide speech-to-text tool similar to Whispr Flow. Capture voice input from anywhere and have it automatically transcribed and pasted at your cursor position.
+- Activated by holding a key combination (e.g., Cmd+Shift)
+- Shows a waveform visualization window while recording
+- Records audio from system microphone
+- Converts audio to text via speech-to-text API (Whisper or similar)
+- Applies a grammar/optimization layer to clean up transcription
+- Auto-pastes the cleaned result at cursor position
+- Works system-wide across any application
+- Minimal floating UI during recording
+- Configurable hotkey and transcription settings
+
+### Encrypted Web Backup
+**Location:** External service (Netlify-hosted)
+A low-tech, elegant backup solution powered by Netlify - a simple HTML file with a sleek black lock design that contains an encrypted zip of app data. Syncs daily and allows data recovery by entering the URL and password to decrypt and import.
+- Netlify-hosted static HTML page with minimalist black lock design
+- Daily automated sync of local app data export
+- Data stored as encrypted zip file embedded in/alongside the page
+- Password-based decryption for data recovery
+- Enter URL + password to decrypt and import data back into app
+- Low-tech, resilient approach - works even if main service is down
+- No account required, just a URL and password
 
 ---
 

@@ -43,6 +43,7 @@ pub async fn start_claude_session(
     session_id: String,
     permission_mode: Option<PermissionMode>,
     resume_session_id: Option<String>,
+    safe_mode: Option<bool>,
 ) -> Result<String, String> {
     // Check if session is already running
     {
@@ -52,17 +53,28 @@ pub async fn start_claude_session(
         }
     }
 
-    let mode = permission_mode.unwrap_or_default();
+    let mut mode = permission_mode.unwrap_or_default();
+    let is_safe_mode = safe_mode.unwrap_or(true);
+
+    // Safe mode: prevent bypassPermissions to protect against destructive operations
+    // outside the project directory. Downgrade to acceptEdits which still allows
+    // file edits but rejects arbitrary bash commands.
+    if is_safe_mode && mode == PermissionMode::BypassPermissions {
+        eprintln!("[Claude] Safe mode enabled: downgrading bypassPermissions to acceptEdits");
+        mode = PermissionMode::AcceptEdits;
+    }
 
     // Build args for streaming JSON mode with persistent stdin
-    // Note: --output-format and --input-format only work with -p (print) mode
+    // Note: In stream-json mode, there's no interactive tool approval.
+    // Tools are either auto-approved (based on permission-mode) or auto-rejected.
+    // The result message includes `permission_denials` for rejected tools.
     let mut args = vec![
-        "-p".to_string(), // Print mode (required for stream-json)
+        "-p".to_string(),              // Print mode (required for stream-json)
         "--input-format".to_string(),
-        "stream-json".to_string(), // JSON input via stdin
+        "stream-json".to_string(),     // JSON input via stdin
         "--output-format".to_string(),
-        "stream-json".to_string(), // JSON output via stdout
-        "--verbose".to_string(),   // Required for stream-json
+        "stream-json".to_string(),     // JSON output via stdout
+        "--verbose".to_string(),       // Required for stream-json
         "--permission-mode".to_string(),
         mode.as_str().to_string(),
     ];
@@ -248,9 +260,8 @@ pub async fn start_claude_session(
     Ok(session_id)
 }
 
-/// Send input to a running Claude session (prompts, tool approvals, etc.)
-/// For prompts, we format as JSON: {"type":"user","message":{"role":"user","content":"..."}}
-/// For raw input (like tool approvals), pass is_raw=true via send_claude_raw_input
+/// Send input to a running Claude session (prompts)
+/// We format as JSON: {"type":"user","message":{"role":"user","content":"..."}}
 #[tauri::command]
 pub async fn send_claude_input(
     state: State<'_, Arc<ClaudeProcessManager>>,
@@ -392,6 +403,7 @@ pub async fn start_claude_streaming(
         session_id.clone(),
         permission_mode,
         claude_session_id,
+        None, // safe_mode defaults to true
     )
     .await?;
 

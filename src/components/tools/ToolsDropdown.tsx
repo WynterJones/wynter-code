@@ -188,6 +188,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Play,
     actionKey: "openLivePreview",
     category: "code",
+    hiddenInDropdown: true,
   },
   {
     id: "storybook-viewer",
@@ -277,6 +278,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Eye,
     actionKey: "openOverwatch",
     category: "production",
+    hiddenInDropdown: true,
   },
   {
     id: "netlify-ftp",
@@ -357,6 +359,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Bookmark,
     actionKey: "openBookmarks",
     category: "productivity",
+    hiddenInDropdown: true,
   },
   {
     id: "subscription-manager",
@@ -697,6 +700,7 @@ export function ToolsDropdown({
       description: "Preview in browser",
       icon: <Play className="w-4 h-4" />,
       category: "code",
+      hiddenInDropdown: true,
       onClick: () => {
         onOpenLivePreview();
         setIsOpen(false);
@@ -824,6 +828,7 @@ export function ToolsDropdown({
       description: "Monitor prod services",
       icon: <Eye className="w-4 h-4" />,
       category: "production",
+      hiddenInDropdown: true,
       onClick: () => {
         onOpenOverwatch();
         setIsOpen(false);
@@ -931,6 +936,7 @@ export function ToolsDropdown({
       description: "Manage your bookmarks",
       icon: <Bookmark className="w-4 h-4" />,
       category: "productivity",
+      hiddenInDropdown: true,
       onClick: () => {
         onOpenBookmarks();
         setIsOpen(false);

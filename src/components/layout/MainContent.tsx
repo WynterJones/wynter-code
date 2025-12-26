@@ -13,6 +13,7 @@ import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudeDropdown, ClaudePopup } from "@/components/claude";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle } from "@/components/session";
+import { Tooltip } from "@/components/ui";
 import { PanelLayoutContainer } from "@/components/panels";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
@@ -22,40 +23,14 @@ import { cn } from "@/lib/utils";
 import type { Project, PermissionMode, ToolCall } from "@/types";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
-// Tools that typically need permission in default mode
-const TOOLS_REQUIRING_PERMISSION = [
-  "bash", "shell", "exec", "execute",
-  "edit", "write", "delete", "remove",
-  "task", "mcp__", "skill",
-];
-
-// Tools that are always auto-approved
-const AUTO_APPROVED_TOOLS = [
-  "read", "glob", "grep", "todowrite", "websearch", "webfetch",
-];
-
-function toolNeedsPermission(toolName: string, permissionMode: PermissionMode): boolean {
-  const nameLower = toolName.toLowerCase();
-
-  // bypassPermissions mode - nothing needs approval
-  if (permissionMode === "bypassPermissions") {
-    return false;
-  }
-
-  // Check if tool is always auto-approved
-  if (AUTO_APPROVED_TOOLS.some(t => nameLower.includes(t))) {
-    return false;
-  }
-
-  // acceptEdits mode - only bash/exec needs approval
-  if (permissionMode === "acceptEdits") {
-    return nameLower.includes("bash") ||
-           nameLower.includes("shell") ||
-           nameLower.includes("exec");
-  }
-
-  // default/plan mode - check against permission-requiring tools
-  return TOOLS_REQUIRING_PERMISSION.some(t => nameLower.includes(t));
+// In stream-json mode, there's no interactive tool approval.
+// The CLI auto-approves or auto-rejects based on --permission-mode:
+// - "default": File edits rejected, user sees permission_denials in result
+// - "acceptEdits": File edits auto-approved, Bash still needs approval (rejected)
+// - "bypassPermissions": Everything auto-approved
+// GUI doesn't need to check permissions - CLI handles it
+function toolNeedsPermission(_toolName: string, _permissionMode: PermissionMode): boolean {
+  return false; // CLI handles permissions in stream-json mode
 }
 
 interface MainContentProps {
@@ -95,7 +70,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     setPendingQuestionSet,
   } = useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
-  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition } = useSettingsStore();
+  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, claudeSafeMode } = useSettingsStore();
 
   const sessions = getSessionsForProject(project.id);
   const currentSessionId = activeSessionId.get(project.id);
@@ -192,8 +167,10 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
             appendToolInput(currentSessionId, toolId, partialJson);
           },
           onToolEnd: () => {},
-          onToolResult: (toolId, content) => {
-            updateToolCallStatus(currentSessionId, toolId, "completed", content);
+          onToolResult: (toolId, content, isError) => {
+            // If tool had an error, mark as error status; otherwise completed
+            const status = isError ? "error" : "completed";
+            updateToolCallStatus(currentSessionId, toolId, status, content, isError);
             // Add separator so subsequent text appears as new block
             appendStreamingText(currentSessionId, "\n\n");
           },
@@ -229,7 +206,8 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           },
         },
         permissionMode,
-        resumeSessionId
+        resumeSessionId,
+        claudeSafeMode
       );
     } catch (error) {
       console.error("[MainContent] Failed to start session:", error);
@@ -252,6 +230,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     updateStats,
     finishStreaming,
     setPendingQuestionSet,
+    claudeSafeMode,
   ]);
 
   // Stop the Claude session
@@ -429,35 +408,35 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           className="flex items-center gap-2 transition-[padding] duration-200"
           style={{ paddingRight: sidebarPosition === "right" ? (sidebarCollapsed ? 28 : 16) : 0 }}
         >
-          <ModelSelector />
           {currentSession && currentSession.type === "claude" && !useMultiPanelLayout && (
             <>
               {!isSessionActive && !isSessionStarting ? (
                 <button
                   onClick={handleStartSession}
-                  className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors"
+                  className="flex items-center gap-2 px-3 h-8 rounded-md text-sm bg-bg-tertiary border border-accent-green/50 hover:border-accent-green hover:bg-accent-green/10 text-accent-green transition-colors"
                   title="Start Claude session"
                 >
-                  <Play className="w-3 h-3" />
-                  Start
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Start</span>
                 </button>
               ) : isSessionStarting ? (
-                <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-yellow-400">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  Starting...
+                <div className="flex items-center gap-2 px-3 h-8 rounded-md text-sm bg-bg-tertiary border border-yellow-500/50 text-yellow-400">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Starting...</span>
                 </div>
               ) : (
                 <button
                   onClick={handleStopSession}
-                  className="flex items-center gap-1.5 px-2 py-1 text-xs rounded bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors"
+                  className="flex items-center gap-2 px-3 h-8 rounded-md text-sm bg-bg-tertiary border border-accent-red/50 hover:border-accent-red hover:bg-accent-red/10 text-accent-red transition-colors"
                   title="Stop Claude session"
                 >
-                  <Square className="w-3 h-3" />
-                  Stop
+                  <Square className="w-3.5 h-3.5" />
+                  <span>Stop</span>
                 </button>
               )}
             </>
           )}
+          <ModelSelector />
           {currentSession && (
             <PermissionModeToggle
               mode={currentSession.permissionMode || "default"}
@@ -465,28 +444,32 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
             />
           )}
           <div className="w-px h-5 bg-border" />
-          <ClaudeDropdown projectPath={project.path} />
+          <Tooltip content="Claude Code Manager" side="bottom">
+            <ClaudeDropdown projectPath={project.path} />
+          </Tooltip>
           {!isTerminalSession && !useMultiPanelLayout && (
-            <button
-              onClick={() => toggleTerminal(project.id)}
-              className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-              title="Toggle terminal"
-            >
-              <TerminalIcon className="w-4 h-4" />
-            </button>
+            <Tooltip content="Quick Terminal" side="bottom">
+              <button
+                onClick={() => toggleTerminal(project.id)}
+                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <TerminalIcon className="w-4 h-4" />
+              </button>
+            </Tooltip>
           )}
-          <button
-            onClick={() => setUseMultiPanelLayout(!useMultiPanelLayout)}
-            className={cn(
-              "p-1.5 rounded transition-colors",
-              useMultiPanelLayout
-                ? "bg-accent/20 text-accent hover:bg-accent/30"
-                : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
-            )}
-            title={useMultiPanelLayout ? "Switch to classic layout" : "Switch to multi-panel layout"}
-          >
-            {useMultiPanelLayout ? <Columns className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
-          </button>
+          <Tooltip content={useMultiPanelLayout ? "Exit Panel Mode" : "Panel Layout"} side="bottom">
+            <button
+              onClick={() => setUseMultiPanelLayout(!useMultiPanelLayout)}
+              className={cn(
+                "p-1.5 rounded transition-colors",
+                useMultiPanelLayout
+                  ? "bg-accent/20 text-accent hover:bg-accent/30"
+                  : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+              )}
+            >
+              {useMultiPanelLayout ? <Columns className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+            </button>
+          </Tooltip>
         </div>
       </div>
 

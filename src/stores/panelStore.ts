@@ -7,7 +7,7 @@ import type {
   LayoutNode,
   LayoutTemplateId,
 } from "@/types/panel";
-import { LAYOUT_TEMPLATES, createDefaultLayout } from "@/components/panels/layoutTemplates";
+import { LAYOUT_TEMPLATES } from "@/components/panels/layoutTemplates";
 
 /** Generate a unique ID */
 function generateId(): string {
@@ -26,12 +26,21 @@ function createDefaultPanel(type: PanelType): PanelState {
 
 /** Default layout state for new projects */
 function createDefaultLayoutState(): PanelLayoutState {
-  const panel = createDefaultPanel("claude-output");
+  const template = LAYOUT_TEMPLATES["split-h"];
+  const panels: Record<string, PanelState> = {};
+  const panelIds: string[] = [];
+
+  template.defaultPanelTypes.forEach((type) => {
+    const panel = createDefaultPanel(type);
+    panels[panel.id] = panel;
+    panelIds.push(panel.id);
+  });
+
   return {
-    layout: createDefaultLayout([panel.id]),
-    panels: { [panel.id]: panel },
-    activeTemplateId: "single",
-    focusedPanelId: panel.id,
+    layout: template.createLayout(panelIds),
+    panels,
+    activeTemplateId: "split-h",
+    focusedPanelId: panelIds[0] || null,
   };
 }
 

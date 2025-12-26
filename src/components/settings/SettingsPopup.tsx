@@ -79,6 +79,8 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     setTerminalShell,
     setTerminalFontSize,
     setTerminalCursorBlink,
+    claudeSafeMode,
+    setClaudeSafeMode,
   } = useSettingsStore();
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
@@ -147,6 +149,8 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
                   onCompactProjectTabsChange={setCompactProjectTabs}
                   dimInactiveProjects={dimInactiveProjects}
                   onDimInactiveProjectsChange={setDimInactiveProjects}
+                  claudeSafeMode={claudeSafeMode}
+                  onClaudeSafeModeChange={setClaudeSafeMode}
                 />
               )}
               {activeTab === "editor" && (
@@ -396,6 +400,8 @@ interface GeneralSettingsProps {
   onCompactProjectTabsChange: (compact: boolean) => void;
   dimInactiveProjects: boolean;
   onDimInactiveProjectsChange: (dim: boolean) => void;
+  claudeSafeMode: boolean;
+  onClaudeSafeModeChange: (enabled: boolean) => void;
 }
 
 const SIDEBAR_POSITION_OPTIONS: { id: SidebarPosition; name: string }[] = [
@@ -414,6 +420,8 @@ function GeneralSettings({
   onCompactProjectTabsChange,
   dimInactiveProjects,
   onDimInactiveProjectsChange,
+  claudeSafeMode,
+  onClaudeSafeModeChange,
 }: GeneralSettingsProps) {
   return (
     <div className="space-y-6">
@@ -482,6 +490,40 @@ function GeneralSettings({
         <p className="text-xs text-text-secondary italic pt-1">
           Tip: Right-click any project tab to change its icon or color
         </p>
+      </div>
+
+      {/* Claude AI Settings */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+          Claude AI
+        </h3>
+
+        {/* Safe Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-text-primary">
+              Safe Mode
+            </label>
+            <p className="text-xs text-text-secondary">
+              Prevent Claude from using &quot;bypass permissions&quot; mode. Protects against
+              destructive operations outside the project directory.
+            </p>
+          </div>
+          <button
+            onClick={() => onClaudeSafeModeChange(!claudeSafeMode)}
+            className={cn(
+              "w-11 h-6 rounded-full transition-colors relative",
+              claudeSafeMode ? "bg-accent" : "bg-bg-hover"
+            )}
+          >
+            <div
+              className={cn(
+                "w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all",
+                claudeSafeMode ? "left-5" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
       </div>
 
       {/* App Font */}

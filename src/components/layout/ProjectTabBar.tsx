@@ -12,6 +12,8 @@ import {
   Database,
   Search,
   Bot,
+  Eye,
+  Bookmark,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -32,7 +34,7 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { IconButton, Tooltip, ContextMenu, IconPicker } from "@/components/ui";
+import { IconButton, Tooltip, TabContextMenu } from "@/components/ui";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { SubscriptionButton } from "@/components/subscriptions";
@@ -84,22 +86,10 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { WorkspaceSelectorPopup } from "@/components/workspaces";
 import type { Project } from "@/types";
 
-const PROJECT_COLORS = [
-  "#cba6f7", // Purple
-  "#89b4fa", // Blue
-  "#a6e3a1", // Green
-  "#f9e2af", // Yellow
-  "#fab387", // Orange
-  "#f38ba8", // Red/Pink
-  "#94e2d5", // Teal
-  "#cdd6f4", // White-ish
-];
-
 interface ContextMenuState {
   isOpen: boolean;
   position: { x: number; y: number };
   projectId: string | null;
-  activeTab: "icon" | "color";
 }
 
 interface ProjectTabBarProps {
@@ -186,10 +176,10 @@ function SortableProjectTab({
       }}
       onContextMenu={onContextMenu}
       className={cn(
-        "group relative flex items-center cursor-pointer transition-all min-w-[120px] max-w-[200px] flex-shrink-0",
+        "group relative flex items-center cursor-pointer transition-all w-[200px] min-w-[140px] max-w-[200px] flex-shrink",
         isMinimized
           ? cn(
-              "px-2 gap-1 border-r border-border",
+              "px-2 gap-1 border-r border-border w-auto min-w-0 max-w-none",
               isCompact ? "h-9" : "h-11",
             )
           : isCompact
@@ -206,11 +196,11 @@ function SortableProjectTab({
         isDragging && "opacity-50 z-50",
       )}
     >
-      {/* Project color indicator - only show when active */}
-      {isActive && project.color && (
+      {/* Project color indicator - show color when has color, subtle border when no color */}
+      {isActive && (
         <div
           className="absolute bottom-0 left-0 right-0 h-0.5"
-          style={{ backgroundColor: project.color }}
+          style={{ backgroundColor: project.color || "var(--border)" }}
         />
       )}
 
@@ -221,8 +211,8 @@ function SortableProjectTab({
       {!isMinimized && (
         <span
           className={cn(
-            "truncate",
-            isCompact ? "text-xs max-w-[100px]" : "text-sm max-w-[120px]",
+            "truncate flex-1 min-w-0",
+            isCompact ? "text-xs" : "text-sm",
           )}
         >
           {project.name}
@@ -299,6 +289,7 @@ export function ProjectTabBar({
     setActiveProject,
     removeProject,
     addProject,
+    updateProjectName,
     updateProjectColor,
     updateProjectIcon,
     toggleMinimized,
@@ -374,7 +365,6 @@ export function ProjectTabBar({
     isOpen: false,
     position: { x: 0, y: 0 },
     projectId: null,
-    activeTab: "icon",
   });
   const [showPortManager, setShowPortManager] = useState(false);
   const [showNodeModulesCleaner, setShowNodeModulesCleaner] = useState(false);
@@ -593,7 +583,6 @@ export function ProjectTabBar({
       isOpen: true,
       position: { x: rect.left, y: rect.bottom + 4 },
       projectId,
-      activeTab: "icon",
     });
   };
 
@@ -800,6 +789,24 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
+      {/* Overwatch */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Overwatch">
+          <IconButton size="sm" onClick={() => setShowOverwatch(true)}>
+            <Eye className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Bookmarks */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Bookmarks">
+          <IconButton size="sm" onClick={() => setShowBookmarks(true)}>
+            <Bookmark className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
       {/* Auto Build */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Auto Build">
@@ -894,107 +901,31 @@ export function ProjectTabBar({
       </div>
 
       {/* Context Menu for Project Customization */}
-      <ContextMenu
-        isOpen={contextMenu.isOpen}
-        position={contextMenu.position}
-        onClose={closeContextMenu}
-      >
-        <div className="min-w-[280px]">
-          {/* Tabs */}
-          <div className="flex border-b border-border mb-3">
-            <button
-              onClick={() =>
-                setContextMenu((prev) => ({ ...prev, activeTab: "icon" }))
-              }
-              className={cn(
-                "flex-1 py-1.5 text-sm font-medium transition-colors",
-                contextMenu.activeTab === "icon"
-                  ? "text-accent border-b-2 border-accent"
-                  : "text-text-secondary hover:text-text-primary",
-              )}
-            >
-              Icon
-            </button>
-            <button
-              onClick={() =>
-                setContextMenu((prev) => ({ ...prev, activeTab: "color" }))
-              }
-              className={cn(
-                "flex-1 py-1.5 text-sm font-medium transition-colors",
-                contextMenu.activeTab === "color"
-                  ? "text-accent border-b-2 border-accent"
-                  : "text-text-secondary hover:text-text-primary",
-              )}
-            >
-              Color
-            </button>
-          </div>
-
-          {/* Tab Content */}
-          {contextMenu.activeTab === "icon" && contextMenuProject && (
-            <IconPicker
-              selectedIcon={contextMenuProject.icon}
-              onSelectIcon={(icon) => {
-                if (contextMenu.projectId) {
-                  updateProjectIcon(contextMenu.projectId, icon);
-                }
-                closeContextMenu();
-              }}
-              onRemoveIcon={
-                contextMenuProject.icon
-                  ? () => {
-                      if (contextMenu.projectId) {
-                        updateProjectIcon(contextMenu.projectId, "");
-                      }
-                      closeContextMenu();
-                    }
-                  : undefined
-              }
-            />
-          )}
-
-          {contextMenu.activeTab === "color" && contextMenuProject && (
-            <div>
-              <div className="text-xs text-text-secondary mb-2 font-medium">
-                Project Color
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                {PROJECT_COLORS.map((color) => (
-                  <button
-                    key={color}
-                    onClick={() => {
-                      if (contextMenu.projectId) {
-                        updateProjectColor(contextMenu.projectId, color);
-                      }
-                      closeContextMenu();
-                    }}
-                    className={cn(
-                      "w-8 h-8 rounded-full border-2 transition-all hover:scale-110",
-                      contextMenuProject.color === color
-                        ? "border-white ring-2 ring-accent/50"
-                        : "border-transparent hover:border-white/50",
-                    )}
-                    style={{ backgroundColor: color }}
-                  />
-                ))}
-              </div>
-              {contextMenuProject.color && (
-                <button
-                  onClick={() => {
-                    if (contextMenu.projectId) {
-                      updateProjectColor(contextMenu.projectId, "");
-                    }
-                    closeContextMenu();
-                  }}
-                  className="w-full mt-3 px-2 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors border-t border-border pt-3"
-                >
-                  Remove color
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </ContextMenu>
+      {contextMenuProject && (
+        <TabContextMenu
+          isOpen={contextMenu.isOpen}
+          position={contextMenu.position}
+          onClose={closeContextMenu}
+          name={contextMenuProject.name}
+          icon={contextMenuProject.icon}
+          color={contextMenuProject.color}
+          onUpdateName={(name) => {
+            if (contextMenu.projectId) {
+              updateProjectName(contextMenu.projectId, name);
+            }
+          }}
+          onUpdateIcon={(icon) => {
+            if (contextMenu.projectId) {
+              updateProjectIcon(contextMenu.projectId, icon);
+            }
+          }}
+          onUpdateColor={(color) => {
+            if (contextMenu.projectId) {
+              updateProjectColor(contextMenu.projectId, color);
+            }
+          }}
+        />
+      )}
 
       {/* File Browser Popup */}
       <FileBrowserPopup

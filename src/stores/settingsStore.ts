@@ -87,6 +87,9 @@ interface SettingsStore {
   terminalCursorBlink: boolean;
   useMultiPanelLayout: boolean;
 
+  // Claude safety settings
+  claudeSafeMode: boolean; // Prevents bypassPermissions, restricts to project dir
+
   // Avatar
   userAvatar: string | null;
 
@@ -120,6 +123,7 @@ interface SettingsStore {
   setTerminalCursorBlink: (blink: boolean) => void;
   setUseMultiPanelLayout: (use: boolean) => void;
   setUserAvatar: (avatar: string | null) => void;
+  setClaudeSafeMode: (enabled: boolean) => void;
 
   // Radio setters
   setAudioSourceType: (type: AudioSourceType) => void;
@@ -159,6 +163,7 @@ export const useSettingsStore = create<SettingsStore>()(
       terminalCursorBlink: true,
       useMultiPanelLayout: false,
       userAvatar: null,
+      claudeSafeMode: true, // Enabled by default for safety
 
       // Radio defaults
       audioSourceType: "nightride",
@@ -260,6 +265,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setUserAvatar: (userAvatar: string | null) => {
         set({ userAvatar });
+      },
+
+      setClaudeSafeMode: (claudeSafeMode: boolean) => {
+        set({ claudeSafeMode });
       },
 
       // Radio setters

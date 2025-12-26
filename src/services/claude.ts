@@ -13,6 +13,7 @@ export interface ClaudeSessionInfo {
   claudeSessionId?: string;
   tools?: string[];
   cwd?: string;
+  permissionMode?: PermissionMode;
 }
 
 export interface AskUserQuestionInput {
@@ -35,7 +36,7 @@ export interface ClaudeSessionCallbacks {
   onToolStart: (toolName: string, toolId: string) => void;
   onToolInputDelta: (toolId: string, partialJson: string) => void;
   onToolEnd: (toolId: string) => void;
-  onToolResult: (toolId: string, content: string) => void;
+  onToolResult: (toolId: string, content: string, isError?: boolean) => void;
   onAskUserQuestion: (toolId: string, input: AskUserQuestionInput) => void;
   onInit: (model: string, cwd: string, claudeSessionId?: string) => void;
   onUsage: (stats: Partial<StreamingStats>) => void;
@@ -73,13 +74,15 @@ class ClaudeService {
     sessionId: string,
     callbacks: ClaudeSessionCallbacks,
     permissionMode?: PermissionMode,
-    resumeSessionId?: string
+    resumeSessionId?: string,
+    safeMode?: boolean
   ): Promise<void> {
     console.log("[ClaudeService] startSession called:", {
       cwd,
       sessionId,
       permissionMode,
       resumeSessionId,
+      safeMode,
     });
 
     if (this._sessionActiveMap.get(sessionId)) {
@@ -118,22 +121,25 @@ class ClaudeService {
 
         case "session_ready":
           this._sessionActiveMap.set(sessionId, true);
-          // Parse init info from content (it's the full JSON)
+          // Parse init info from content (it's the full JSON) or from chunk fields
           let info: ClaudeSessionInfo = {
             model: chunk.model,
             claudeSessionId: chunk.claude_session_id,
+            tools: chunk.tools,
+            permissionMode: chunk.permission_mode,
           };
           if (chunk.content) {
             try {
               const initData = JSON.parse(chunk.content);
               info = {
-                model: initData.model,
-                claudeSessionId: initData.session_id,
-                tools: initData.tools,
+                model: initData.model || chunk.model,
+                claudeSessionId: initData.session_id || chunk.claude_session_id,
+                tools: initData.tools || chunk.tools,
                 cwd: initData.cwd,
+                permissionMode: initData.permissionMode || chunk.permission_mode,
               };
             } catch {
-              // Use basic info from chunk
+              // Use basic info from chunk fields
             }
           }
           cb.onSessionReady(info);
@@ -201,7 +207,7 @@ class ClaudeService {
 
         case "tool_result":
           if (chunk.tool_id) {
-            cb.onToolResult(chunk.tool_id, chunk.content || "");
+            cb.onToolResult(chunk.tool_id, chunk.content || "", chunk.tool_is_error);
             this._currentToolIdMap.set(sessionId, null);
           }
           break;
@@ -243,8 +249,14 @@ class ClaudeService {
           cb.onUsage({
             inputTokens: chunk.input_tokens,
             outputTokens: chunk.output_tokens,
+            cacheReadTokens: chunk.cache_read_tokens,
+            cacheWriteTokens: chunk.cache_write_tokens,
             costUsd: chunk.cost_usd,
             durationMs: chunk.duration_ms,
+            durationApiMs: chunk.duration_api_ms,
+            numTurns: chunk.num_turns,
+            resultSubtype: chunk.subtype as 'success' | 'error_max_turns' | 'error_during_execution' | undefined,
+            isError: chunk.is_error,
           });
           break;
 
@@ -275,6 +287,7 @@ class ClaudeService {
         sessionId,
         permissionMode,
         resumeSessionId,
+        safeMode,
       });
       console.log("[ClaudeService] start_claude_session invoke succeeded");
     } catch (error) {

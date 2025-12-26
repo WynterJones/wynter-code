@@ -82,11 +82,11 @@ export function ModelSelector() {
               )}
             >
               <model.icon className={cn("w-4 h-4 mt-0.5", model.color)} />
-              <div className="flex-1 text-left">
+              <div className="flex-1 text-left min-w-0">
                 <div className="text-sm font-medium text-text-primary">
                   {model.label}
                 </div>
-                <div className="text-xs text-text-secondary">
+                <div className="text-[10px] text-text-secondary/70 truncate">
                   {model.description}
                 </div>
               </div>
