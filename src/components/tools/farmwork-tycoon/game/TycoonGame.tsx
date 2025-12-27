@@ -39,6 +39,7 @@ export function TycoonGame({
 
   const [scale, setScale] = useState(1);
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
+  const [flowerTooltip, setFlowerTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 
   const {
     buildings,
@@ -563,7 +564,24 @@ export function TycoonGame({
       : gardenStats.activeIdeas;
 
     gardenFlowersRef.current.setFlowerCount(flowerCount);
-  }, [gardenStats.activeIdeas, simulatedFlowerCount]);
+    gardenFlowersRef.current.setIdeaNames(gardenStats.ideas);
+
+    // Set up flower hover callback for tooltips (only in full game view)
+    if (!isMiniPlayer) {
+      gardenFlowersRef.current.setOnFlowerHover((ideaName, x, y) => {
+        if (ideaName) {
+          setFlowerTooltip({ text: ideaName, x: x * scale, y: y * scale });
+        } else {
+          setFlowerTooltip(null);
+        }
+      });
+
+      // Set up garden click to open building popup
+      gardenFlowersRef.current.setOnGardenClick(() => {
+        setSelectedBuilding("garden");
+      });
+    }
+  }, [gardenStats.activeIdeas, gardenStats.ideas, simulatedFlowerCount, scale, isMiniPlayer]);
 
   const displaySize = Math.round(GAME_SIZE * scale);
 
@@ -578,9 +596,21 @@ export function TycoonGame({
         <BuildingPopup
           buildingId={selectedBuilding}
           onClose={() => setSelectedBuilding(null)}
-          containerRef={containerRef}
-          scale={scale}
         />
+      )}
+
+      {/* Flower tooltip */}
+      {!isMiniPlayer && flowerTooltip && (
+        <div
+          className="absolute pointer-events-none z-40 px-2 py-1 bg-bg-secondary/95 backdrop-blur-sm rounded-md border border-border/50 shadow-lg text-xs text-text-primary max-w-[200px] truncate"
+          style={{
+            left: flowerTooltip.x,
+            top: flowerTooltip.y - 30,
+            transform: "translateX(-50%)",
+          }}
+        >
+          {flowerTooltip.text}
+        </div>
       )}
     </div>
   );

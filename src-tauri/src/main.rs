@@ -11,6 +11,7 @@ mod cost_popup;
 mod database_viewer;
 mod domain_tools;
 mod gif_capture;
+mod homebrew;
 mod launcher;
 mod limits_monitor;
 mod live_preview;
@@ -18,6 +19,7 @@ mod mcp_permission_server;
 mod netlify_backup;
 mod overwatch;
 mod storybook;
+mod system_cleaner;
 mod terminal;
 mod tunnel;
 mod watcher;
@@ -411,6 +413,31 @@ fn main() {
             domain_tools::http_head_request,
             domain_tools::http_get_json,
             domain_tools::http_follow_redirects,
+            // Homebrew Manager
+            homebrew::brew_check_installed,
+            homebrew::brew_version,
+            homebrew::brew_list_installed,
+            homebrew::brew_list_outdated,
+            homebrew::brew_search,
+            homebrew::brew_info,
+            homebrew::brew_install,
+            homebrew::brew_uninstall,
+            homebrew::brew_update,
+            homebrew::brew_upgrade,
+            homebrew::brew_list_taps,
+            homebrew::brew_tap,
+            homebrew::brew_untap,
+            homebrew::brew_doctor,
+            homebrew::brew_cleanup,
+            homebrew::brew_pin,
+            homebrew::brew_unpin,
+            // System Cleaner
+            system_cleaner::scan_large_files,
+            system_cleaner::get_cache_locations,
+            system_cleaner::scan_app_caches,
+            system_cleaner::scan_installed_apps,
+            system_cleaner::cleaner_delete_to_trash,
+            system_cleaner::uninstall_app,
             // Audio Proxy (for radio streams)
             audio_proxy::start_audio_proxy,
             audio_proxy::stop_audio_proxy,

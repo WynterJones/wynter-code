@@ -19,8 +19,6 @@ import type { BuildingType, AuditKey } from "../types";
 interface BuildingPopupProps {
   buildingId: string | null;
   onClose: () => void;
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  scale: number;
 }
 
 interface BuildingInfo {
@@ -96,7 +94,7 @@ const AUDIT_KEY_MAP: Partial<Record<BuildingType, AuditKey>> = {
   codeQuality: "codeQuality",
 };
 
-export function BuildingPopup({ buildingId, onClose, scale }: BuildingPopupProps) {
+export function BuildingPopup({ buildingId, onClose }: BuildingPopupProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const { buildings, auditScores, gardenStats, compostStats } = useFarmworkTycoonStore();
@@ -118,16 +116,22 @@ export function BuildingPopup({ buildingId, onClose, scale }: BuildingPopupProps
     }
   }, [buildingId]);
 
+  // Handle escape key to close
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && buildingId) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [buildingId, onClose]);
+
   if (!isAnimating || !building || !info) return null;
 
   const Icon = info.icon;
   const auditKey = AUDIT_KEY_MAP[building.type];
   const metadata = auditKey ? auditScores[auditKey] : null;
-
-  // Calculate popup position based on building position
-  const pos = building.position;
-  const popupX = (pos.x + pos.width / 2) * scale;
-  const popupY = (pos.y + pos.height / 2) * scale;
 
   // Get count value for count-type buildings
   const getCountValue = () => {
@@ -158,202 +162,212 @@ export function BuildingPopup({ buildingId, onClose, scale }: BuildingPopupProps
 
   return (
     <div
-      className="absolute inset-0 z-50"
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/20"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         className={cn(
-          "absolute bg-bg-secondary/95 backdrop-blur-sm rounded-xl border border-border/50 shadow-2xl",
-          "p-4 w-[280px] transform -translate-x-1/2 -translate-y-1/2",
+          "bg-bg-secondary/95 backdrop-blur-sm rounded-xl border border-border/50 shadow-2xl",
+          "w-[300px] max-h-[80%] flex flex-col",
           "transition-all duration-200 ease-out",
           isVisible
             ? "opacity-100 scale-100"
-            : "opacity-0 scale-90"
+            : "opacity-0 scale-95"
         )}
-        style={{
-          left: popupX,
-          top: popupY,
-        }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-2 right-2 p-1 rounded-md hover:bg-bg-tertiary transition-colors"
-        >
-          <X className="w-4 h-4 text-text-tertiary" />
-        </button>
-
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-3">
-          <div
-            className="p-2.5 rounded-lg"
-            style={{ backgroundColor: `${info.color}20` }}
+        {/* Header - fixed */}
+        <div className="p-4 pb-3 border-b border-border/30 shrink-0 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-bg-tertiary transition-colors"
           >
-            <Icon className="w-6 h-6" style={{ color: info.color }} />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary">
-              {building.name}
-            </h3>
-            <span
-              className="text-xs font-mono"
-              style={{ color: info.color }}
+            <X className="w-4 h-4 text-text-tertiary" />
+          </button>
+
+          <div className="flex items-center gap-3 pr-8">
+            <div
+              className="p-2.5 rounded-lg shrink-0"
+              style={{ backgroundColor: `${info.color}20` }}
             >
-              {info.type === "audit" && metadata
-                ? `${metadata.score.toFixed(1)}/10`
-                : `${getCountValue()} ${getCountLabel().toLowerCase()}`}
-            </span>
+              <Icon className="w-6 h-6" style={{ color: info.color }} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-text-primary truncate">
+                {building.name}
+              </h3>
+              <span
+                className="text-xs font-mono"
+                style={{ color: info.color }}
+              >
+                {info.type === "audit" && metadata
+                  ? `${metadata.score.toFixed(1)}/10`
+                  : `${getCountValue()} ${getCountLabel().toLowerCase()}`}
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Description */}
-        <p className="text-xs text-text-secondary leading-relaxed mb-4">
-          {info.description}
-        </p>
+        {/* Scrollable content */}
+        <div className="p-4 pt-3 overflow-y-auto flex-1 min-h-0">
+          {/* Description */}
+          <p className="text-xs text-text-secondary leading-relaxed mb-4">
+            {info.description}
+          </p>
 
-        {/* Progress Bar for audit buildings */}
-        {info.type === "audit" && metadata && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-text-tertiary uppercase tracking-wider">Score</span>
-              <span className="font-mono font-bold" style={{ color: info.color }}>
-                {metadata.score.toFixed(1)}/10
-              </span>
-            </div>
-            <div className="flex gap-[3px] h-3">
-              {Array.from({ length: 10 }).map((_, i) => {
-                const isFilled = i < Math.floor(metadata.score);
-                const isPartial = i === Math.floor(metadata.score) && (metadata.score % 1) > 0;
-                const partialFill = (metadata.score % 1) * 100;
-
-                return (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-[4px] relative overflow-hidden"
-                    style={{
-                      backgroundColor: `${info.color}15`,
-                      boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
-                    }}
-                  >
-                    {isFilled && (
-                      <div
-                        className="absolute inset-0 rounded-[4px]"
-                        style={{
-                          backgroundColor: info.color,
-                          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
-                        }}
-                      />
-                    )}
-                    {isPartial && (
-                      <div
-                        className="absolute inset-y-0 left-0 rounded-[4px]"
-                        style={{
-                          backgroundColor: info.color,
-                          width: `${partialFill}%`,
-                          boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
-                        }}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Last updated and status */}
-            {(metadata.lastUpdated || metadata.status) && (
-              <div className="mt-3 pt-2 border-t border-border/30 space-y-1">
-                {metadata.lastUpdated && (
-                  <div className="flex justify-between text-[10px]">
-                    <span className="text-text-tertiary">Last Updated</span>
-                    <span className="text-text-secondary">{metadata.lastUpdated}</span>
-                  </div>
-                )}
-                {metadata.status && (
-                  <div className="flex justify-between text-[10px]">
-                    <span className="text-text-tertiary">Status</span>
-                    <span className="text-text-secondary">{metadata.status}</span>
-                  </div>
-                )}
+          {/* Progress Bar for audit buildings */}
+          {info.type === "audit" && metadata && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-text-tertiary uppercase tracking-wider">Score</span>
+                <span className="font-mono font-bold" style={{ color: info.color }}>
+                  {metadata.score.toFixed(1)}/10
+                </span>
               </div>
-            )}
+              <div className="flex gap-[3px] h-3">
+                {Array.from({ length: 10 }).map((_, i) => {
+                  const isFilled = i < Math.floor(metadata.score);
+                  const isPartial = i === Math.floor(metadata.score) && (metadata.score % 1) > 0;
+                  const partialFill = (metadata.score % 1) * 100;
 
-            {/* Open items */}
-            {metadata.openItems.length > 0 && (
-              <div className="mt-3 pt-2 border-t border-border/30">
-                <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">
-                  Open Items ({metadata.openItems.length})
-                </div>
-                <div className="space-y-1 max-h-24 overflow-y-auto">
-                  {metadata.openItems.slice(0, 5).map((item, i) => (
+                  return (
                     <div
                       key={i}
-                      className={cn(
-                        "text-[10px] leading-snug py-1 px-2 rounded",
-                        "bg-bg-tertiary/50 truncate",
-                        item.priority === "high" && "text-red-400 border-l-2 border-red-400/50",
-                        item.priority === "medium" && "text-yellow-400 border-l-2 border-yellow-400/50",
-                        !item.priority && "text-text-secondary border-l-2 border-border/50"
+                      className="flex-1 rounded-[4px] relative overflow-hidden"
+                      style={{
+                        backgroundColor: `${info.color}15`,
+                        boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
+                      }}
+                    >
+                      {isFilled && (
+                        <div
+                          className="absolute inset-0 rounded-[4px]"
+                          style={{
+                            backgroundColor: info.color,
+                            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
+                          }}
+                        />
                       )}
-                      title={item.text}
-                    >
-                      {item.text}
+                      {isPartial && (
+                        <div
+                          className="absolute inset-y-0 left-0 rounded-[4px]"
+                          style={{
+                            backgroundColor: info.color,
+                            width: `${partialFill}%`,
+                            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
+                          }}
+                        />
+                      )}
                     </div>
-                  ))}
-                  {metadata.openItems.length > 5 && (
-                    <div className="text-[9px] text-text-tertiary text-center py-1">
-                      +{metadata.openItems.length - 5} more items
+                  );
+                })}
+              </div>
+
+              {/* Last updated and status */}
+              {(metadata.lastUpdated || metadata.status) && (
+                <div className="mt-3 pt-2 border-t border-border/30 space-y-1">
+                  {metadata.lastUpdated && (
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-text-tertiary">Last Updated</span>
+                      <span className="text-text-secondary">{metadata.lastUpdated}</span>
+                    </div>
+                  )}
+                  {metadata.status && (
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-text-tertiary">Status</span>
+                      <span className="text-text-secondary truncate ml-2">{metadata.status}</span>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
 
-        {/* Count display for count-type buildings */}
-        {info.type === "count" && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-text-tertiary uppercase tracking-wider">
-                {getCountLabel()}
-              </span>
-              <span
-                className="text-2xl font-mono font-bold"
-                style={{ color: info.color }}
-              >
-                {getCountValue()}
-              </span>
+              {/* Open items */}
+              {metadata.openItems.length > 0 && (
+                <div className="mt-3 pt-2 border-t border-border/30">
+                  <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">
+                    Open Items ({metadata.openItems.length})
+                  </div>
+                  <div className="space-y-1">
+                    {metadata.openItems.map((item, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "text-[10px] leading-snug py-1 px-2 rounded",
+                          "bg-bg-tertiary/50 truncate",
+                          item.priority === "high" && "text-red-400 border-l-2 border-red-400/50",
+                          item.priority === "medium" && "text-yellow-400 border-l-2 border-yellow-400/50",
+                          !item.priority && "text-text-secondary border-l-2 border-border/50"
+                        )}
+                        title={item.text}
+                      >
+                        {item.text}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+          )}
 
-            {/* Show ideas list for garden */}
-            {building.type === "garden" && gardenStats.ideas.length > 0 && (
-              <div className="mt-3 pt-2 border-t border-border/30">
-                <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">
-                  Ideas
-                </div>
-                <div className="space-y-1 max-h-24 overflow-y-auto">
-                  {gardenStats.ideas.slice(0, 5).map((idea, i) => (
-                    <div
-                      key={i}
-                      className="text-[10px] leading-snug py-1 px-2 rounded bg-bg-tertiary/50 text-text-secondary truncate"
-                      title={idea}
-                    >
-                      {idea}
-                    </div>
-                  ))}
-                  {gardenStats.ideas.length > 5 && (
-                    <div className="text-[9px] text-text-tertiary text-center py-1">
-                      +{gardenStats.ideas.length - 5} more ideas
-                    </div>
-                  )}
-                </div>
+          {/* Count display for count-type buildings */}
+          {info.type === "count" && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-text-tertiary uppercase tracking-wider">
+                  {getCountLabel()}
+                </span>
+                <span
+                  className="text-2xl font-mono font-bold"
+                  style={{ color: info.color }}
+                >
+                  {getCountValue()}
+                </span>
               </div>
-            )}
-          </div>
-        )}
+
+              {/* Show ideas list for garden */}
+              {building.type === "garden" && gardenStats.ideas.length > 0 && (
+                <div className="mt-3 pt-2 border-t border-border/30">
+                  <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">
+                    Ideas
+                  </div>
+                  <div className="space-y-1">
+                    {gardenStats.ideas.map((idea, i) => (
+                      <div
+                        key={i}
+                        className="text-[10px] leading-snug py-1 px-2 rounded bg-bg-tertiary/50 text-text-secondary truncate"
+                        title={idea}
+                      >
+                        {idea}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Show rejected ideas list for compost */}
+              {building.type === "compost" && compostStats.ideas.length > 0 && (
+                <div className="mt-3 pt-2 border-t border-border/30">
+                  <div className="text-[10px] text-text-tertiary uppercase tracking-wider mb-1.5">
+                    Rejected Ideas
+                  </div>
+                  <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                    {compostStats.ideas.map((idea, i) => (
+                      <div
+                        key={i}
+                        className="text-[10px] leading-snug py-1 px-2 rounded bg-bg-tertiary/50 text-text-secondary truncate"
+                        title={idea}
+                      >
+                        {idea}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

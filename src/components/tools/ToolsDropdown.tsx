@@ -19,6 +19,7 @@ import {
   Hammer,
   Tractor,
   BarChart3,
+  Gauge,
   Video,
   AtSign,
   MonitorPlay,
@@ -69,6 +70,7 @@ import {
   Twitter,
   Map,
   Languages,
+  Beer,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -206,6 +208,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openClaudeCodeStats",
     category: "code",
   },
+  {
+    id: "limits-monitor",
+    name: "Claude Limits Monitor",
+    description: "Track API usage limits",
+    icon: Gauge,
+    actionKey: "openLimitsMonitor",
+    category: "code",
+  },
 
   // === TESTING ===
   {
@@ -267,6 +277,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Dev tools & resources",
     icon: Activity,
     actionKey: "openSystemHealth",
+    category: "local-system",
+  },
+  {
+    id: "homebrew-manager",
+    name: "Homebrew Manager",
+    description: "Manage Homebrew packages",
+    icon: Beer,
+    actionKey: "openHomebrewManager",
+    category: "local-system",
+  },
+  {
+    id: "system-cleaner",
+    name: "System Cleaner",
+    description: "Clean up disk space",
+    icon: HardDrive,
+    actionKey: "openSystemCleaner",
     category: "local-system",
   },
 
@@ -505,6 +531,8 @@ interface ToolsDropdownProps {
   onOpenNodeModulesCleaner: () => void;
   onOpenLocalhostTunnel: () => void;
   onOpenSystemHealth: () => void;
+  onOpenHomebrewManager: () => void;
+  onOpenSystemCleaner: () => void;
   onOpenLivePreview: () => void;
   onOpenEnvManager: () => void;
   onOpenApiTester: () => void;
@@ -516,6 +544,7 @@ interface ToolsDropdownProps {
   onOpenFaviconGenerator: () => void;
   onOpenDevToolkit: () => void;
   onOpenClaudeCodeStats: () => void;
+  onOpenLimitsMonitor: () => void;
   onOpenDomainTools: () => void;
   onOpenSeoTools: () => void;
   onOpenFloatingWebcam: () => void;
@@ -540,6 +569,8 @@ export function ToolsDropdown({
   onOpenNodeModulesCleaner,
   onOpenLocalhostTunnel,
   onOpenSystemHealth,
+  onOpenHomebrewManager,
+  onOpenSystemCleaner,
   onOpenLivePreview,
   onOpenEnvManager,
   onOpenApiTester,
@@ -551,6 +582,7 @@ export function ToolsDropdown({
   onOpenFaviconGenerator,
   onOpenDevToolkit,
   onOpenClaudeCodeStats,
+  onOpenLimitsMonitor,
   onOpenDomainTools,
   onOpenSeoTools,
   onOpenFloatingWebcam,
@@ -740,6 +772,17 @@ export function ToolsDropdown({
         setIsOpen(false);
       },
     },
+    {
+      id: "limits-monitor",
+      name: "Claude Limits Monitor",
+      description: "Track API usage limits",
+      icon: <Gauge className="w-4 h-4" />,
+      category: "code",
+      onClick: () => {
+        onOpenLimitsMonitor();
+        setIsOpen(false);
+      },
+    },
 
     // === TESTING ===
     {
@@ -825,6 +868,28 @@ export function ToolsDropdown({
       category: "local-system",
       onClick: () => {
         onOpenSystemHealth();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "homebrew-manager",
+      name: "Homebrew Manager",
+      description: "Manage Homebrew packages",
+      icon: <Beer className="w-4 h-4" />,
+      category: "local-system",
+      onClick: () => {
+        onOpenHomebrewManager();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "system-cleaner",
+      name: "System Cleaner",
+      description: "Clean up disk space",
+      icon: <HardDrive className="w-4 h-4" />,
+      category: "local-system",
+      onClick: () => {
+        onOpenSystemCleaner();
         setIsOpen(false);
       },
     },

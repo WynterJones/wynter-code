@@ -20,3 +20,4 @@ export { ScreenStudioPopup } from "./screen-studio";
 export { NetlifyFtpPopup } from "./netlify-ftp";
 export { ProjectSearchPopup } from "./project-search";
 export { JustCommandManagerPopup } from "./just-command-manager";
+export { HomebrewManagerPopup } from "./homebrew-manager";

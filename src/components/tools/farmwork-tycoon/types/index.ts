@@ -123,6 +123,7 @@ export interface GardenStats {
 
 export interface CompostStats {
   rejectedIdeas: number;
+  ideas: string[];
 }
 
 export interface NavNode {

@@ -198,16 +198,25 @@ const parseGardenIdeas = (content: string): GardenParseResult => {
   return { planted, growing, picked, ideas };
 };
 
-const parseCompostCount = (content: string): number => {
-  // First try to parse the header count: **Composted Ideas:** N
-  const headerMatch = content.match(/\*\*Composted Ideas:\*\*\s*(\d+)/i);
-  if (headerMatch) {
-    return parseInt(headerMatch[1], 10);
+const parseCompostStats = (content: string): { count: number; ideas: string[] } => {
+  const ideas: string[] = [];
+
+  // Extract idea names from ### headers
+  const entryMatches = content.match(/^###\s+(.+)$/gm);
+  if (entryMatches) {
+    for (const match of entryMatches) {
+      const ideaName = match.replace(/^###\s+/, "").trim();
+      if (ideaName) {
+        ideas.push(ideaName);
+      }
+    }
   }
 
-  // Fall back to counting entries (### headers in Composted Ideas section)
-  const entryMatches = content.match(/^###\s+.+/gm);
-  return entryMatches ? entryMatches.length : 0;
+  // First try to parse the header count: **Composted Ideas:** N
+  const headerMatch = content.match(/\*\*Composted Ideas:\*\*\s*(\d+)/i);
+  const count = headerMatch ? parseInt(headerMatch[1], 10) : ideas.length;
+
+  return { count, ideas };
 };
 
 export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => ({
@@ -229,7 +238,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   },
   beadsStats: null,
   gardenStats: { activeIdeas: 0, ideas: [], planted: 0, growing: 0, picked: 0 },
-  compostStats: { rejectedIdeas: 0 },
+  compostStats: { rejectedIdeas: 0, ideas: [] },
 
   activityFeed: [],
   navGraph: null,
@@ -353,11 +362,14 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
 
       // Parse compost stats
       let compostCount = 0;
+      let compostIdeas: string[] = [];
       try {
         const compostPath = await join(projectPath, "_AUDIT/COMPOST.md");
         const compostContent = await readTextFile(compostPath);
-        compostCount = parseCompostCount(compostContent);
-        set({ compostStats: { rejectedIdeas: compostCount } });
+        const compostResult = parseCompostStats(compostContent);
+        compostCount = compostResult.count;
+        compostIdeas = compostResult.ideas;
+        set({ compostStats: { rejectedIdeas: compostCount, ideas: compostIdeas } });
       } catch {
         // COMPOST.md doesn't exist
       }

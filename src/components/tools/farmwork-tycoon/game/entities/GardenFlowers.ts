@@ -1,4 +1,4 @@
-import { Container, Sprite, Assets, Texture } from "pixi.js";
+import { Container, Sprite, Assets, Texture, Rectangle, Graphics } from "pixi.js";
 import { BUILDING_POSITIONS } from "../../types";
 
 const GRID_SIZE = 6;
@@ -13,6 +13,7 @@ interface FlowerSlot {
   sprite: Sprite;
   occupied: boolean;
   fadeTarget: number;
+  ideaName: string | null;
 }
 
 export class GardenFlowers extends Container {
@@ -21,6 +22,10 @@ export class GardenFlowers extends Container {
   private isLoaded = false;
   private gardenPos = BUILDING_POSITIONS.garden;
   private pendingFlowerCount: number | null = null;
+  private pendingIdeaNames: string[] | null = null;
+  private onFlowerHover: ((ideaName: string | null, x: number, y: number) => void) | null = null;
+  private onGardenClick: (() => void) | null = null;
+  private clickArea: Graphics | null = null;
 
   private cellWidth: number;
   private cellHeight: number;
@@ -51,6 +56,24 @@ export class GardenFlowers extends Container {
   }
 
   private initializeGrid(): void {
+    // Create clickable background area for the whole garden
+    this.clickArea = new Graphics();
+    this.clickArea.rect(
+      this.gardenPos.x,
+      this.gardenPos.y,
+      this.gardenPos.width,
+      this.gardenPos.height
+    );
+    this.clickArea.fill({ color: 0x000000, alpha: 0 }); // Invisible fill
+    this.clickArea.eventMode = "static";
+    this.clickArea.cursor = "pointer";
+    this.clickArea.on("pointerdown", () => {
+      if (this.onGardenClick) {
+        this.onGardenClick();
+      }
+    });
+    this.addChild(this.clickArea);
+
     for (let row = 0; row < GRID_SIZE; row++) {
       this.flowers[row] = [];
       for (let col = 0; col < GRID_SIZE; col++) {
@@ -67,11 +90,39 @@ export class GardenFlowers extends Container {
         const randomRotation = (Math.random() - 0.5) * 0.3;
         sprite.rotation = randomRotation;
 
+        // Set hitArea to match the cell size for easier hovering
+        // The hitArea is relative to the sprite's local coordinates (centered due to anchor 0.5)
+        sprite.hitArea = new Rectangle(
+          -this.cellWidth / 2,
+          -this.cellHeight / 2,
+          this.cellWidth,
+          this.cellHeight
+        );
+
+        // Make flower interactive for tooltips
+        sprite.eventMode = "static";
+        sprite.cursor = "pointer";
+
+        const flowerRow = row;
+        const flowerCol = col;
+        sprite.on("pointerenter", () => {
+          const slot = this.flowers[flowerRow]?.[flowerCol];
+          if (slot?.occupied && slot.ideaName && this.onFlowerHover) {
+            this.onFlowerHover(slot.ideaName, sprite.x, sprite.y);
+          }
+        });
+        sprite.on("pointerleave", () => {
+          if (this.onFlowerHover) {
+            this.onFlowerHover(null, 0, 0);
+          }
+        });
+
         this.addChild(sprite);
         this.flowers[row][col] = {
           sprite,
           occupied: false,
           fadeTarget: 0,
+          ideaName: null,
         };
       }
     }
@@ -80,6 +131,12 @@ export class GardenFlowers extends Container {
     if (this.pendingFlowerCount !== null) {
       this.setFlowerCount(this.pendingFlowerCount);
       this.pendingFlowerCount = null;
+    }
+
+    // Apply any pending idea names
+    if (this.pendingIdeaNames !== null) {
+      this.setIdeaNames(this.pendingIdeaNames);
+      this.pendingIdeaNames = null;
     }
   }
 
@@ -221,5 +278,44 @@ export class GardenFlowers extends Container {
       }
     }
     return count;
+  }
+
+  setIdeaNames(names: string[]): void {
+    if (!this.isLoaded) {
+      this.pendingIdeaNames = names;
+      return;
+    }
+
+    let currentIndex = 0;
+    for (let row = 0; row < GRID_SIZE; row++) {
+      for (let col = 0; col < GRID_SIZE; col++) {
+        const slot = this.flowers[row]?.[col];
+        if (!slot) continue;
+
+        if (currentIndex < names.length) {
+          slot.ideaName = names[currentIndex];
+        } else {
+          slot.ideaName = null;
+        }
+        currentIndex++;
+      }
+    }
+  }
+
+  setOnFlowerHover(callback: ((ideaName: string | null, x: number, y: number) => void) | null): void {
+    this.onFlowerHover = callback;
+  }
+
+  setOnGardenClick(callback: (() => void) | null): void {
+    this.onGardenClick = callback;
+  }
+
+  getGardenBounds(): { x: number; y: number; width: number; height: number } {
+    return {
+      x: this.gardenPos.x,
+      y: this.gardenPos.y,
+      width: this.gardenPos.width,
+      height: this.gardenPos.height,
+    };
   }
 }

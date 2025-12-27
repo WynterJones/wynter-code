@@ -17,6 +17,7 @@ import { useTerminalStore } from "@/stores/terminalStore";
 import { claudeService } from "@/services/claude";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
+import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
 
 interface DropdownPosition {
   top: number;
@@ -58,6 +59,7 @@ export function SessionTabBar({
     finishStreaming,
   } = useSessionStore();
   const { getSessionPtyId } = useTerminalStore();
+  const { hasFarmwork } = useFarmworkDetection();
 
   const sessions = getSessionsForProject(projectId);
   const activeId = activeSessionId.get(projectId);
@@ -347,12 +349,12 @@ export function SessionTabBar({
       {/* Toolbar buttons */}
       <div className="flex items-center h-full border-l border-border gap-1 px-2">
         {/* Farmwork */}
-        <Tooltip content="Farmwork">
+        <Tooltip content="Farmwork Tycoon">
           <button
             onClick={onOpenFarmwork}
             className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
           >
-            <Tractor className="w-4 h-4 text-green-500" />
+            <Tractor className={cn("w-4 h-4", hasFarmwork && "text-green-500")} />
           </button>
         </Tooltip>
 

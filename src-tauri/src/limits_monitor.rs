@@ -1,4 +1,4 @@
-use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc, Weekday};
+use chrono::{DateTime, Datelike, Duration, TimeZone, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
@@ -13,10 +13,12 @@ pub enum ModelTier {
     Unknown,
 }
 
+/// Usage data from Claude Code JSONL - uses snake_case in source
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct TokenUsage {
+    #[serde(default)]
     pub input_tokens: u64,
+    #[serde(default)]
     pub output_tokens: u64,
     #[serde(default)]
     pub cache_creation_input_tokens: u64,
@@ -37,6 +39,7 @@ struct JournalEntry {
     timestamp: String,
     #[serde(default)]
     message: Option<MessageContent>,
+    /// "assistant", "user", "summary", etc.
     #[serde(rename = "type")]
     entry_type: Option<String>,
 }
@@ -137,7 +140,7 @@ fn get_week_start(now: DateTime<Utc>) -> DateTime<Utc> {
         .unwrap_or(now)
 }
 
-/// Parse all JSONL files from Claude projects directory
+/// Parse recent JSONL files from Claude projects directory (last 7 days only)
 fn parse_all_jsonl_files() -> Vec<UsageEntry> {
     let mut entries = Vec::new();
 
@@ -151,9 +154,17 @@ fn parse_all_jsonl_files() -> Vec<UsageEntry> {
         return entries;
     }
 
+    // Only process files modified in last 7 days
+    let cutoff = std::time::SystemTime::now()
+        .checked_sub(std::time::Duration::from_secs(7 * 24 * 60 * 60))
+        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+
+    let mut files_processed = 0;
+    const MAX_FILES: usize = 100; // Limit to prevent hanging
+
     // Iterate through all project directories
     if let Ok(project_dirs) = fs::read_dir(&projects_dir) {
-        for project_entry in project_dirs.flatten() {
+        'outer: for project_entry in project_dirs.flatten() {
             let project_path = project_entry.path();
             if !project_path.is_dir() {
                 continue;
@@ -162,9 +173,22 @@ fn parse_all_jsonl_files() -> Vec<UsageEntry> {
             // Find all JSONL files in the project directory
             if let Ok(files) = fs::read_dir(&project_path) {
                 for file_entry in files.flatten() {
+                    if files_processed >= MAX_FILES {
+                        break 'outer;
+                    }
+
                     let file_path = file_entry.path();
                     if file_path.extension().map_or(false, |ext| ext == "jsonl") {
+                        // Only process recent files
+                        if let Ok(metadata) = file_path.metadata() {
+                            if let Ok(modified) = metadata.modified() {
+                                if modified < cutoff {
+                                    continue;
+                                }
+                            }
+                        }
                         parse_jsonl_file(&file_path, &mut entries);
+                        files_processed += 1;
                     }
                 }
             }
@@ -174,7 +198,7 @@ fn parse_all_jsonl_files() -> Vec<UsageEntry> {
     entries
 }
 
-/// Parse a single JSONL file and extract usage entries
+/// Parse a single JSONL file and extract usage entries (limited to recent entries)
 fn parse_jsonl_file(path: &PathBuf, entries: &mut Vec<UsageEntry>) {
     let file = match File::open(path) {
         Ok(f) => f,
@@ -182,8 +206,18 @@ fn parse_jsonl_file(path: &PathBuf, entries: &mut Vec<UsageEntry>) {
     };
 
     let reader = BufReader::new(file);
+    let mut lines_processed = 0;
+    const MAX_LINES: usize = 5000; // Limit lines per file
+
+    // Only consider entries from last 7 days
+    let cutoff = Utc::now() - Duration::days(7);
 
     for line in reader.lines().flatten() {
+        if lines_processed >= MAX_LINES {
+            break;
+        }
+        lines_processed += 1;
+
         if line.is_empty() {
             continue;
         }
@@ -219,6 +253,11 @@ fn parse_jsonl_file(path: &PathBuf, entries: &mut Vec<UsageEntry>) {
             Ok(dt) => dt.with_timezone(&Utc),
             Err(_) => continue,
         };
+
+        // Skip entries older than 7 days
+        if timestamp < cutoff {
+            continue;
+        }
 
         let tier = classify_model(&model);
         let total_tokens = usage.input_tokens
@@ -296,7 +335,7 @@ fn calculate_burn_rate(entries: &[UsageEntry], now: DateTime<Utc>, minutes: i64)
     (sonnet_rate, opus_rate)
 }
 
-/// Count unique sessions today
+/// Count unique sessions today (with limits)
 fn count_sessions_today(now: DateTime<Utc>) -> u64 {
     let home = match dirs::home_dir() {
         Some(h) => h,
@@ -310,10 +349,17 @@ fn count_sessions_today(now: DateTime<Utc>) -> u64 {
 
     let today = now.date_naive();
     let mut session_count = 0u64;
+    let mut dirs_checked = 0;
+    const MAX_DIRS: usize = 50;
 
     // Count JSONL files modified today as rough session count
     if let Ok(project_dirs) = fs::read_dir(&projects_dir) {
         for project_entry in project_dirs.flatten() {
+            if dirs_checked >= MAX_DIRS {
+                break;
+            }
+            dirs_checked += 1;
+
             let project_path = project_entry.path();
             if !project_path.is_dir() {
                 continue;
@@ -437,6 +483,7 @@ pub fn calculate_usage_summary() -> Result<UsageSummary, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Weekday;
 
     #[test]
     fn test_classify_model() {

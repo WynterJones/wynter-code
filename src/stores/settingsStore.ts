@@ -121,6 +121,9 @@ interface SettingsStore {
   // Claude usage limits settings
   claudeSubscriptionPlan: ClaudeSubscriptionPlan;
 
+  // Farmwork settings
+  autoOpenFarmworkMiniPlayer: boolean;
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
@@ -163,6 +166,9 @@ interface SettingsStore {
 
   // Claude limits setter
   setClaudeSubscriptionPlan: (plan: ClaudeSubscriptionPlan) => void;
+
+  // Farmwork setters
+  setAutoOpenFarmworkMiniPlayer: (enabled: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -208,6 +214,9 @@ export const useSettingsStore = create<SettingsStore>()(
 
       // Claude limits defaults
       claudeSubscriptionPlan: "pro",
+
+      // Farmwork defaults
+      autoOpenFarmworkMiniPlayer: false,
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -374,6 +383,11 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setClaudeSubscriptionPlan: (claudeSubscriptionPlan: ClaudeSubscriptionPlan) => {
         set({ claudeSubscriptionPlan });
+      },
+
+      // Farmwork setters
+      setAutoOpenFarmworkMiniPlayer: (autoOpenFarmworkMiniPlayer: boolean) => {
+        set({ autoOpenFarmworkMiniPlayer });
       },
     }),
     {

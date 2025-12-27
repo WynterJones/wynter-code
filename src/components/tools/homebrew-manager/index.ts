@@ -1,0 +1,1 @@
+export { HomebrewManagerPopup } from "./HomebrewManagerPopup";

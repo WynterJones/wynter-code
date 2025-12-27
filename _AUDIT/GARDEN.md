@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-26
-**Active Ideas:** 3
+**Active Ideas:** 0
 
 ---
 
@@ -19,38 +19,7 @@
 
 ## Ideas
 
-### Homebrew Manager
-**Location:** New tool popup
-A tool to view, manage, and search for Homebrew packages.
-- View all installed Homebrew packages
-- Search for new packages from Homebrew registry
-- Install/uninstall packages with one click
-- View package details (description, version, dependencies)
-- Update outdated packages
-- Manage casks (GUI applications) alongside formulae
-
-### System Cleaner
-**Location:** New tool popup
-A CleanMyMac-style tool to find and remove large files, temp files, and system junk to free up disk space.
-- Scan for large files and folders across the system
-- Find and clean temporary files and caches
-- Identify old downloads and unused applications
-- Clean browser caches and data
-- Remove system logs and crash reports
-- Show disk usage visualization
-- Safe deletion with trash/restore option
-- Exclude list for protected paths
-
-### Claude Code Limits Dashboard
-**Location:** Enhancement to Claude Code Stats
-Enhance the Claude Code Stats feature to display usage limits and progress bars for the daily 5-hour sliding window and weekly usage caps.
-- Show daily 5-hour sliding window usage with progress bar
-- Display weekly usage limit with progress bar
-- Visual indicators when approaching limits (warning/yellow and critical/red thresholds)
-- Show time remaining until limit resets
-- Historical usage graph over time
-- Notification when nearing capacity
-- Color-coded status (green/yellow/red based on usage level)
+*No active ideas — all graduated or implemented!*
 
 ---
 
@@ -107,3 +76,6 @@ Enhance the Claude Code Stats feature to display usage limits and progress bars 
 | Just Command Manager | `JustCommandManagerPopup` - Manage justfile recipes, detect justfile presence, run recipes with embedded terminal, favorites/recents, visual editor to add/edit recipes, help tab with quick reference | 2025-12-25 |
 | Raycast-Style Launcher | System-level popup launcher with global hotkey, Google/file/feature search, keyboard navigation | 2025-12-26 |
 | Encrypted Web Backup | Netlify-hosted encrypted backup with black lock design, password decryption, data import/export | 2025-12-26 |
+| Homebrew Manager | `HomebrewManagerPopup` - Full Homebrew package management: list installed formulae/casks, search catalog, install/uninstall, upgrade outdated packages, manage taps, run brew doctor, pin packages | 2025-12-26 |
+| Claude Code Limits | `LimitsMonitorPopup` - Monitor Claude API usage limits, 5-hour sliding window tracking, weekly cap display, progress bars, reset timers, color-coded status indicators | 2025-12-26 |
+| System Cleaner | `SystemCleanerPopup` - Full-screen cleaner with 3 categories: Large Files scanner (configurable 50MB-1GB threshold), App Caches (browser/dev/system caches), Installed Apps manager. All deletions go to Trash for safety. | 2025-12-26 |

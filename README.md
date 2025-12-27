@@ -87,6 +87,8 @@ Keep your local dev environment under control.
 - **Localhost Tunnel** — Share your local server with the world
 - **Background Services** — Monitor what's happening behind the scenes
 - **System Health** — Keep an eye on CPU, memory, and disk
+- **Homebrew Manager** — Install, update, and manage Homebrew packages and casks
+- **System Cleaner** — Find large files, clear app caches, manage installed apps
 - **Overwatch** — Production service monitoring dashboard
 
 ---
@@ -122,6 +124,7 @@ For building and testing your apps.
 - **API Tester** — Send requests, inspect responses, manage webhooks
 - **Beads Tracker** — Issue tracking with Kanban board
 - **Claude Code Stats** — Usage analytics and insights
+- **Claude Code Limits** — Monitor API usage limits and reset times
 - **Farmwork Tycoon** — A little game that tracks your CLI activity
 
 ---

@@ -62,11 +62,13 @@ import {
   FaviconGeneratorPopup,
   FarmworkTycoonPopup,
   MiniGamePlayer,
+  HomebrewManagerPopup,
 } from "@/components/tools";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { McpManagerPopup } from "@/components/tools/mcp-manager";
 import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
 import { ClaudeCodeStatsPopup } from "@/components/tools/claude-code-stats";
+import { LimitsMonitorPopup } from "@/components/tools/limits-monitor";
 import { WebcamToolPopup } from "@/components/tools/webcam";
 import { DomainToolsPopup } from "@/components/tools/domain-tools";
 import { SeoToolsPopup } from "@/components/tools/seo-tools";
@@ -76,12 +78,14 @@ import { NetlifyFtpPopup } from "@/components/tools/netlify-ftp";
 import { BookmarksPopup } from "@/components/tools/bookmarks";
 import { ProjectSearchPopup } from "@/components/tools/project-search";
 import { AutoBuildPopup } from "@/components/tools/auto-build";
-import { useMcpStore } from "@/stores";
+import { SystemCleanerPopup } from "@/components/tools/system-cleaner";
+import { useMcpStore, useSessionStore } from "@/stores";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useStorybookDetection } from "@/hooks/useStorybookDetection";
 import { useJustfileDetection } from "@/hooks/useJustfileDetection";
+import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
 import { JustCommandManagerPopup } from "@/components/tools/just-command-manager";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { WorkspaceSelectorPopup } from "@/components/workspaces";
@@ -371,6 +375,8 @@ export function ProjectTabBar({
   const [showNodeModulesCleaner, setShowNodeModulesCleaner] = useState(false);
   const [showTunnelManager, setShowTunnelManager] = useState(false);
   const [showSystemHealth, setShowSystemHealth] = useState(false);
+  const [showHomebrewManager, setShowHomebrewManager] = useState(false);
+  const [showSystemCleaner, setShowSystemCleaner] = useState(false);
   const [showOverwatch, setShowOverwatch] = useState(false);
   const [showLivePreview, setShowLivePreview] = useState(false);
   const [showEnvManager, setShowEnvManager] = useState(false);
@@ -386,6 +392,7 @@ export function ProjectTabBar({
   const [devToolkitInitialTool, setDevToolkitInitialTool] = useState<string | undefined>();
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
   const [showClaudeCodeStats, setShowClaudeCodeStats] = useState(false);
+  const [showLimitsMonitor, setShowLimitsMonitor] = useState(false);
   const [showWebcamTool, setShowWebcamTool] = useState(false);
   const [showDomainTools, setShowDomainTools] = useState(false);
   const [domainToolsInitialTool, setDomainToolsInitialTool] = useState<string | undefined>();
@@ -472,6 +479,12 @@ export function ProjectTabBar({
         case "openSystemHealth":
           setShowSystemHealth(true);
           break;
+        case "openHomebrewManager":
+          setShowHomebrewManager(true);
+          break;
+        case "openSystemCleaner":
+          setShowSystemCleaner(true);
+          break;
         case "openEnvManager":
           setShowEnvManager(true);
           break;
@@ -511,6 +524,9 @@ export function ProjectTabBar({
           break;
         case "openClaudeCodeStats":
           setShowClaudeCodeStats(true);
+          break;
+        case "openLimitsMonitor":
+          setShowLimitsMonitor(true);
           break;
         case "openFloatingWebcam":
           setShowWebcamTool(true);
@@ -898,6 +914,8 @@ export function ProjectTabBar({
           onOpenNodeModulesCleaner={() => setShowNodeModulesCleaner(true)}
           onOpenLocalhostTunnel={() => setShowTunnelManager(true)}
           onOpenSystemHealth={() => setShowSystemHealth(true)}
+          onOpenHomebrewManager={() => setShowHomebrewManager(true)}
+          onOpenSystemCleaner={() => setShowSystemCleaner(true)}
           onOpenLivePreview={() => setShowLivePreview(true)}
           onOpenEnvManager={() => setShowEnvManager(true)}
           onOpenApiTester={() => setShowApiTester(true)}
@@ -909,6 +927,7 @@ export function ProjectTabBar({
           onOpenFaviconGenerator={() => setShowFaviconGenerator(true)}
           onOpenDevToolkit={() => setShowDevToolkit(true)}
           onOpenClaudeCodeStats={() => setShowClaudeCodeStats(true)}
+          onOpenLimitsMonitor={() => setShowLimitsMonitor(true)}
           onOpenDomainTools={() => setShowDomainTools(true)}
           onOpenSeoTools={() => setShowSeoTools(true)}
           onOpenFloatingWebcam={() => setShowWebcamTool(true)}
@@ -1026,6 +1045,18 @@ export function ProjectTabBar({
         onClose={() => setShowSystemHealth(false)}
       />
 
+      {/* Homebrew Manager Popup */}
+      <HomebrewManagerPopup
+        isOpen={showHomebrewManager}
+        onClose={() => setShowHomebrewManager(false)}
+      />
+
+      {/* System Cleaner Popup */}
+      <SystemCleanerPopup
+        isOpen={showSystemCleaner}
+        onClose={() => setShowSystemCleaner(false)}
+      />
+
       {/* Overwatch Popup */}
       <OverwatchPopup
         isOpen={showOverwatch}
@@ -1129,6 +1160,12 @@ export function ProjectTabBar({
         onClose={() => setShowClaudeCodeStats(false)}
       />
 
+      {/* Claude Limits Monitor */}
+      <LimitsMonitorPopup
+        isOpen={showLimitsMonitor}
+        onClose={() => setShowLimitsMonitor(false)}
+      />
+
       {/* Floating Webcam Tool */}
       <WebcamToolPopup
         isOpen={showWebcamTool}
@@ -1206,7 +1243,40 @@ export function ProjectTabBar({
 }
 
 function FarmworkMiniPlayerWrapper({ onExpand }: { onExpand: () => void }) {
-  const { showMiniPlayer, hideMiniPlayer } = useFarmworkTycoonStore();
+  const { showMiniPlayer, hideMiniPlayer, showMiniPlayerFn } = useFarmworkTycoonStore();
+  const autoOpenFarmworkMiniPlayer = useSettingsStore((s) => s.autoOpenFarmworkMiniPlayer);
+  const { hasFarmwork } = useFarmworkDetection();
+  const streamingState = useSessionStore((s) => s.streamingState);
+  const wasStreamingRef = useRef(false);
+
+  // Check if any session is currently streaming
+  const isAnySessionStreaming = useMemo(() => {
+    for (const state of streamingState.values()) {
+      if (state.isStreaming) {
+        return true;
+      }
+    }
+    return false;
+  }, [streamingState]);
+
+  // Auto-open/close mini player based on streaming state
+  useEffect(() => {
+    if (!autoOpenFarmworkMiniPlayer || !hasFarmwork) {
+      return;
+    }
+
+    // Session just started streaming
+    if (isAnySessionStreaming && !wasStreamingRef.current) {
+      wasStreamingRef.current = true;
+      showMiniPlayerFn();
+    }
+
+    // All sessions stopped streaming
+    if (!isAnySessionStreaming && wasStreamingRef.current) {
+      wasStreamingRef.current = false;
+      hideMiniPlayer();
+    }
+  }, [isAnySessionStreaming, autoOpenFarmworkMiniPlayer, hasFarmwork, showMiniPlayerFn, hideMiniPlayer]);
 
   return (
     <MiniGamePlayer

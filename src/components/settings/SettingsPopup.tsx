@@ -83,6 +83,8 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     setTerminalCursorBlink,
     claudeSafeMode,
     setClaudeSafeMode,
+    autoOpenFarmworkMiniPlayer,
+    setAutoOpenFarmworkMiniPlayer,
   } = useSettingsStore();
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
@@ -156,6 +158,8 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
                   onDimInactiveProjectsChange={setDimInactiveProjects}
                   claudeSafeMode={claudeSafeMode}
                   onClaudeSafeModeChange={setClaudeSafeMode}
+                  autoOpenFarmworkMiniPlayer={autoOpenFarmworkMiniPlayer}
+                  onAutoOpenFarmworkMiniPlayerChange={setAutoOpenFarmworkMiniPlayer}
                 />
               )}
               {activeTab === "editor" && (
@@ -408,6 +412,8 @@ interface GeneralSettingsProps {
   onDimInactiveProjectsChange: (dim: boolean) => void;
   claudeSafeMode: boolean;
   onClaudeSafeModeChange: (enabled: boolean) => void;
+  autoOpenFarmworkMiniPlayer: boolean;
+  onAutoOpenFarmworkMiniPlayerChange: (enabled: boolean) => void;
 }
 
 const SIDEBAR_POSITION_OPTIONS: { id: SidebarPosition; name: string }[] = [
@@ -428,6 +434,8 @@ function GeneralSettings({
   onDimInactiveProjectsChange,
   claudeSafeMode,
   onClaudeSafeModeChange,
+  autoOpenFarmworkMiniPlayer,
+  onAutoOpenFarmworkMiniPlayerChange,
 }: GeneralSettingsProps) {
   const { launchAtStartup, setLaunchAtStartup } = useSettingsStore();
   const [autostartStatus, setAutostartStatus] = useState<"loading" | "enabled" | "disabled" | "error">("loading");
@@ -533,6 +541,39 @@ function GeneralSettings({
         <p className="text-xs text-text-secondary italic pt-1">
           Tip: Right-click any project tab to change its icon or color
         </p>
+      </div>
+
+      {/* Farmwork Settings */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-medium text-text-primary border-b border-border pb-2">
+          Farmwork Tycoon
+        </h3>
+
+        {/* Auto Open Mini Player */}
+        <div className="flex items-center justify-between">
+          <div>
+            <label className="text-sm font-medium text-text-primary">
+              Auto-open Mini Player
+            </label>
+            <p className="text-xs text-text-secondary">
+              Automatically show Farmwork mini player when opening a project with _AUDIT folder
+            </p>
+          </div>
+          <button
+            onClick={() => onAutoOpenFarmworkMiniPlayerChange(!autoOpenFarmworkMiniPlayer)}
+            className={cn(
+              "w-11 h-6 rounded-full transition-colors relative",
+              autoOpenFarmworkMiniPlayer ? "bg-accent" : "bg-bg-hover"
+            )}
+          >
+            <div
+              className={cn(
+                "w-5 h-5 rounded-full bg-white absolute top-0.5 transition-all",
+                autoOpenFarmworkMiniPlayer ? "left-5" : "left-0.5"
+              )}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Claude AI Settings */}
