@@ -13,9 +13,10 @@ interface PanelProps {
   panel: PanelState;
   projectId: string;
   projectPath: string;
+  sessionId?: string;
 }
 
-export function Panel({ panel, projectId, projectPath }: PanelProps) {
+export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) {
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closeReason, setCloseReason] = useState("");
 
@@ -23,14 +24,14 @@ export function Panel({ panel, projectId, projectPath }: PanelProps) {
   const getStreamingState = useSessionStore((s) => s.getStreamingState);
 
   const handleFocus = useCallback(() => {
-    focusPanel(projectId, panel.id);
-  }, [projectId, panel.id, focusPanel]);
+    focusPanel(projectId, panel.id, sessionId);
+  }, [projectId, panel.id, sessionId, focusPanel]);
 
   const handleTypeChange = useCallback(
     (newType: PanelType) => {
-      changePanelType(projectId, panel.id, newType);
+      changePanelType(projectId, panel.id, newType, sessionId);
     },
-    [projectId, panel.id, changePanelType]
+    [projectId, panel.id, sessionId, changePanelType]
   );
 
   const checkSafeToClose = useCallback(async (): Promise<PanelCloseCheck> => {
@@ -86,13 +87,13 @@ export function Panel({ panel, projectId, projectPath }: PanelProps) {
       return;
     }
     // Set panel to empty state so user can choose new type
-    changePanelType(projectId, panel.id, "empty");
-  }, [checkSafeToClose, projectId, panel.id, changePanelType]);
+    changePanelType(projectId, panel.id, "empty", sessionId);
+  }, [checkSafeToClose, projectId, panel.id, sessionId, changePanelType]);
 
   const handleConfirmClose = useCallback(() => {
     setShowCloseConfirm(false);
-    changePanelType(projectId, panel.id, "empty");
-  }, [projectId, panel.id, changePanelType]);
+    changePanelType(projectId, panel.id, "empty", sessionId);
+  }, [projectId, panel.id, sessionId, changePanelType]);
 
   const handleCancelClose = useCallback(() => {
     setShowCloseConfirm(false);
@@ -100,16 +101,16 @@ export function Panel({ panel, projectId, projectPath }: PanelProps) {
 
   const handleProcessStateChange = useCallback(
     (running: boolean) => {
-      setProcessRunning(projectId, panel.id, running);
+      setProcessRunning(projectId, panel.id, running, sessionId);
     },
-    [projectId, panel.id, setProcessRunning]
+    [projectId, panel.id, sessionId, setProcessRunning]
   );
 
   const handlePanelUpdate = useCallback(
     (updates: Partial<PanelState>) => {
-      updatePanel(projectId, panel.id, updates);
+      updatePanel(projectId, panel.id, updates, sessionId);
     },
-    [projectId, panel.id, updatePanel]
+    [projectId, panel.id, sessionId, updatePanel]
   );
 
   return (

@@ -13,6 +13,7 @@ export type PanelType =
   | "file-browser"
   | "file-viewer"
   | "markdown-viewer"
+  | "farmwork-stats"
   | "browser-preview"
   | "youtube-embed";
 
@@ -22,13 +23,14 @@ export interface YouTubeVideo {
   title: string;
   thumbnailUrl?: string;
   addedAt: number;
+  /** Category ID for organization */
+  categoryId?: string;
 }
 
-/** YouTube playlist */
-export interface YouTubePlaylist {
+/** YouTube category for organizing favorites */
+export interface YouTubeCategory {
   id: string;
   name: string;
-  videos: YouTubeVideo[];
   createdAt: number;
 }
 
@@ -113,14 +115,17 @@ export interface PanelState {
   /** YouTube favorites (for youtube-embed panels) */
   youtubeFavorites?: YouTubeVideo[];
 
-  /** YouTube playlists (for youtube-embed panels) */
-  youtubePlaylists?: YouTubePlaylist[];
+  /** YouTube categories for organizing favorites (for youtube-embed panels) */
+  youtubeCategories?: YouTubeCategory[];
 
-  /** Current YouTube playlist being played (for youtube-embed panels) */
-  youtubeCurrentPlaylist?: string;
+  /** Whether favorites playlist mode is active (for youtube-embed panels) */
+  youtubeFavoritesPlaylistActive?: boolean;
 
-  /** Current index in YouTube playlist (for youtube-embed panels) */
-  youtubePlaylistIndex?: number;
+  /** Current category filter for favorites playlist (undefined = all) */
+  youtubeFavoritesPlaylistCategory?: string;
+
+  /** Current index in favorites playlist (for youtube-embed panels) */
+  youtubeFavoritesPlaylistIndex?: number;
 
   /** Whether this panel has an active running process */
   hasRunningProcess: boolean;

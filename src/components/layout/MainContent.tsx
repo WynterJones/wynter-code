@@ -603,7 +603,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
 
       {/* Multi-panel layout mode */}
       {useMultiPanelLayout && !isTerminalSession && (
-        <PanelLayoutContainer projectId={project.id} projectPath={project.path} />
+        <PanelLayoutContainer projectId={project.id} projectPath={project.path} sessionId={currentSessionId} />
       )}
 
       {/* Empty state */}

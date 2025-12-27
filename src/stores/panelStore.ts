@@ -44,36 +44,41 @@ function createDefaultLayoutState(): PanelLayoutState {
   };
 }
 
+/** Create a layout key from project and optional session */
+function getLayoutKey(projectId: string, sessionId?: string): string {
+  return sessionId ? `${projectId}:${sessionId}` : projectId;
+}
+
 interface PanelStore {
-  /** Per-project layout states */
+  /** Per-project or per-session layout states */
   layouts: Map<string, PanelLayoutState>;
 
-  /** Get layout state for a project (creates default if none exists) */
-  getLayoutForProject: (projectId: string) => PanelLayoutState;
+  /** Get layout state for a project/session (creates default if none exists) */
+  getLayoutForProject: (projectId: string, sessionId?: string) => PanelLayoutState;
 
-  /** Set layout template for a project */
-  setLayoutTemplate: (projectId: string, templateId: LayoutTemplateId) => void;
+  /** Set layout template for a project/session */
+  setLayoutTemplate: (projectId: string, templateId: LayoutTemplateId, sessionId?: string) => void;
 
   /** Update a specific panel */
-  updatePanel: (projectId: string, panelId: string, updates: Partial<PanelState>) => void;
+  updatePanel: (projectId: string, panelId: string, updates: Partial<PanelState>, sessionId?: string) => void;
 
   /** Change panel type */
-  changePanelType: (projectId: string, panelId: string, newType: PanelType) => void;
+  changePanelType: (projectId: string, panelId: string, newType: PanelType, sessionId?: string) => void;
 
   /** Set focused panel */
-  focusPanel: (projectId: string, panelId: string) => void;
+  focusPanel: (projectId: string, panelId: string, sessionId?: string) => void;
 
   /** Set split ratio for a layout node */
-  setSplitRatio: (projectId: string, nodeId: string, ratio: number) => void;
+  setSplitRatio: (projectId: string, nodeId: string, ratio: number, sessionId?: string) => void;
 
   /** Set process running state for a panel */
-  setProcessRunning: (projectId: string, panelId: string, running: boolean) => void;
+  setProcessRunning: (projectId: string, panelId: string, running: boolean, sessionId?: string) => void;
 
   /** Get a specific panel */
-  getPanel: (projectId: string, panelId: string) => PanelState | undefined;
+  getPanel: (projectId: string, panelId: string, sessionId?: string) => PanelState | undefined;
 
-  /** Reset layout for a project */
-  resetLayout: (projectId: string) => void;
+  /** Reset layout for a project/session */
+  resetLayout: (projectId: string, sessionId?: string) => void;
 
   /** Reset all layouts */
   reset: () => void;
@@ -105,24 +110,26 @@ export const usePanelStore = create<PanelStore>()(
     (set, get) => ({
       layouts: new Map(),
 
-      getLayoutForProject: (projectId: string) => {
-        const layout = get().layouts.get(projectId);
+      getLayoutForProject: (projectId: string, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
+        const layout = get().layouts.get(key);
         if (layout) return layout;
 
-        // Create default layout for new project
+        // Create default layout for new project/session
         const defaultLayout = createDefaultLayoutState();
         set((state) => {
           const layouts = new Map(state.layouts);
-          layouts.set(projectId, defaultLayout);
+          layouts.set(key, defaultLayout);
           return { layouts };
         });
         return defaultLayout;
       },
 
-      setLayoutTemplate: (projectId: string, templateId: LayoutTemplateId) => {
+      setLayoutTemplate: (projectId: string, templateId: LayoutTemplateId, sessionId?: string) => {
         const template = LAYOUT_TEMPLATES[templateId];
         if (!template) return;
 
+        const key = getLayoutKey(projectId, sessionId);
         set((state) => {
           const layouts = new Map(state.layouts);
 
@@ -139,7 +146,7 @@ export const usePanelStore = create<PanelStore>()(
           // Create the layout structure
           const layout = template.createLayout(panelIds);
 
-          layouts.set(projectId, {
+          layouts.set(key, {
             layout,
             panels,
             activeTemplateId: templateId,
@@ -150,13 +157,14 @@ export const usePanelStore = create<PanelStore>()(
         });
       },
 
-      updatePanel: (projectId: string, panelId: string, updates: Partial<PanelState>) => {
+      updatePanel: (projectId: string, panelId: string, updates: Partial<PanelState>, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
         set((state) => {
           const layouts = new Map(state.layouts);
-          const current = layouts.get(projectId);
+          const current = layouts.get(key);
           if (!current || !current.panels[panelId]) return state;
 
-          layouts.set(projectId, {
+          layouts.set(key, {
             ...current,
             panels: {
               ...current.panels,
@@ -168,10 +176,11 @@ export const usePanelStore = create<PanelStore>()(
         });
       },
 
-      changePanelType: (projectId: string, panelId: string, newType: PanelType) => {
+      changePanelType: (projectId: string, panelId: string, newType: PanelType, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
         set((state) => {
           const layouts = new Map(state.layouts);
-          const current = layouts.get(projectId);
+          const current = layouts.get(key);
           if (!current || !current.panels[panelId]) return state;
 
           // Reset type-specific state when changing types
@@ -185,7 +194,7 @@ export const usePanelStore = create<PanelStore>()(
             hasRunningProcess: false,
           };
 
-          layouts.set(projectId, {
+          layouts.set(key, {
             ...current,
             panels: {
               ...current.panels,
@@ -197,10 +206,11 @@ export const usePanelStore = create<PanelStore>()(
         });
       },
 
-      focusPanel: (projectId: string, panelId: string) => {
+      focusPanel: (projectId: string, panelId: string, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
         set((state) => {
           const layouts = new Map(state.layouts);
-          const current = layouts.get(projectId);
+          const current = layouts.get(key);
           if (!current) return state;
 
           // Update isFocused for all panels
@@ -209,7 +219,7 @@ export const usePanelStore = create<PanelStore>()(
             panels[id] = { ...panels[id], isFocused: id === panelId };
           });
 
-          layouts.set(projectId, {
+          layouts.set(key, {
             ...current,
             panels,
             focusedPanelId: panelId,
@@ -219,10 +229,11 @@ export const usePanelStore = create<PanelStore>()(
         });
       },
 
-      setSplitRatio: (projectId: string, nodeId: string, ratio: number) => {
+      setSplitRatio: (projectId: string, nodeId: string, ratio: number, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
         set((state) => {
           const layouts = new Map(state.layouts);
-          const current = layouts.get(projectId);
+          const current = layouts.get(key);
           if (!current) return state;
 
           const clampedRatio = Math.max(0.1, Math.min(0.9, ratio));
@@ -230,7 +241,7 @@ export const usePanelStore = create<PanelStore>()(
             splitRatio: clampedRatio,
           });
 
-          layouts.set(projectId, {
+          layouts.set(key, {
             ...current,
             layout: updatedLayout,
           });
@@ -239,13 +250,14 @@ export const usePanelStore = create<PanelStore>()(
         });
       },
 
-      setProcessRunning: (projectId: string, panelId: string, running: boolean) => {
+      setProcessRunning: (projectId: string, panelId: string, running: boolean, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
         set((state) => {
           const layouts = new Map(state.layouts);
-          const current = layouts.get(projectId);
+          const current = layouts.get(key);
           if (!current || !current.panels[panelId]) return state;
 
-          layouts.set(projectId, {
+          layouts.set(key, {
             ...current,
             panels: {
               ...current.panels,
@@ -257,15 +269,17 @@ export const usePanelStore = create<PanelStore>()(
         });
       },
 
-      getPanel: (projectId: string, panelId: string) => {
-        const layout = get().layouts.get(projectId);
+      getPanel: (projectId: string, panelId: string, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
+        const layout = get().layouts.get(key);
         return layout?.panels[panelId];
       },
 
-      resetLayout: (projectId: string) => {
+      resetLayout: (projectId: string, sessionId?: string) => {
+        const key = getLayoutKey(projectId, sessionId);
         set((state) => {
           const layouts = new Map(state.layouts);
-          layouts.set(projectId, createDefaultLayoutState());
+          layouts.set(key, createDefaultLayoutState());
           return { layouts };
         });
       },

@@ -9,10 +9,11 @@ interface LayoutNodeProps {
   node: LayoutNodeType;
   projectId: string;
   projectPath: string;
+  sessionId?: string;
   panels: Record<string, PanelState>;
 }
 
-export function LayoutNode({ node, projectId, projectPath, panels }: LayoutNodeProps) {
+export function LayoutNode({ node, projectId, projectPath, sessionId, panels }: LayoutNodeProps) {
   const setSplitRatio = usePanelStore((s) => s.setSplitRatio);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -29,9 +30,9 @@ export function LayoutNode({ node, projectId, projectPath, panels }: LayoutNodeP
       const deltaRatio = delta / totalSize;
       const newRatio = Math.max(0.1, Math.min(0.9, currentRatio + deltaRatio));
 
-      setSplitRatio(projectId, node.id, newRatio);
+      setSplitRatio(projectId, node.id, newRatio, sessionId);
     },
-    [node, projectId, setSplitRatio]
+    [node, projectId, sessionId, setSplitRatio]
   );
 
   const handleResizeEnd = useCallback(() => {
@@ -54,6 +55,7 @@ export function LayoutNode({ node, projectId, projectPath, panels }: LayoutNodeP
         panel={panel}
         projectId={projectId}
         projectPath={projectPath}
+        sessionId={sessionId}
       />
     );
   }
@@ -88,6 +90,7 @@ export function LayoutNode({ node, projectId, projectPath, panels }: LayoutNodeP
             node={first}
             projectId={projectId}
             projectPath={projectPath}
+            sessionId={sessionId}
             panels={panels}
           />
         </div>
@@ -109,6 +112,7 @@ export function LayoutNode({ node, projectId, projectPath, panels }: LayoutNodeP
             node={second}
             projectId={projectId}
             projectPath={projectPath}
+            sessionId={sessionId}
             panels={panels}
           />
         </div>

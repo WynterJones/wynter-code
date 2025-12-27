@@ -3,8 +3,6 @@ import {
   Youtube,
   Heart,
   History,
-  ListVideo,
-  Plus,
   Trash2,
   Play,
   ExternalLink,
@@ -13,13 +11,17 @@ import {
   ChevronRight,
   Edit2,
   Check,
+  Pause,
+  FolderPlus,
+  Tag,
+  Shuffle,
 } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
-import type { PanelContentProps, YouTubeVideo, YouTubePlaylist } from "@/types/panel";
+import type { PanelContentProps, YouTubeVideo, YouTubeCategory } from "@/types/panel";
 
-type TabType = "player" | "history" | "favorites" | "playlists";
+type TabType = "player" | "history" | "favorites";
 
 const MAX_HISTORY = 50;
 
@@ -45,11 +47,6 @@ function extractVideoId(input: string): string | null {
   return null;
 }
 
-function extractPlaylistId(input: string): string | null {
-  const match = input.match(/[?&]list=([a-zA-Z0-9_-]+)/);
-  return match ? match[1] : null;
-}
-
 export function YouTubeEmbedPanel({
   panelId: _panelId,
   projectId: _projectId,
@@ -61,24 +58,41 @@ export function YouTubeEmbedPanel({
 }: PanelContentProps) {
   const [inputUrl, setInputUrl] = useState("");
   const [activeTab, setActiveTab] = useState<TabType>("player");
-  const [showNewPlaylist, setShowNewPlaylist] = useState(false);
-  const [newPlaylistName, setNewPlaylistName] = useState("");
-  const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);
-  const [editingPlaylistName, setEditingPlaylistName] = useState("");
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string | undefined>(undefined);
+  const [assigningVideoId, setAssigningVideoId] = useState<string | null>(null);
 
   const currentVideoId = panel.youtubeVideoId || "";
   const history = panel.youtubeHistory || [];
   const favorites = panel.youtubeFavorites || [];
-  const playlists = panel.youtubePlaylists || [];
-  const currentPlaylistId = panel.youtubeCurrentPlaylist;
-  const playlistIndex = panel.youtubePlaylistIndex ?? 0;
+  const categories = panel.youtubeCategories || [];
+  const isPlaylistActive = panel.youtubeFavoritesPlaylistActive || false;
+  const playlistCategory = panel.youtubeFavoritesPlaylistCategory;
+  const playlistIndex = panel.youtubeFavoritesPlaylistIndex ?? 0;
 
-  const currentPlaylist = useMemo(() => {
-    return playlists.find((p) => p.id === currentPlaylistId);
-  }, [playlists, currentPlaylistId]);
+  // Get filtered favorites based on current category filter or playlist category
+  const getFilteredFavorites = useCallback((categoryId?: string) => {
+    if (!categoryId) return favorites;
+    return favorites.filter((v) => v.categoryId === categoryId);
+  }, [favorites]);
+
+  const filteredFavorites = useMemo(() => {
+    return getFilteredFavorites(selectedCategoryFilter);
+  }, [getFilteredFavorites, selectedCategoryFilter]);
+
+  const playlistFavorites = useMemo(() => {
+    return getFilteredFavorites(playlistCategory);
+  }, [getFilteredFavorites, playlistCategory]);
 
   const isFavorite = useMemo(() => {
     return favorites.some((v) => v.videoId === currentVideoId);
+  }, [favorites, currentVideoId]);
+
+  const currentFavorite = useMemo(() => {
+    return favorites.find((v) => v.videoId === currentVideoId);
   }, [favorites, currentVideoId]);
 
   const addToHistory = useCallback(
@@ -99,23 +113,13 @@ export function YouTubeEmbedPanel({
 
   const handleNavigate = useCallback(() => {
     const videoId = extractVideoId(inputUrl);
-    const playlistId = extractPlaylistId(inputUrl);
 
     if (videoId) {
       addToHistory(videoId);
       onPanelUpdate({
         youtubeVideoId: videoId,
-        youtubeCurrentPlaylist: undefined,
-        youtubePlaylistIndex: undefined,
+        youtubeFavoritesPlaylistActive: false,
         title: `YouTube`,
-      });
-      setInputUrl("");
-      setActiveTab("player");
-    } else if (playlistId) {
-      // For YouTube playlists, we'll embed the playlist directly
-      onPanelUpdate({
-        youtubeVideoId: `videoseries?list=${playlistId}`,
-        title: `YouTube Playlist`,
       });
       setInputUrl("");
       setActiveTab("player");
@@ -132,14 +136,21 @@ export function YouTubeEmbedPanel({
   );
 
   const handlePlayVideo = useCallback(
-    (video: YouTubeVideo) => {
+    (video: YouTubeVideo, fromPlaylist = false, index?: number) => {
       addToHistory(video.videoId, video.title);
-      onPanelUpdate({
-        youtubeVideoId: video.videoId,
-        youtubeCurrentPlaylist: undefined,
-        youtubePlaylistIndex: undefined,
-        title: `YouTube`,
-      });
+      if (fromPlaylist && index !== undefined) {
+        onPanelUpdate({
+          youtubeVideoId: video.videoId,
+          youtubeFavoritesPlaylistIndex: index,
+          title: `YouTube`,
+        });
+      } else {
+        onPanelUpdate({
+          youtubeVideoId: video.videoId,
+          youtubeFavoritesPlaylistActive: false,
+          title: `YouTube`,
+        });
+      }
       setActiveTab("player");
     },
     [addToHistory, onPanelUpdate]
@@ -188,110 +199,116 @@ export function YouTubeEmbedPanel({
     [history, onPanelUpdate]
   );
 
-  const handleCreatePlaylist = useCallback(() => {
-    if (!newPlaylistName.trim()) return;
+  // Category management
+  const handleCreateCategory = useCallback(() => {
+    if (!newCategoryName.trim()) return;
 
-    const newPlaylist: YouTubePlaylist = {
-      id: `playlist-${Date.now()}`,
-      name: newPlaylistName.trim(),
-      videos: [],
+    const newCategory: YouTubeCategory = {
+      id: `cat-${Date.now()}`,
+      name: newCategoryName.trim(),
       createdAt: Date.now(),
     };
 
     onPanelUpdate({
-      youtubePlaylists: [newPlaylist, ...playlists],
+      youtubeCategories: [...categories, newCategory],
     });
-    setNewPlaylistName("");
-    setShowNewPlaylist(false);
-  }, [newPlaylistName, playlists, onPanelUpdate]);
+    setNewCategoryName("");
+    setShowNewCategory(false);
+  }, [newCategoryName, categories, onPanelUpdate]);
 
-  const handleDeletePlaylist = useCallback(
-    (playlistId: string) => {
-      onPanelUpdate({
-        youtubePlaylists: playlists.filter((p) => p.id !== playlistId),
-        youtubeCurrentPlaylist:
-          currentPlaylistId === playlistId ? undefined : currentPlaylistId,
-      });
-    },
-    [playlists, currentPlaylistId, onPanelUpdate]
-  );
-
-  const handleRenamePlaylist = useCallback(
-    (playlistId: string) => {
-      if (!editingPlaylistName.trim()) return;
+  const handleRenameCategory = useCallback(
+    (categoryId: string) => {
+      if (!editingCategoryName.trim()) return;
 
       onPanelUpdate({
-        youtubePlaylists: playlists.map((p) =>
-          p.id === playlistId ? { ...p, name: editingPlaylistName.trim() } : p
+        youtubeCategories: categories.map((c) =>
+          c.id === categoryId ? { ...c, name: editingCategoryName.trim() } : c
         ),
       });
-      setEditingPlaylistId(null);
-      setEditingPlaylistName("");
+      setEditingCategoryId(null);
+      setEditingCategoryName("");
     },
-    [editingPlaylistName, playlists, onPanelUpdate]
+    [editingCategoryName, categories, onPanelUpdate]
   );
 
-  const handleAddToPlaylist = useCallback(
-    (playlistId: string, video: YouTubeVideo) => {
+  const handleDeleteCategory = useCallback(
+    (categoryId: string) => {
+      // Remove category and unassign from all favorites
       onPanelUpdate({
-        youtubePlaylists: playlists.map((p) => {
-          if (p.id !== playlistId) return p;
-          if (p.videos.some((v) => v.videoId === video.videoId)) return p;
-          return { ...p, videos: [...p.videos, video] };
-        }),
-      });
-    },
-    [playlists, onPanelUpdate]
-  );
-
-  const handleRemoveFromPlaylist = useCallback(
-    (playlistId: string, videoId: string) => {
-      onPanelUpdate({
-        youtubePlaylists: playlists.map((p) =>
-          p.id === playlistId
-            ? { ...p, videos: p.videos.filter((v) => v.videoId !== videoId) }
-            : p
+        youtubeCategories: categories.filter((c) => c.id !== categoryId),
+        youtubeFavorites: favorites.map((v) =>
+          v.categoryId === categoryId ? { ...v, categoryId: undefined } : v
         ),
       });
+      if (selectedCategoryFilter === categoryId) {
+        setSelectedCategoryFilter(undefined);
+      }
     },
-    [playlists, onPanelUpdate]
+    [categories, favorites, selectedCategoryFilter, onPanelUpdate]
   );
 
-  const handlePlayPlaylist = useCallback(
-    (playlist: YouTubePlaylist, startIndex = 0) => {
-      if (playlist.videos.length === 0) return;
+  const handleAssignCategory = useCallback(
+    (videoId: string, categoryId: string | undefined) => {
+      onPanelUpdate({
+        youtubeFavorites: favorites.map((v) =>
+          v.videoId === videoId ? { ...v, categoryId } : v
+        ),
+      });
+      setAssigningVideoId(null);
+    },
+    [favorites, onPanelUpdate]
+  );
 
-      const video = playlist.videos[startIndex];
+  // Playlist controls
+  const handleStartPlaylist = useCallback(
+    (categoryId?: string, shuffle = false) => {
+      const targetFavorites = getFilteredFavorites(categoryId);
+      if (targetFavorites.length === 0) return;
+
+      let startIndex = 0;
+      if (shuffle) {
+        startIndex = Math.floor(Math.random() * targetFavorites.length);
+      }
+
+      const video = targetFavorites[startIndex];
       addToHistory(video.videoId, video.title);
       onPanelUpdate({
         youtubeVideoId: video.videoId,
-        youtubeCurrentPlaylist: playlist.id,
-        youtubePlaylistIndex: startIndex,
-        title: `YouTube - ${playlist.name}`,
+        youtubeFavoritesPlaylistActive: true,
+        youtubeFavoritesPlaylistCategory: categoryId,
+        youtubeFavoritesPlaylistIndex: startIndex,
+        title: `YouTube`,
       });
       setActiveTab("player");
     },
-    [addToHistory, onPanelUpdate]
+    [getFilteredFavorites, addToHistory, onPanelUpdate]
   );
+
+  const handleStopPlaylist = useCallback(() => {
+    onPanelUpdate({
+      youtubeFavoritesPlaylistActive: false,
+      youtubeFavoritesPlaylistCategory: undefined,
+      youtubeFavoritesPlaylistIndex: undefined,
+    });
+  }, [onPanelUpdate]);
 
   const handlePlaylistNav = useCallback(
     (direction: "prev" | "next") => {
-      if (!currentPlaylist) return;
+      if (!isPlaylistActive || playlistFavorites.length === 0) return;
 
       const newIndex =
         direction === "next"
-          ? (playlistIndex + 1) % currentPlaylist.videos.length
-          : (playlistIndex - 1 + currentPlaylist.videos.length) %
-            currentPlaylist.videos.length;
+          ? (playlistIndex + 1) % playlistFavorites.length
+          : (playlistIndex - 1 + playlistFavorites.length) % playlistFavorites.length;
 
-      const video = currentPlaylist.videos[newIndex];
+      const video = playlistFavorites[newIndex];
       addToHistory(video.videoId, video.title);
       onPanelUpdate({
         youtubeVideoId: video.videoId,
-        youtubePlaylistIndex: newIndex,
+        youtubeFavoritesPlaylistIndex: newIndex,
       });
     },
-    [currentPlaylist, playlistIndex, addToHistory, onPanelUpdate]
+    [isPlaylistActive, playlistFavorites, playlistIndex, addToHistory, onPanelUpdate]
   );
 
   const handleOpenExternal = useCallback(() => {
@@ -300,17 +317,30 @@ export function YouTubeEmbedPanel({
     }
   }, [currentVideoId]);
 
+  const getCategoryName = useCallback(
+    (categoryId?: string) => {
+      if (!categoryId) return null;
+      return categories.find((c) => c.id === categoryId)?.name;
+    },
+    [categories]
+  );
+
   const renderVideoCard = (
     video: YouTubeVideo,
     onRemove?: () => void,
-    showAddToPlaylist = false
+    showCategoryAssign = false,
+    isInPlaylist = false,
+    playlistIdx?: number
   ) => (
     <div
       key={video.videoId}
-      className="flex gap-2 p-2 rounded-md hover:bg-bg-hover group"
+      className={cn(
+        "flex gap-2 p-2 rounded-md hover:bg-bg-hover group",
+        isInPlaylist && playlistIdx === playlistIndex && isPlaylistActive && "bg-accent/10 border border-accent/30"
+      )}
     >
       <button
-        onClick={() => handlePlayVideo(video)}
+        onClick={() => handlePlayVideo(video, isInPlaylist, playlistIdx)}
         className="relative flex-shrink-0 w-24 h-14 rounded overflow-hidden bg-bg-tertiary"
       >
         <img
@@ -324,30 +354,55 @@ export function YouTubeEmbedPanel({
       </button>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-text-primary truncate">{video.title}</p>
-        <p className="text-[10px] text-text-secondary/50 mt-0.5">
-          {new Date(video.addedAt).toLocaleDateString()}
-        </p>
+        <div className="flex items-center gap-1 mt-0.5">
+          <p className="text-[10px] text-text-secondary/50">
+            {new Date(video.addedAt).toLocaleDateString()}
+          </p>
+          {video.categoryId && (
+            <span className="px-1.5 py-0.5 text-[9px] rounded bg-accent/20 text-accent">
+              {getCategoryName(video.categoryId)}
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        {showAddToPlaylist && playlists.length > 0 && (
-          <div className="relative group/add">
+        {showCategoryAssign && (
+          <div className="relative">
             <button
-              className="p-1 rounded hover:bg-bg-tertiary text-text-secondary/60 hover:text-text-primary"
-              title="Add to playlist"
+              onClick={() => setAssigningVideoId(assigningVideoId === video.videoId ? null : video.videoId)}
+              className={cn(
+                "p-1 rounded hover:bg-bg-tertiary transition-colors",
+                video.categoryId ? "text-accent" : "text-text-secondary/60 hover:text-text-primary"
+              )}
+              title="Assign category"
             >
-              <ListVideo className="w-3.5 h-3.5" />
+              <Tag className="w-3.5 h-3.5" />
             </button>
-            <div className="absolute right-0 top-full mt-1 bg-bg-secondary border border-border rounded-md shadow-lg z-10 hidden group-hover/add:block min-w-[120px]">
-              {playlists.map((pl) => (
+            {assigningVideoId === video.videoId && (
+              <div className="absolute right-0 top-full mt-1 bg-bg-secondary border border-border rounded-md shadow-lg z-20 min-w-[140px] py-1">
                 <button
-                  key={pl.id}
-                  onClick={() => handleAddToPlaylist(pl.id, video)}
-                  className="w-full px-2 py-1 text-xs text-left hover:bg-bg-hover text-text-primary truncate"
+                  onClick={() => handleAssignCategory(video.videoId, undefined)}
+                  className={cn(
+                    "w-full px-3 py-1.5 text-xs text-left hover:bg-bg-hover",
+                    !video.categoryId ? "text-accent" : "text-text-secondary"
+                  )}
                 >
-                  {pl.name}
+                  No category
                 </button>
-              ))}
-            </div>
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleAssignCategory(video.videoId, cat.id)}
+                    className={cn(
+                      "w-full px-3 py-1.5 text-xs text-left hover:bg-bg-hover truncate",
+                      video.categoryId === cat.id ? "text-accent" : "text-text-primary"
+                    )}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {onRemove && (
@@ -378,7 +433,6 @@ export function YouTubeEmbedPanel({
                 { id: "player", icon: Youtube, label: "Player" },
                 { id: "history", icon: History, label: "History" },
                 { id: "favorites", icon: Heart, label: "Favorites" },
-                { id: "playlists", icon: ListVideo, label: "Playlists" },
               ] as const
             ).map(({ id, icon: Icon, label }) => (
               <button
@@ -425,9 +479,6 @@ export function YouTubeEmbedPanel({
                   Play
                 </button>
               </div>
-              <p className="text-xs text-text-secondary/60">
-                Supports video URLs, shorts, and playlist URLs
-              </p>
             </div>
           )}
 
@@ -457,11 +508,7 @@ export function YouTubeEmbedPanel({
                     </p>
                   ) : (
                     history.map((video) =>
-                      renderVideoCard(
-                        video,
-                        () => handleRemoveFromHistory(video.videoId),
-                        true
-                      )
+                      renderVideoCard(video, () => handleRemoveFromHistory(video.videoId))
                     )
                   )}
                 </div>
@@ -469,197 +516,193 @@ export function YouTubeEmbedPanel({
             </div>
           )}
 
-          {activeTab === "favorites" && (
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
-                <span className="text-xs text-text-secondary">
-                  {favorites.length} favorites
-                </span>
-              </div>
-              <OverlayScrollbarsComponent
-                className="flex-1"
-                options={{ scrollbars: { autoHide: "leave", autoHideDelay: 100 } }}
-              >
-                <div className="p-2 space-y-1">
-                  {favorites.length === 0 ? (
-                    <p className="text-xs text-text-secondary/50 text-center py-8">
-                      No favorites yet. Click the heart icon while watching to
-                      add favorites.
-                    </p>
-                  ) : (
-                    favorites.map((video) =>
-                      renderVideoCard(
-                        video,
-                        () => handleRemoveFromFavorites(video.videoId),
-                        true
-                      )
-                    )
-                  )}
-                </div>
-              </OverlayScrollbarsComponent>
-            </div>
-          )}
+          {activeTab === "favorites" && renderFavoritesTab()}
+        </div>
+      </OverlayScrollbarsComponent>
+    );
+  }
 
-          {activeTab === "playlists" && (
-            <div className="flex-1 flex flex-col">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
-                <span className="text-xs text-text-secondary">
-                  {playlists.length} playlists
-                </span>
-                <button
-                  onClick={() => setShowNewPlaylist(true)}
-                  className="flex items-center gap-1 text-xs text-accent hover:text-accent/80 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New
-                </button>
-              </div>
-              <OverlayScrollbarsComponent
-                className="flex-1"
-                options={{ scrollbars: { autoHide: "leave", autoHideDelay: 100 } }}
-              >
-                <div className="p-2 space-y-2">
-                  {showNewPlaylist && (
-                    <div className="flex items-center gap-2 p-2 bg-bg-tertiary rounded-md">
+  function renderFavoritesTab() {
+    return (
+      <div className="flex-1 flex flex-col">
+        {/* Category filter bar */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30">
+          <div className="flex items-center gap-1 flex-1 overflow-x-auto">
+            <button
+              onClick={() => setSelectedCategoryFilter(undefined)}
+              className={cn(
+                "px-2 py-0.5 text-[10px] rounded-full whitespace-nowrap transition-colors",
+                !selectedCategoryFilter
+                  ? "bg-accent text-primary-950"
+                  : "bg-bg-tertiary text-text-secondary hover:bg-bg-hover"
+              )}
+            >
+              All ({favorites.length})
+            </button>
+            {categories.map((cat) => {
+              const count = favorites.filter((v) => v.categoryId === cat.id).length;
+              return (
+                <div key={cat.id} className="flex items-center group/cat">
+                  {editingCategoryId === cat.id ? (
+                    <div className="flex items-center gap-1">
                       <input
                         type="text"
-                        value={newPlaylistName}
-                        onChange={(e) => setNewPlaylistName(e.target.value)}
+                        value={editingCategoryName}
+                        onChange={(e) => setEditingCategoryName(e.target.value)}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") handleCreatePlaylist();
+                          if (e.key === "Enter") handleRenameCategory(cat.id);
                           if (e.key === "Escape") {
-                            setShowNewPlaylist(false);
-                            setNewPlaylistName("");
+                            setEditingCategoryId(null);
+                            setEditingCategoryName("");
                           }
                         }}
-                        placeholder="Playlist name"
-                        className="flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border rounded text-text-primary"
+                        className="px-2 py-0.5 text-[10px] bg-bg-secondary border border-border rounded text-text-primary w-20"
                         autoFocus
                       />
                       <button
-                        onClick={handleCreatePlaylist}
-                        className="p-1 rounded bg-accent hover:bg-accent/80 text-primary-950"
+                        onClick={() => handleRenameCategory(cat.id)}
+                        className="p-0.5 text-accent"
                       >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowNewPlaylist(false);
-                          setNewPlaylistName("");
-                        }}
-                        className="p-1 rounded hover:bg-bg-hover text-text-secondary"
-                      >
-                        <X className="w-3.5 h-3.5" />
+                        <Check className="w-3 h-3" />
                       </button>
                     </div>
-                  )}
-                  {playlists.length === 0 && !showNewPlaylist ? (
-                    <p className="text-xs text-text-secondary/50 text-center py-8">
-                      No playlists yet. Create one to save videos.
-                    </p>
                   ) : (
-                    playlists.map((playlist) => (
-                      <div
-                        key={playlist.id}
-                        className="p-2 rounded-md bg-bg-tertiary/50 hover:bg-bg-tertiary transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          {editingPlaylistId === playlist.id ? (
-                            <div className="flex items-center gap-1 flex-1">
-                              <input
-                                type="text"
-                                value={editingPlaylistName}
-                                onChange={(e) =>
-                                  setEditingPlaylistName(e.target.value)
-                                }
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter")
-                                    handleRenamePlaylist(playlist.id);
-                                  if (e.key === "Escape") {
-                                    setEditingPlaylistId(null);
-                                    setEditingPlaylistName("");
-                                  }
-                                }}
-                                className="flex-1 px-2 py-0.5 text-xs bg-bg-secondary border border-border rounded text-text-primary"
-                                autoFocus
-                              />
-                              <button
-                                onClick={() => handleRenamePlaylist(playlist.id)}
-                                className="p-0.5 rounded hover:bg-bg-hover text-accent"
-                              >
-                                <Check className="w-3 h-3" />
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs font-medium text-text-primary">
-                              {playlist.name}
-                            </span>
-                          )}
-                          <div className="flex items-center gap-1">
-                            {playlist.videos.length > 0 && (
-                              <button
-                                onClick={() => handlePlayPlaylist(playlist)}
-                                className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-accent"
-                                title="Play playlist"
-                              >
-                                <Play className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => {
-                                setEditingPlaylistId(playlist.id);
-                                setEditingPlaylistName(playlist.name);
-                              }}
-                              className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary"
-                              title="Rename"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeletePlaylist(playlist.id)}
-                              className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-red-400"
-                              title="Delete playlist"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                        <p className="text-[10px] text-text-secondary/50">
-                          {playlist.videos.length} videos
-                        </p>
-                        {playlist.videos.length > 0 && (
-                          <div className="mt-2 flex gap-1 overflow-x-auto">
-                            {playlist.videos.slice(0, 4).map((video, idx) => (
-                              <button
-                                key={video.videoId}
-                                onClick={() => handlePlayPlaylist(playlist, idx)}
-                                className="relative flex-shrink-0 w-16 h-9 rounded overflow-hidden bg-bg-secondary"
-                              >
-                                <img
-                                  src={video.thumbnailUrl}
-                                  alt={video.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              </button>
-                            ))}
-                            {playlist.videos.length > 4 && (
-                              <div className="flex-shrink-0 w-16 h-9 rounded bg-bg-secondary flex items-center justify-center">
-                                <span className="text-[10px] text-text-secondary">
-                                  +{playlist.videos.length - 4}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                    <>
+                      <button
+                        onClick={() => setSelectedCategoryFilter(cat.id)}
+                        className={cn(
+                          "px-2 py-0.5 text-[10px] rounded-full whitespace-nowrap transition-colors",
+                          selectedCategoryFilter === cat.id
+                            ? "bg-accent text-primary-950"
+                            : "bg-bg-tertiary text-text-secondary hover:bg-bg-hover"
                         )}
+                      >
+                        {cat.name} ({count})
+                      </button>
+                      <div className="hidden group-hover/cat:flex items-center -ml-1">
+                        <button
+                          onClick={() => {
+                            setEditingCategoryId(cat.id);
+                            setEditingCategoryName(cat.name);
+                          }}
+                          className="p-0.5 text-text-secondary/50 hover:text-text-primary"
+                        >
+                          <Edit2 className="w-2.5 h-2.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="p-0.5 text-text-secondary/50 hover:text-red-400"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
                       </div>
-                    ))
+                    </>
                   )}
                 </div>
-              </OverlayScrollbarsComponent>
-            </div>
-          )}
+              );
+            })}
+            {showNewCategory ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateCategory();
+                    if (e.key === "Escape") {
+                      setShowNewCategory(false);
+                      setNewCategoryName("");
+                    }
+                  }}
+                  placeholder="Category name"
+                  className="px-2 py-0.5 text-[10px] bg-bg-secondary border border-border rounded text-text-primary w-20"
+                  autoFocus
+                />
+                <button
+                  onClick={handleCreateCategory}
+                  className="p-0.5 text-accent"
+                >
+                  <Check className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => {
+                    setShowNewCategory(false);
+                    setNewCategoryName("");
+                  }}
+                  className="p-0.5 text-text-secondary"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowNewCategory(true)}
+                className="p-1 rounded hover:bg-bg-hover text-text-secondary/60 hover:text-accent"
+                title="Add category"
+              >
+                <FolderPlus className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
-      </OverlayScrollbarsComponent>
+
+        {/* Playlist controls */}
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border/30 bg-bg-tertiary/30">
+          <span className="text-[10px] text-text-secondary">Playlist:</span>
+          <button
+            onClick={() => handleStartPlaylist(selectedCategoryFilter)}
+            disabled={filteredFavorites.length === 0}
+            className={cn(
+              "flex items-center gap-1 px-2 py-0.5 text-[10px] rounded transition-colors",
+              filteredFavorites.length > 0
+                ? "bg-green-600/20 text-green-400 hover:bg-green-600/30"
+                : "bg-bg-tertiary text-text-secondary/50 cursor-not-allowed"
+            )}
+          >
+            <Play className="w-3 h-3" />
+            Play {selectedCategoryFilter ? getCategoryName(selectedCategoryFilter) : "All"}
+          </button>
+          <button
+            onClick={() => handleStartPlaylist(selectedCategoryFilter, true)}
+            disabled={filteredFavorites.length === 0}
+            className={cn(
+              "flex items-center gap-1 px-2 py-0.5 text-[10px] rounded transition-colors",
+              filteredFavorites.length > 0
+                ? "bg-purple-600/20 text-purple-400 hover:bg-purple-600/30"
+                : "bg-bg-tertiary text-text-secondary/50 cursor-not-allowed"
+            )}
+          >
+            <Shuffle className="w-3 h-3" />
+            Shuffle
+          </button>
+        </div>
+
+        {/* Favorites list */}
+        <OverlayScrollbarsComponent
+          className="flex-1"
+          options={{ scrollbars: { autoHide: "leave", autoHideDelay: 100 } }}
+        >
+          <div className="p-2 space-y-1">
+            {filteredFavorites.length === 0 ? (
+              <p className="text-xs text-text-secondary/50 text-center py-8">
+                {favorites.length === 0
+                  ? "No favorites yet. Click the heart icon while watching to add favorites."
+                  : "No favorites in this category."}
+              </p>
+            ) : (
+              filteredFavorites.map((video, idx) =>
+                renderVideoCard(
+                  video,
+                  () => handleRemoveFromFavorites(video.videoId),
+                  true,
+                  isPlaylistActive && playlistCategory === selectedCategoryFilter,
+                  idx
+                )
+              )
+            )}
+          </div>
+        </OverlayScrollbarsComponent>
+      </div>
     );
   }
 
@@ -674,7 +717,6 @@ export function YouTubeEmbedPanel({
             { id: "player", icon: Youtube, label: "Player" },
             { id: "history", icon: History, label: "History" },
             { id: "favorites", icon: Heart, label: "Favorites" },
-            { id: "playlists", icon: ListVideo, label: "Playlists" },
           ] as const
         ).map(({ id, icon: Icon, label }) => (
           <button
@@ -694,27 +736,41 @@ export function YouTubeEmbedPanel({
 
         <div className="flex-1" />
 
-        {/* Playlist navigation */}
-        {currentPlaylist && (
-          <div className="flex items-center gap-1 mr-2">
+        {/* Playlist controls when active */}
+        {isPlaylistActive && playlistFavorites.length > 0 && (
+          <div className="flex items-center gap-1 mr-2 px-2 py-0.5 rounded bg-green-600/20">
             <button
               onClick={() => handlePlaylistNav("prev")}
-              className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary"
+              className="p-0.5 rounded hover:bg-green-600/30 text-green-400"
               title="Previous"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <span className="text-[10px] text-text-secondary">
-              {playlistIndex + 1}/{currentPlaylist.videos.length}
+            <span className="text-[10px] text-green-400 min-w-[40px] text-center">
+              {playlistIndex + 1}/{playlistFavorites.length}
             </span>
             <button
               onClick={() => handlePlaylistNav("next")}
-              className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-text-primary"
+              className="p-0.5 rounded hover:bg-green-600/30 text-green-400"
               title="Next"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
+            <button
+              onClick={handleStopPlaylist}
+              className="p-0.5 rounded hover:bg-red-600/30 text-red-400 ml-1"
+              title="Stop playlist"
+            >
+              <Pause className="w-3.5 h-3.5" />
+            </button>
           </div>
+        )}
+
+        {/* Current category badge */}
+        {currentFavorite?.categoryId && (
+          <span className="px-1.5 py-0.5 text-[9px] rounded bg-accent/20 text-accent mr-2">
+            {getCategoryName(currentFavorite.categoryId)}
+          </span>
         )}
 
         {/* URL input */}
@@ -795,159 +851,13 @@ export function YouTubeEmbedPanel({
                 </p>
               ) : (
                 history.map((video) =>
-                  renderVideoCard(
-                    video,
-                    () => handleRemoveFromHistory(video.videoId),
-                    true
-                  )
+                  renderVideoCard(video, () => handleRemoveFromHistory(video.videoId))
                 )
               )}
             </div>
           )}
 
-          {activeTab === "favorites" && (
-            <div className="p-2 space-y-1">
-              <div className="flex items-center justify-between px-1 py-2">
-                <span className="text-xs text-text-secondary">
-                  {favorites.length} favorites
-                </span>
-              </div>
-              {favorites.length === 0 ? (
-                <p className="text-xs text-text-secondary/50 text-center py-8">
-                  No favorites yet
-                </p>
-              ) : (
-                favorites.map((video) =>
-                  renderVideoCard(
-                    video,
-                    () => handleRemoveFromFavorites(video.videoId),
-                    true
-                  )
-                )
-              )}
-            </div>
-          )}
-
-          {activeTab === "playlists" && (
-            <div className="p-2 space-y-2">
-              <div className="flex items-center justify-between px-1 py-2">
-                <span className="text-xs text-text-secondary">
-                  {playlists.length} playlists
-                </span>
-                <button
-                  onClick={() => setShowNewPlaylist(true)}
-                  className="flex items-center gap-1 text-xs text-accent hover:text-accent/80"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  New
-                </button>
-              </div>
-              {showNewPlaylist && (
-                <div className="flex items-center gap-2 p-2 bg-bg-tertiary rounded-md">
-                  <input
-                    type="text"
-                    value={newPlaylistName}
-                    onChange={(e) => setNewPlaylistName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleCreatePlaylist();
-                      if (e.key === "Escape") {
-                        setShowNewPlaylist(false);
-                        setNewPlaylistName("");
-                      }
-                    }}
-                    placeholder="Playlist name"
-                    className="flex-1 px-2 py-1 text-xs bg-bg-secondary border border-border rounded text-text-primary"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleCreatePlaylist}
-                    className="p-1 rounded bg-accent hover:bg-accent/80 text-primary-950"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowNewPlaylist(false);
-                      setNewPlaylistName("");
-                    }}
-                    className="p-1 rounded hover:bg-bg-hover text-text-secondary"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-              {playlists.map((playlist) => (
-                <div
-                  key={playlist.id}
-                  className={cn(
-                    "p-2 rounded-md transition-colors",
-                    currentPlaylistId === playlist.id
-                      ? "bg-accent/10 border border-accent/30"
-                      : "bg-bg-tertiary/50 hover:bg-bg-tertiary"
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-medium text-text-primary">
-                      {playlist.name}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      {playlist.videos.length > 0 && (
-                        <button
-                          onClick={() => handlePlayPlaylist(playlist)}
-                          className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-accent"
-                        >
-                          <Play className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDeletePlaylist(playlist.id)}
-                        className="p-1 rounded hover:bg-bg-hover text-text-secondary hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-[10px] text-text-secondary/50 mb-2">
-                    {playlist.videos.length} videos
-                  </p>
-                  {playlist.videos.map((video, idx) => (
-                    <div
-                      key={video.videoId}
-                      className={cn(
-                        "flex items-center gap-2 p-1 rounded",
-                        currentPlaylistId === playlist.id &&
-                          playlistIndex === idx
-                          ? "bg-accent/20"
-                          : "hover:bg-bg-hover"
-                      )}
-                    >
-                      <button
-                        onClick={() => handlePlayPlaylist(playlist, idx)}
-                        className="relative flex-shrink-0 w-12 h-7 rounded overflow-hidden bg-bg-secondary"
-                      >
-                        <img
-                          src={video.thumbnailUrl}
-                          alt={video.title}
-                          className="w-full h-full object-cover"
-                        />
-                      </button>
-                      <span className="flex-1 text-[10px] text-text-primary truncate">
-                        {video.title}
-                      </span>
-                      <button
-                        onClick={() =>
-                          handleRemoveFromPlaylist(playlist.id, video.videoId)
-                        }
-                        className="p-0.5 rounded hover:bg-bg-tertiary text-text-secondary/50 hover:text-red-400"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
+          {activeTab === "favorites" && renderFavoritesTab()}
         </OverlayScrollbarsComponent>
       )}
     </div>

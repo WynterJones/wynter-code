@@ -7,6 +7,7 @@ import {
   FolderOpen,
   FileCode,
   FileText,
+  Tractor,
   Globe,
   Youtube,
   Plus,
@@ -22,6 +23,7 @@ const PANEL_ICONS: Record<PanelType, React.ComponentType<{ className?: string }>
   "file-browser": FolderOpen,
   "file-viewer": FileCode,
   "markdown-viewer": FileText,
+  "farmwork-stats": Tractor,
   "browser-preview": Globe,
   "youtube-embed": Youtube,
 };

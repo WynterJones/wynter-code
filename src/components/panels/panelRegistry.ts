@@ -62,6 +62,15 @@ export const PANEL_TYPES: Record<PanelType, PanelTypeConfig> = {
     requiresProtection: false,
   },
 
+  "farmwork-stats": {
+    id: "farmwork-stats",
+    name: "Farmwork Stats",
+    icon: "Tractor",
+    defaultTitle: "Farmwork",
+    canHaveMultiple: true,
+    requiresProtection: false,
+  },
+
   "browser-preview": {
     id: "browser-preview",
     name: "Browser Preview",

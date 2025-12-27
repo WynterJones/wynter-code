@@ -28,10 +28,11 @@ const LAYOUT_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
 
 interface LayoutSelectorProps {
   projectId: string;
+  sessionId?: string;
   activeTemplateId: LayoutTemplateId;
 }
 
-export function LayoutSelector({ projectId, activeTemplateId }: LayoutSelectorProps) {
+export function LayoutSelector({ projectId, sessionId, activeTemplateId }: LayoutSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const setLayoutTemplate = usePanelStore((s) => s.setLayoutTemplate);
   const templates = getLayoutTemplateList();
@@ -40,7 +41,7 @@ export function LayoutSelector({ projectId, activeTemplateId }: LayoutSelectorPr
   const ActiveIcon = activeTemplate ? LAYOUT_ICONS[activeTemplate.icon] : Square;
 
   const handleSelect = (templateId: LayoutTemplateId) => {
-    setLayoutTemplate(projectId, templateId);
+    setLayoutTemplate(projectId, templateId, sessionId);
     setIsOpen(false);
   };
 

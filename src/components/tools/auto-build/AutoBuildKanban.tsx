@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Plus, Inbox, Loader2, FlaskConical, Eye, Check, CheckCircle2, Settings, Layers, ChevronRight } from "lucide-react";
+import { Plus, Inbox, Loader2, FlaskConical, Eye, Check, CheckCircle2, Settings, Layers, ChevronRight, Users, Wrench, TestTube, GitCommit, Clock } from "lucide-react";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { AutoBuildIssueCard } from "./AutoBuildIssueCard";
 import { AutoBuildNewIssuePopup } from "./AutoBuildNewIssuePopup";
 import { cn } from "@/lib/utils";
 import type { BeadsIssue, BeadsIssueType } from "@/types/beads";
-import type { AutoBuildSettings } from "@/types/autoBuild";
+import type { AutoBuildSettings, AutoBuildWorker } from "@/types/autoBuild";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { Tooltip } from "@/components/ui";
 import { invoke } from "@tauri-apps/api/core";
@@ -30,8 +30,68 @@ const TYPE_COLORS: Record<BeadsIssueType, string> = {
   epic: "bg-purple-500/20 text-purple-400",
 };
 
+// Worker status bar component
+function WorkerStatusBar({ workers, getCachedIssue }: { workers: AutoBuildWorker[]; getCachedIssue: (id: string) => BeadsIssue | undefined }) {
+  const activeWorkers = workers.filter(w => w.issueId !== null);
+
+  if (activeWorkers.length === 0) return null;
+
+  const getPhaseIcon = (phase: AutoBuildWorker["phase"]) => {
+    switch (phase) {
+      case "working": return <Wrench className="w-3 h-3" />;
+      case "testing": return <TestTube className="w-3 h-3" />;
+      case "fixing": return <Wrench className="w-3 h-3 text-amber-400" />;
+      case "committing": return <GitCommit className="w-3 h-3" />;
+      case "reviewing": return <Eye className="w-3 h-3" />;
+      default: return <Clock className="w-3 h-3" />;
+    }
+  };
+
+  const getElapsedTime = (startTime: number | null) => {
+    if (!startTime) return "";
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    if (elapsed < 60) return `${elapsed}s`;
+    return `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+  };
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-bg-tertiary/50 border-b border-border">
+      <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+        <Users className="w-3.5 h-3.5" />
+        <span>{activeWorkers.length} worker{activeWorkers.length !== 1 ? "s" : ""} active</span>
+      </div>
+      <div className="flex-1 flex items-center gap-2 overflow-x-auto">
+        {activeWorkers.map((worker) => {
+          const issue = worker.issueId ? getCachedIssue(worker.issueId) : null;
+          return (
+            <div
+              key={worker.id}
+              className="flex items-center gap-1.5 px-2 py-1 bg-bg-secondary rounded border border-border text-xs shrink-0"
+            >
+              <span className="font-medium text-accent">W{worker.id + 1}</span>
+              <span className="text-text-secondary">|</span>
+              {getPhaseIcon(worker.phase)}
+              <span className="text-text-primary truncate max-w-[150px]">
+                {issue?.title || worker.issueId?.split("-").pop() || "..."}
+              </span>
+              {worker.startTime && (
+                <span className="text-text-secondary">{getElapsedTime(worker.startTime)}</span>
+              )}
+              {worker.filesModified.length > 0 && (
+                <Tooltip content={`${worker.filesModified.length} files modified`}>
+                  <span className="text-green-400">{worker.filesModified.length}f</span>
+                </Tooltip>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export function AutoBuildKanban({ issues }: AutoBuildKanbanProps) {
-  const { queue, completed, humanReview, currentIssueId, currentPhase, addToQueue, getCachedIssue, cacheIssue, settings, updateSettings, status, projectPath } =
+  const { queue, completed, humanReview, currentIssueId, currentPhase, addToQueue, getCachedIssue, cacheIssue, settings, updateSettings, status, projectPath, workers } =
     useAutoBuildStore();
   const [showNewIssuePopup, setShowNewIssuePopup] = useState(false);
   const [showTestingSettings, setShowTestingSettings] = useState(false);
@@ -48,27 +108,25 @@ export function AutoBuildKanban({ issues }: AutoBuildKanbanProps) {
 
   // Build columns (without Completed - it's now a compact list)
   const columns = useMemo<KanbanColumn[]>(() => {
-    // Backlog: Issues in queue (not current)
+    // Get all issue IDs being worked on by workers
+    const workingIssueIds = new Set(workers.filter(w => w.issueId && w.phase === "working").map(w => w.issueId!));
+    const testingIssueIds = new Set(workers.filter(w => w.issueId && (w.phase === "testing" || w.phase === "fixing" || w.phase === "committing")).map(w => w.issueId!));
+
+    // Backlog: Issues in queue (not being worked on)
     const backlogIssues = queue
-      .filter((id) => id !== currentIssueId)
+      .filter((id) => !workingIssueIds.has(id) && !testingIssueIds.has(id))
       .map((id) => issues.find((i) => i.id === id) || getCachedIssue(id))
       .filter((i): i is BeadsIssue => !!i);
 
-    // Doing: Current issue in working phase
-    const doingIssues =
-      currentIssueId && currentPhase === "working"
-        ? [issues.find((i) => i.id === currentIssueId) || getCachedIssue(currentIssueId)].filter(
-            (i): i is BeadsIssue => !!i
-          )
-        : [];
+    // Doing: All issues in working phase across all workers
+    const doingIssues = Array.from(workingIssueIds)
+      .map((id) => issues.find((i) => i.id === id) || getCachedIssue(id))
+      .filter((i): i is BeadsIssue => !!i);
 
-    // Testing: Current issue in testing/fixing/committing phase
-    const testingIssues =
-      currentIssueId && (currentPhase === "testing" || currentPhase === "fixing" || currentPhase === "committing")
-        ? [issues.find((i) => i.id === currentIssueId) || getCachedIssue(currentIssueId)].filter(
-            (i): i is BeadsIssue => !!i
-          )
-        : [];
+    // Testing: All issues in testing/fixing/committing phase across all workers
+    const testingIssues = Array.from(testingIssueIds)
+      .map((id) => issues.find((i) => i.id === id) || getCachedIssue(id))
+      .filter((i): i is BeadsIssue => !!i);
 
     // Human Review: Issues awaiting approval
     const reviewIssues = humanReview
@@ -109,7 +167,7 @@ export function AutoBuildKanban({ issues }: AutoBuildKanbanProps) {
         emptyMessage: "No reviews pending",
       },
     ];
-  }, [queue, humanReview, currentIssueId, currentPhase, issues, getCachedIssue]);
+  }, [queue, humanReview, workers, issues, getCachedIssue]);
 
   // Completed issues for compact list
   const completedIssues = useMemo(() => {
@@ -134,6 +192,10 @@ export function AutoBuildKanban({ issues }: AutoBuildKanbanProps) {
 
   return (
     <>
+      {/* Worker Status Bar - shows when workers are active */}
+      {status === "running" && workers.length > 0 && (
+        <WorkerStatusBar workers={workers} getCachedIssue={getCachedIssue} />
+      )}
       <div className="flex h-full gap-4">
         {columns.map((column) => (
           <div
@@ -378,6 +440,26 @@ function TestingSettingsPopup({ settings, onUpdate, onClose }: TestingSettingsPo
 
       {/* Popup */}
       <div className="absolute left-2 right-2 top-12 z-20 rounded-lg border border-border bg-bg-primary p-3 shadow-xl">
+        {/* Concurrent Workers */}
+        <div className="mb-3">
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Concurrent Workers</div>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={1}
+              max={10}
+              value={settings.maxConcurrentIssues}
+              onChange={(e) => onUpdate({ maxConcurrentIssues: parseInt(e.target.value) })}
+              className="flex-1 h-1.5 rounded bg-bg-tertiary accent-accent cursor-pointer"
+            />
+            <span className="w-6 text-center text-sm font-medium">{settings.maxConcurrentIssues}</span>
+          </div>
+          <div className="mt-1 text-xs text-text-secondary">
+            {settings.maxConcurrentIssues === 1 ? "Sequential mode" : `Up to ${settings.maxConcurrentIssues} issues at once`}
+          </div>
+        </div>
+
+        {/* Verification Steps */}
         <div className="mb-2 text-xs font-medium text-text-secondary">Verification Steps</div>
         <div className="flex flex-col gap-2">
           <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-bg-secondary">
@@ -407,6 +489,22 @@ function TestingSettingsPopup({ settings, onUpdate, onClose }: TestingSettingsPo
             />
             <span>Run Build</span>
           </label>
+        </div>
+
+        {/* Smart Test Attribution */}
+        <div className="mt-3 pt-3 border-t border-border">
+          <label className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-sm transition-colors hover:bg-bg-secondary">
+            <input
+              type="checkbox"
+              checked={settings.ignoreUnrelatedFailures}
+              onChange={(e) => onUpdate({ ignoreUnrelatedFailures: e.target.checked })}
+              className="h-3.5 w-3.5 rounded border-border bg-bg-secondary accent-accent"
+            />
+            <span>Ignore unrelated failures</span>
+          </label>
+          <div className="px-2 mt-1 text-xs text-text-secondary">
+            Skip test/build errors not related to modified files
+          </div>
         </div>
       </div>
     </>

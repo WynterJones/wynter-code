@@ -37,6 +37,14 @@ interface AutoBuildActions {
   stop: () => void;
   skipCurrent: () => void;
 
+  // Worker Management
+  initializeWorkers: () => void;
+  getNextIssueForWorker: (workerId: number) => string | null;
+  updateWorker: (workerId: number, updates: Partial<AutoBuildWorker>) => void;
+  markWorkerIdle: (workerId: number) => void;
+  startFileCoordinator: () => Promise<void>;
+  stopFileCoordinator: () => Promise<void>;
+
   // Internal
   setStatus: (status: AutoBuildStatus) => void;
   setPhase: (phase: AutoBuildPhase) => void;
@@ -69,10 +77,12 @@ interface AutoBuildActions {
 
   // Agent Loop
   runAgentLoop: () => Promise<void>;
+  runWorker: (workerId: number) => Promise<void>;
+  processIssue: (workerId: number, issueId: string) => Promise<boolean>;
   executeWork: (issueId: string) => Promise<AutoBuildResult>;
-  executeStreamingWork: (issueId: string, fixMode?: boolean, errors?: string) => Promise<boolean>;
-  runVerification: () => Promise<VerificationResult>;
-  runFixLoop: (issueId: string, errors: string) => Promise<boolean>;
+  executeStreamingWork: (issueId: string, fixMode?: boolean, errors?: string, workerId?: number) => Promise<boolean>;
+  runVerification: (issueId?: string, filesModified?: string[]) => Promise<VerificationResult>;
+  runFixLoop: (issueId: string, errors: string, workerId?: number) => Promise<boolean>;
   commitChanges: (issueId: string) => Promise<void>;
   closeIssue: (issueId: string, reason: string) => Promise<void>;
   markBlocked: (issueId: string) => Promise<void>;
@@ -181,15 +191,23 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
 
   // Agent Control
   start: async () => {
-    const { status, queue, runAgentLoop, addLog, saveSession } = get();
+    const { status, queue, settings, runAgentLoop, addLog, saveSession, initializeWorkers, startFileCoordinator } = get();
     if (status === "running") return;
     if (queue.length === 0) {
       addLog("warning", "No issues in queue");
       return;
     }
 
+    // Start file coordinator for concurrent mode
+    if (settings.maxConcurrentIssues > 1) {
+      await startFileCoordinator();
+    }
+
+    // Initialize worker pool
+    initializeWorkers();
+
     set({ status: "running", retryCount: 0 });
-    addLog("info", `Starting Auto Build with ${queue.length} issues`);
+    addLog("info", `Starting Auto Build with ${queue.length} issues (${settings.maxConcurrentIssues} concurrent workers)`);
     await saveSession();
     await runAgentLoop();
   },
@@ -219,16 +237,93 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
   },
 
   stop: () => {
-    const { addLog, clearSession } = get();
+    const { addLog, clearSession, stopFileCoordinator } = get();
     set({
       status: "idle",
       currentIssueId: null,
       currentPhase: null,
       progress: 0,
       retryCount: 0,
+      workers: [],
     });
     addLog("info", "Stopped Auto Build");
+    stopFileCoordinator();
     clearSession();
+  },
+
+  // Worker Management
+  initializeWorkers: () => {
+    const { settings } = get();
+    const workers: AutoBuildWorker[] = [];
+    for (let i = 0; i < settings.maxConcurrentIssues; i++) {
+      workers.push(createWorker(i));
+    }
+    set({ workers });
+  },
+
+  getNextIssueForWorker: (workerId: number) => {
+    const { queue, workers, issueCache } = get();
+
+    // Get issues currently being worked on by other workers
+    const activeIssueIds = new Set(
+      workers
+        .filter(w => w.id !== workerId && w.issueId !== null)
+        .map(w => w.issueId)
+    );
+
+    // Sort queue by phase
+    const sortedQueue = sortQueueByPhase(queue, issueCache);
+
+    // Find first available issue not being worked on
+    for (const issueId of sortedQueue) {
+      if (!activeIssueIds.has(issueId)) {
+        return issueId;
+      }
+    }
+    return null;
+  },
+
+  updateWorker: (workerId, updates) => {
+    const { workers } = get();
+    const newWorkers = workers.map(w =>
+      w.id === workerId ? { ...w, ...updates } : w
+    );
+    set({ workers: newWorkers });
+  },
+
+  markWorkerIdle: (workerId) => {
+    const { updateWorker } = get();
+    updateWorker(workerId, {
+      issueId: null,
+      phase: null,
+      streamingState: null,
+      retryCount: 0,
+      filesModified: [],
+      startTime: null,
+    });
+  },
+
+  startFileCoordinator: async () => {
+    try {
+      const port = await invoke<number>("start_file_coordinator_server");
+      set({ fileCoordinatorPort: port });
+      get().addLog("info", `File coordinator started on port ${port}`);
+    } catch (err) {
+      get().addLog("warning", `File coordinator failed: ${err}`);
+      // Continue without file coordinator - single worker fallback
+    }
+  },
+
+  stopFileCoordinator: async () => {
+    const { fileCoordinatorPort } = get();
+    if (fileCoordinatorPort) {
+      try {
+        await invoke("stop_file_coordinator_server");
+        set({ fileCoordinatorPort: null });
+      } catch (err) {
+        console.error("Failed to stop file coordinator:", err);
+      }
+    }
   },
 
   skipCurrent: () => {
@@ -502,13 +597,76 @@ Last Updated: ${progress.lastUpdated}
     }
   },
 
-  // Agent Loop (with streaming and Human Review support)
+  // Agent Loop - Concurrent Worker Pool
   runAgentLoop: async () => {
+    const { settings, addLog, runWorker, saveSession, stopFileCoordinator } = get();
+
+    // Spawn workers concurrently
+    const activeWorkerCount = Math.min(settings.maxConcurrentIssues, get().queue.length);
+    const workerPromises: Promise<void>[] = [];
+
+    for (let i = 0; i < activeWorkerCount; i++) {
+      workerPromises.push(runWorker(i));
+    }
+
+    // Wait for all workers to complete
+    await Promise.all(workerPromises);
+
+    // Cleanup
+    await stopFileCoordinator();
+
+    // Finished all issues in queue (some may be in human review)
+    if (get().status === "running") {
+      const { humanReview } = get();
+      if (humanReview.length > 0) {
+        set({ status: "paused", currentIssueId: null, currentPhase: null, workers: [] });
+        addLog("info", `Queue complete. ${humanReview.length} issue(s) awaiting review`);
+      } else {
+        set({ status: "idle", currentIssueId: null, currentPhase: null, workers: [] });
+        addLog("success", "All issues completed");
+        get().clearSession();
+      }
+    }
+    await saveSession();
+  },
+
+  // Run a single worker - loops picking issues until queue is empty
+  runWorker: async (workerId: number) => {
+    const { getNextIssueForWorker, processIssue, markWorkerIdle, addLog, saveSession } = get();
+
+    while (get().status === "running") {
+      const issueId = getNextIssueForWorker(workerId);
+
+      if (!issueId) {
+        // No more issues available for this worker
+        markWorkerIdle(workerId);
+        break;
+      }
+
+      addLog("info", `Worker ${workerId + 1} picked up issue`, issueId);
+
+      const success = await processIssue(workerId, issueId);
+
+      if (!success) {
+        addLog("warning", `Worker ${workerId + 1} failed to complete issue`, issueId);
+      }
+
+      // Check if paused
+      if (get().status === "paused") {
+        await saveSession();
+        return;
+      }
+    }
+
+    markWorkerIdle(workerId);
+  },
+
+  // Process a single issue with a specific worker
+  processIssue: async (workerId: number, issueId: string) => {
     const {
       settings,
       addLog,
-      setPhase,
-      setProgress,
+      updateWorker,
       executeStreamingWork,
       runVerification,
       runFixLoop,
@@ -520,150 +678,125 @@ Last Updated: ${progress.lastUpdated}
       getCachedIssue,
     } = get();
 
-    while (get().status === "running" && get().queue.length > 0) {
-      const currentQueue = get().queue;
-      const issueId = currentQueue[0];
+    const issue = getCachedIssue(issueId);
 
-      set({ currentIssueId: issueId, retryCount: 0, progress: 0 });
+    // Update worker state
+    updateWorker(workerId, {
+      issueId,
+      phase: "working",
+      startTime: Date.now(),
+      retryCount: 0,
+      filesModified: [],
+    });
 
-      const issue = getCachedIssue(issueId);
-      addLog("info", `Starting: ${issue?.title || issueId}`, issueId);
+    // Also update legacy single-worker state for UI compatibility
+    set({ currentIssueId: issueId, currentPhase: "working", progress: 10 });
 
+    addLog("info", `Starting: ${issue?.title || issueId}`, issueId);
+    await saveSession();
+
+    try {
       // Phase 1: Working (with streaming)
-      setPhase("working");
-      setProgress(10);
-      await saveSession();
+      const workSuccess = await executeStreamingWork(issueId, false, undefined, workerId);
 
-      try {
-        const workSuccess = await executeStreamingWork(issueId);
+      if (!workSuccess) {
+        addLog("error", "Work phase failed", issueId);
+        await markBlocked(issueId);
+        set({ queue: get().queue.filter((id) => id !== issueId) });
+        return false;
+      }
 
-        if (!workSuccess) {
-          addLog("error", "Work phase failed", issueId);
-          await markBlocked(issueId);
-          set({
-            queue: get().queue.filter((id) => id !== issueId),
-            currentIssueId: null,
-            currentPhase: null,
-            retryCount: 0,
-          });
-          continue;
-        }
+      // Phase 2: Testing with fix loop
+      updateWorker(workerId, { phase: "testing" });
+      set({ currentPhase: "testing", progress: 50 });
+      addLog("info", "Running verification", issueId);
 
-        setProgress(50);
+      // Get files modified by this worker for test attribution
+      const worker = get().workers.find(w => w.id === workerId);
+      const filesModified = worker?.filesModified || [];
 
-        // Phase 2: Testing with fix loop
-        setPhase("testing");
-        addLog("info", "Running verification", issueId);
+      let testsPass = false;
+      let fixAttempts = 0;
 
-        let testsPass = false;
-        let fixAttempts = 0;
+      while (!testsPass && fixAttempts <= settings.maxRetries) {
+        const verification = await runVerification(issueId, filesModified);
 
-        while (!testsPass && fixAttempts <= settings.maxRetries) {
-          const verification = await runVerification();
+        if (verification.success) {
+          testsPass = true;
+          addLog("success", "All verification passed", issueId);
+        } else {
+          // Build error string for fix attempt
+          const errors: string[] = [];
+          if (!verification.lint.success) errors.push(`Lint errors:\n${verification.lint.output}`);
+          if (!verification.tests.success) errors.push(`Test failures:\n${verification.tests.output}`);
+          if (!verification.build.success) errors.push(`Build errors:\n${verification.build.output}`);
+          const errorString = errors.join("\n\n");
 
-          if (verification.success) {
-            testsPass = true;
-            addLog("success", "All verification passed", issueId);
-          } else {
-            // Build error string for fix attempt
-            const errors: string[] = [];
-            if (!verification.lint.success) errors.push(`Lint errors:\n${verification.lint.output}`);
-            if (!verification.tests.success) errors.push(`Test failures:\n${verification.tests.output}`);
-            if (!verification.build.success) errors.push(`Build errors:\n${verification.build.output}`);
-            const errorString = errors.join("\n\n");
+          if (fixAttempts < settings.maxRetries) {
+            fixAttempts++;
+            addLog("warning", `Verification failed, attempting fix (${fixAttempts}/${settings.maxRetries})`, issueId);
 
-            if (fixAttempts < settings.maxRetries) {
-              fixAttempts++;
-              addLog("warning", `Verification failed, attempting fix (${fixAttempts}/${settings.maxRetries})`, issueId);
+            updateWorker(workerId, { phase: "fixing", retryCount: fixAttempts });
+            set({ currentPhase: "fixing" });
 
-              // Phase: Fixing
-              setPhase("fixing");
-              const fixed = await runFixLoop(issueId, errorString);
+            const fixed = await runFixLoop(issueId, errorString, workerId);
 
-              if (!fixed) {
-                addLog("error", "Fix attempt failed", issueId);
-                break;
-              }
-
-              setPhase("testing");
-            } else {
-              addLog("error", "Verification failed after max fix attempts", issueId);
+            if (!fixed) {
+              addLog("error", "Fix attempt failed", issueId);
               break;
             }
+
+            updateWorker(workerId, { phase: "testing" });
+            set({ currentPhase: "testing" });
+          } else {
+            addLog("error", "Verification failed after max fix attempts", issueId);
+            break;
           }
         }
+      }
 
-        if (!testsPass) {
-          await markBlocked(issueId);
-          set({
-            queue: get().queue.filter((id) => id !== issueId),
-            currentIssueId: null,
-            currentPhase: null,
-            retryCount: 0,
-          });
-          continue;
-        }
-
-        setProgress(80);
-
-        // Phase 3: Commit (if not requiring human review)
-        if (!settings.requireHumanReview && settings.autoCommit) {
-          setPhase("committing");
-          addLog("info", "Committing changes", issueId);
-          await commitChanges(issueId);
-        }
-
-        setProgress(90);
-
-        // Phase 4: Human Review or Complete
-        if (settings.requireHumanReview) {
-          moveToReview(issueId);
-          addLog("info", `Awaiting human review: ${issue?.title || issueId}`, issueId);
-        } else {
-          // Auto-complete
-          await closeIssue(issueId, "Completed by Auto Build");
-          addLog("success", `Completed: ${issue?.title || issueId}`, issueId);
-
-          set({
-            queue: get().queue.filter((id) => id !== issueId),
-            completed: [...get().completed.slice(-9), issueId],
-            currentIssueId: null,
-            currentPhase: null,
-            progress: 100,
-            retryCount: 0,
-          });
-        }
-
-        await saveSession();
-      } catch (err) {
-        addLog("error", `Error: ${err}`, issueId);
+      if (!testsPass) {
         await markBlocked(issueId);
+        set({ queue: get().queue.filter((id) => id !== issueId) });
+        return false;
+      }
+
+      set({ progress: 80 });
+
+      // Phase 3: Commit (if not requiring human review)
+      if (!settings.requireHumanReview && settings.autoCommit) {
+        updateWorker(workerId, { phase: "committing" });
+        set({ currentPhase: "committing" });
+        addLog("info", "Committing changes", issueId);
+        await commitChanges(issueId);
+      }
+
+      set({ progress: 90 });
+
+      // Phase 4: Human Review or Complete
+      if (settings.requireHumanReview) {
+        updateWorker(workerId, { phase: "reviewing" });
+        moveToReview(issueId);
+        addLog("info", `Awaiting human review: ${issue?.title || issueId}`, issueId);
+      } else {
+        // Auto-complete
+        await closeIssue(issueId, "Completed by Auto Build");
+        addLog("success", `Completed: ${issue?.title || issueId}`, issueId);
+
         set({
           queue: get().queue.filter((id) => id !== issueId),
-          currentIssueId: null,
-          currentPhase: null,
-          retryCount: 0,
+          completed: [...get().completed.slice(-9), issueId],
+          progress: 100,
         });
       }
 
-      // Check if paused
-      if (get().status === "paused") {
-        await saveSession();
-        return;
-      }
-    }
-
-    // Finished all issues in queue (some may be in human review)
-    if (get().status === "running") {
-      const { humanReview } = get();
-      if (humanReview.length > 0) {
-        set({ status: "paused", currentIssueId: null, currentPhase: null });
-        addLog("info", `Queue complete. ${humanReview.length} issue(s) awaiting review`);
-      } else {
-        set({ status: "idle", currentIssueId: null, currentPhase: null });
-        addLog("success", "All issues completed");
-        get().clearSession();
-      }
+      await saveSession();
+      return true;
+    } catch (err) {
+      addLog("error", `Error: ${err}`, issueId);
+      await markBlocked(issueId);
+      set({ queue: get().queue.filter((id) => id !== issueId) });
+      return false;
     }
   },
 
@@ -700,8 +833,8 @@ Last Updated: ${progress.lastUpdated}
   },
 
   // Streaming work execution using Claude CLI stream-json mode
-  executeStreamingWork: async (issueId, fixMode = false, errors) => {
-    const { projectPath, getCachedIssue, addLog, setStreamingState, updateStreamingAction, loadSiloContext } = get();
+  executeStreamingWork: async (issueId, fixMode = false, errors, workerId) => {
+    const { projectPath, getCachedIssue, addLog, setStreamingState, updateStreamingAction, loadSiloContext, fileCoordinatorPort, settings, updateWorker } = get();
 
     if (!projectPath) {
       addLog("error", "No project path", issueId);
@@ -719,6 +852,26 @@ Last Updated: ${progress.lastUpdated}
     // Load existing SILO context
     const siloContext = await loadSiloContext(issueId);
 
+    // File coordinator instructions for concurrent mode
+    const fileCoordinatorInstructions = fileCoordinatorPort && settings.maxConcurrentIssues > 1
+      ? `
+IMPORTANT - FILE COORDINATION:
+Multiple issues are being worked on concurrently. To prevent file conflicts, you MUST use the file coordinator MCP before editing any file:
+
+1. Before editing a file, acquire a lock:
+   - Use the acquire_file_lock tool with the file path and issue_id "${issueId}"
+   - If the lock is held by another issue, wait 10 seconds and retry
+   - Only proceed with editing after you have the lock
+
+2. After you're done with a file, release the lock:
+   - Use the release_file_lock tool with the file path and your lock_id
+
+3. You can check file status with check_file_status
+
+The file coordinator server is running on port ${fileCoordinatorPort}.
+`
+      : "";
+
     // Build prompt based on mode
     let prompt: string;
     if (fixMode && errors) {
@@ -726,7 +879,7 @@ Last Updated: ${progress.lastUpdated}
 
 Issue: ${issue.title}
 Type: ${issue.issue_type}
-
+${fileCoordinatorInstructions}
 ${siloContext ? `Previous context from _SILO file:\n${siloContext}\n` : ""}
 
 Verification failed with:
@@ -738,7 +891,7 @@ Please fix the issues and ensure lint/tests/build pass. Do NOT commit - I will h
 Type: ${issue.issue_type}
 Title: ${issue.title}
 Description: ${issue.description || "No description provided"}
-
+${fileCoordinatorInstructions}
 ${siloContext ? `Previous context:\n${siloContext}` : "No previous context."}
 
 Please:
@@ -749,6 +902,9 @@ Please:
 
 When done, your last message should confirm what was completed.`;
     }
+
+    // Track files modified by this worker
+    const filesModified: string[] = [];
 
     // Set up streaming state
     setStreamingState({
@@ -789,6 +945,15 @@ When done, your last message should confirm what was completed.`;
                   const path = String(input.file_path);
                   const filename = path.split("/").pop() || path;
                   action = `${toolName}: ${filename}`;
+
+                  // Track file modifications for test attribution
+                  if ((toolName === "Edit" || toolName === "Write") && !filesModified.includes(path)) {
+                    filesModified.push(path);
+                    // Update worker's filesModified array
+                    if (workerId !== undefined) {
+                      updateWorker(workerId, { filesModified: [...filesModified] });
+                    }
+                  }
                 } else if (input.command) {
                   const cmd = String(input.command).slice(0, 30);
                   action = `${toolName}: ${cmd}...`;
@@ -857,12 +1022,12 @@ When done, your last message should confirm what was completed.`;
   },
 
   // Run fix loop - invoke Claude to fix test/lint/build failures
-  runFixLoop: async (issueId, errors) => {
+  runFixLoop: async (issueId, errors, workerId) => {
     const { executeStreamingWork } = get();
-    return executeStreamingWork(issueId, true, errors);
+    return executeStreamingWork(issueId, true, errors, workerId);
   },
 
-  runVerification: async () => {
+  runVerification: async (issueId, filesModified) => {
     const { projectPath, settings, addLog } = get();
     if (!projectPath) {
       return {
@@ -881,17 +1046,61 @@ When done, your last message should confirm what was completed.`;
         runBuild: settings.runBuild,
       });
 
+      // Smart test attribution: Check if failures are related to files we modified
+      const isFailureRelated = (output: string): boolean => {
+        if (!filesModified || filesModified.length === 0) return true; // Can't attribute, assume related
+        if (!settings.ignoreUnrelatedFailures) return true; // Feature disabled
+
+        // Check if any modified file appears in the error output
+        for (const file of filesModified) {
+          const filename = file.split("/").pop() || file;
+          if (output.includes(filename) || output.includes(file)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // Adjust results based on test attribution
+      let adjustedResult = { ...result };
+
       if (settings.runLint) {
-        addLog(result.lint.success ? "success" : "error", `Lint: ${result.lint.success ? "passed" : "failed"}`);
-      }
-      if (settings.runTests) {
-        addLog(result.tests.success ? "success" : "error", `Tests: ${result.tests.success ? "passed" : "failed"}`);
-      }
-      if (settings.runBuild) {
-        addLog(result.build.success ? "success" : "error", `Build: ${result.build.success ? "passed" : "failed"}`);
+        if (result.lint.success) {
+          addLog("success", "Lint: passed", issueId);
+        } else if (!isFailureRelated(result.lint.output)) {
+          addLog("warning", "Lint: failed (unrelated to this issue - ignoring)", issueId);
+          adjustedResult.lint = { success: true, output: result.lint.output };
+        } else {
+          addLog("error", "Lint: failed", issueId);
+        }
       }
 
-      return result;
+      if (settings.runTests) {
+        if (result.tests.success) {
+          addLog("success", "Tests: passed", issueId);
+        } else if (!isFailureRelated(result.tests.output)) {
+          addLog("warning", "Tests: failed (unrelated to this issue - ignoring)", issueId);
+          adjustedResult.tests = { success: true, output: result.tests.output };
+        } else {
+          addLog("error", "Tests: failed", issueId);
+        }
+      }
+
+      if (settings.runBuild) {
+        if (result.build.success) {
+          addLog("success", "Build: passed", issueId);
+        } else if (!isFailureRelated(result.build.output)) {
+          addLog("warning", "Build: failed (unrelated to this issue - ignoring)", issueId);
+          adjustedResult.build = { success: true, output: result.build.output };
+        } else {
+          addLog("error", "Build: failed", issueId);
+        }
+      }
+
+      // Recalculate overall success
+      adjustedResult.success = adjustedResult.lint.success && adjustedResult.tests.success && adjustedResult.build.success;
+
+      return adjustedResult;
     } catch (err) {
       return {
         success: false,

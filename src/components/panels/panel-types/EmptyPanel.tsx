@@ -1,4 +1,4 @@
-import { MessageSquare, Terminal, FolderOpen, FileCode, FileText, Globe, Youtube } from "lucide-react";
+import { MessageSquare, Terminal, FolderOpen, FileCode, FileText, Tractor, Globe, Youtube } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps, PanelType } from "@/types/panel";
 
@@ -32,6 +32,12 @@ const PANEL_OPTIONS: { type: PanelType; name: string; icon: React.ComponentType<
     name: "Markdown",
     icon: FileText,
     description: "View & edit .md",
+  },
+  {
+    type: "farmwork-stats",
+    name: "Farmwork",
+    icon: Tractor,
+    description: "Project stats & audits",
   },
   {
     type: "browser-preview",
