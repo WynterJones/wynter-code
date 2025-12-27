@@ -31,11 +31,13 @@ export function BrowserPreviewPanel({
   onPanelUpdate,
 }: PanelContentProps) {
   const [inputUrl, setInputUrl] = useState(panel.browserUrl || DEFAULT_URL);
-  const [isLoading, setIsLoading] = useState(false);
+  // Start as loading if we have a URL to load
+  const [isLoading, setIsLoading] = useState(!!panel.browserUrl);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadTimeout, setLoadTimeout] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isCorsError, setIsCorsError] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -68,6 +70,7 @@ export function BrowserPreviewPanel({
     setIsBlocked(false);
     setIsCorsError(false);
     setIsLoading(true);
+    setHasLoaded(false);
     onPanelUpdate({ browserUrl: url, title: new URL(url).hostname });
   }, [inputUrl, onPanelUpdate]);
 
@@ -87,6 +90,7 @@ export function BrowserPreviewPanel({
       setLoadTimeout(false);
       setIsBlocked(false);
       setIsCorsError(false);
+      setHasLoaded(false);
       iframeRef.current.src = currentUrl;
     }
   }, [currentUrl]);
@@ -100,6 +104,7 @@ export function BrowserPreviewPanel({
   const handleIframeLoad = useCallback(() => {
     setIsLoading(false);
     setLoadTimeout(false);
+    setHasLoaded(true);
     // Clear the timeout since we loaded successfully
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -328,9 +333,10 @@ export function BrowserPreviewPanel({
       </div>
 
       {/* iframe container */}
-      <div className="flex-1 overflow-hidden bg-white relative">
+      <div className="flex-1 overflow-hidden bg-bg-secondary relative">
+        {/* Always show a loading indicator while iframe is loading */}
         {isLoading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-bg-secondary/90 z-10 gap-3">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-bg-secondary z-10 gap-3">
             <RefreshCw className="w-6 h-6 animate-spin text-accent" />
             <span className="text-xs text-text-secondary">Loading...</span>
             {loadTimeout && (
@@ -436,7 +442,11 @@ export function BrowserPreviewPanel({
         <iframe
           ref={iframeRef}
           src={currentUrl}
-          className="w-full h-full border-0"
+          className={cn(
+            "w-full h-full border-0",
+            // Hide iframe until it has loaded to prevent white flash
+            !hasLoaded && "opacity-0"
+          )}
           onLoad={handleIframeLoad}
           onError={handleIframeError}
           sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-modals allow-top-navigation-by-user-activation"

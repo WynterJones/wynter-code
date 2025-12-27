@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "@/lib/storageUtils";
+import { useDragStore } from "@/stores/dragStore";
 import type { FileNode } from "@/types";
 import {
   type GitStatusMap,
@@ -37,6 +38,8 @@ export function FileTreeNode({
 }: FileTreeNodeProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const startDrag = useDragStore((s) => s.startDrag);
+  const cancelDrag = useDragStore((s) => s.cancelDrag);
 
   const isSelected = selectedPaths?.has(node.path) ?? false;
 
@@ -100,13 +103,32 @@ export function FileTreeNode({
 
   const handleDragStart = (e: React.DragEvent) => {
     e.stopPropagation();
-    e.dataTransfer.setData("application/x-wynter-file", JSON.stringify({
+    const fileInfo = {
       path: node.path,
       name: node.name,
       isDirectory: node.isDirectory
-    }));
-    e.dataTransfer.effectAllowed = "move";
+    };
+
+    // Set HTML5 drag data (for internal folder moves)
+    e.dataTransfer.setData("application/x-wynter-file", JSON.stringify(fileInfo));
+    e.dataTransfer.effectAllowed = "copyMove";
+
+    // Also store in global drag store (for cross-component drops)
+    startDrag(fileInfo);
   };
+
+  // Cancel drag on mouseup if drag was started but not dropped on valid target
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      // Small delay to allow drop handlers to run first
+      setTimeout(() => {
+        cancelDrag();
+      }, 100);
+    };
+
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+  }, [cancelDrag]);
 
   const handleDragOver = (e: React.DragEvent) => {
     if (!node.isDirectory) return;

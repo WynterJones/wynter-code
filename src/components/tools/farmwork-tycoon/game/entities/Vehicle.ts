@@ -230,9 +230,11 @@ export class VehicleSprite extends Container {
 
     const carryingChanged = this.isCarrying !== data.carrying;
 
-    // Preserve the current path and pathIndex - don't let store sync overwrite them
+    // Preserve sprite-local state that the store doesn't track
     const currentPath = this.data.path;
     const currentPathIndex = this.data.pathIndex;
+    const currentTask = this.data.task;
+    const currentRouteIndex = this.data.currentRouteIndex;
 
     this.data = data;
 
@@ -241,6 +243,11 @@ export class VehicleSprite extends Container {
       this.data.path = currentPath;
       this.data.pathIndex = currentPathIndex;
     }
+
+    // Preserve task and route index - these are managed by the sprite, not the store
+    // This prevents "exiting" vehicles from being reset to "entering" and re-routed
+    this.data.task = currentTask;
+    this.data.currentRouteIndex = currentRouteIndex;
 
     this.position.set(data.position.x, data.position.y);
     this.isCarrying = data.carrying;

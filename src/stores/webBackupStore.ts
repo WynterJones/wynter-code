@@ -13,6 +13,24 @@ import type {
   BackupConnectionStatus,
 } from "@/types/webBackup";
 
+/**
+ * Fix corrupted siteUrl that may have been saved as a deploy object instead of a string
+ */
+function fixCorruptedSiteUrl(siteUrl: unknown): string | null {
+  if (siteUrl === null || siteUrl === undefined) return null;
+  if (typeof siteUrl === "string") return siteUrl;
+
+  // If it's an object (corrupted deploy response), extract the URL
+  if (typeof siteUrl === "object" && siteUrl !== null) {
+    const obj = siteUrl as Record<string, unknown>;
+    if (typeof obj.ssl_url === "string") return obj.ssl_url;
+    if (typeof obj.deploy_ssl_url === "string") return obj.deploy_ssl_url;
+    if (typeof obj.url === "string") return obj.url;
+  }
+
+  return null;
+}
+
 export const useWebBackupStore = create<WebBackupStore>()(
   persist(
     (set, get) => ({
@@ -291,6 +309,15 @@ export const useWebBackupStore = create<WebBackupStore>()(
         autoBackupInterval: state.autoBackupInterval,
         backupOnClose: state.backupOnClose,
       }),
+      // Fix corrupted siteUrl on load (may have been saved as deploy object)
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          const fixedUrl = fixCorruptedSiteUrl(state.siteUrl);
+          if (fixedUrl !== state.siteUrl) {
+            state.siteUrl = fixedUrl;
+          }
+        }
+      },
     }
   )
 );

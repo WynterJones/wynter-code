@@ -13,6 +13,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { IconButton } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useSessionStore } from "@/stores/sessionStore";
+import { useDragStore } from "@/stores/dragStore";
 import { FocusOverlay } from "./FocusOverlay";
 import { ImageThumbnails, type ImageAttachment } from "./ImageThumbnail";
 import { FileTagBadges, type FileReference } from "./FileTagBadge";
@@ -90,6 +91,81 @@ export function EnhancedPromptInput({
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragCounterRef = useRef(0);
+
+  // Global drag store for cross-component drag-drop
+  const globalIsDragging = useDragStore((s) => s.isDragging);
+  const endDrag = useDragStore((s) => s.endDrag);
+
+  // Attach file immediately when dragged over the dropzone (instant UX)
+  const handleDragDrop = useCallback(async () => {
+    const fileInfo = endDrag();
+    if (!fileInfo) return;
+
+    // Focus the input after attaching
+    setTimeout(() => inputRef.current?.focus(), 0);
+
+    // Handle the dropped file
+    if (fileInfo.isDirectory) {
+      const parts = fileInfo.path.split("/");
+      const displayPath =
+        parts.length > 3
+          ? `${parts[0]}/.../${parts.slice(-2).join("/")}/`
+          : fileInfo.path + "/";
+
+      setFiles((prev) => [
+        ...prev,
+        {
+          id: uuid(),
+          path: fileInfo.path,
+          displayPath,
+        },
+      ]);
+      return;
+    }
+
+    if (isImageFile(fileInfo.name)) {
+      try {
+        const base64 = await invoke<string>("read_file_base64", {
+          path: fileInfo.path,
+        });
+        const mimeType = getMimeType(fileInfo.name);
+        setImages((prev) => [
+          ...prev,
+          {
+            id: uuid(),
+            data: `data:${mimeType};base64,${base64}`,
+            mimeType,
+            name: fileInfo.name,
+          },
+        ]);
+      } catch (error) {
+        console.error("Error reading image:", error);
+      }
+    } else {
+      const parts = fileInfo.path.split("/");
+      const displayPath =
+        parts.length > 3
+          ? `${parts[0]}/.../${parts.slice(-2).join("/")}`
+          : fileInfo.path;
+
+      setFiles((prev) => [
+        ...prev,
+        {
+          id: uuid(),
+          path: fileInfo.path,
+          displayPath,
+        },
+      ]);
+    }
+  }, [endDrag]);
+
+  // Auto-attach when mouse enters dropzone while dragging
+  const handleMouseEnter = useCallback(() => {
+    if (globalIsDragging) {
+      handleDragDrop();
+    }
+  }, [globalIsDragging, handleDragDrop]);
 
   const {
     addMessage,
@@ -156,18 +232,35 @@ export function EnhancedPromptInput({
     }
   }, []);
 
+  const handleDragEnter = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (dragCounterRef.current === 1) {
+      setIsDragging(true);
+    }
+  }, []);
+
   const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(true);
+    e.stopPropagation();
+    // Set dropEffect to show it's a valid drop target
+    e.dataTransfer.dropEffect = "copy";
   }, []);
 
   const handleDragLeave = useCallback((e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(false);
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
   }, []);
 
   const handleDrop = useCallback(async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
     setIsDragging(false);
 
     // Check for internal file drag from sidebar FileTree
@@ -180,7 +273,24 @@ export function EnhancedPromptInput({
           isDirectory: boolean;
         };
 
-        if (fileInfo.isDirectory) return; // Don't handle directories
+        // Handle directories as file references (Claude can read directory contents)
+        if (fileInfo.isDirectory) {
+          const parts = fileInfo.path.split("/");
+          const displayPath =
+            parts.length > 3
+              ? `${parts[0]}/.../${parts.slice(-2).join("/")}/`
+              : fileInfo.path + "/";
+
+          setFiles((prev) => [
+            ...prev,
+            {
+              id: uuid(),
+              path: fileInfo.path,
+              displayPath,
+            },
+          ]);
+          return;
+        }
 
         if (isImageFile(fileInfo.name)) {
           // Read image as base64 via Tauri
@@ -226,6 +336,7 @@ export function EnhancedPromptInput({
 
     for (const file of droppedFiles) {
       if (file.type.startsWith("image/")) {
+        // Handle images by reading as base64
         const reader = new FileReader();
         reader.onload = (event) => {
           const data = event.target?.result as string;
@@ -240,6 +351,22 @@ export function EnhancedPromptInput({
           ]);
         };
         reader.readAsDataURL(file);
+      } else {
+        // For non-image files from external sources, try to get the path
+        // Note: Web File API doesn't expose full paths for security reasons
+        // but the file name can still be useful for display
+        // In Tauri, we may be able to get paths via webkitRelativePath or native APIs
+        const webkitPath = (file as File & { webkitRelativePath?: string }).webkitRelativePath;
+        const path = webkitPath || file.name;
+
+        setFiles((prev) => [
+          ...prev,
+          {
+            id: uuid(),
+            path: path,
+            displayPath: file.name,
+          },
+        ]);
       }
     }
   }, []);
@@ -453,21 +580,24 @@ export function EnhancedPromptInput({
 
       <div
         ref={containerRef}
+        onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onMouseEnter={handleMouseEnter}
         className={cn("relative", isFocused ? "z-50" : "z-10")}
       >
         <div
           className={cn(
             "flex flex-col gap-3 p-4 rounded-xl",
-            "bg-bg-tertiary border border-solid",
+            "bg-bg-tertiary border-2 border-solid transition-all duration-150",
             isFocused
               ? "border-accent shadow-lg shadow-accent/10"
               : "border-border",
-            isDragging && "!border-accent !border-dashed bg-accent/5",
+            (isDragging || globalIsDragging) && "!border-accent !border-dashed !bg-accent/5",
           )}
         >
+
           {hasAttachments && (
             <div className="flex flex-col gap-2">
               <ImageThumbnails images={images} onRemove={handleRemoveImage} />

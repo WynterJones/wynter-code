@@ -1,8 +1,12 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useLayoutEffect } from "react";
 import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui";
 import { FileIcon } from "@/components/files/FileIcon";
+
+const DROPDOWN_WIDTH = 320;
+const DROPDOWN_MAX_HEIGHT = 256;
+const VIEWPORT_PADDING = 8;
 
 interface FilePickerDropdownProps {
   isOpen: boolean;
@@ -62,7 +66,53 @@ export function FilePickerDropdown({
   onClose,
 }: FilePickerDropdownProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [adjustedPosition, setAdjustedPosition] = useState<{
+    top: number;
+    left: number;
+    showAbove: boolean;
+  }>({ top: 0, left: 0, showAbove: false });
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Calculate viewport-aware position
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Calculate adjusted left position to stay within viewport
+    let adjustedLeft = position.left;
+    if (adjustedLeft + DROPDOWN_WIDTH > viewportWidth - VIEWPORT_PADDING) {
+      adjustedLeft = viewportWidth - DROPDOWN_WIDTH - VIEWPORT_PADDING;
+    }
+    if (adjustedLeft < VIEWPORT_PADDING) {
+      adjustedLeft = VIEWPORT_PADDING;
+    }
+
+    // Determine if we should show above or below
+    const spaceBelow = viewportHeight - position.top;
+    const spaceAbove = position.top;
+    const showAbove = spaceBelow < DROPDOWN_MAX_HEIGHT + VIEWPORT_PADDING && spaceAbove > spaceBelow;
+
+    // Calculate adjusted top position
+    let adjustedTop: number;
+    if (showAbove) {
+      // Show above: position so bottom of dropdown is at the input position
+      adjustedTop = position.top - DROPDOWN_MAX_HEIGHT - 8;
+      if (adjustedTop < VIEWPORT_PADDING) {
+        adjustedTop = VIEWPORT_PADDING;
+      }
+    } else {
+      // Show below: use the provided position
+      adjustedTop = position.top;
+      // Ensure dropdown doesn't go off bottom of viewport
+      if (adjustedTop + DROPDOWN_MAX_HEIGHT > viewportHeight - VIEWPORT_PADDING) {
+        adjustedTop = viewportHeight - DROPDOWN_MAX_HEIGHT - VIEWPORT_PADDING;
+      }
+    }
+
+    setAdjustedPosition({ top: adjustedTop, left: adjustedLeft, showAbove });
+  }, [isOpen, position]);
 
   const filteredFiles = useMemo(() => {
     if (!searchQuery) {
@@ -128,11 +178,15 @@ export function FilePickerDropdown({
         "fixed z-50",
         "w-80 max-h-64",
         "bg-bg-secondary border border-border rounded-lg shadow-xl",
-        "overflow-hidden"
+        "overflow-hidden",
+        "animate-in fade-in-0 zoom-in-95 duration-100",
+        adjustedPosition.showAbove ? "origin-bottom" : "origin-top"
       )}
       style={{
-        top: position.top,
-        left: position.left,
+        top: adjustedPosition.top,
+        left: adjustedPosition.left,
+        width: DROPDOWN_WIDTH,
+        maxHeight: DROPDOWN_MAX_HEIGHT,
       }}
     >
       <ScrollArea className="max-h-64">

@@ -69,6 +69,18 @@ async function decompressData(data: Uint8Array): Promise<string> {
 }
 
 /**
+ * Netlify deploy response structure
+ */
+interface NetlifyDeployResponse {
+  id: string;
+  url: string;
+  ssl_url: string;
+  deploy_ssl_url: string;
+  state: string;
+  [key: string]: unknown;
+}
+
+/**
  * Deploy HTML to Netlify (via Tauri to avoid CORS)
  */
 async function deployToNetlify(
@@ -103,13 +115,15 @@ Disallow: /
   });
 
   // Use Tauri backend to deploy (avoids CORS)
-  const deployUrl = await invoke<string>("netlify_deploy_zip", {
+  // Returns full deploy response object, we extract the URL
+  const deployResponse = await invoke<NetlifyDeployResponse>("netlify_deploy_zip", {
     token,
     siteId,
     zipData: Array.from(zipData), // Convert Uint8Array to array for Tauri
   });
 
-  return deployUrl;
+  // Return the SSL URL from the deploy response
+  return deployResponse.ssl_url || deployResponse.deploy_ssl_url || deployResponse.url;
 }
 
 /**

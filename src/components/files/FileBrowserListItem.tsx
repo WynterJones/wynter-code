@@ -1,5 +1,6 @@
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
+import { useDragStore } from "@/stores/dragStore";
 import type { FileNode } from "@/types";
 import {
   type GitFileStatusType,
@@ -31,6 +32,7 @@ export function FileBrowserListItem({
   gitStatus,
 }: FileBrowserListItemProps) {
   const gitStatusColorClass = getGitStatusColor(gitStatus);
+  const startDrag = useDragStore((s) => s.startDrag);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -48,8 +50,26 @@ export function FileBrowserListItem({
     onContextMenu(e, node);
   };
 
+  const handleDragStart = (e: React.DragEvent) => {
+    e.stopPropagation();
+    const fileInfo = {
+      path: node.path,
+      name: node.name,
+      isDirectory: node.isDirectory,
+    };
+
+    // Set HTML5 drag data
+    e.dataTransfer.setData("application/x-wynter-file", JSON.stringify(fileInfo));
+    e.dataTransfer.effectAllowed = "copyMove";
+
+    // Also store in global drag store (for cross-component drops)
+    startDrag(fileInfo);
+  };
+
   return (
     <div
+      draggable
+      onDragStart={handleDragStart}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
