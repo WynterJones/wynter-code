@@ -193,7 +193,10 @@ export function useLauncherSearch() {
     if (searchMode !== "all" && searchMode !== "apps") return;
 
     const fetchApps = async () => {
-      setIsLoadingApps(true);
+      // Only show loading spinner when there's an actual query
+      if (query.length > 0) {
+        setIsLoadingApps(true);
+      }
       try {
         const apps = await invoke<MacOSApp[]>("search_macos_apps", {
           query: query,
@@ -207,7 +210,14 @@ export function useLauncherSearch() {
       }
     };
 
-    const timeoutId = setTimeout(fetchApps, 150); // Debounce
+    // Fetch immediately on mount (no debounce for empty query)
+    // Debounce only when user is actively typing
+    if (query.length === 0) {
+      fetchApps();
+      return;
+    }
+
+    const timeoutId = setTimeout(fetchApps, 150);
     return () => clearTimeout(timeoutId);
   }, [query, searchMode]);
 

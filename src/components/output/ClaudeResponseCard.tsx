@@ -3,14 +3,16 @@ import { Copy, Check, Brain } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ToolCallBlock } from "./ToolCallBlock";
+import { InlineStreamingIndicator } from "./InlineStreamingIndicator";
 import { cn } from "@/lib/utils";
-import type { ToolCall } from "@/types";
+import type { ToolCall, StreamingStats } from "@/types";
 
 interface ClaudeResponseCardProps {
   content: string;
   toolCalls?: ToolCall[];
   thinkingText?: string;
   isStreaming?: boolean;
+  streamingStats?: StreamingStats;
   onApprove?: (toolId: string) => void;
   onReject?: (toolId: string) => void;
 }
@@ -20,6 +22,7 @@ export function ClaudeResponseCard({
   toolCalls = [],
   thinkingText,
   isStreaming = false,
+  streamingStats,
   onApprove,
   onReject,
 }: ClaudeResponseCardProps) {
@@ -41,17 +44,8 @@ export function ClaudeResponseCard({
           isStreaming ? "border-accent/30" : "border-border/50"
         )}
       >
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                "w-2 h-2 rounded-full",
-                isStreaming ? "bg-accent animate-pulse" : "bg-accent-green"
-              )}
-            />
-            <span className="text-xs text-text-secondary font-medium">Claude</span>
-          </div>
-          {!isStreaming && (
+        {!isStreaming && (
+          <div className="absolute top-3 right-3">
             <IconButton
               size="sm"
               onClick={handleCopy}
@@ -63,8 +57,8 @@ export function ClaudeResponseCard({
                 <Copy className="w-3.5 h-3.5" />
               )}
             </IconButton>
-          )}
-        </div>
+          </div>
+        )}
 
         {thinkingText && (
           <div className="mb-4 rounded-lg border border-accent/30 overflow-hidden">
@@ -116,6 +110,10 @@ export function ClaudeResponseCard({
               />
             ))}
           </div>
+        )}
+
+        {isStreaming && streamingStats && (
+          <InlineStreamingIndicator stats={streamingStats} />
         )}
       </div>
     </div>

@@ -67,6 +67,7 @@ struct RailwayData {
 
 #[derive(Debug, Deserialize)]
 struct RailwayProject {
+    #[allow(dead_code)]
     name: String,
     services: RailwayServices,
     environments: RailwayEnvironments,
@@ -79,11 +80,13 @@ struct RailwayServices {
 
 #[derive(Debug, Deserialize)]
 struct RailwayServiceEdge {
+    #[allow(dead_code)]
     node: RailwayService,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 struct RailwayService {
     id: String,
     name: String,
@@ -164,6 +167,7 @@ struct NetlifyDeploy {
 
 // Sentry API responses
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SentryIssue {
     id: String,
     #[serde(rename = "firstSeen")]
@@ -171,6 +175,7 @@ struct SentryIssue {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct SentryStats {
     #[serde(rename = "crashFreeRate")]
     crash_free_rate: Option<f64>,

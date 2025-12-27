@@ -46,6 +46,7 @@ pub async fn create_cost_popup(app: AppHandle, x: f64, y: f64) -> Result<(), Str
     let window = builder.build().map_err(|e| e.to_string())?;
 
     #[cfg(target_os = "macos")]
+    #[allow(deprecated)]
     {
         use cocoa::base::id;
         use objc::{msg_send, sel, sel_impl};

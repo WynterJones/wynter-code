@@ -35,6 +35,7 @@ import type {
   ProjectDetectionResult,
   PreviewEvent,
   PreviewStatus,
+  PortCheckResult,
 } from "@/types/livepreview";
 
 interface LivePreviewPopupProps {
@@ -94,6 +95,21 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
   const [error, setError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [portInput, setPortInput] = useState(preferredPort.toString());
+  const [portStatus, setPortStatus] = useState<PortCheckResult | null>(null);
+  const [checkingPort, setCheckingPort] = useState(false);
+
+  const checkPortStatus = useCallback(async (port: number) => {
+    setCheckingPort(true);
+    try {
+      const result = await invoke<PortCheckResult>("check_port_status", { port });
+      setPortStatus(result);
+    } catch (err) {
+      console.error("Failed to check port status:", err);
+      setPortStatus(null);
+    } finally {
+      setCheckingPort(false);
+    }
+  }, []);
 
   const detectProject = useCallback(async () => {
     if (!activeProject?.path) return;
@@ -106,6 +122,11 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
       });
       setDetectionResult(result);
       setPortInput(result.suggestedPort.toString());
+      // Check port status for the suggested port
+      const portResult = await invoke<PortCheckResult>("check_port_status", {
+        port: result.suggestedPort,
+      });
+      setPortStatus(portResult);
     } catch (err) {
       setError(`Detection failed: ${err}`);
       setDetectionResult(null);
@@ -130,8 +151,10 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
     if (isOpen) {
       detectProject();
       fetchServers();
+      // Check port status on open with the preferred port
+      checkPortStatus(preferredPort);
     }
-  }, [isOpen, detectProject, fetchServers]);
+  }, [isOpen, detectProject, fetchServers, checkPortStatus, preferredPort]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -261,6 +284,9 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
       (s.status === "running" || s.status === "starting")
   );
 
+  const currentPort = parseInt(portInput, 10);
+  const portInUse = portStatus?.inUse && portStatus.port === currentPort;
+
   return (
     <Popup isOpen={isOpen} onClose={onClose} size="medium">
       <Popup.Header icon={Eye} title="Live Preview" />
@@ -344,24 +370,85 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
 
             {/* Port Input & Options */}
             {!projectHasActiveServer && (
-              <div className="flex items-center gap-4 mt-3">
-                <div className="flex items-center gap-2">
-                  <label className="text-xs text-text-secondary">Port:</label>
-                  <input
-                    type="number"
-                    value={portInput}
-                    onChange={(e) => setPortInput(e.target.value)}
-                    className="w-20 h-8 px-2 text-sm bg-bg-primary border border-border rounded-lg focus:outline-none focus:border-accent text-text-primary"
-                    min="1"
-                    max="65535"
+              <div className="space-y-2 mt-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs text-text-secondary">Port:</label>
+                    <input
+                      type="number"
+                      value={portInput}
+                      onChange={(e) => setPortInput(e.target.value)}
+                      onBlur={() => {
+                        const port = parseInt(portInput, 10);
+                        if (!isNaN(port) && port > 0 && port < 65536) {
+                          checkPortStatus(port);
+                        }
+                      }}
+                      className={cn(
+                        "w-20 h-8 px-2 text-sm bg-bg-primary border rounded-lg focus:outline-none text-text-primary",
+                        portInUse
+                          ? "border-yellow-500/50 focus:border-yellow-500"
+                          : "border-border focus:border-accent"
+                      )}
+                      min="1"
+                      max="65535"
+                    />
+                    {checkingPort && (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-text-secondary" />
+                    )}
+                  </div>
+                  <Checkbox
+                    checked={autoOpenBrowser}
+                    onChange={(e) => setAutoOpenBrowser(e.target.checked)}
+                    label="Auto-open browser"
+                    className="text-xs"
                   />
                 </div>
-                <Checkbox
-                  checked={autoOpenBrowser}
-                  onChange={(e) => setAutoOpenBrowser(e.target.checked)}
-                  label="Auto-open browser"
-                  className="text-xs"
-                />
+
+                {/* Port Status Indicator */}
+                {portInUse && (
+                  <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                    <Play className="w-4 h-4 text-green-400 flex-shrink-0" />
+                    <span className="text-xs text-green-400">
+                      Server already running on port {portStatus.port}
+                    </span>
+                    <div className="ml-auto flex items-center gap-2">
+                      <button
+                        onClick={() => open(`http://localhost:${portStatus.port}`)}
+                        className="text-xs text-accent hover:underline flex items-center gap-1"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        Open
+                      </button>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await invoke("kill_process_on_port", { port: portStatus.port });
+                            // Re-check port status after killing
+                            setTimeout(() => checkPortStatus(portStatus.port), 500);
+                          } catch (err) {
+                            setError(`Failed to stop server: ${err}`);
+                          }
+                        }}
+                        className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                      >
+                        <Square className="w-3 h-3" />
+                        Stop
+                      </button>
+                      {portStatus.nextAvailable !== portStatus.port && (
+                        <button
+                          onClick={() => {
+                            setPortInput(portStatus.nextAvailable.toString());
+                            checkPortStatus(portStatus.nextAvailable);
+                          }}
+                          className="text-xs text-text-secondary hover:text-text-primary"
+                        >
+                          Use {portStatus.nextAvailable}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

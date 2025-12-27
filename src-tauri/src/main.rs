@@ -10,17 +10,18 @@ mod commands;
 mod cost_popup;
 mod database_viewer;
 mod domain_tools;
+mod gif_capture;
+mod launcher;
+mod limits_monitor;
 mod live_preview;
 mod mcp_permission_server;
+mod netlify_backup;
 mod overwatch;
 mod storybook;
 mod terminal;
 mod tunnel;
 mod watcher;
 mod webcam_window;
-mod gif_capture;
-mod launcher;
-mod netlify_backup;
 
 use std::sync::Arc;
 use tauri::{
@@ -111,11 +112,7 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .plugin(
-            tauri_plugin_sql::Builder::new()
-                .add_migrations("sqlite:wyntercode.db", commands::get_migrations())
-                .build(),
-        )
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let menu = create_menu(app.handle())?;
             app.set_menu(menu)?;
@@ -244,6 +241,7 @@ fn main() {
             commands::read_file_base64,
             commands::write_file_content,
             commands::find_markdown_files,
+            commands::list_project_files,
             commands::search::grep_project,
             commands::search::replace_in_files,
             commands::get_node_modules,
@@ -318,6 +316,8 @@ fn main() {
             live_preview::start_preview_server,
             live_preview::stop_preview_server,
             live_preview::list_preview_servers,
+            live_preview::check_port_status,
+            live_preview::kill_process_on_port,
             api_tester::send_http_request,
             api_tester::start_webhook_server,
             api_tester::stop_webhook_server,
@@ -362,6 +362,17 @@ fn main() {
             commands::validate_mcp_command,
             // Claude Code Stats
             commands::read_claude_stats,
+            // Claude Code Limits Monitor
+            limits_monitor::calculate_usage_summary,
+            // Netlify API
+            netlify_backup::netlify_test_connection,
+            netlify_backup::netlify_fetch_sites,
+            netlify_backup::netlify_fetch_deploys,
+            netlify_backup::netlify_create_site,
+            netlify_backup::netlify_delete_site,
+            netlify_backup::netlify_update_site,
+            netlify_backup::netlify_deploy_zip,
+            netlify_backup::netlify_rollback_deploy,
             // Claude Process Management
             claude_process::start_claude_session,
             claude_process::stop_claude_session,

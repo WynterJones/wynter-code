@@ -704,11 +704,37 @@ export function ProjectTabBar({
         compactProjectTabs ? "h-9" : "h-11",
       )}
     >
-      {/* Traffic light spacer for macOS */}
+      {/* Traffic light spacer for macOS with version */}
       <div
         data-tauri-drag-region
-        className="w-20 h-full flex-shrink-0 flex items-center justify-end pr-2"
-      />
+        className="w-20 h-full flex-shrink-0 flex flex-col items-center justify-end pb-0.5"
+      >
+        <Tooltip content="Check for Updates" side="bottom">
+          <button
+            onClick={async () => {
+              try {
+                const { check } = await import("@tauri-apps/plugin-updater");
+                const update = await check();
+                if (update) {
+                  if (confirm(`Update v${update.version} is available. Download and install now?`)) {
+                    await update.downloadAndInstall();
+                    const { relaunch } = await import("@tauri-apps/plugin-process");
+                    await relaunch();
+                  }
+                } else {
+                  alert("You're up to date!");
+                }
+              } catch (error) {
+                console.error("Update check failed:", error);
+                alert("Update check failed. Try again later.");
+              }
+            }}
+            className="text-[8px] text-text-secondary/50 font-mono hover:text-text-secondary transition-colors"
+          >
+            v1.0.2
+          </button>
+        </Tooltip>
+      </div>
 
       {/* Workspace Selector */}
       <div className="flex items-center px-2 h-full border-r border-border">
@@ -818,9 +844,9 @@ export function ProjectTabBar({
           <IconButton
             size="sm"
             onClick={() => setMeditationActive(!isMeditating)}
-            className={cn(isMeditating && "text-accent bg-accent/10")}
+            className={cn(isMeditating && "text-accent")}
           >
-            <Music className={cn("w-4 h-4", isMeditating && "fill-accent")} />
+            <Music className="w-4 h-4" />
           </IconButton>
         </Tooltip>
       </div>
@@ -912,7 +938,10 @@ export function ProjectTabBar({
         )}
       >
         {onOpenSubscriptions && (
-          <SubscriptionButton onOpenManage={onOpenSubscriptions} />
+          <SubscriptionButton
+            onOpenManage={onOpenSubscriptions}
+            workspaceId={activeWorkspaceId}
+          />
         )}
 {userAvatar ? (
           <Tooltip content="Settings" side="bottom">

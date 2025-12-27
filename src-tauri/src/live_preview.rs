@@ -146,6 +146,63 @@ fn find_available_port(start_port: u16) -> u16 {
     start_port
 }
 
+fn is_port_in_use(port: u16) -> bool {
+    // Check both IPv4 and IPv6 - if either fails, port is in use
+    let ipv4_in_use = TcpListener::bind(format!("127.0.0.1:{}", port)).is_err();
+    let ipv6_in_use = TcpListener::bind(format!("[::1]:{}", port)).is_err();
+    ipv4_in_use || ipv6_in_use
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortCheckResult {
+    pub port: u16,
+    pub in_use: bool,
+    pub next_available: u16,
+}
+
+#[tauri::command]
+pub async fn check_port_status(port: u16) -> Result<PortCheckResult, String> {
+    let in_use = is_port_in_use(port);
+    let next_available = if in_use {
+        find_available_port(port)
+    } else {
+        port
+    };
+
+    Ok(PortCheckResult {
+        port,
+        in_use,
+        next_available,
+    })
+}
+
+#[tauri::command]
+pub async fn kill_process_on_port(port: u16) -> Result<(), String> {
+    // Use lsof to find the process listening on the port, then kill it
+    let output = Command::new("lsof")
+        .args(["-t", "-i", &format!(":{}", port)])
+        .output()
+        .map_err(|e| format!("Failed to run lsof: {}", e))?;
+
+    let pids = String::from_utf8_lossy(&output.stdout);
+    let pids: Vec<&str> = pids.trim().lines().collect();
+
+    if pids.is_empty() {
+        return Err(format!("No process found on port {}", port));
+    }
+
+    for pid in pids {
+        if !pid.is_empty() {
+            let _ = Command::new("kill")
+                .args(["-9", pid])
+                .output();
+        }
+    }
+
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn detect_project_type(project_path: String) -> Result<ProjectDetectionResult, String> {
     let path = Path::new(&project_path);

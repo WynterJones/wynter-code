@@ -4,12 +4,13 @@ import type {
   Building,
   BuildingType,
 } from "../../types";
-import { BUILDING_COLORS } from "../../types";
+import { BUILDING_COLORS, BUILDING_NAMES } from "../../types";
 
 export class BuildingBadge extends Badge {
   private buildingType: BuildingType;
   private iconGraphic: Graphics;
   private scoreLabel: Text;
+  private nameLabel: Text;
   private currentScore = 0;
 
   constructor(building: Building) {
@@ -40,16 +41,27 @@ export class BuildingBadge extends Badge {
     this.scoreLabel.anchor.set(0, 0.5);
     this.addChild(this.scoreLabel);
 
+    const nameStyle = new TextStyle({
+      fontFamily: "monospace",
+      fontSize: 10,
+      fontWeight: "normal",
+      fill: 0x888888,
+    });
+
+    this.nameLabel = new Text({ text: BUILDING_NAMES[this.buildingType], style: nameStyle });
+    this.nameLabel.anchor.set(0.5, 0);
+    this.addChild(this.nameLabel);
+
     this.drawBuildingBadge();
     this.updateScore(building.score);
   }
 
   private formatScore(score: number): string {
-    // Garden and compost show counts, not scores
-    if (this.buildingType === "garden" || this.buildingType === "compost") {
+    // Garden, compost, and office (Home) show counts, not scores
+    if (this.buildingType === "garden" || this.buildingType === "compost" || this.buildingType === "office") {
       return `${Math.floor(score)}`;
     }
-    return `${score.toFixed(0)}/10`;
+    return `${score.toFixed(1)}/10`;
   }
 
   private drawBuildingBadge(): void {
@@ -59,21 +71,29 @@ export class BuildingBadge extends Badge {
     const scoreWidth = this.scoreLabel.width;
     const gap = 8;
     const padding = 12;
+    const nameHeight = 14;
 
     const totalContentWidth = iconSize + gap + scoreWidth;
-    const width = totalContentWidth + padding * 2;
-    const height = 36;
+    const width = Math.max(totalContentWidth + padding * 2, this.nameLabel.width + padding * 2);
+    const height = 36 + nameHeight;
 
     this.background.clear();
-    this.background.roundRect(-width / 2, -height / 2, width, height, height / 2);
+    this.background.roundRect(-width / 2, -height / 2, width, height, 8);
     this.background.fill({ color: 0x1a1a2e, alpha: 0.92 });
     this.background.stroke({ color: baseColor, width: 2, alpha: 0.8 });
 
     this.drawIcon(baseColor, iconSize);
 
     const startX = -totalContentWidth / 2;
+    const topRowY = -nameHeight / 2;
     this.iconGraphic.x = startX + iconSize / 2;
+    this.iconGraphic.y = topRowY;
     this.scoreLabel.x = startX + iconSize + gap;
+    this.scoreLabel.y = topRowY;
+
+    // Position name label below
+    this.nameLabel.x = 0;
+    this.nameLabel.y = topRowY + 12;
   }
 
   private drawIcon(color: number, size: number): void {
@@ -168,9 +188,10 @@ export class BuildingBadge extends Badge {
   }
 
   getScoreColor(score: number): number {
-    // Garden and compost use their building colors
+    // Garden, compost, and office use their building colors
     if (this.buildingType === "garden") return 0x84cc16; // lime green
     if (this.buildingType === "compost") return 0x78716c; // stone
+    if (this.buildingType === "office") return 0x06b6d4; // cyan
 
     // Audit buildings use score-based colors
     if (score < 3) return 0xef4444;

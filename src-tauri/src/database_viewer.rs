@@ -115,6 +115,7 @@ pub enum DbPool {
 // Store connection type alongside pool
 pub struct ConnectionEntry {
     pub pool: DbPool,
+    #[allow(dead_code)]
     pub db_type: String,
 }
 

@@ -6,15 +6,15 @@ import { SubscriptionDropdown } from "./SubscriptionDropdown";
 
 interface SubscriptionButtonProps {
   onOpenManage: () => void;
+  workspaceId?: string | null;
 }
 
-export function SubscriptionButton({ onOpenManage }: SubscriptionButtonProps) {
+export function SubscriptionButton({ onOpenManage, workspaceId }: SubscriptionButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { calculateSummary, subscriptions } = useSubscriptionStore();
+  const { calculateSummary } = useSubscriptionStore();
 
-  const summary = calculateSummary();
-  const hasSubscriptions = subscriptions.length > 0;
+  const summary = workspaceId ? calculateSummary(workspaceId) : calculateSummary();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -45,11 +45,9 @@ export function SubscriptionButton({ onOpenManage }: SubscriptionButtonProps) {
         )}
       >
         <CreditCard className="w-3.5 h-3.5 text-accent-green" />
-        {hasSubscriptions && summary.totalMonthly > 0 && (
-          <span className="text-text-primary font-mono text-xs">
-            {formatCurrency(summary.totalMonthly)}/mo
-          </span>
-        )}
+        <span className="text-text-primary font-mono text-xs">
+          {formatCurrency(summary.totalMonthly)}/mo
+        </span>
         <ChevronDown className="w-3.5 h-3.5 text-text-secondary" />
       </button>
 

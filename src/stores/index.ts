@@ -10,3 +10,4 @@ export { useClaudeStore } from "./claudeStore";
 export type { ClaudeManagerTab } from "./claudeStore";
 export { useMcpStore, isSensitiveEnvKey } from "./mcpStore";
 export { useSearchStore } from "./searchStore";
+export { useFileIndexStore } from "./fileIndexStore";

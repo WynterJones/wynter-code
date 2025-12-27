@@ -45,6 +45,7 @@ pub async fn start_claude_session(
     resume_session_id: Option<String>,
     safe_mode: Option<bool>,
     mcp_permission_port: Option<u16>,
+    model: Option<String>,
 ) -> Result<String, String> {
     // Check if session is already running
     {
@@ -88,9 +89,16 @@ pub async fn start_claude_session(
         "--output-format".to_string(),
         "stream-json".to_string(),     // JSON output via stdout
         "--verbose".to_string(),       // Required for stream-json
+        "--include-partial-messages".to_string(), // Enable streaming of tool_use and text_delta events
         "--permission-mode".to_string(),
         effective_mode.as_str().to_string(),
     ];
+
+    // Add model flag if specified
+    if let Some(ref model_name) = model {
+        args.push("--model".to_string());
+        args.push(model_name.clone());
+    }
 
     // For manual mode, add permission-prompt-tool flag
     if is_manual_mode {
@@ -115,6 +123,9 @@ pub async fn start_claude_session(
 
     eprintln!("[Claude] Starting persistent session with args: {:?}", args);
     eprintln!("[Claude] Working directory: {}", cwd);
+    if let Some(ref m) = model {
+        eprintln!("[Claude] Model: {}", m);
+    }
     if is_manual_mode {
         eprintln!("[Claude] Manual mode enabled with MCP permission server");
     }
@@ -477,6 +488,7 @@ pub async fn start_claude_streaming(
         claude_session_id,
         None, // safe_mode defaults to true
         None, // mcp_permission_port not used in deprecated function
+        None, // model - use default
     )
     .await?;
 

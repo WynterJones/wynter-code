@@ -82,21 +82,16 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
   const checkFarmworkConfig = useCallback(async (projectPath: string) => {
     try {
       const configPath = await join(projectPath, ".farmwork.json");
-      console.log("[Farmwork] Checking for config at:", configPath);
-      console.log("[Farmwork] Project path:", projectPath);
       const configExists = await exists(configPath);
-      console.log("[Farmwork] Config exists:", configExists);
       setFarmworkStatus(configExists ? "installed" : "not_installed");
       return configExists;
-    } catch (err) {
-      console.log("[Farmwork] Error checking config:", err);
+    } catch {
       setFarmworkStatus("not_installed");
       return false;
     }
   }, []);
 
   useEffect(() => {
-    console.log("[Farmwork] useEffect triggered - isOpen:", isOpen, "activeProject:", activeProject?.path);
     if (isOpen && activeProject?.path) {
       setFarmworkStatus("checking");
       checkFarmworkConfig(activeProject.path).then((hasConfig) => {
@@ -110,7 +105,6 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
         }
       });
     } else if (isOpen && !activeProject?.path) {
-      console.log("[Farmwork] No active project path available");
       setFarmworkStatus("not_installed");
     }
   }, [isOpen, activeProject?.path, isInitialized, initialize, refreshStats, checkFarmworkConfig]);

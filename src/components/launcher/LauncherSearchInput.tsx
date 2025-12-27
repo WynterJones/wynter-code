@@ -22,19 +22,22 @@ export function LauncherSearchInput({
   const { query, setQuery, searchMode, cycleSearchMode } = useLauncherStore();
 
   useEffect(() => {
-    // Auto-focus on mount with retries for reliability
-    const focusInput = () => {
-      inputRef.current?.focus();
+    // Auto-focus and select all on mount with retries for reliability
+    const focusAndSelect = () => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
     };
 
     // Immediate focus
-    focusInput();
+    focusAndSelect();
 
     // Retry focus after short delays to ensure window is ready
     const timers = [
-      setTimeout(focusInput, 50),
-      setTimeout(focusInput, 150),
-      setTimeout(focusInput, 300),
+      setTimeout(focusAndSelect, 50),
+      setTimeout(focusAndSelect, 150),
+      setTimeout(focusAndSelect, 300),
     ];
 
     return () => timers.forEach(clearTimeout);

@@ -1,6 +1,10 @@
 import { useEffect, useCallback } from "react";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import type { PermissionMode } from "@/types";
+
+// Mode cycle order: Manual -> Auto -> Bypass -> Plan -> Manual...
+const MODE_CYCLE: PermissionMode[] = ["manual", "acceptEdits", "bypassPermissions", "plan"];
 
 export interface KeyboardShortcut {
   key: string;
@@ -32,6 +36,9 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   { key: "Enter", modifiers: [], description: "Send prompt", category: "editing", action: "sendPrompt" },
   { key: "Enter", modifiers: ["shift"], description: "New line in prompt", category: "editing", action: "newLine" },
   { key: "Escape", modifiers: [], description: "Close popup / Cancel", category: "editing", action: "escape" },
+
+  // Sessions
+  { key: "Tab", modifiers: ["shift"], description: "Cycle permission mode", category: "sessions", action: "cycleMode" },
 ];
 
 interface UseKeyboardShortcutsOptions {
@@ -52,7 +59,7 @@ export function useKeyboardShortcuts({
   onOpenCommandPalette,
 }: UseKeyboardShortcutsOptions) {
   const { projects, activeProjectId, setActiveProject } = useProjectStore();
-  const { createSession, removeSession, getSessionsForProject, getActiveSession, setActiveSession } = useSessionStore();
+  const { createSession, removeSession, getSessionsForProject, getActiveSession, setActiveSession, updateSessionPermissionMode } = useSessionStore();
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const isMod = e.metaKey || e.ctrlKey;
@@ -160,6 +167,22 @@ export function useKeyboardShortcuts({
       }
       return;
     }
+
+    // Shift + Tab: Cycle permission mode (Manual -> Auto -> Bypass -> Plan)
+    if (!isMod && isShift && e.key === "Tab") {
+      e.preventDefault();
+      if (activeProjectId) {
+        const activeSession = getActiveSession(activeProjectId);
+        if (activeSession) {
+          const currentMode = activeSession.permissionMode || "acceptEdits";
+          const currentIndex = MODE_CYCLE.indexOf(currentMode);
+          const nextIndex = (currentIndex + 1) % MODE_CYCLE.length;
+          const nextMode = MODE_CYCLE[nextIndex];
+          updateSessionPermissionMode(activeSession.id, nextMode);
+        }
+      }
+      return;
+    }
   }, [
     projects,
     activeProjectId,
@@ -169,6 +192,7 @@ export function useKeyboardShortcuts({
     getSessionsForProject,
     getActiveSession,
     setActiveSession,
+    updateSessionPermissionMode,
     onOpenSettings,
     onToggleSidebar,
     onToggleFileBrowser,
@@ -201,6 +225,7 @@ export function formatShortcut(shortcut: KeyboardShortcut): string {
   let key = shortcut.key;
   if (key === "Enter") key = "↵";
   else if (key === "Escape") key = "Esc";
+  else if (key === "Tab") key = "⇥";
   else if (key === "[") key = "[";
   else if (key === "]") key = "]";
   else if (key === ",") key = ",";

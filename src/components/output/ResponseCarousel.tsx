@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Check } from "
 import { IconButton, ScrollArea } from "@/components/ui";
 import { ClaudeResponseCard } from "./ClaudeResponseCard";
 import { cn } from "@/lib/utils";
-import type { Message, ToolCall } from "@/types";
+import type { Message, ToolCall, StreamingStats } from "@/types";
 
 interface MessagePair {
   user: Message;
@@ -16,6 +16,7 @@ interface ResponseCarouselProps {
   thinkingText?: string;
   pendingToolCalls?: ToolCall[];
   isStreaming?: boolean;
+  streamingStats?: StreamingStats;
 }
 
 // Collapsible user message status bar
@@ -98,6 +99,7 @@ export function ResponseCarousel({
   thinkingText = "",
   pendingToolCalls = [],
   isStreaming = false,
+  streamingStats,
 }: ResponseCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -253,6 +255,7 @@ export function ResponseCarousel({
                     content={streamingText}
                     thinkingText={thinkingText}
                     isStreaming={isStreaming}
+                    streamingStats={streamingStats}
                   />
                 </div>
               </ScrollArea>

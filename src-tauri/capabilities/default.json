@@ -17,15 +17,12 @@
     "shell:allow-open",
     "shell:allow-spawn",
     "shell:allow-execute",
-    "sql:default",
-    "sql:allow-execute",
-    "sql:allow-select",
-    "sql:allow-load",
-    "sql:allow-close",
     "dialog:default",
     "dialog:allow-open",
     "global-shortcut:default",
-    "autostart:default"
+    "autostart:default",
+    "process:default",
+    "updater:default"
   ],
   "scope": {
     "shell": {

@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ interface SettingsPopupProps {
   initialTab?: SettingsTab;
 }
 
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.2";
 
 export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopupProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
@@ -974,6 +974,39 @@ function TerminalSettings({
 }
 
 function AboutSection() {
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+
+  const handleCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    setUpdateStatus(null);
+    try {
+      const { check } = await import("@tauri-apps/plugin-updater");
+      const update = await check();
+      if (update) {
+        setUpdateStatus(`Update available: v${update.version}`);
+        // Optionally prompt to download and install
+        if (confirm(`Update v${update.version} is available. Download and install now?`)) {
+          await update.downloadAndInstall();
+          const { relaunch } = await import("@tauri-apps/plugin-process");
+          await relaunch();
+        }
+      } else {
+        setUpdateStatus("You're up to date!");
+      }
+    } catch (error) {
+      console.error("Update check failed:", error);
+      setUpdateStatus("Update check failed. Try again later.");
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleOpenLink = async (url: string) => {
+    const { open } = await import("@tauri-apps/plugin-shell");
+    await open(url);
+  };
+
   return (
     <div className="space-y-6">
       <div className="text-center py-8">
@@ -986,6 +1019,48 @@ function AboutSection() {
           Wynter Code
         </h1>
         <p className="text-text-secondary">Version {APP_VERSION}</p>
+
+        {/* Check for Updates Button */}
+        <button
+          onClick={handleCheckUpdate}
+          disabled={isCheckingUpdate}
+          className={cn(
+            "mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm transition-colors",
+            isCheckingUpdate
+              ? "opacity-50 cursor-not-allowed"
+              : "hover:bg-bg-hover text-text-secondary hover:text-text-primary"
+          )}
+        >
+          <RefreshCw className={cn("w-4 h-4", isCheckingUpdate && "animate-spin")} />
+          {isCheckingUpdate ? "Checking..." : "Check for Updates"}
+        </button>
+
+        {updateStatus && (
+          <p className={cn(
+            "mt-2 text-sm",
+            updateStatus.includes("available") ? "text-accent" : "text-text-secondary"
+          )}>
+            {updateStatus}
+          </p>
+        )}
+      </div>
+
+      {/* Quick Links */}
+      <div className="flex items-center justify-center gap-3">
+        <button
+          onClick={() => handleOpenLink("https://code.wynter.ai")}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors text-sm"
+        >
+          <Globe className="w-4 h-4" />
+          Website
+        </button>
+        <button
+          onClick={() => handleOpenLink("https://github.com/WynterJones/wynter-code")}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors text-sm"
+        >
+          <Github className="w-4 h-4" />
+          GitHub
+        </button>
       </div>
 
       <div className="space-y-4 text-sm">

@@ -6,6 +6,7 @@ import { BuildingSprite } from "./entities/Building";
 import { VehicleSprite } from "./entities/Vehicle";
 import { GardenFlowers } from "./entities/GardenFlowers";
 import { FarmParticleEmitter } from "./particles/FarmParticleEmitter";
+import { BuildingPopup } from "./BuildingPopup";
 import { BUILDING_POSITIONS, type BuildingType } from "../types";
 import { getRandomSpawnPoint } from "./navigation/SpawnPoints";
 
@@ -37,6 +38,7 @@ export function TycoonGame({
   const particleEmitterRef = useRef<FarmParticleEmitter | null>(null);
 
   const [scale, setScale] = useState(1);
+  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
 
   const {
     buildings,
@@ -56,9 +58,7 @@ export function TycoonGame({
 
   const initializeNavigation = useCallback(async () => {
     if (!navigationSystem.isInitialized()) {
-      console.log("[Tycoon] Initializing navigation system...");
       const graph = await navigationSystem.initialize("/tycoon/map-mask.png", 16);
-      console.log(`[Tycoon] Navigation initialized with ${graph.nodes.size} nodes`);
       setNavGraph(graph);
     }
   }, [setNavGraph]);
@@ -68,15 +68,11 @@ export function TycoonGame({
       graphics.clear();
 
       if (!showDebug) {
-        console.log("[Tycoon] Debug overlay cleared (showDebug=false)");
         return;
       }
 
-      console.log("[Tycoon] Drawing debug overlay...");
-
       // Draw walkable grid cells (road areas)
       const grid = navigationSystem.getGrid();
-      console.log(`[Tycoon] Grid: ${grid ? `${grid.cols}x${grid.rows}` : 'null'}`);
       if (grid) {
         for (let gy = 0; gy < grid.rows; gy++) {
           for (let gx = 0; gx < grid.cols; gx++) {
@@ -195,6 +191,11 @@ export function TycoonGame({
       app.stage.addChild(gardenFlowers);
       gardenFlowersRef.current = gardenFlowers;
 
+      // Set initial flower count from store (in case effect ran before ref was set)
+      const { gardenStats: initialGardenStats, simulatedFlowerCount: initialSimulated } = useFarmworkTycoonStore.getState();
+      const initialFlowerCount = initialSimulated !== null ? initialSimulated : initialGardenStats.activeIdeas;
+      gardenFlowers.setFlowerCount(initialFlowerCount);
+
       const vehiclesContainer = new Container();
       vehiclesContainer.label = "vehicles";
       app.stage.addChild(vehiclesContainer);
@@ -214,6 +215,13 @@ export function TycoonGame({
         buildingSprite.setDebugMode(useFarmworkTycoonStore.getState().showDebug);
         buildingsContainer.addChild(buildingSprite);
         buildingSpritesRef.current.set(buildingData.id, buildingSprite);
+
+        // Add click handler for building popup (only in full game view, not mini player)
+        if (!isMiniPlayer) {
+          buildingSprite.on("pointerdown", () => {
+            setSelectedBuilding(buildingData.id);
+          });
+        }
       }
 
       await initializeNavigation();
@@ -442,7 +450,6 @@ export function TycoonGame({
           x: BUILDING_POSITIONS[building.type as BuildingType].dockX,
           y: BUILDING_POSITIONS[building.type as BuildingType].dockY - 30, // Above the dock
         };
-        console.log(`[Tycoon] Celebrating ${building.name} at`, position);
         particleEmitterRef.current.emitCelebration(position);
       }
     }
@@ -506,13 +513,8 @@ export function TycoonGame({
             if (path && path.length > 0) {
               sprite.setPath(path);
               sprite.setTask("traveling_to_pickup", firstDest);
-              console.log(`[Tycoon] Vehicle ${vehicleData.id} path set: ${path.length} waypoints`);
-            } else {
-              console.warn(`[Tycoon] No path found for vehicle ${vehicleData.id}`);
             }
           }
-        } else if (!navGraph) {
-          console.warn(`[Tycoon] NavGraph not ready for vehicle ${vehicleData.id}`);
         }
       } else {
         sprite.updateData(vehicleData);
@@ -535,7 +537,6 @@ export function TycoonGame({
             if (path && path.length > 0) {
               sprite.setPath(path);
               sprite.setTask("traveling_to_pickup", firstDest || undefined);
-              console.log(`[Tycoon] Late path set for ${vehicleData.id}: ${path.length} waypoints`);
             }
           }
         }
@@ -544,7 +545,6 @@ export function TycoonGame({
   }, [vehicles, navGraph, buildings, isMiniPlayer]);
 
   useEffect(() => {
-    console.log(`[Tycoon] Debug toggle: showDebug=${showDebug}, hasGraphics=${!!debugGraphicsRef.current}, hasNavGraph=${!!navGraph}`);
     if (debugGraphicsRef.current) {
       drawDebugOverlay(debugGraphicsRef.current);
     }
@@ -572,6 +572,16 @@ export function TycoonGame({
       ref={containerRef}
       className="relative bg-bg-tertiary rounded-lg overflow-hidden"
       style={{ width: displaySize, height: displaySize }}
-    />
+    >
+      {/* Building popup overlay */}
+      {!isMiniPlayer && (
+        <BuildingPopup
+          buildingId={selectedBuilding}
+          onClose={() => setSelectedBuilding(null)}
+          containerRef={containerRef}
+          scale={scale}
+        />
+      )}
+    </div>
   );
 }

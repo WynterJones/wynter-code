@@ -1,28 +1,6 @@
-use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 const NETLIFY_API_BASE: &str = "https://api.netlify.com/api/v1";
-
-// ============================================================================
-// Types
-// ============================================================================
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NetlifySite {
-    pub id: String,
-    pub name: String,
-    pub url: String,
-    pub ssl_url: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NetlifyUser {
-    pub id: String,
-    pub email: String,
-    pub full_name: Option<String>,
-}
 
 // ============================================================================
 // Commands
@@ -30,7 +8,7 @@ pub struct NetlifyUser {
 
 /// Test Netlify API connection
 #[tauri::command]
-pub async fn netlify_test_connection(token: String) -> Result<NetlifyUser, String> {
+pub async fn netlify_test_connection(token: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -44,11 +22,7 @@ pub async fn netlify_test_connection(token: String) -> Result<NetlifyUser, Strin
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if response.status().is_success() {
-        let user: NetlifyUser = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-        Ok(user)
+        response.json().await.map_err(|e| format!("Failed to parse response: {}", e))
     } else {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
@@ -58,7 +32,7 @@ pub async fn netlify_test_connection(token: String) -> Result<NetlifyUser, Strin
 
 /// Fetch all Netlify sites
 #[tauri::command]
-pub async fn netlify_fetch_sites(token: String) -> Result<Vec<NetlifySite>, String> {
+pub async fn netlify_fetch_sites(token: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -72,11 +46,7 @@ pub async fn netlify_fetch_sites(token: String) -> Result<Vec<NetlifySite>, Stri
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if response.status().is_success() {
-        let sites: Vec<NetlifySite> = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-        Ok(sites)
+        response.json().await.map_err(|e| format!("Failed to parse response: {}", e))
     } else {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
@@ -84,9 +54,33 @@ pub async fn netlify_fetch_sites(token: String) -> Result<Vec<NetlifySite>, Stri
     }
 }
 
+/// Fetch deploys for a site
+#[tauri::command]
+pub async fn netlify_fetch_deploys(token: String, site_id: String) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let response = client
+        .get(format!("{}/sites/{}/deploys", NETLIFY_API_BASE, site_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if response.status().is_success() {
+        response.json().await.map_err(|e| format!("Failed to parse response: {}", e))
+    } else {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        Err(format!("Failed to fetch deploys: {} - {}", status, error_text))
+    }
+}
+
 /// Create a new Netlify site
 #[tauri::command]
-pub async fn netlify_create_site(token: String, name: String) -> Result<NetlifySite, String> {
+pub async fn netlify_create_site(token: String, name: String) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
@@ -104,15 +98,63 @@ pub async fn netlify_create_site(token: String, name: String) -> Result<NetlifyS
         .map_err(|e| format!("Request failed: {}", e))?;
 
     if response.status().is_success() {
-        let site: NetlifySite = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-        Ok(site)
+        response.json().await.map_err(|e| format!("Failed to parse response: {}", e))
     } else {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
         Err(format!("Failed to create site: {} - {}", status, error_text))
+    }
+}
+
+/// Delete a Netlify site
+#[tauri::command]
+pub async fn netlify_delete_site(token: String, site_id: String) -> Result<(), String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let response = client
+        .delete(format!("{}/sites/{}", NETLIFY_API_BASE, site_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        Err(format!("Failed to delete site: {} - {}", status, error_text))
+    }
+}
+
+/// Update a Netlify site name
+#[tauri::command]
+pub async fn netlify_update_site(token: String, site_id: String, name: String) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let body = serde_json::json!({ "name": name });
+
+    let response = client
+        .patch(format!("{}/sites/{}", NETLIFY_API_BASE, site_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Type", "application/json")
+        .body(body.to_string())
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if response.status().is_success() {
+        response.json().await.map_err(|e| format!("Failed to parse response: {}", e))
+    } else {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        Err(format!("Failed to update site: {} - {}", status, error_text))
     }
 }
 
@@ -122,7 +164,7 @@ pub async fn netlify_deploy_zip(
     token: String,
     site_id: String,
     zip_data: Vec<u8>,
-) -> Result<String, String> {
+) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(120)) // Longer timeout for uploads
         .build()
@@ -138,22 +180,38 @@ pub async fn netlify_deploy_zip(
         .map_err(|e| format!("Deploy request failed: {}", e))?;
 
     if response.status().is_success() {
-        let deploy: serde_json::Value = response
-            .json()
-            .await
-            .map_err(|e| format!("Failed to parse response: {}", e))?;
-
-        // Return the deploy URL
-        let deploy_url = deploy["ssl_url"]
-            .as_str()
-            .or_else(|| deploy["url"].as_str())
-            .unwrap_or("")
-            .to_string();
-
-        Ok(deploy_url)
+        response.json().await.map_err(|e| format!("Failed to parse response: {}", e))
     } else {
         let status = response.status();
         let error_text = response.text().await.unwrap_or_default();
         Err(format!("Deploy failed: {} - {}", status, error_text))
+    }
+}
+
+/// Rollback to a previous deploy
+#[tauri::command]
+pub async fn netlify_rollback_deploy(
+    token: String,
+    site_id: String,
+    deploy_id: String,
+) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let response = client
+        .post(format!("{}/sites/{}/deploys/{}/restore", NETLIFY_API_BASE, site_id, deploy_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {}", e))?;
+
+    if response.status().is_success() {
+        response.json().await.map_err(|e| format!("Failed to parse response: {}", e))
+    } else {
+        let status = response.status();
+        let error_text = response.text().await.unwrap_or_default();
+        Err(format!("Rollback failed: {} - {}", status, error_text))
     }
 }

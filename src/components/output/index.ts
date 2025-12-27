@@ -1,4 +1,3 @@
-export { OutputWindow } from "./OutputWindow";
 export { MarkdownRenderer } from "./MarkdownRenderer";
 export { CodeBlock } from "./CodeBlock";
 export { ToolCallBlock } from "./ToolCallBlock";
@@ -8,3 +7,4 @@ export { UserMessageCard } from "./UserMessageCard";
 export { ClaudeResponseCard } from "./ClaudeResponseCard";
 export { ActivityFeed } from "./ActivityFeed";
 export { StreamingToolbar } from "./StreamingToolbar";
+export { InlineStreamingIndicator } from "./InlineStreamingIndicator";

@@ -1,19 +1,10 @@
 import { Cpu, MemoryStick, HardDrive } from "lucide-react";
 import { ResourceBar } from "./ResourceBar";
+import { formatBytes } from "@/lib/storageUtils";
 import type { SystemResourcesInfo } from "./types";
 
 interface SystemResourcesSectionProps {
   resources: SystemResourcesInfo | null;
-}
-
-function formatBytes(bytes: number): string {
-  const GB = 1024 * 1024 * 1024;
-  const MB = 1024 * 1024;
-
-  if (bytes >= GB) {
-    return `${(bytes / GB).toFixed(1)} GB`;
-  }
-  return `${(bytes / MB).toFixed(0)} MB`;
 }
 
 export function SystemResourcesSection({

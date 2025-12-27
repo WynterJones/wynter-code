@@ -2,20 +2,13 @@ import { useState } from "react";
 import { Copy, Check, Loader2, FileJson } from "lucide-react";
 import { useApiTesterStore } from "@/stores/apiTesterStore";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/storageUtils";
 
 type ResponseTab = "body" | "headers";
 
 interface ResponseViewerProps {
   requestId: string;
   loading: boolean;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 function formatTime(ms: number): string {

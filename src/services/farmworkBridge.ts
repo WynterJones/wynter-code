@@ -84,15 +84,27 @@ class FarmworkBridge {
         buildingId,
       });
     } else {
-      // Regular tool: spawn tinted vehicle to farmhouse
+      // Regular tool: spawn tinted vehicle to Home, with random chance to also visit farmhouse
       const tint = this.getTintForTool(toolName);
-      const vehicleId = store.spawnVehicleWithTint("farmhouse", tint);
+      const alsoVisitFarmhouse = Math.random() < 0.3; // 30% chance to also visit farmhouse
+
+      let vehicleId: string;
+      if (alsoVisitFarmhouse) {
+        // Route: office (Home) -> farmhouse
+        vehicleId = store.spawnVehicleWithTintAndRoute(["office", "farmhouse"], tint);
+      } else {
+        // Route: just office (Home)
+        vehicleId = store.spawnVehicleWithTintAndRoute(["office"], tint);
+      }
       this.toolVehicleMap.set(toolId, vehicleId);
+
+      // Increment tool count for Home building
+      store.incrementToolCount();
 
       store.addActivity({
         type: "tool_started",
         message: `${this.formatToolName(toolName)}`,
-        buildingId: "farmhouse",
+        buildingId: "office",
       });
     }
   }

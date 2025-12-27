@@ -3,6 +3,7 @@ import { Download, Trash2, Image as ImageIcon, FileDown, X } from "lucide-react"
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/storageUtils";
 import JSZip from "jszip";
 
 interface ProcessedImage {
@@ -141,14 +142,6 @@ export function ExifDataRemover() {
       URL.revokeObjectURL(image.cleanedUrl);
     });
     setImages([]);
-  };
-
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
 
   const totalOriginalSize = images.reduce((sum, img) => sum + img.originalSize, 0);

@@ -20,6 +20,7 @@ export class GardenFlowers extends Container {
   private textures: Texture[] = [];
   private isLoaded = false;
   private gardenPos = BUILDING_POSITIONS.garden;
+  private pendingFlowerCount: number | null = null;
 
   private cellWidth: number;
   private cellHeight: number;
@@ -74,10 +75,20 @@ export class GardenFlowers extends Container {
         };
       }
     }
+
+    // Apply any pending flower count that was set before textures loaded
+    if (this.pendingFlowerCount !== null) {
+      this.setFlowerCount(this.pendingFlowerCount);
+      this.pendingFlowerCount = null;
+    }
   }
 
   setFlowerCount(count: number): void {
-    if (!this.isLoaded) return;
+    if (!this.isLoaded) {
+      // Store for later when textures finish loading
+      this.pendingFlowerCount = count;
+      return;
+    }
 
     const maxFlowers = GRID_SIZE * GRID_SIZE;
     const targetCount = Math.min(count, maxFlowers);

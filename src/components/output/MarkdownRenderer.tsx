@@ -56,17 +56,17 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
           </h3>
         ),
         ul: ({ children }) => (
-          <ul className="list-disc list-inside mb-3 space-y-1 text-sm text-text-primary">
+          <ul className="list-disc ml-4 pl-5 mb-3 space-y-1 text-sm text-text-primary">
             {children}
           </ul>
         ),
         ol: ({ children }) => (
-          <ol className="list-decimal list-inside mb-3 space-y-1 text-sm text-text-primary">
+          <ol className="list-decimal ml-4 pl-5 mb-3 space-y-1 text-sm text-text-primary">
             {children}
           </ol>
         ),
         li: ({ children }) => (
-          <li className="text-sm text-text-primary">{children}</li>
+          <li className="text-sm text-text-primary pl-1">{children}</li>
         ),
         code: ({ className, children, ...props }) => {
           const match = /language-(\w+)/.exec(className || "");

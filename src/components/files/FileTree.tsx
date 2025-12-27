@@ -9,7 +9,7 @@ import { FileDialog } from "./FileDialog";
 import { useFileOperations } from "@/hooks/useFileOperations";
 import { useGitStatus } from "@/hooks/useGitStatus";
 import { useCompression } from "@/hooks/useCompression";
-import { formatBytes } from "@/types/compression";
+import { formatBytes } from "@/lib/storageUtils";
 import type { FileNode } from "@/types";
 
 interface FileTreeProps {

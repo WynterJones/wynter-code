@@ -30,6 +30,9 @@ export type TerminalShell = "system" | "bash" | "zsh" | "fish" | "sh";
 // Lightcast hotkey options
 export type LightcastHotkey = "alt-space" | "cmd-space" | "ctrl-space" | "cmd-shift-space" | "alt-shift-space";
 
+// Claude subscription plan types
+export type ClaudeSubscriptionPlan = "pro" | "max-100" | "max-200";
+
 export const LIGHTCAST_HOTKEYS: { id: LightcastHotkey; name: string; display: string }[] = [
   { id: "alt-space", name: "Option + Space", display: "⌥ Space" },
   { id: "cmd-space", name: "Command + Space", display: "⌘ Space" },
@@ -115,6 +118,9 @@ interface SettingsStore {
   lightcastEnabled: boolean;
   launchAtStartup: boolean;
 
+  // Claude usage limits settings
+  claudeSubscriptionPlan: ClaudeSubscriptionPlan;
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
@@ -154,6 +160,9 @@ interface SettingsStore {
   setLightcastHotkey: (hotkey: LightcastHotkey) => void;
   setLightcastEnabled: (enabled: boolean) => void;
   setLaunchAtStartup: (enabled: boolean) => void;
+
+  // Claude limits setter
+  setClaudeSubscriptionPlan: (plan: ClaudeSubscriptionPlan) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -196,6 +205,9 @@ export const useSettingsStore = create<SettingsStore>()(
       lightcastHotkey: "alt-space",
       lightcastEnabled: true,
       launchAtStartup: false,
+
+      // Claude limits defaults
+      claudeSubscriptionPlan: "pro",
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -358,6 +370,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setLaunchAtStartup: (launchAtStartup: boolean) => {
         set({ launchAtStartup });
+      },
+
+      setClaudeSubscriptionPlan: (claudeSubscriptionPlan: ClaudeSubscriptionPlan) => {
+        set({ claudeSubscriptionPlan });
       },
     }),
     {

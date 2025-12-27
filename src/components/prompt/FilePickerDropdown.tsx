@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { FileCode, Folder } from "lucide-react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui";
+import { FileIcon } from "@/components/files/FileIcon";
 
 interface FilePickerDropdownProps {
   isOpen: boolean;
@@ -38,13 +39,6 @@ function fuzzyMatch(query: string, text: string): { match: boolean; score: numbe
     match: queryIndex === queryLower.length,
     score,
   };
-}
-
-function getFileIcon(path: string) {
-  if (path.endsWith("/")) {
-    return <Folder className="w-4 h-4 text-accent-yellow" />;
-  }
-  return <FileCode className="w-4 h-4 text-accent" />;
 }
 
 function getFileName(path: string): string {
@@ -102,6 +96,7 @@ export function FilePickerDropdown({
           e.preventDefault();
           setSelectedIndex((i) => Math.max(i - 1, 0));
           break;
+        case "Tab":
         case "Enter":
           e.preventDefault();
           if (filteredFiles[selectedIndex]) {
@@ -119,7 +114,12 @@ export function FilePickerDropdown({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, selectedIndex, filteredFiles, onSelect, onClose]);
 
-  if (!isOpen || filteredFiles.length === 0) return null;
+  if (!isOpen) return null;
+
+  // Show empty state when there are files but no matches
+  const showEmptyState = files.length > 0 && filteredFiles.length === 0 && searchQuery.length > 0;
+  // Don't show if there are no files at all
+  if (files.length === 0) return null;
 
   return (
     <div
@@ -137,34 +137,45 @@ export function FilePickerDropdown({
     >
       <ScrollArea className="max-h-64">
         <div className="py-1">
-          {filteredFiles.map((file, index) => (
-            <button
-              key={file.path}
-              type="button"
-              className={cn(
-                "w-full flex items-center gap-2 px-3 py-2",
-                "text-left text-sm",
-                "transition-colors",
-                index === selectedIndex
-                  ? "bg-accent/10 text-text-primary"
-                  : "text-text-secondary hover:bg-bg-hover"
-              )}
-              onClick={() => onSelect(file.path)}
-              onMouseEnter={() => setSelectedIndex(index)}
-            >
-              {getFileIcon(file.path)}
-              <div className="flex-1 min-w-0">
-                <div className="font-mono text-xs truncate">
-                  {getFileName(file.path)}
-                </div>
-                {getParentPath(file.path) && (
-                  <div className="text-xs text-text-secondary truncate">
-                    {getParentPath(file.path)}
-                  </div>
+          {showEmptyState ? (
+            <div className="flex flex-col items-center justify-center py-6 px-4 text-text-secondary">
+              <Search className="w-8 h-8 mb-2 opacity-50" />
+              <p className="text-sm">No matching files</p>
+              <p className="text-xs opacity-70">Try a different search term</p>
+            </div>
+          ) : (
+            filteredFiles.map((file, index) => (
+              <button
+                key={file.path}
+                type="button"
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-2",
+                  "text-left text-sm",
+                  "transition-colors",
+                  index === selectedIndex
+                    ? "bg-accent/10 text-text-primary"
+                    : "text-text-secondary hover:bg-bg-hover"
                 )}
-              </div>
-            </button>
-          ))}
+                onClick={() => onSelect(file.path)}
+                onMouseEnter={() => setSelectedIndex(index)}
+              >
+                <FileIcon
+                  name={getFileName(file.path)}
+                  isDirectory={file.path.endsWith("/")}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-mono text-xs truncate">
+                    {getFileName(file.path)}
+                  </div>
+                  {getParentPath(file.path) && (
+                    <div className="text-xs text-text-secondary truncate">
+                      {getParentPath(file.path)}
+                    </div>
+                  )}
+                </div>
+              </button>
+            ))
+          )}
         </div>
       </ScrollArea>
     </div>

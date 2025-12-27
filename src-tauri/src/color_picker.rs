@@ -37,6 +37,7 @@ pub struct MagnifierData {
 /// Pick the color at the current cursor position using screen capture
 #[cfg(target_os = "macos")]
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn pick_screen_color() -> Result<ColorResult, String> {
     use cocoa::base::id;
     use cocoa::foundation::NSPoint;
@@ -171,6 +172,7 @@ pub async fn close_color_picker_window(app: AppHandle) -> Result<(), String> {
 /// Get the current cursor position (for window positioning)
 #[cfg(target_os = "macos")]
 #[tauri::command]
+#[allow(deprecated)]
 pub fn get_cursor_position() -> Result<(f64, f64), String> {
     use cocoa::base::id;
     use cocoa::foundation::NSPoint;
@@ -258,8 +260,9 @@ pub fn save_color_picker_position(x: f64, y: f64) {
 /// Capture a region of pixels around the cursor for the magnifier
 #[cfg(target_os = "macos")]
 #[tauri::command]
+#[allow(deprecated)]
 pub async fn capture_magnifier_region(app: AppHandle, zoom_in: bool) -> Result<MagnifierData, String> {
-    use cocoa::base::{id, nil};
+    use cocoa::base::id;
     use cocoa::foundation::{NSArray, NSPoint};
     use core_graphics::display::CGDisplay;
     use core_graphics::geometry::{CGPoint, CGRect, CGSize};
@@ -469,6 +472,7 @@ pub async fn start_color_picking_mode(app: AppHandle) -> Result<(), String> {
 
     // Store window ID for screenshot exclusion
     #[cfg(target_os = "macos")]
+    #[allow(deprecated)]
     {
         use cocoa::base::id;
         use objc::{msg_send, sel, sel_impl};

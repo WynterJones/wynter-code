@@ -131,8 +131,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
     <div
       ref={containerRef}
       className={cn(
-        "fixed z-[9999] rounded-lg overflow-hidden shadow-2xl",
-        "border border-border bg-bg-secondary",
+        "fixed z-[9999] overflow-hidden",
         "transition-shadow duration-200",
         (isDragging || isResizing) && "shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]"
       )}
@@ -140,20 +139,35 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
         left: position.x,
         top: position.y,
         width: size,
+        borderRadius: "12px",
+        border: "3px solid #3a3a3a",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
+        background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
       }}
     >
       {/* Header - Drag Handle */}
       <div
         className={cn(
-          "flex items-center justify-between px-2 py-1.5",
-          "bg-bg-tertiary border-b border-border cursor-grab",
+          "flex items-center justify-between px-2 py-1.5 cursor-grab",
           isDragging && "cursor-grabbing"
         )}
+        style={{
+          background: "linear-gradient(180deg, #333 0%, #222 100%)",
+          borderBottom: "1px solid #444",
+        }}
         onMouseDown={handleDragStart}
       >
         <div className="flex items-center gap-1.5">
-          <GripVertical className="w-3 h-3 text-text-secondary" />
-          <span className="text-xs font-medium text-text-primary">Farmwork Tycoon</span>
+          <GripVertical className="w-3 h-3" style={{ color: "#666" }} />
+          <span
+            className="text-xs font-bold tracking-widest uppercase"
+            style={{
+              color: "#555",
+              textShadow: "0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(255,255,255,0.05)",
+            }}
+          >
+            Farmwork Tycoon
+          </span>
         </div>
         <div className="flex items-center gap-0.5">
           <Tooltip content="Expand">
@@ -183,38 +197,76 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
         </div>
       </div>
 
-      {/* Game Container */}
+      {/* Arcade Cabinet Frame */}
       <div
-        className="relative bg-neutral-950"
-        style={{ height: size - 36 }}
+        className="relative"
+        style={{
+          height: size - 36,
+          padding: "8px",
+          background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
+        }}
       >
-        <div className="absolute inset-0 flex items-center justify-center">
-          <TycoonGame
-            containerWidth={size}
-            containerHeight={size - 36}
-            isMiniPlayer
+        {/* Screen bezel */}
+        <div
+          className="relative h-full overflow-hidden"
+          style={{
+            padding: "4px",
+            background: "#0a0a0a",
+            borderRadius: "4px",
+            border: "2px solid #222",
+          }}
+        >
+          {/* CRT Screen glow effect */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: "radial-gradient(ellipse at center, rgba(100,255,100,0.03) 0%, transparent 70%)",
+              zIndex: 1,
+            }}
           />
-        </div>
 
-        {/* CRT Effects */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `repeating-linear-gradient(
-              0deg,
-              transparent,
-              transparent 2px,
-              rgba(0, 0, 0, 0.1) 2px,
-              rgba(0, 0, 0, 0.1) 4px
-            )`,
-          }}
-        />
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            boxShadow: "inset 0 0 30px rgba(0,0,0,0.3)",
-          }}
-        />
+          {/* Game canvas */}
+          <div className="relative h-full flex items-center justify-center">
+            <TycoonGame
+              containerWidth={size - 28}
+              containerHeight={size - 60}
+              isMiniPlayer
+            />
+
+            {/* Scanline overlay */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: `repeating-linear-gradient(
+                  0deg,
+                  transparent,
+                  transparent 2px,
+                  rgba(0, 0, 0, 0.15) 2px,
+                  rgba(0, 0, 0, 0.15) 4px
+                )`,
+                zIndex: 10,
+              }}
+            />
+
+            {/* Screen reflection/glare */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)",
+                zIndex: 11,
+              }}
+            />
+
+            {/* Vignette effect */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 40px rgba(0,0,0,0.4)",
+                zIndex: 12,
+              }}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Resize Handle */}

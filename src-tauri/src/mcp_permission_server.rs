@@ -192,6 +192,10 @@ fn handle_mcp_connection(
                         request.session_id = session_id.clone();
 
                         let request_id = request.id.clone();
+                        eprintln!(
+                            "[MCP Permission] Processing permission request: id={}, tool={}",
+                            request_id, request.tool_name
+                        );
 
                         // Create response channel
                         let (tx, rx) = oneshot::channel();
@@ -206,10 +210,18 @@ fn handle_mcp_connection(
                                     response_tx: Some(tx),
                                 },
                             );
+                            eprintln!(
+                                "[MCP Permission] Stored pending request with ID: {}",
+                                request_id
+                            );
                         }
 
                         // Emit event to frontend
                         let event = McpPermissionEvent { request };
+                        eprintln!(
+                            "[MCP Permission] Emitting mcp-permission-request event for ID: {}",
+                            request_id
+                        );
                         if let Err(e) = window.emit("mcp-permission-request", &event) {
                             eprintln!("[MCP Permission] Failed to emit event: {}", e);
                         }
@@ -279,17 +291,37 @@ pub async fn respond_to_mcp_permission(
     approved: bool,
     updated_input: Option<serde_json::Value>,
 ) -> Result<(), String> {
+    eprintln!(
+        "[MCP Permission] respond_to_mcp_permission called: request_id={}, approved={}",
+        request_id, approved
+    );
+
     let mut pending = state.pending_requests.lock().unwrap();
 
-    if let Some(mut request) = pending.remove(&request_id) {
-        if let Some(tx) = request.response_tx.take() {
+    // Log all pending request IDs for debugging
+    let pending_ids: Vec<String> = pending.keys().cloned().collect();
+    eprintln!(
+        "[MCP Permission] Pending requests: {:?}",
+        pending_ids
+    );
+
+    if let Some(mut pending_request) = pending.remove(&request_id) {
+        if let Some(tx) = pending_request.response_tx.take() {
+            // When approving, use the updated_input if provided, otherwise echo back the original input
+            // Claude's permission-prompt-tool requires the input to be returned with the approval
+            let final_input = if approved {
+                updated_input.or(Some(pending_request.request.input.clone()))
+            } else {
+                None
+            };
+
             let response = McpPermissionResponse {
                 behavior: if approved {
                     "allow".to_string()
                 } else {
                     "deny".to_string()
                 },
-                updated_input: if approved { updated_input } else { None },
+                updated_input: final_input,
                 message: if approved {
                     None
                 } else {
@@ -297,14 +329,25 @@ pub async fn respond_to_mcp_permission(
                 },
             };
 
+            eprintln!(
+                "[MCP Permission] Sending response via channel: {:?}",
+                response
+            );
+
             tx.send(response)
                 .map_err(|_| "Failed to send response".to_string())?;
 
+            eprintln!("[MCP Permission] Response sent successfully");
             Ok(())
         } else {
+            eprintln!("[MCP Permission] ERROR: Response channel already used");
             Err("Response channel already used".to_string())
         }
     } else {
+        eprintln!(
+            "[MCP Permission] ERROR: Request not found! Looking for: {}, available: {:?}",
+            request_id, pending_ids
+        );
         Err("Request not found".to_string())
     }
 }

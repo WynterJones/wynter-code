@@ -3,7 +3,7 @@
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
 **Last Updated:** 2025-12-26
-**Active Ideas:** 4
+**Active Ideas:** 3
 
 ---
 
@@ -19,53 +19,38 @@
 
 ## Ideas
 
-### Auto Build
-**Location:** New session tab type
-A new session tab type featuring a Kanban board for automated feature development. Issues/tickets flow through the pipeline automatically via an auto-prompt process that builds features hands-free.
-- New session tab type (alongside existing tab types)
-- Kanban board with 4 columns: Backlog, In Progress, QA, Completed
-- Auto-prompt system that automatically works through tickets
-- Moves issues from Backlog -> In Progress -> QA -> Completed
-- Automated feature building workflow
-- Real-time Kanban updates as work progresses
-- Hands-free development pipeline
-- Follow existing UI patterns (OverlayScrollbars, no emojis, proper icons)
+### Homebrew Manager
+**Location:** New tool popup
+A tool to view, manage, and search for Homebrew packages.
+- View all installed Homebrew packages
+- Search for new packages from Homebrew registry
+- Install/uninstall packages with one click
+- View package details (description, version, dependencies)
+- Update outdated packages
+- Manage casks (GUI applications) alongside formulae
 
-### System-Wide Raycast-Style Launcher
-**Location:** System-level feature (outside main app)
-A Raycast-style popup window that opens outside the main Wynter Code app as a system-level feature. Provides quick access to search and actions from anywhere on your desktop.
-- Opens via global hotkey (configurable)
-- Search Google directly from launcher
-- Search user's local files and folders
-- Search features within Wynter Code app (like command palette but system-wide)
-- Quick launcher UI similar to Raycast/Alfred aesthetic
-- Fast, minimal popup that appears over any app
-- Keyboard-driven navigation
-- Recent searches and favorites
+### System Cleaner
+**Location:** New tool popup
+A CleanMyMac-style tool to find and remove large files, temp files, and system junk to free up disk space.
+- Scan for large files and folders across the system
+- Find and clean temporary files and caches
+- Identify old downloads and unused applications
+- Clean browser caches and data
+- Remove system logs and crash reports
+- Show disk usage visualization
+- Safe deletion with trash/restore option
+- Exclude list for protected paths
 
-### System-Wide Whispr Flow Clone
-**Location:** System-level feature (outside main app)
-A system-wide speech-to-text tool similar to Whispr Flow. Capture voice input from anywhere and have it automatically transcribed and pasted at your cursor position.
-- Activated by holding a key combination (e.g., Cmd+Shift)
-- Shows a waveform visualization window while recording
-- Records audio from system microphone
-- Converts audio to text via speech-to-text API (Whisper or similar)
-- Applies a grammar/optimization layer to clean up transcription
-- Auto-pastes the cleaned result at cursor position
-- Works system-wide across any application
-- Minimal floating UI during recording
-- Configurable hotkey and transcription settings
-
-### Encrypted Web Backup
-**Location:** External service (Netlify-hosted)
-A low-tech, elegant backup solution powered by Netlify - a simple HTML file with a sleek black lock design that contains an encrypted zip of app data. Syncs daily and allows data recovery by entering the URL and password to decrypt and import.
-- Netlify-hosted static HTML page with minimalist black lock design
-- Daily automated sync of local app data export
-- Data stored as encrypted zip file embedded in/alongside the page
-- Password-based decryption for data recovery
-- Enter URL + password to decrypt and import data back into app
-- Low-tech, resilient approach - works even if main service is down
-- No account required, just a URL and password
+### Claude Code Limits Dashboard
+**Location:** Enhancement to Claude Code Stats
+Enhance the Claude Code Stats feature to display usage limits and progress bars for the daily 5-hour sliding window and weekly usage caps.
+- Show daily 5-hour sliding window usage with progress bar
+- Display weekly usage limit with progress bar
+- Visual indicators when approaching limits (warning/yellow and critical/red thresholds)
+- Show time remaining until limit resets
+- Historical usage graph over time
+- Notification when nearing capacity
+- Color-coded status (green/yellow/red based on usage level)
 
 ---
 
@@ -75,6 +60,7 @@ A low-tech, elegant backup solution powered by Netlify - a simple HTML file with
 |------|------|------|
 | Multi-Model Support | `_PLANS/MULTI_MODEL_SUPPORT.md` | 2025-12-23 |
 | Farmwork Tycoon | `_PLANS/PIXIJS_GAME_MODE.md` | 2025-12-23 |
+| Auto Build | `_PLANS/AUTO_BUILD.md` | 2025-12-26 |
 
 ---
 
@@ -119,3 +105,5 @@ A low-tech, elegant backup solution powered by Netlify - a simple HTML file with
 | Bookmarks | `BookmarksPopup` - Save and organize sites/web apps/services, category folders, icon gallery vs list view, favicon display, AI apps tracking | 2025-12-24 |
 | Project Search | `ProjectSearchPopup` - Project-wide file search with context chunks, regex/case-sensitive/whole-word modes, find & replace, click to open file at line, keyboard navigation | 2025-12-24 |
 | Just Command Manager | `JustCommandManagerPopup` - Manage justfile recipes, detect justfile presence, run recipes with embedded terminal, favorites/recents, visual editor to add/edit recipes, help tab with quick reference | 2025-12-25 |
+| Raycast-Style Launcher | System-level popup launcher with global hotkey, Google/file/feature search, keyboard navigation | 2025-12-26 |
+| Encrypted Web Backup | Netlify-hosted encrypted backup with black lock design, password decryption, data import/export | 2025-12-26 |

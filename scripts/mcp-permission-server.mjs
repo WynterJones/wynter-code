@@ -49,15 +49,21 @@ function connectWebSocket() {
   ws.on('message', (data) => {
     try {
       const response = JSON.parse(data.toString());
-      console.error('[MCP] Received response:', JSON.stringify(response).slice(0, 200));
+      console.error('[MCP] Received WebSocket response:', JSON.stringify(response));
+      console.error('[MCP] Pending requests count:', pendingRequests.size);
 
       // Find the pending request by matching (we only have one at a time)
       // The response contains the MCP permission response format
       const [requestId, resolver] = [...pendingRequests.entries()][0] || [];
 
+      console.error('[MCP] Resolving request:', requestId);
+
       if (resolver) {
         pendingRequests.delete(requestId);
+        console.error('[MCP] Calling resolver with response');
         resolver(response);
+      } else {
+        console.error('[MCP] WARNING: No resolver found for response!');
       }
     } catch (e) {
       console.error('[MCP] Failed to parse response:', e);
@@ -164,13 +170,15 @@ const handlers = {
     const input = args.input;
 
     console.error(`[MCP] Permission request for tool: ${toolName}`);
+    console.error(`[MCP] Tool input keys: ${Object.keys(input || {}).join(', ')}`);
 
     try {
       const response = await requestPermission(toolName, input);
+      console.error(`[MCP] Got permission response:`, JSON.stringify(response));
 
       // Return in MCP tool result format
       // The content should match what Claude expects for permission responses
-      return {
+      const result = {
         content: [
           {
             type: 'text',
@@ -178,10 +186,12 @@ const handlers = {
           }
         ]
       };
+      console.error(`[MCP] Returning result to Claude:`, JSON.stringify(result));
+      return result;
     } catch (e) {
       console.error('[MCP] Permission request failed:', e);
       // Return deny on error
-      return {
+      const denyResult = {
         content: [
           {
             type: 'text',
@@ -192,6 +202,8 @@ const handlers = {
           }
         ]
       };
+      console.error(`[MCP] Returning DENY to Claude:`, JSON.stringify(denyResult));
+      return denyResult;
     }
   },
 

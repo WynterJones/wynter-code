@@ -273,7 +273,7 @@ pub async fn start_webhook_server(
 
                         // Read body
                         let mut body = String::new();
-                        let mut reader = request.as_reader();
+                        let reader = request.as_reader();
                         let _ = reader.take(1024 * 1024).read_to_string(&mut body);
 
                         let event = WebhookRequestEvent {

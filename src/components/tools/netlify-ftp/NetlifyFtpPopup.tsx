@@ -3,20 +3,19 @@ import {
   Plug,
   Plus,
   RefreshCw,
-  Settings,
   LogOut,
   Loader2,
   Upload,
+  ExternalLink,
 } from "lucide-react";
-import { Modal, Button, Input } from "@/components/ui";
+import { open } from "@tauri-apps/plugin-shell";
+import { Popup, Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useNetlifyFtpStore } from "@/stores/netlifyFtpStore";
 import { DropZone } from "./DropZone";
 import { SiteList } from "./SiteList";
 import { DeployHistory } from "./DeployHistory";
-import { StatusBar } from "./StatusBar";
 import { TokenSetup } from "./TokenSetup";
-import { SiteSettings } from "./SiteSettings";
 
 interface NetlifyFtpPopupProps {
   isOpen: boolean;
@@ -24,13 +23,12 @@ interface NetlifyFtpPopupProps {
 }
 
 const MIN_SIDEBAR_WIDTH = 200;
-const MAX_SIDEBAR_WIDTH = 500;
-const DEFAULT_SIDEBAR_WIDTH = 280;
+const MAX_SIDEBAR_WIDTH = 400;
+const DEFAULT_SIDEBAR_WIDTH = 240;
 
 export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
   const [showNewSiteDialog, setShowNewSiteDialog] = useState(false);
   const [newSiteName, setNewSiteName] = useState("");
-  const [showSiteSettings, setShowSiteSettings] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
@@ -139,9 +137,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
 
   const handleDeleteSite = useCallback(
     async (siteId: string) => {
-      if (confirm("Are you sure you want to delete this site?")) {
-        await deleteSite(siteId);
-      }
+      await deleteSite(siteId);
     },
     [deleteSite],
   );
@@ -167,20 +163,34 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     [currentSiteId, rollbackDeploy],
   );
 
+  const handleOpenSite = useCallback(async () => {
+    if (currentSite) {
+      const url = currentSite.custom_domain
+        ? `https://${currentSite.custom_domain}`
+        : currentSite.ssl_url || currentSite.url;
+      try {
+        await open(url);
+      } catch (err) {
+        console.error("Failed to open URL:", err);
+      }
+    }
+  }, [currentSite]);
+
   const isConnected = connectionStatus === "connected";
 
+  // Get display URL for current site
+  const currentSiteUrl = currentSite
+    ? currentSite.custom_domain || currentSite.url.replace(/https?:\/\//, "")
+    : "";
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="full" title="Netlify FTP">
-      <div className={cn("flex flex-col h-full", isResizing && "select-none")}>
-        {/* Toolbar */}
-        <div className="flex items-center gap-2 px-4 py-2 border-b border-border">
-          {isConnected ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={handleDisconnect}>
-                <LogOut className="w-4 h-4 mr-1.5" />
-                Disconnect
-              </Button>
-              <div className="w-px h-4 bg-border" />
+    <Popup isOpen={isOpen} onClose={onClose} size="full">
+      <Popup.Header
+        icon={Upload}
+        title="Netlify FTP"
+        actions={
+          isConnected ? (
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="sm"
@@ -196,27 +206,13 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                 disabled={isLoadingSites}
               >
                 <RefreshCw
-                  className={cn(
-                    "w-4 h-4 mr-1.5",
-                    isLoadingSites && "animate-spin",
-                  )}
+                  className={cn("w-4 h-4", isLoadingSites && "animate-spin")}
                 />
-                Refresh
               </Button>
-              {currentSite && (
-                <>
-                  <div className="w-px h-4 bg-border" />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowSiteSettings(true)}
-                  >
-                    <Settings className="w-4 h-4 mr-1.5" />
-                    Settings
-                  </Button>
-                </>
-              )}
-            </>
+              <Button variant="ghost" size="sm" onClick={handleDisconnect}>
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           ) : (
             <Button
               variant="ghost"
@@ -227,11 +223,12 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
               <Plug className="w-4 h-4 mr-1.5" />
               Connect
             </Button>
-          )}
-        </div>
+          )
+        }
+      />
 
-        {/* Main Content */}
-        <div className="flex-1 min-h-0">
+      <Popup.Content scrollable={false} padding="none">
+        <div className={cn("flex h-full", isResizing && "select-none")}>
           {!apiToken || connectionStatus === "disconnected" ? (
             <TokenSetup
               onSubmit={handleConnect}
@@ -239,7 +236,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
               error={connectionError}
             />
           ) : connectionStatus === "connecting" ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex items-center justify-center w-full">
               <div className="text-center">
                 <Loader2 className="w-8 h-8 text-accent animate-spin mx-auto mb-3" />
                 <div className="text-sm text-text-primary mb-1">
@@ -251,7 +248,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
               </div>
             </div>
           ) : connectionStatus === "error" ? (
-            <div className="flex flex-col items-center justify-center h-full p-8">
+            <div className="flex flex-col items-center justify-center w-full p-8">
               <div className="text-accent-red text-sm font-medium mb-2">
                 Connection Failed
               </div>
@@ -274,7 +271,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
               </div>
             </div>
           ) : (
-            <div className="flex flex-1 h-full">
+            <>
               {/* Left Pane - Sites */}
               <div
                 className="relative border-r border-border flex flex-col shrink-0 bg-bg-primary"
@@ -299,72 +296,77 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
               </div>
 
               {/* Right Pane - Deploy Zone & History */}
-              <div className="flex-1 flex flex-col min-w-0">
-                <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-                  <Upload className="w-4 h-4 text-text-secondary" />
-                  <span className="text-sm font-medium">
-                    {currentSite ? currentSite.name : "Select a site"}
-                  </span>
-                </div>
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  {currentSite ? (
-                    <>
-                      {/* Drop Zone */}
-                      <div className="p-3 border-b border-border">
-                        <DropZone
-                          onFileDrop={handleFileDrop}
-                          isUploading={isDeploying}
-                          progress={deployProgress}
-                          message={deployMessage}
-                          disabled={!currentSite}
+              <div className="flex-1 flex flex-col min-w-0 bg-bg-secondary">
+                {currentSite ? (
+                  <>
+                    {/* Site Header */}
+                    <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-bg-primary">
+                      {/* Screenshot thumbnail */}
+                      {currentSite.screenshot_url ? (
+                        <img
+                          src={currentSite.screenshot_url}
+                          alt={currentSite.name}
+                          className="w-16 h-10 object-cover rounded border border-border"
                         />
-                      </div>
+                      ) : (
+                        <div className="w-16 h-10 rounded border border-border bg-bg-tertiary flex items-center justify-center">
+                          <Upload className="w-4 h-4 text-text-secondary" />
+                        </div>
+                      )}
 
-                      {/* Deploy History */}
-                      <div className="flex-1 min-h-0">
-                        <DeployHistory
-                          deploys={currentDeploys}
-                          isLoading={isLoadingDeploys}
-                          onRollback={handleRollback}
-                        />
+                      <div className="flex-1 min-w-0">
+                        {/* Site name */}
+                        <div className="text-sm font-medium text-text-primary truncate">
+                          {currentSite.name}
+                        </div>
+
+                        {/* URL */}
+                        <button
+                          onClick={handleOpenSite}
+                          className="flex items-center gap-1 text-xs text-accent hover:underline"
+                        >
+                          {currentSiteUrl}
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-sm text-text-secondary">
-                      Select a site to deploy
                     </div>
-                  )}
-                </div>
+
+                    {/* Drop Zone */}
+                    <div className="p-4 border-b border-border">
+                      <DropZone
+                        onFileDrop={handleFileDrop}
+                        isUploading={isDeploying}
+                        progress={deployProgress}
+                        message={deployMessage}
+                        disabled={!currentSite}
+                      />
+                    </div>
+
+                    {/* Deploy History */}
+                    <div className="flex-1 min-h-0">
+                      <DeployHistory
+                        deploys={currentDeploys}
+                        isLoading={isLoadingDeploys}
+                        onRollback={handleRollback}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-sm text-text-secondary">
+                    Select a site to deploy
+                  </div>
+                )}
               </div>
-            </div>
+            </>
           )}
         </div>
 
-        {/* Status Bar */}
-        <StatusBar
-          status={connectionStatus}
-          currentSite={currentSite}
-          error={connectionError}
-        />
-
-        {/* Site Settings Modal */}
-        {showSiteSettings && currentSite && (
-          <SiteSettings
-            site={currentSite}
-            onClose={() => setShowSiteSettings(false)}
-          />
-        )}
-
         {/* New Site Dialog */}
         {showNewSiteDialog && (
-          <Modal
-            isOpen={showNewSiteDialog}
-            onClose={() => setShowNewSiteDialog(false)}
-            title="Create New Site"
-            size="sm"
-          >
-            <div className="p-4">
-              <label className="block text-sm text-text-secondary mb-2">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-bg-secondary border border-border rounded-lg p-4 w-80">
+              <h3 className="text-sm font-semibold mb-3">Create New Site</h3>
+              <label className="block text-xs text-text-secondary mb-2">
                 Site name (subdomain)
               </label>
               <Input
@@ -397,9 +399,9 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                 </Button>
               </div>
             </div>
-          </Modal>
+          </div>
         )}
-      </div>
-    </Modal>
+      </Popup.Content>
+    </Popup>
   );
 }

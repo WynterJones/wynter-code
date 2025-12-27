@@ -1,5 +1,7 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, Loader2 } from "lucide-react";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 
 interface DropZoneProps {
@@ -8,6 +10,10 @@ interface DropZoneProps {
   progress: number;
   message: string;
   disabled?: boolean;
+}
+
+function isZipFile(filename: string): boolean {
+  return filename.toLowerCase().endsWith(".zip");
 }
 
 export function DropZone({
@@ -19,6 +25,84 @@ export function DropZone({
 }: DropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  // Check if a position is within the dropzone bounds
+  const isPositionInDropZone = useCallback((x: number, y: number): boolean => {
+    if (!dropZoneRef.current) return false;
+    const rect = dropZoneRef.current.getBoundingClientRect();
+    return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  }, []);
+
+  // Listen for Tauri file drop events (works with Finder/external apps)
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    const setupListener = async () => {
+      try {
+        const webview = getCurrentWebview();
+        unlisten = await webview.onDragDropEvent(async (event) => {
+          if (disabled || isUploading) return;
+
+          const eventType = event.payload.type;
+
+          if (eventType === "enter" || eventType === "over") {
+            // Check if position is over our dropzone
+            const pos = event.payload.position;
+            if (pos && isPositionInDropZone(pos.x, pos.y)) {
+              setIsDragging(true);
+            } else {
+              setIsDragging(false);
+            }
+          } else if (eventType === "drop") {
+            setIsDragging(false);
+
+            // Check if drop position is within our dropzone
+            const pos = event.payload.position;
+            if (!pos || !isPositionInDropZone(pos.x, pos.y)) return;
+
+            const paths = event.payload.paths;
+            if (paths && paths.length > 0) {
+              const filePath = paths[0];
+              const fileName = filePath.split("/").pop() || filePath;
+
+              if (isZipFile(fileName)) {
+                try {
+                  // Read the file as binary using Tauri command
+                  const base64Data = await invoke<string>("read_file_base64", {
+                    path: filePath,
+                  });
+                  // Convert base64 to binary
+                  const binaryString = atob(base64Data);
+                  const bytes = new Uint8Array(binaryString.length);
+                  for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                  }
+                  // Create a File object from the data
+                  const file = new File([bytes], fileName, {
+                    type: "application/zip",
+                  });
+                  onFileDrop(file);
+                } catch (err) {
+                  console.error("Failed to read dropped file:", err);
+                }
+              }
+            }
+          } else if (eventType === "leave") {
+            setIsDragging(false);
+          }
+        });
+      } catch (err) {
+        console.error("Failed to setup drag-drop listener:", err);
+      }
+    };
+
+    setupListener();
+
+    return () => {
+      unlisten?.();
+    };
+  }, [disabled, isUploading, onFileDrop, isPositionInDropZone]);
 
   const handleDragEnter = useCallback(
     (e: React.DragEvent) => {
@@ -42,6 +126,7 @@ export function DropZone({
     e.stopPropagation();
   }, []);
 
+  // HTML5 drop handler as fallback (for internal drags)
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -53,7 +138,7 @@ export function DropZone({
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         const file = files[0];
-        if (file.name.endsWith(".zip") || file.type === "application/zip") {
+        if (isZipFile(file.name) || file.type === "application/zip" || file.type === "application/x-zip-compressed") {
           onFileDrop(file);
         }
       }
@@ -83,6 +168,7 @@ export function DropZone({
 
   return (
     <div
+      ref={dropZoneRef}
       className={cn(
         "border-2 border-dashed rounded-lg p-6 transition-colors",
         "flex flex-col items-center justify-center text-center min-h-[140px]",

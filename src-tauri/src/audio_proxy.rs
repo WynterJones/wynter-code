@@ -268,7 +268,7 @@ pub async fn stop_audio_proxy(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn get_audio_proxy_url(app: AppHandle, stream_url: String) -> Result<String, String> {
-    let manager = app.state::<Arc<AudioProxyManager>>();
+    let _manager = app.state::<Arc<AudioProxyManager>>();
 
     // Start proxy if not running
     let info = start_audio_proxy(app.clone()).await?;

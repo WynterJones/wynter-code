@@ -17,6 +17,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Modal, IconButton, Tooltip } from "@/components/ui";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
+import { formatBytes } from "@/lib/storageUtils";
 import type { BackgroundService, ServiceCategory } from "./types";
 import { CATEGORY_CONFIG } from "./types";
 
@@ -40,14 +41,6 @@ const CATEGORY_ICONS: Record<ServiceCategory, React.ReactNode> = {
   message_queues: <MessageSquare className="w-4 h-4" />,
   other: <Zap className="w-4 h-4" />,
 };
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
 
 export function BackgroundServicesPopup({
   isOpen,

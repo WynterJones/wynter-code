@@ -8,6 +8,7 @@ import { AskUserQuestionModal } from "@/components/output/AskUserQuestionModal";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useFileIndexStore } from "@/stores/fileIndexStore";
 import { claudeService } from "@/services/claude";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
@@ -62,7 +63,9 @@ export function ClaudeOutputPanel({
     setPendingQuestionSet,
     updateSessionPermissionMode,
   } = useSessionStore();
-  const { claudeSafeMode } = useSettingsStore();
+  const { claudeSafeMode, defaultModel } = useSettingsStore();
+  const { getFiles, loadIndex } = useFileIndexStore();
+  const projectFiles = getFiles(projectPath);
 
   const [activityHeight, setActivityHeight] = useState(DEFAULT_ACTIVITY_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
@@ -87,6 +90,13 @@ export function ClaudeOutputPanel({
   useEffect(() => {
     onProcessStateChange(isStreaming || isSessionActive);
   }, [isStreaming, isSessionActive, onProcessStateChange]);
+
+  // Load file index for @ mentions
+  useEffect(() => {
+    if (projectPath) {
+      loadIndex(projectPath);
+    }
+  }, [projectPath, loadIndex]);
 
   // Set sessionId if not already set
   useEffect(() => {
@@ -234,7 +244,8 @@ export function ClaudeOutputPanel({
         },
         permissionMode,
         resumeSessionId,
-        claudeSafeMode
+        claudeSafeMode,
+        defaultModel
       );
     } catch (error) {
       console.error("[ClaudeOutputPanel] Failed to start session:", error);
@@ -258,6 +269,7 @@ export function ClaudeOutputPanel({
     finishStreaming,
     claudeSafeMode,
     setPendingQuestionSet,
+    defaultModel,
   ]);
 
   const handleStopSession = useCallback(async () => {
@@ -425,7 +437,8 @@ export function ClaudeOutputPanel({
         },
         "acceptEdits",
         resumeSessionId,
-        claudeSafeMode
+        claudeSafeMode,
+        defaultModel
       );
     } catch (error) {
       console.error("[ClaudeOutputPanel] Failed to execute plan:", error);
@@ -451,6 +464,7 @@ export function ClaudeOutputPanel({
     updateStats,
     setPendingQuestionSet,
     claudeSafeMode,
+    defaultModel,
   ]);
 
   const handleQuestionSubmit = useCallback(
@@ -572,7 +586,7 @@ export function ClaudeOutputPanel({
         <EnhancedPromptInput
           projectPath={projectPath}
           sessionId={sessionId}
-          projectFiles={[]}
+          projectFiles={projectFiles}
           onSendPrompt={handleSendPrompt}
           disabled={!isSessionActive}
           placeholder={

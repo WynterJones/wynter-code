@@ -14,6 +14,7 @@ import {
 import { ScrollArea, Badge } from "@/components/ui";
 import type { Project } from "@/types";
 import { formatDate } from "@/lib/utils";
+import { formatBytes } from "@/lib/storageUtils";
 
 interface ProjectInfoProps {
   project: Project;
@@ -26,14 +27,6 @@ interface DirectoryStats {
   nodeModulesSize: number;
   linesOfCode: number;
   fileTypeCounts: Record<string, number>;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  const k = 1024;
-  const sizes = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 function formatNumber(num: number): string {

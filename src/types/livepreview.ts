@@ -51,3 +51,9 @@ export interface PreviewEvent {
   status?: PreviewStatus;
   message?: string;
 }
+
+export interface PortCheckResult {
+  port: number;
+  inUse: boolean;
+  nextAvailable: number;
+}

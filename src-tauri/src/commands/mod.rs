@@ -5,7 +5,6 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 use tauri::Emitter;
-use tauri_plugin_sql::Migration;
 use ignore::gitignore::GitignoreBuilder;
 use ignore::WalkBuilder;
 
@@ -276,6 +275,91 @@ pub fn find_markdown_files(project_path: String) -> Result<Vec<MarkdownFile>, St
         }
         a.name.to_lowercase().cmp(&b.name.to_lowercase())
     });
+
+    Ok(files)
+}
+
+/// Lists all files in a project for @ file mention autocomplete
+/// Returns relative paths, respects .gitignore, excludes common build/dependency dirs
+#[tauri::command]
+pub fn list_project_files(project_path: String) -> Result<Vec<String>, String> {
+    let project_path_obj = Path::new(&project_path);
+
+    if !project_path_obj.exists() {
+        return Err(format!("Path does not exist: {}", project_path));
+    }
+
+    const MAX_FILES: usize = 10_000;
+    const EXCLUDED_DIRS: &[&str] = &[
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        ".next",
+        "target",
+        ".turbo",
+        ".cache",
+        "coverage",
+        ".pnpm",
+        "vendor",
+        ".svn",
+        ".hg",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        "venv",
+        ".venv",
+        "env",
+        ".tox",
+    ];
+
+    let mut files: Vec<String> = Vec::new();
+
+    let walker = WalkBuilder::new(&project_path)
+        .hidden(false)
+        .git_ignore(true)
+        .git_global(true)
+        .git_exclude(true)
+        .require_git(false)
+        .build();
+
+    for entry in walker {
+        if files.len() >= MAX_FILES {
+            break;
+        }
+
+        let entry = match entry {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        let path = entry.path();
+
+        if path.is_dir() {
+            continue;
+        }
+
+        let path_str = path.to_string_lossy().to_lowercase();
+        let should_skip = EXCLUDED_DIRS.iter().any(|dir| {
+            path_str.contains(&format!("/{}/", dir)) || path_str.contains(&format!("\\{}\\", dir))
+        });
+
+        if should_skip {
+            continue;
+        }
+
+        let relative_path = path
+            .strip_prefix(&project_path)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .to_string();
+
+        if !relative_path.is_empty() {
+            files.push(relative_path);
+        }
+    }
+
+    files.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
 
     Ok(files)
 }
@@ -678,6 +762,20 @@ pub fn create_chunk(chunk_type: &str, session_id: &str) -> StreamChunk {
 }
 
 pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<StreamChunk> {
+    // Handle stream_event wrapper format from Claude Code CLI
+    // Format: {"type":"stream_event","event":{...actual event...}}
+    let original_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
+    let json = if original_type == "stream_event" {
+        if let Some(inner_event) = json.get("event") {
+            eprintln!("[RUST] Unwrapped stream_event, inner type: {:?}", inner_event.get("type"));
+            inner_event
+        } else {
+            json
+        }
+    } else {
+        json
+    };
+
     let msg_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
     let subtype = json.get("subtype").and_then(|v| v.as_str()).unwrap_or("");
 
@@ -723,13 +821,22 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
                         chunk.content = delta.get("partial_json").and_then(|p| p.as_str()).map(|s| s.to_string());
                         return Some(chunk);
                     }
-                    _ => {}
+                    "signature_delta" => {
+                        // Signature deltas are metadata for thinking block verification
+                        // Not visible content - just log and continue
+                        eprintln!("[RUST] Received signature_delta (thinking verification)");
+                        return None;
+                    }
+                    _ => {
+                        // Log unknown delta types for debugging
+                        eprintln!("[RUST] Unknown delta type: {}", delta_type);
+                    }
                 }
             }
             None
         }
 
-        // Handle content block start (for tool use and thinking)
+        // Handle content block start (for tool use, thinking, and text)
         "content_block_start" => {
             if let Some(content_block) = json.get("content_block") {
                 let block_type = content_block.get("type").and_then(|t| t.as_str()).unwrap_or("");
@@ -744,6 +851,16 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
                     "thinking" => {
                         let chunk = create_chunk("thinking_start", session_id);
                         return Some(chunk);
+                    }
+                    "text" => {
+                        // Text block start - if it has initial text, emit it
+                        if let Some(text) = content_block.get("text").and_then(|t| t.as_str()) {
+                            if !text.is_empty() {
+                                let mut chunk = create_chunk("text", session_id);
+                                chunk.content = Some(text.to_string());
+                                return Some(chunk);
+                            }
+                        }
                     }
                     _ => {}
                 }
@@ -819,30 +936,17 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
             None
         }
 
-        // Handle assistant message
+        // Handle assistant message - DO NOT emit text here!
+        // Text was already streamed via content_block_delta events.
+        // This message contains the complete text but emitting it again would cause doubling.
         "assistant" => {
+            // We only extract tool_use blocks here since those aren't streamed via deltas
+            // (tool_use is handled via content_block_start)
+            // Text is intentionally NOT emitted to avoid doubling
             if let Some(message) = json.get("message") {
-                if let Some(content) = message.get("content").and_then(|c| c.as_array()) {
-                    for block in content {
-                        if let Some(block_type) = block.get("type").and_then(|t| t.as_str()) {
-                            match block_type {
-                                "text" => {
-                                    let mut chunk = create_chunk("text", session_id);
-                                    chunk.content = block.get("text").and_then(|t| t.as_str()).map(|s| s.to_string());
-                                    return Some(chunk);
-                                }
-                                "tool_use" => {
-                                    let mut chunk = create_chunk("tool_use", session_id);
-                                    chunk.tool_name = block.get("name").and_then(|n| n.as_str()).map(|s| s.to_string());
-                                    chunk.tool_id = block.get("id").and_then(|n| n.as_str()).map(|s| s.to_string());
-                                    chunk.tool_input = block.get("input").map(|i| i.to_string());
-                                    println!("[RUST] Parsed assistant tool_use: name={:?}, id={:?}", chunk.tool_name, chunk.tool_id);
-                                    return Some(chunk);
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
+                if let Some(_content) = message.get("content").and_then(|c| c.as_array()) {
+                    // Log for debugging but don't emit text
+                    eprintln!("[RUST] Assistant message received (text already streamed via deltas)");
                 }
             }
             None
@@ -2494,87 +2598,6 @@ pub fn get_system_env_vars() -> Vec<SystemEnvVar> {
     std::env::vars()
         .map(|(key, value)| SystemEnvVar { key, value })
         .collect()
-}
-
-pub fn get_migrations() -> Vec<Migration> {
-    vec![
-        Migration {
-            version: 1,
-            description: "create_initial_tables",
-            sql: r#"
-                CREATE TABLE IF NOT EXISTS projects (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    path TEXT NOT NULL UNIQUE,
-                    is_favorite INTEGER DEFAULT 0,
-                    last_opened_at TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-                );
-
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id TEXT PRIMARY KEY,
-                    project_id TEXT NOT NULL,
-                    name TEXT,
-                    model TEXT DEFAULT 'claude-sonnet-4-20250514',
-                    claude_session_id TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-                );
-
-                CREATE TABLE IF NOT EXISTS messages (
-                    id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    role TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    tool_calls TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
-                );
-
-                CREATE TABLE IF NOT EXISTS settings (
-                    key TEXT PRIMARY KEY,
-                    value TEXT NOT NULL
-                );
-            "#,
-            kind: tauri_plugin_sql::MigrationKind::Up,
-        },
-        Migration {
-            version: 2,
-            description: "create_subscription_tables",
-            sql: r#"
-                CREATE TABLE IF NOT EXISTS subscription_groups (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    color TEXT,
-                    sort_order INTEGER DEFAULT 0,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL
-                );
-
-                CREATE TABLE IF NOT EXISTS subscriptions (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    url TEXT,
-                    favicon_url TEXT,
-                    monthly_cost REAL NOT NULL DEFAULT 0,
-                    billing_cycle TEXT DEFAULT 'monthly',
-                    currency TEXT DEFAULT 'USD',
-                    group_id TEXT,
-                    notes TEXT,
-                    is_active INTEGER DEFAULT 1,
-                    sort_order INTEGER DEFAULT 0,
-                    created_at INTEGER NOT NULL,
-                    updated_at INTEGER NOT NULL,
-                    FOREIGN KEY (group_id) REFERENCES subscription_groups(id) ON DELETE SET NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_subscriptions_group_id ON subscriptions(group_id);
-                CREATE INDEX IF NOT EXISTS idx_subscriptions_is_active ON subscriptions(is_active);
-            "#,
-            kind: tauri_plugin_sql::MigrationKind::Up,
-        },
-    ]
 }
 
 // ============================================

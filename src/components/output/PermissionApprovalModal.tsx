@@ -1,11 +1,12 @@
+import { useState } from "react";
 import { AlertTriangle, Check, X, Terminal, FileEdit, Globe } from "lucide-react";
-import { Button } from "@/components/ui";
+import { Button, Checkbox } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { ToolCall } from "@/types";
 
 interface PermissionApprovalModalProps {
   toolCall: ToolCall;
-  onApprove: () => void;
+  onApprove: (alwaysAllow?: boolean) => void;
   onReject: () => void;
 }
 
@@ -64,9 +65,14 @@ export function PermissionApprovalModal({
   onApprove,
   onReject,
 }: PermissionApprovalModalProps) {
+  const [alwaysAllow, setAlwaysAllow] = useState(false);
   const Icon = getToolIcon(toolCall.name);
   const riskLevel = getToolRiskLevel(toolCall.name);
   const inputPreview = formatToolInput(toolCall.input);
+
+  const handleApprove = () => {
+    onApprove(alwaysAllow);
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
@@ -141,25 +147,36 @@ export function PermissionApprovalModal({
         </div>
 
         {/* Footer - Actions */}
-        <div className="flex items-center justify-end gap-3 px-4 py-3 border-t border-border bg-bg-secondary">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onReject}
-            className="text-accent-red hover:text-accent-red hover:bg-accent-red/10"
-          >
-            <X className="w-4 h-4 mr-1.5" />
-            Deny
-          </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={onApprove}
-            className="bg-accent-green hover:bg-accent-green/90"
-          >
-            <Check className="w-4 h-4 mr-1.5" />
-            Allow
-          </Button>
+        <div className="px-4 py-3 border-t border-border bg-bg-secondary space-y-3">
+          {/* Always allow checkbox */}
+          <Checkbox
+            checked={alwaysAllow}
+            onChange={(e) => setAlwaysAllow(e.target.checked)}
+            label={`Always allow ${toolCall.name} for this session`}
+            className="text-xs"
+          />
+
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onReject}
+              className="text-accent-red hover:text-accent-red hover:bg-accent-red/10"
+            >
+              <X className="w-4 h-4 mr-1.5" />
+              Deny
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleApprove}
+              className="bg-accent-green hover:bg-accent-green/90"
+            >
+              <Check className="w-4 h-4 mr-1.5" />
+              Allow
+            </Button>
+          </div>
         </div>
       </div>
     </div>

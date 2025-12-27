@@ -187,6 +187,8 @@ export interface FarmworkTycoonState {
   spawnVehicle: (destination: string, returnDestination?: string) => string;
   spawnVehicleWithTint: (destination: string, tint: number) => string;
   spawnVehicleWithRoute: (route: string[]) => string;
+  spawnVehicleWithTintAndRoute: (route: string[], tint: number) => string;
+  incrementToolCount: () => void;
   removeVehicle: (vehicleId: string) => void;
   setVehicleCarrying: (vehicleId: string, carrying: boolean) => void;
   startTestRun: () => void;
@@ -255,7 +257,7 @@ export const BUILDING_NAMES: Record<BuildingType, string> = {
   tests: "Tests",
   performance: "Performance",
   farmhouse: "Farmhouse",
-  office: "Home/Office",
+  office: "Home",
   accessibility: "Accessibility",
   garden: "Idea Garden",
   compost: "Compost",

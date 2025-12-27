@@ -8,6 +8,9 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 static CURRENT_HOTKEY: Mutex<Option<String>> = Mutex::new(None);
 static LIGHTCAST_ENABLED: Mutex<bool> = Mutex::new(true);
 
+// Cache for macOS apps - populated once and reused
+static APP_CACHE: Mutex<Option<Vec<MacOSApp>>> = Mutex::new(None);
+
 /// Initialize the launcher with the default hotkey
 pub fn init_launcher() {
     if let Ok(mut guard) = CURRENT_HOTKEY.lock() {
@@ -72,6 +75,7 @@ pub fn toggle_launcher_window_sync(app: AppHandle) -> Result<bool, String> {
 
     // Set window level to floating on macOS
     #[cfg(target_os = "macos")]
+    #[allow(deprecated)]
     {
         use cocoa::base::id;
         use objc::{msg_send, sel, sel_impl};
@@ -110,17 +114,18 @@ pub async fn is_launcher_visible(app: AppHandle) -> Result<bool, String> {
     }
 }
 
-#[tauri::command]
-pub async fn search_macos_apps(query: String) -> Result<Vec<MacOSApp>, String> {
+/// Load all macOS apps (called once, cached for performance)
+fn load_all_apps() -> Vec<MacOSApp> {
     // Use mdfind (Spotlight) to get all applications
-    let output = Command::new("mdfind")
-        .args([
-            "kMDItemContentTypeTree == 'com.apple.application-bundle'",
-        ])
+    let output = match Command::new("mdfind")
+        .args(["kMDItemContentTypeTree == 'com.apple.application-bundle'"])
         .output()
-        .map_err(|e| e.to_string())?;
+    {
+        Ok(o) => o,
+        Err(_) => return Vec::new(),
+    };
 
-    let all_apps: Vec<MacOSApp> = String::from_utf8_lossy(&output.stdout)
+    String::from_utf8_lossy(&output.stdout)
         .lines()
         .filter(|path| {
             // Filter to main application directories
@@ -134,27 +139,32 @@ pub async fn search_macos_apps(query: String) -> Result<Vec<MacOSApp>, String> {
                 .to_str()?
                 .to_string();
 
-            // Get bundle identifier if available
-            let bundle_id = Command::new("mdls")
-                .args(["-name", "kMDItemCFBundleIdentifier", "-raw", path])
-                .output()
-                .ok()
-                .and_then(|o| {
-                    let id = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                    if id == "(null)" || id.is_empty() {
-                        None
-                    } else {
-                        Some(id)
-                    }
-                });
-
             Some(MacOSApp {
                 name,
                 path: path.to_string(),
-                bundle_id,
+                bundle_id: None, // Don't fetch bundle_id - it's slow and not used
             })
         })
-        .collect();
+        .collect()
+}
+
+/// Get cached apps or load them
+fn get_cached_apps() -> Vec<MacOSApp> {
+    let mut cache = match APP_CACHE.lock() {
+        Ok(guard) => guard,
+        Err(_) => return Vec::new(),
+    };
+
+    if cache.is_none() {
+        *cache = Some(load_all_apps());
+    }
+
+    cache.as_ref().cloned().unwrap_or_default()
+}
+
+#[tauri::command]
+pub async fn search_macos_apps(query: String) -> Result<Vec<MacOSApp>, String> {
+    let all_apps = get_cached_apps();
 
     // Filter by query if provided
     if query.is_empty() {

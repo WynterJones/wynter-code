@@ -259,8 +259,10 @@ export function EnhancedPromptInput({
 
         if (inputRef.current) {
           const rect = inputRef.current.getBoundingClientRect();
+          // Position below the text line, not the expanded textarea
+          // Use top + ~32px for one line of text with padding
           setFilePickerPosition({
-            top: rect.bottom + 4,
+            top: rect.top + 32,
             left: rect.left,
           });
         }

@@ -7,7 +7,6 @@ import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
 import { PermissionApprovalModal } from "@/components/output/PermissionApprovalModal";
 import { AskUserQuestionModal } from "@/components/output/AskUserQuestionModal";
-import { StreamingToolbar } from "@/components/output/StreamingToolbar";
 import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudeDropdown, ClaudePopup } from "@/components/claude";
@@ -18,10 +17,11 @@ import { PanelLayoutContainer } from "@/components/panels";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useFileIndexStore } from "@/stores/fileIndexStore";
 import { claudeService } from "@/services/claude";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
-import type { Project, PermissionMode, ToolCall } from "@/types";
+import type { Project, PermissionMode, ToolCall, McpPermissionRequest } from "@/types";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 // In stream-json mode, there's no interactive tool approval.
@@ -71,7 +71,9 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     setPendingQuestionSet,
   } = useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
-  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, claudeSafeMode } = useSettingsStore();
+  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, claudeSafeMode, defaultModel } = useSettingsStore();
+  const { getFiles, loadIndex } = useFileIndexStore();
+  const projectFiles = getFiles(project.path);
 
   const sessions = getSessionsForProject(project.id);
   const currentSessionId = activeSessionId.get(project.id);
@@ -88,7 +90,22 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const [activityHeight, setActivityHeight] = useState(DEFAULT_ACTIVITY_HEIGHT);
   const [isResizing, setIsResizing] = useState(false);
   const [isActivityCollapsed, setIsActivityCollapsed] = useState(false);
+  const [pendingMcpRequest, setPendingMcpRequest] = useState<McpPermissionRequest | null>(null);
+  const [autoApprovedTools, setAutoApprovedTools] = useState<Set<string>>(new Set());
+  const autoApprovedToolsRef = useRef<Set<string>>(new Set());
   const resizeRef = useRef<HTMLDivElement>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    autoApprovedToolsRef.current = autoApprovedTools;
+  }, [autoApprovedTools]);
+
+  // Load file index for @ mentions
+  useEffect(() => {
+    if (project.path) {
+      loadIndex(project.path);
+    }
+  }, [project.path, loadIndex]);
 
   const allToolCalls = [
     ...messages.flatMap((m) => m.toolCalls || []),
@@ -113,6 +130,13 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     const session = getSession(currentSessionId);
     const permissionMode = session?.permissionMode || "default";
     const resumeSessionId = session?.claudeSessionId || undefined;
+
+    console.log("[MainContent] Starting session with:", {
+      sessionId: currentSessionId,
+      permissionMode,
+      resumeSessionId,
+      isManualMode: permissionMode === "manual",
+    });
 
     setClaudeSessionStarting(currentSessionId);
 
@@ -209,10 +233,34 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
             console.error("[MainContent] Error:", error);
             appendStreamingText(currentSessionId, `\nError: ${error}`);
           },
+          onPermissionRequest: async (request) => {
+            console.log("[MainContent] MCP Permission request received:", {
+              id: request.id,
+              toolName: request.toolName,
+              sessionId: request.sessionId,
+              inputKeys: Object.keys(request.input || {}),
+            });
+
+            // Check if this tool is auto-approved for this session
+            if (autoApprovedToolsRef.current.has(request.toolName)) {
+              console.log("[MainContent] Auto-approving tool:", request.toolName);
+              try {
+                await claudeService.respondToPermission(request.id, true);
+                console.log("[MainContent] Auto-approved successfully");
+              } catch (error) {
+                console.error("[MainContent] Failed to auto-approve:", error);
+              }
+              return;
+            }
+
+            // Show the permission modal
+            setPendingMcpRequest(request);
+          },
         },
         permissionMode,
         resumeSessionId,
-        claudeSafeMode
+        claudeSafeMode,
+        defaultModel
       );
     } catch (error) {
       console.error("[MainContent] Failed to start session:", error);
@@ -236,6 +284,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     finishStreaming,
     setPendingQuestionSet,
     claudeSafeMode,
+    defaultModel,
   ]);
 
   // Stop the Claude session
@@ -301,6 +350,40 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     },
     [currentSessionId, updateToolCallStatus]
   );
+
+  // MCP Permission handlers (for manual mode)
+  const handleMcpApprove = useCallback(async (alwaysAllow?: boolean) => {
+    if (!pendingMcpRequest) return;
+    console.log("[MainContent] MCP Approve clicked, request:", {
+      id: pendingMcpRequest.id,
+      toolName: pendingMcpRequest.toolName,
+      alwaysAllow,
+    });
+
+    // If "always allow" was checked, add this tool to auto-approved set
+    if (alwaysAllow && pendingMcpRequest.toolName) {
+      setAutoApprovedTools(prev => new Set([...prev, pendingMcpRequest.toolName]));
+      console.log("[MainContent] Added to auto-approved tools:", pendingMcpRequest.toolName);
+    }
+
+    try {
+      await claudeService.respondToPermission(pendingMcpRequest.id, true);
+      console.log("[MainContent] MCP permission response sent successfully");
+      setPendingMcpRequest(null);
+    } catch (error) {
+      console.error("[MainContent] Failed to approve MCP permission:", error);
+    }
+  }, [pendingMcpRequest]);
+
+  const handleMcpReject = useCallback(async () => {
+    if (!pendingMcpRequest) return;
+    try {
+      await claudeService.respondToPermission(pendingMcpRequest.id, false);
+      setPendingMcpRequest(null);
+    } catch (error) {
+      console.error("Failed to reject MCP permission:", error);
+    }
+  }, [pendingMcpRequest]);
 
   // Handle question submission - format answers as JSON and send to Claude stdin
   const handleQuestionSubmit = useCallback(
@@ -392,11 +475,33 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     }
   };
 
-  const handleModeChange = (mode: PermissionMode) => {
-    if (currentSessionId) {
-      updateSessionPermissionMode(currentSessionId, mode);
+  const handleModeChange = useCallback(async (mode: PermissionMode) => {
+    if (!currentSessionId) return;
+
+    const wasActive = isSessionActive;
+
+    // Update the mode in store
+    updateSessionPermissionMode(currentSessionId, mode);
+
+    // If session is active, we need to restart it for the new mode to take effect
+    if (wasActive) {
+      console.log("[MainContent] Mode changed while session active, restarting session with mode:", mode);
+      try {
+        // Stop current session
+        await claudeService.stopSession(currentSessionId);
+        setClaudeSessionEnded(currentSessionId);
+
+        // Small delay for cleanup
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Restart will happen automatically when user clicks Start again,
+        // or we can auto-restart here. For now, just notify user.
+        console.log("[MainContent] Session stopped. Start again to use new mode:", mode);
+      } catch (error) {
+        console.error("[MainContent] Failed to restart session for mode change:", error);
+      }
     }
-  };
+  }, [currentSessionId, isSessionActive, updateSessionPermissionMode, setClaudeSessionEnded]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
@@ -518,7 +623,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
             <EnhancedPromptInput
               projectPath={project.path}
               sessionId={currentSession?.id}
-              projectFiles={[]}
+              projectFiles={projectFiles}
               pendingImage={pendingImage}
               onImageConsumed={onImageConsumed}
               onRequestImageBrowser={onRequestImageBrowser}
@@ -543,6 +648,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
                 thinkingText={streamingState?.thinkingText || ""}
                 pendingToolCalls={streamingState?.pendingToolCalls || []}
                 isStreaming={isStreaming}
+                streamingStats={streamingState?.stats}
               />
             </div>
 
@@ -596,10 +702,6 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         <TerminalPanel projectId={project.id} projectPath={project.path} />
       )}
 
-      {isStreaming && streamingState && (
-        <StreamingToolbar isStreaming={isStreaming} stats={streamingState.stats} />
-      )}
-
       <ClaudePopup projectPath={project.path} />
 
       {/* Permission approval modal - blocks UI until user approves/rejects */}
@@ -608,6 +710,20 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           toolCall={pendingApprovalTool}
           onApprove={() => handleApprove(pendingApprovalTool.id)}
           onReject={() => handleReject(pendingApprovalTool.id)}
+        />
+      )}
+
+      {/* MCP Permission modal - for manual mode permission requests */}
+      {pendingMcpRequest && (
+        <PermissionApprovalModal
+          toolCall={{
+            id: pendingMcpRequest.id,
+            name: pendingMcpRequest.toolName,
+            input: pendingMcpRequest.input,
+            status: "pending",
+          }}
+          onApprove={handleMcpApprove}
+          onReject={handleMcpReject}
         />
       )}
 

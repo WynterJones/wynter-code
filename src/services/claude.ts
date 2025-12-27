@@ -94,11 +94,18 @@ class ClaudeService {
     approved: boolean,
     updatedInput?: Record<string, unknown>
   ): Promise<void> {
-    await invoke("respond_to_mcp_permission", {
-      requestId,
-      approved,
-      updatedInput: updatedInput ? JSON.stringify(updatedInput) : null,
-    });
+    console.log("[ClaudeService] respondToPermission:", { requestId, approved });
+    try {
+      await invoke("respond_to_mcp_permission", {
+        requestId,
+        approved,
+        updatedInput: updatedInput ? JSON.stringify(updatedInput) : null,
+      });
+      console.log("[ClaudeService] respondToPermission succeeded");
+    } catch (error) {
+      console.error("[ClaudeService] respondToPermission FAILED:", error);
+      throw error;
+    }
   }
 
   /** Set up MCP permission event listener for a session */
@@ -112,10 +119,18 @@ class ClaudeService {
       }
 
       console.log("[ClaudeService] MCP permission request:", request);
+      console.log("[ClaudeService] Looking for callbacks with sessionId:", sessionId);
+      console.log("[ClaudeService] Available sessions in callbacksMap:", Array.from(this._callbacksMap.keys()));
 
       const cb = this._callbacksMap.get(sessionId);
+      console.log("[ClaudeService] Found callbacks?", !!cb);
+      console.log("[ClaudeService] Has onPermissionRequest?", !!cb?.onPermissionRequest);
+
       if (cb?.onPermissionRequest) {
+        console.log("[ClaudeService] Calling onPermissionRequest callback");
         cb.onPermissionRequest(request);
+      } else {
+        console.warn("[ClaudeService] No onPermissionRequest callback found!");
       }
     });
 
@@ -129,7 +144,8 @@ class ClaudeService {
     callbacks: ClaudeSessionCallbacks,
     permissionMode?: PermissionMode,
     resumeSessionId?: string,
-    safeMode?: boolean
+    safeMode?: boolean,
+    model?: string
   ): Promise<void> {
     console.log("[ClaudeService] startSession called:", {
       cwd,
@@ -137,6 +153,7 @@ class ClaudeService {
       permissionMode,
       resumeSessionId,
       safeMode,
+      model,
     });
 
     if (this._sessionActiveMap.get(sessionId)) {
@@ -337,10 +354,13 @@ class ClaudeService {
     try {
       // For manual mode, start MCP permission server first
       let mcpPermissionPort: number | undefined;
+      console.log("[ClaudeService] Permission mode check:", { permissionMode, isManual: permissionMode === "manual" });
       if (permissionMode === "manual") {
         console.log("[ClaudeService] Starting MCP permission server for manual mode...");
         mcpPermissionPort = await this.startMcpPermissionServer(sessionId);
+        console.log("[ClaudeService] MCP permission server started on port:", mcpPermissionPort);
         await this.setupMcpPermissionListener(sessionId);
+        console.log("[ClaudeService] MCP permission listener set up");
       }
 
       console.log("[ClaudeService] Invoking start_claude_session...");
@@ -351,6 +371,7 @@ class ClaudeService {
         resumeSessionId,
         safeMode,
         mcpPermissionPort,
+        model,
       });
       console.log("[ClaudeService] start_claude_session invoke succeeded");
     } catch (error) {

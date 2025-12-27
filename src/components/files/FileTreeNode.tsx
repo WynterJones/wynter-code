@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
-import { formatBytes } from "@/types/compression";
+import { formatBytes } from "@/lib/storageUtils";
 import type { FileNode } from "@/types";
 import {
   type GitStatusMap,

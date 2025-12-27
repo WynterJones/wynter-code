@@ -2,8 +2,8 @@
 
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
-**Last Updated:** 2025-12-25
-**Composted Ideas:** 34
+**Last Updated:** 2025-12-26
+**Composted Ideas:** 35
 
 ---
 
@@ -18,6 +18,10 @@
 ---
 
 ## Composted Ideas
+
+### System-Wide Whispr Flow Clone
+A system-wide speech-to-text tool similar to Whispr Flow. Capture voice input from anywhere and have it automatically transcribed and pasted at your cursor position.
+> **Why rejected (2025-12-26):** No longer pursuing this idea
 
 ### Plugin Architecture
 Refactor 25+ tools into a plugin system with manifests, dynamic registration, and lazy loading.

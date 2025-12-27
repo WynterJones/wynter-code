@@ -508,10 +508,16 @@ export const useSessionStore = create<SessionStore>()(
 
         // If there's streaming text, convert it to a message
         if (streamingState.streamingText.trim()) {
+          // Clean up text: replace trailing colon with period
+          let finalContent = streamingState.streamingText.trimEnd();
+          if (finalContent.endsWith(':')) {
+            finalContent = finalContent.slice(0, -1) + '.';
+          }
+
           state.addMessage(sessionId, {
             sessionId,
             role: "assistant",
-            content: streamingState.streamingText,
+            content: finalContent,
             toolCalls:
               streamingState.pendingToolCalls.length > 0
                 ? streamingState.pendingToolCalls
