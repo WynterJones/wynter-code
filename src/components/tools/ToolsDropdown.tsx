@@ -438,6 +438,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openJustCommandManager",
     category: "utilities",
   },
+  {
+    id: "universal-viewer",
+    name: "File Viewer",
+    description: "Open any file type",
+    icon: Eye,
+    actionKey: "openUniversalViewer",
+    category: "utilities",
+  },
 
   // === DEV TOOLKIT MINI-TOOLS ===
   { id: "dt-json-formatter", name: "JSON Formatter", description: "Format & validate JSON", icon: Braces, actionKey: "openDevToolkit", category: "web-tools", hiddenInDropdown: true, parentActionKey: "openDevToolkit", subToolId: "json-formatter", group: "Developer Tools" },
@@ -559,6 +567,7 @@ interface ToolsDropdownProps {
   onOpenSubscriptions: () => void;
   onOpenFarmwork: () => void;
   onOpenJustCommandManager: () => void;
+  onOpenUniversalViewer: () => void;
   hasStorybook?: boolean;
   hasJustfile?: boolean;
 }
@@ -597,6 +606,7 @@ export function ToolsDropdown({
   onOpenSubscriptions,
   onOpenFarmwork,
   onOpenJustCommandManager,
+  onOpenUniversalViewer,
   hasStorybook = false,
   hasJustfile = false,
 }: ToolsDropdownProps) {
@@ -1076,6 +1086,17 @@ export function ToolsDropdown({
         setIsOpen(false);
       },
       disabled: !hasJustfile,
+    },
+    {
+      id: "universal-viewer",
+      name: "File Viewer",
+      description: "Open any file type",
+      icon: <Eye className="w-4 h-4" />,
+      category: "utilities",
+      onClick: () => {
+        onOpenUniversalViewer();
+        setIsOpen(false);
+      },
     },
   ];
 

@@ -34,6 +34,8 @@ pub struct BeadsIssue {
     pub labels: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependencies: Option<Vec<BeadsDependency>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -56,6 +58,8 @@ pub struct BeadsUpdate {
     pub priority: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub assignee: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub phase: Option<u8>,
 }
 
 fn run_bd_command(project_path: &str, args: &[&str]) -> Result<String, String> {
@@ -233,4 +237,69 @@ pub async fn beads_show(project_path: String, id: String) -> Result<BeadsIssue, 
         .into_iter()
         .find(|i| i.id == id)
         .ok_or_else(|| format!("Issue {} not found", id))
+}
+
+#[tauri::command]
+pub async fn beads_update_phase(
+    project_path: String,
+    id: String,
+    phase: Option<u8>,
+) -> Result<(), String> {
+    use std::fs;
+    use std::io::{BufRead, BufReader, Write};
+
+    let issues_path = Path::new(&project_path).join(".beads").join("issues.jsonl");
+    if !issues_path.exists() {
+        return Err("Issues file not found".to_string());
+    }
+
+    // Read all issues
+    let file = fs::File::open(&issues_path)
+        .map_err(|e| format!("Failed to open issues file: {}", e))?;
+    let reader = BufReader::new(file);
+
+    let mut updated_lines: Vec<String> = Vec::new();
+    let mut found = false;
+
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Failed to read line: {}", e))?;
+        if line.trim().is_empty() {
+            updated_lines.push(line);
+            continue;
+        }
+
+        match serde_json::from_str::<serde_json::Value>(&line) {
+            Ok(mut issue) => {
+                if issue.get("id").and_then(|v| v.as_str()) == Some(&id) {
+                    found = true;
+                    if let Some(p) = phase {
+                        issue["phase"] = serde_json::json!(p);
+                    } else {
+                        if let Some(obj) = issue.as_object_mut() {
+                            obj.remove("phase");
+                        }
+                    }
+                    updated_lines.push(serde_json::to_string(&issue).unwrap());
+                } else {
+                    updated_lines.push(line);
+                }
+            }
+            Err(_) => {
+                updated_lines.push(line);
+            }
+        }
+    }
+
+    if !found {
+        return Err(format!("Issue {} not found", id));
+    }
+
+    // Write back
+    let mut file = fs::File::create(&issues_path)
+        .map_err(|e| format!("Failed to create issues file: {}", e))?;
+    for line in updated_lines {
+        writeln!(file, "{}", line).map_err(|e| format!("Failed to write line: {}", e))?;
+    }
+
+    Ok(())
 }

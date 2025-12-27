@@ -96,11 +96,29 @@ export const useBeadsStore = create<BeadsState>((set, get) => ({
 
     set({ loading: true, error: null });
     try {
-      await invoke("beads_update", {
-        projectPath,
-        id,
-        updates,
-      });
+      // Handle phase updates separately (custom field not in bd CLI)
+      if ("phase" in updates) {
+        await invoke("beads_update_phase", {
+          projectPath,
+          id,
+          phase: updates.phase ?? null,
+        });
+        // Remove phase from updates to avoid bd CLI error
+        const { phase: _, ...restUpdates } = updates;
+        if (Object.keys(restUpdates).length > 0) {
+          await invoke("beads_update", {
+            projectPath,
+            id,
+            updates: restUpdates,
+          });
+        }
+      } else {
+        await invoke("beads_update", {
+          projectPath,
+          id,
+          updates,
+        });
+      }
       await fetchIssues();
     } catch (err) {
       set({ error: String(err), loading: false });

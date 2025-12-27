@@ -53,11 +53,29 @@ export const PANEL_TYPES: Record<PanelType, PanelTypeConfig> = {
     requiresProtection: false,
   },
 
+  "markdown-viewer": {
+    id: "markdown-viewer",
+    name: "Markdown Viewer",
+    icon: "FileText",
+    defaultTitle: "Markdown",
+    canHaveMultiple: true,
+    requiresProtection: false,
+  },
+
   "browser-preview": {
     id: "browser-preview",
     name: "Browser Preview",
     icon: "Globe",
     defaultTitle: "Preview",
+    canHaveMultiple: true,
+    requiresProtection: false,
+  },
+
+  "youtube-embed": {
+    id: "youtube-embed",
+    name: "YouTube",
+    icon: "Youtube",
+    defaultTitle: "YouTube",
     canHaveMultiple: true,
     requiresProtection: false,
   },

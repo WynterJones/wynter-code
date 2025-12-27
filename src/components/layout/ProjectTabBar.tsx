@@ -87,6 +87,7 @@ import { useStorybookDetection } from "@/hooks/useStorybookDetection";
 import { useJustfileDetection } from "@/hooks/useJustfileDetection";
 import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
 import { JustCommandManagerPopup } from "@/components/tools/just-command-manager";
+import { UniversalViewerPopup } from "@/components/tools/universal-viewer";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { WorkspaceSelectorPopup } from "@/components/workspaces";
 import type { Project } from "@/types";
@@ -404,6 +405,7 @@ export function ProjectTabBar({
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showProjectSearch, setShowProjectSearch] = useState(false);
   const [showJustCommandManager, setShowJustCommandManager] = useState(false);
+  const [showUniversalViewer, setShowUniversalViewer] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -575,6 +577,9 @@ export function ProjectTabBar({
           break;
         case "openFarmwork":
           setShowFarmworkTycoon(true);
+          break;
+        case "openUniversalViewer":
+          setShowUniversalViewer(true);
           break;
       }
     };
@@ -943,6 +948,7 @@ export function ProjectTabBar({
           onOpenSubscriptions={() => onOpenSubscriptions?.()}
           onOpenFarmwork={() => setShowFarmworkTycoon(true)}
           onOpenJustCommandManager={() => setShowJustCommandManager(true)}
+          onOpenUniversalViewer={() => setShowUniversalViewer(true)}
           hasStorybook={hasStorybook}
           hasJustfile={hasJustfile}
         />
@@ -1235,6 +1241,14 @@ export function ProjectTabBar({
         isOpen={showJustCommandManager}
         onClose={() => setShowJustCommandManager(false)}
       />
+
+      {/* Universal File Viewer */}
+      {showUniversalViewer && (
+        <UniversalViewerPopup
+          onClose={() => setShowUniversalViewer(false)}
+          projectPath={activeProject?.path}
+        />
+      )}
 
       {/* Farmwork Mini Player - persists even when popup is closed */}
       <FarmworkMiniPlayerWrapper onExpand={() => setShowFarmworkTycoon(true)} />

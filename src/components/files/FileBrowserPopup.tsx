@@ -26,11 +26,12 @@ interface FileBrowserPopupProps {
   isOpen: boolean;
   onClose: () => void;
   initialPath?: string;
-  mode: "selectProject" | "browse";
+  mode: "selectProject" | "browse" | "selectFile";
   selectButtonLabel?: string;
   sendToPromptLabel?: string;
   overlayClassName?: string;
   onSelectProject?: (path: string) => void;
+  onSelectFile?: (path: string) => void;
   onSendToPrompt?: (image: ImageAttachment) => void;
 }
 
@@ -64,6 +65,7 @@ export function FileBrowserPopup({
   sendToPromptLabel,
   overlayClassName,
   onSelectProject,
+  onSelectFile,
   onSendToPrompt,
 }: FileBrowserPopupProps) {
   const [currentPath, setCurrentPath] = useState(initialPath || "");
@@ -215,11 +217,15 @@ export function FileBrowserPopup({
   const handleOpen = useCallback((file: FileNode) => {
     if (file.isDirectory) {
       navigateTo(file.path);
+    } else if (mode === "selectFile" && onSelectFile) {
+      onSelectFile(file.path);
+      onClose();
+      return;
     }
     // Clear selection when opening a file/folder
     setSelectedPaths(new Set());
     setLastSelectedPath(null);
-  }, [navigateTo]);
+  }, [navigateTo, mode, onSelectFile, onClose]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
     // If right-clicking on a non-selected node, select only that node
@@ -276,6 +282,14 @@ export function FileBrowserPopup({
       onClose();
     }
   }, [getSelectedFile, onSelectProject, onClose]);
+
+  const handleSelectFile = useCallback(() => {
+    const selectedFile = getSelectedFile();
+    if (selectedFile && !selectedFile.isDirectory && onSelectFile) {
+      onSelectFile(selectedFile.path);
+      onClose();
+    }
+  }, [getSelectedFile, onSelectFile, onClose]);
 
   const handleCreateFile = useCallback(() => {
     setDialog({ type: "file", parentPath: currentPath });
@@ -574,7 +588,7 @@ export function FileBrowserPopup({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={mode === "selectProject" ? "Open Project" : "Browse Files"}
+      title={mode === "selectProject" ? "Open Project" : mode === "selectFile" ? "Open File" : "Browse Files"}
       size="xl"
       className="h-[70vh] flex flex-col"
       overlayClassName={overlayClassName}
@@ -625,6 +639,7 @@ export function FileBrowserPopup({
           onToggleQuickLook={() => setShowQuickLook((prev) => !prev)}
           onSendToPrompt={handleSendToPrompt}
           onSelectProject={handleSelectProject}
+          onSelectFile={handleSelectFile}
           onCreateFile={handleCreateFile}
           onCreateFolder={handleCreateFolder}
         />

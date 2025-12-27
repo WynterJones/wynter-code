@@ -10,6 +10,7 @@ mod commands;
 mod cost_popup;
 mod database_viewer;
 mod domain_tools;
+mod file_coordinator;
 mod gif_capture;
 mod homebrew;
 mod launcher;
@@ -236,6 +237,7 @@ fn main() {
         .manage(Arc::new(database_viewer::DatabaseManager::new()))
         .manage(Arc::new(claude_process::ClaudeProcessManager::new()))
         .manage(Arc::new(mcp_permission_server::McpPermissionManager::new()))
+        .manage(Arc::new(file_coordinator::FileCoordinatorManager::new()))
         .manage(Arc::new(audio_proxy::AudioProxyManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
@@ -349,6 +351,7 @@ fn main() {
             beads::beads_close,
             beads::beads_reopen,
             beads::beads_show,
+            beads::beads_update_phase,
             // Auto Build
             auto_build::auto_build_save_session,
             auto_build::auto_build_load_session,
@@ -391,6 +394,12 @@ fn main() {
             mcp_permission_server::stop_mcp_permission_server,
             mcp_permission_server::respond_to_mcp_permission,
             mcp_permission_server::get_mcp_permission_port,
+            // File Coordinator (for concurrent auto-build)
+            file_coordinator::start_file_coordinator_server,
+            file_coordinator::stop_file_coordinator_server,
+            file_coordinator::get_file_coordinator_port,
+            file_coordinator::get_all_file_locks,
+            file_coordinator::release_issue_locks,
             // Webcam Window Management
             webcam_window::create_floating_webcam_window,
             webcam_window::close_floating_webcam_window,

@@ -1,4 +1,4 @@
-import { FilePlus, FolderPlus, Copy, Eye, ImagePlus, FolderOpen } from "lucide-react";
+import { FilePlus, FolderPlus, Copy, Eye, ImagePlus, FolderOpen, FileText } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Button } from "@/components/ui/Button";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -7,7 +7,7 @@ import type { FileNode } from "@/types";
 interface FileBrowserToolbarProps {
   selectedFile: FileNode | null;
   selectedCount: number;
-  mode: "selectProject" | "browse";
+  mode: "selectProject" | "browse" | "selectFile";
   showQuickLook: boolean;
   selectButtonLabel?: string;
   sendToPromptLabel?: string;
@@ -15,6 +15,7 @@ interface FileBrowserToolbarProps {
   onToggleQuickLook: () => void;
   onSendToPrompt: () => void;
   onSelectProject: () => void;
+  onSelectFile?: () => void;
   onCreateFile: () => void;
   onCreateFolder: () => void;
 }
@@ -38,12 +39,14 @@ export function FileBrowserToolbar({
   onToggleQuickLook,
   onSendToPrompt,
   onSelectProject,
+  onSelectFile,
   onCreateFile,
   onCreateFolder,
 }: FileBrowserToolbarProps) {
   const hasSelection = selectedCount > 0;
   const hasMultipleSelection = selectedCount > 1;
   const showOpenAsProject = mode === "selectProject" && selectedFile?.isDirectory && !hasMultipleSelection;
+  const showOpenFile = mode === "selectFile" && selectedFile && !selectedFile.isDirectory && !hasMultipleSelection;
   const showSendToPrompt = isImageFile(selectedFile) && !hasMultipleSelection;
 
   return (
@@ -91,6 +94,13 @@ export function FileBrowserToolbar({
         {showOpenAsProject && (
           <Button size="sm" variant="primary" onClick={onSelectProject}>
             <FolderOpen className="w-3.5 h-3.5 mr-1.5" />
+            {selectButtonLabel}
+          </Button>
+        )}
+
+        {showOpenFile && onSelectFile && (
+          <Button size="sm" variant="primary" onClick={onSelectFile}>
+            <FileText className="w-3.5 h-3.5 mr-1.5" />
             {selectButtonLabel}
           </Button>
         )}

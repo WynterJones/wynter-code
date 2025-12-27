@@ -12,7 +12,25 @@ export type PanelType =
   | "terminal"
   | "file-browser"
   | "file-viewer"
-  | "browser-preview";
+  | "markdown-viewer"
+  | "browser-preview"
+  | "youtube-embed";
+
+/** YouTube video reference */
+export interface YouTubeVideo {
+  videoId: string;
+  title: string;
+  thumbnailUrl?: string;
+  addedAt: number;
+}
+
+/** YouTube playlist */
+export interface YouTubePlaylist {
+  id: string;
+  name: string;
+  videos: YouTubeVideo[];
+  createdAt: number;
+}
 
 /** Split direction for layout nodes */
 export type SplitDirection = "horizontal" | "vertical";
@@ -76,6 +94,33 @@ export interface PanelState {
 
   /** Browser URL (for browser-preview panels) */
   browserUrl?: string;
+
+  /** Playlist folder path (for file-viewer panels in playlist mode) */
+  playlistFolder?: string;
+
+  /** Playlist items (for file-viewer panels in playlist mode) */
+  playlistItems?: string[];
+
+  /** Current playlist index (for file-viewer panels in playlist mode) */
+  playlistIndex?: number;
+
+  /** YouTube video ID (for youtube-embed panels) */
+  youtubeVideoId?: string;
+
+  /** YouTube watch history (for youtube-embed panels) */
+  youtubeHistory?: YouTubeVideo[];
+
+  /** YouTube favorites (for youtube-embed panels) */
+  youtubeFavorites?: YouTubeVideo[];
+
+  /** YouTube playlists (for youtube-embed panels) */
+  youtubePlaylists?: YouTubePlaylist[];
+
+  /** Current YouTube playlist being played (for youtube-embed panels) */
+  youtubeCurrentPlaylist?: string;
+
+  /** Current index in YouTube playlist (for youtube-embed panels) */
+  youtubePlaylistIndex?: number;
 
   /** Whether this panel has an active running process */
   hasRunningProcess: boolean;

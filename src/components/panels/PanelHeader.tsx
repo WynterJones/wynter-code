@@ -6,7 +6,9 @@ import {
   Terminal,
   FolderOpen,
   FileCode,
+  FileText,
   Globe,
+  Youtube,
   Plus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,7 +21,9 @@ const PANEL_ICONS: Record<PanelType, React.ComponentType<{ className?: string }>
   terminal: Terminal,
   "file-browser": FolderOpen,
   "file-viewer": FileCode,
+  "markdown-viewer": FileText,
   "browser-preview": Globe,
+  "youtube-embed": Youtube,
 };
 
 interface PanelHeaderProps {

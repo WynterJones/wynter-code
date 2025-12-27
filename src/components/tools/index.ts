@@ -21,3 +21,4 @@ export { NetlifyFtpPopup } from "./netlify-ftp";
 export { ProjectSearchPopup } from "./project-search";
 export { JustCommandManagerPopup } from "./just-command-manager";
 export { HomebrewManagerPopup } from "./homebrew-manager";
+export { UniversalViewerPopup } from "./universal-viewer";

@@ -24,6 +24,7 @@ export interface BeadsIssue {
   description?: string;
   labels?: string[];
   dependencies?: BeadsDependency[];
+  phase?: number; // For concurrent auto-build ordering (1 = first, 2 = second, etc.)
 }
 
 export interface BeadsUpdate {
@@ -32,6 +33,7 @@ export interface BeadsUpdate {
   priority?: number;
   assignee?: string;
   description?: string;
+  phase?: number;
 }
 
 export interface BeadsStats {

@@ -396,6 +396,15 @@ export function ClaudePopup({ projectPath }: ClaudePopupProps) {
                         }}
                         beforeMount={(monaco: Monaco) => {
                           defineMonacoThemes(monaco);
+                          // Disable all diagnostics/error checking
+                          monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+                            noSemanticValidation: true,
+                            noSyntaxValidation: true,
+                          });
+                          monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+                            noSemanticValidation: true,
+                            noSyntaxValidation: true,
+                          });
                         }}
                         theme={editorTheme || "github-dark"}
                         options={{
@@ -406,6 +415,7 @@ export function ClaudePopup({ projectPath }: ClaudePopupProps) {
                           scrollBeyondLastLine: false,
                           automaticLayout: true,
                           tabSize: 2,
+                          renderValidationDecorations: "off",
                         }}
                       />
                     </div>

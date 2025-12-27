@@ -61,9 +61,18 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
   const fileName = filePath.split("/").pop() || filePath;
   const language = getLanguageFromPath(filePath);
 
-  // Define themes BEFORE mount to prevent white flash
+  // Define themes and disable diagnostics BEFORE mount to prevent white flash
   const handleEditorWillMount = (monaco: Monaco) => {
     defineMonacoThemes(monaco);
+    // Disable all diagnostics/error checking
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
   };
 
   // Store editor ref and scroll to initial line
@@ -225,6 +234,7 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
                 padding: { top: 16, bottom: 16 },
                 cursorBlinking: "smooth",
                 smoothScrolling: true,
+                renderValidationDecorations: "off",
               }}
             />
           )}

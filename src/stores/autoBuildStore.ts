@@ -11,6 +11,7 @@ import type {
   AutoBuildResult,
   VerificationResult,
   AutoBuildStreamingState,
+  AutoBuildWorker,
   SiloProgress,
 } from "@/types/autoBuild";
 import type { StreamChunk } from "@/types";
@@ -85,7 +86,45 @@ const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
   maxRetries: 1,
   priorityThreshold: 4,
   requireHumanReview: true,
+  maxConcurrentIssues: 3,
+  ignoreUnrelatedFailures: true,
 };
+
+// Create empty worker (used in concurrent mode)
+export function createWorker(id: number): AutoBuildWorker {
+  return {
+    id,
+    issueId: null,
+    phase: null,
+    streamingState: null,
+    retryCount: 0,
+    filesModified: [],
+    startTime: null,
+  };
+}
+
+// Sort queue by phase (lower first), then priority (lower first), then created_at
+export function sortQueueByPhase(queue: string[], issueCache: Map<string, BeadsIssue>): string[] {
+  return [...queue].sort((a, b) => {
+    const issueA = issueCache.get(a);
+    const issueB = issueCache.get(b);
+
+    // Phase comparison (undefined/null goes last)
+    const phaseA = issueA?.phase ?? 999;
+    const phaseB = issueB?.phase ?? 999;
+    if (phaseA !== phaseB) return phaseA - phaseB;
+
+    // Priority comparison (0 is highest priority)
+    const priorityA = issueA?.priority ?? 4;
+    const priorityB = issueB?.priority ?? 4;
+    if (priorityA !== priorityB) return priorityA - priorityB;
+
+    // Created at comparison (older first)
+    const createdA = issueA?.created_at ?? "";
+    const createdB = issueB?.created_at ?? "";
+    return createdA.localeCompare(createdB);
+  });
+}
 
 export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set, get) => ({
   // Initial State
@@ -93,6 +132,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
   status: "idle",
   currentIssueId: null,
   currentPhase: null,
+  workers: [],
   queue: [],
   completed: [],
   humanReview: [],
@@ -103,6 +143,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
   settings: DEFAULT_SETTINGS_VALUE,
   projectPath: null,
   issueCache: new Map(),
+  fileCoordinatorPort: null,
 
   // UI Actions
   openPopup: () => set({ isPopupOpen: true }),

@@ -26,6 +26,19 @@ export interface AutoBuildSettings {
   maxRetries: number;
   priorityThreshold: number;
   requireHumanReview: boolean;  // default: true
+  maxConcurrentIssues: number;  // default: 3
+  ignoreUnrelatedFailures: boolean;  // default: true
+}
+
+// Worker state for concurrent issue processing
+export interface AutoBuildWorker {
+  id: number;
+  issueId: string | null;
+  phase: AutoBuildPhase;
+  streamingState: AutoBuildStreamingState | null;
+  retryCount: number;
+  filesModified: string[];  // For test attribution
+  startTime: number | null;
 }
 
 // Streaming state for real-time status display
@@ -80,8 +93,11 @@ export interface AutoBuildState {
 
   // Agent State
   status: AutoBuildStatus;
-  currentIssueId: string | null;
-  currentPhase: AutoBuildPhase;
+  currentIssueId: string | null;  // Legacy: for single worker mode
+  currentPhase: AutoBuildPhase;   // Legacy: for single worker mode
+
+  // Concurrent Workers
+  workers: AutoBuildWorker[];
 
   // Queue Management
   queue: string[];
@@ -93,7 +109,7 @@ export interface AutoBuildState {
   progress: number;
 
   // Streaming
-  streamingState: AutoBuildStreamingState | null;
+  streamingState: AutoBuildStreamingState | null;  // Legacy: for single worker mode
 
   // Logs
   logs: AutoBuildLogEntry[];
@@ -106,6 +122,9 @@ export interface AutoBuildState {
 
   // Cached issue data
   issueCache: Map<string, BeadsIssue>;
+
+  // File Coordinator
+  fileCoordinatorPort: number | null;
 }
 
 export const DEFAULT_SETTINGS: AutoBuildSettings = {
@@ -116,6 +135,8 @@ export const DEFAULT_SETTINGS: AutoBuildSettings = {
   maxRetries: 1,
   priorityThreshold: 4,
   requireHumanReview: true,
+  maxConcurrentIssues: 3,
+  ignoreUnrelatedFailures: true,
 };
 
 export const PHASE_LABELS: Record<NonNullable<AutoBuildPhase>, string> = {

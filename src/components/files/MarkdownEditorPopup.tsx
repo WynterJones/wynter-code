@@ -80,9 +80,18 @@ export function MarkdownEditorPopup({
     setHasChanges(newContent !== originalContent);
   }, [content, originalContent]);
 
-  // Define themes BEFORE mount to prevent white flash
+  // Define themes and disable diagnostics BEFORE mount to prevent white flash
   const handleEditorWillMount = (monaco: Monaco) => {
     defineMonacoThemes(monaco);
+    // Disable all diagnostics/error checking
+    monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true,
+      noSyntaxValidation: true,
+    });
   };
 
   useEffect(() => {
@@ -489,6 +498,7 @@ export function MarkdownEditorPopup({
                       padding: { top: 16, bottom: 16 },
                       cursorBlinking: "smooth",
                       smoothScrolling: true,
+                      renderValidationDecorations: "off",
                     }}
                   />
                 </div>

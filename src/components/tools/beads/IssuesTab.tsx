@@ -29,6 +29,37 @@ interface IssuesTabProps {
   onCreateIssue: () => void;
 }
 
+function PhaseSelector({
+  value,
+  onChange,
+}: {
+  value?: number;
+  onChange: (phase: number | undefined) => void;
+}) {
+  return (
+    <select
+      value={value ?? ""}
+      onChange={(e) => {
+        const val = e.target.value;
+        onChange(val === "" ? undefined : parseInt(val, 10));
+      }}
+      className={cn(
+        "appearance-none px-2 py-0.5 text-xs rounded border cursor-pointer",
+        value
+          ? "bg-purple-500/20 text-purple-400 border-purple-500/30"
+          : "bg-neutral-500/20 text-neutral-400 border-neutral-500/30"
+      )}
+    >
+      <option value="">-</option>
+      <option value="1">P1</option>
+      <option value="2">P2</option>
+      <option value="3">P3</option>
+      <option value="4">P4</option>
+      <option value="5">P5</option>
+    </select>
+  );
+}
+
 export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
   const { issues, loading, fetchIssues, updateIssue, closeIssue, reopenIssue } =
     useBeadsStore();
@@ -156,7 +187,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
               <th className="px-4 py-2 font-medium w-24">Type</th>
               <th className="px-4 py-2 font-medium">Title</th>
               <th className="px-4 py-2 font-medium w-28">Status</th>
-              <th className="px-4 py-2 font-medium w-28">Assignee</th>
+              <th className="px-4 py-2 font-medium w-20">Phase</th>
               <th className="px-4 py-2 font-medium w-24">Priority</th>
               <th className="px-4 py-2 font-medium w-20">Actions</th>
             </tr>
@@ -246,9 +277,10 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="text-xs text-text-secondary">
-                      {issue.assignee || "Unassigned"}
-                    </span>
+                    <PhaseSelector
+                      value={issue.phase}
+                      onChange={(phase) => updateIssue(issue.id, { phase })}
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">

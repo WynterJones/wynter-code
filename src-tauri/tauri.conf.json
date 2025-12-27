@@ -34,7 +34,7 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http: ws: wss:; frame-src *; child-src 'self' blob:;",
       "assetProtocol": {
         "enable": true,
         "scope": ["**"]

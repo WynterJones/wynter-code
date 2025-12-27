@@ -1,4 +1,4 @@
-import { MessageSquare, Terminal, FolderOpen, FileCode, Globe } from "lucide-react";
+import { MessageSquare, Terminal, FolderOpen, FileCode, FileText, Globe, Youtube } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps, PanelType } from "@/types/panel";
 
@@ -25,13 +25,25 @@ const PANEL_OPTIONS: { type: PanelType; name: string; icon: React.ComponentType<
     type: "file-viewer",
     name: "Viewer",
     icon: FileCode,
-    description: "Preview file",
+    description: "Files, audio, video, playlists",
+  },
+  {
+    type: "markdown-viewer",
+    name: "Markdown",
+    icon: FileText,
+    description: "View & edit .md",
   },
   {
     type: "browser-preview",
     name: "Browser",
     icon: Globe,
     description: "Web preview",
+  },
+  {
+    type: "youtube-embed",
+    name: "YouTube",
+    icon: Youtube,
+    description: "Watch videos",
   },
 ];
 
