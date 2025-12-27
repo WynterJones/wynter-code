@@ -55,10 +55,10 @@ export function CommitSection({
         return;
       }
 
-      const prompt = `-p "Generate a concise git commit message for these staged changes. Use conventional commit format (feat:, fix:, docs:, refactor:, chore:, etc.). Be specific but brief - ideally under 72 chars. Just respond with the commit message, nothing else.
+      const prompt = `Generate a concise git commit message for these staged changes. Use conventional commit format (feat:, fix:, docs:, refactor:, chore:, etc.). Be specific but brief - ideally under 72 chars. Just respond with the commit message, nothing else.
 
 Staged diff:
-${diff.slice(0, 4000)}" --print`;
+${diff.slice(0, 4000)}`;
 
       const result = await claudeService.sendPromptSync(prompt, projectPath);
 
