@@ -8,7 +8,8 @@ import {
   X,
   ChevronDown,
 } from "lucide-react";
-import { Modal, IconButton, Tooltip } from "@/components/ui";
+import { createPortal } from "react-dom";
+import { IconButton, Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useBeadsStore } from "@/stores/beadsStore";
 import { IssuesTab, EpicsTab, BoardTab, HelpTab } from "./beads";
@@ -56,12 +57,45 @@ export function BeadsTrackerPopup({
     setShowCreateModal(true);
   }, []);
 
-  return (
+  // Keyboard shortcuts
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showCreateModal) {
+          setShowCreateModal(false);
+        } else {
+          onClose();
+        }
+      }
+    },
+    [onClose, showCreateModal]
+  );
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
     <>
-      <Modal isOpen={isOpen} onClose={onClose} size="full" showCloseButton={false}>
-        <div className="flex flex-col h-[90vh]">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in-0 duration-150">
+        {/* Backdrop click to close */}
+        <div className="absolute inset-0" onClick={onClose} />
+
+        {/* Popup Container */}
+        <div
+          className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-bg-primary shadow-2xl animate-in zoom-in-95 duration-150"
+          style={{
+            width: "calc(100vw - 60px)",
+            height: "calc(100vh - 60px)",
+            maxWidth: "1600px",
+            maxHeight: "900px",
+          }}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <div className="flex items-center justify-between h-14 shrink-0 px-4 border-b border-border bg-bg-secondary">
             <div className="flex items-center gap-3">
               <CircleDot className="w-5 h-5 text-accent" />
               <h2 className="text-lg font-semibold text-text-primary">Beads</h2>
@@ -121,7 +155,7 @@ export function BeadsTrackerPopup({
             {activeTab === "help" && <HelpTab />}
           </div>
         </div>
-      </Modal>
+      </div>
 
       {/* Create Issue Modal */}
       {showCreateModal && (
@@ -130,7 +164,8 @@ export function BeadsTrackerPopup({
           onClose={() => setShowCreateModal(false)}
         />
       )}
-    </>
+    </>,
+    document.body
   );
 }
 

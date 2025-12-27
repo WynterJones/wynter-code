@@ -77,8 +77,11 @@ export function AutoBuildNewIssuePopup({ onClose }: AutoBuildNewIssuePopupProps)
         className="relative flex flex-col rounded-xl border border-border bg-bg-primary shadow-2xl animate-in zoom-in-95 duration-100"
         style={{ width: "600px", maxHeight: "80vh" }}
       >
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h3 className="text-lg font-semibold">New Issue</h3>
+        <div
+          data-tauri-drag-region
+          className="flex items-center justify-between border-b border-border px-5 py-4 cursor-grab active:cursor-grabbing"
+        >
+          <h3 className="text-lg font-semibold" data-tauri-drag-region>New Issue</h3>
           <IconButton size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </IconButton>

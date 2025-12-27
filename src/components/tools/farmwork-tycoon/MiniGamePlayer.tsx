@@ -80,8 +80,10 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
         const dx = e.clientX - dragStartRef.current.x;
         const dy = e.clientY - dragStartRef.current.y;
 
-        const newX = Math.max(0, Math.min(window.innerWidth - size, dragStartRef.current.posX + dx));
-        const newY = Math.max(0, Math.min(window.innerHeight - size - 40, dragStartRef.current.posY + dy));
+        // Constrain to viewport boundaries with a small margin
+        const margin = 10;
+        const newX = Math.max(margin, Math.min(window.innerWidth - size - margin, dragStartRef.current.posX + dx));
+        const newY = Math.max(margin, Math.min(window.innerHeight - size - margin, dragStartRef.current.posY + dy));
 
         setPosition({ x: newX, y: newY });
       }
@@ -92,13 +94,15 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
         const delta = Math.max(dx, dy);
 
         const newSize = Math.max(MIN_SIZE, Math.min(MAX_SIZE, resizeStartRef.current.size + delta));
-        setSize(newSize);
 
+        // Calculate new position with boundary constraints
+        const margin = 10;
         const sizeDiff = newSize - resizeStartRef.current.size;
-        setPosition({
-          x: Math.max(0, dragStartRef.current.posX - sizeDiff),
-          y: Math.max(0, dragStartRef.current.posY - sizeDiff),
-        });
+        const newX = Math.max(margin, Math.min(window.innerWidth - newSize - margin, dragStartRef.current.posX - sizeDiff));
+        const newY = Math.max(margin, Math.min(window.innerHeight - newSize - margin, dragStartRef.current.posY - sizeDiff));
+
+        setSize(newSize);
+        setPosition({ x: newX, y: newY });
       }
     };
 
@@ -124,6 +128,20 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
       dragStartRef.current.posY = position.y;
     }
   }, [isResizing, position]);
+
+  // Handle window resize to keep player within bounds
+  useEffect(() => {
+    const handleResize = () => {
+      const margin = 10;
+      setPosition((prev) => ({
+        x: Math.max(margin, Math.min(window.innerWidth - size - margin, prev.x)),
+        y: Math.max(margin, Math.min(window.innerHeight - size - margin, prev.y)),
+      }));
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [size]);
 
   if (!isOpen) return null;
 

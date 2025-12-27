@@ -9,6 +9,7 @@ pub struct AutoBuildSession {
     pub status: String,
     pub queue: Vec<String>,
     pub completed: Vec<String>,
+    pub human_review: Vec<String>,  // IDs awaiting human review
     pub current_issue_id: Option<String>,
     pub current_phase: Option<String>,
     pub retry_count: u8,
@@ -25,6 +26,7 @@ pub struct AutoBuildSettings {
     pub run_build: bool,
     pub max_retries: u8,
     pub priority_threshold: u8,
+    pub require_human_review: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,6 +54,14 @@ fn get_session_path(project_path: &str) -> std::path::PathBuf {
     Path::new(project_path)
         .join(".beads")
         .join(".autobuild-session.json")
+}
+
+fn get_silo_path(project_path: &str) -> std::path::PathBuf {
+    Path::new(project_path).join("_SILO")
+}
+
+fn get_silo_file_path(project_path: &str, issue_id: &str) -> std::path::PathBuf {
+    get_silo_path(project_path).join(format!("{}.md", issue_id))
 }
 
 #[tauri::command]
@@ -104,6 +114,40 @@ pub async fn auto_build_clear_session(project_path: String) -> Result<(), String
     Ok(())
 }
 
+// SILO progress file management
+#[tauri::command]
+pub async fn auto_build_read_silo(
+    project_path: String,
+    issue_id: String,
+) -> Result<Option<String>, String> {
+    let silo_path = get_silo_file_path(&project_path, &issue_id);
+
+    if silo_path.exists() {
+        fs::read_to_string(&silo_path)
+            .map(Some)
+            .map_err(|e| format!("Failed to read SILO file: {}", e))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub async fn auto_build_write_silo(
+    project_path: String,
+    issue_id: String,
+    content: String,
+) -> Result<(), String> {
+    let silo_dir = get_silo_path(&project_path);
+
+    // Ensure _SILO directory exists
+    fs::create_dir_all(&silo_dir)
+        .map_err(|e| format!("Failed to create _SILO directory: {}", e))?;
+
+    let file_path = get_silo_file_path(&project_path, &issue_id);
+    fs::write(&file_path, content)
+        .map_err(|e| format!("Failed to write SILO file: {}", e))
+}
+
 #[tauri::command]
 pub async fn auto_build_run_claude(
     project_path: String,
@@ -132,12 +176,14 @@ When done, your last message should confirm what was completed."#,
         if issue_description.is_empty() { "No description provided" } else { &issue_description }
     );
 
-    // Run claude CLI
+    // Run claude CLI with explicit default permission mode to avoid plan mode
     let output = Command::new("claude")
         .arg("-p")
         .arg(&prompt)
         .arg("--allowedTools")
         .arg("Edit,Write,Bash,Read,Glob,Grep")
+        .arg("--permission-mode")
+        .arg("default")
         .current_dir(&project_path)
         .output()
         .map_err(|e| format!("Failed to run claude: {}", e))?;

@@ -606,7 +606,7 @@ pub struct StreamChunk {
 #[tauri::command]
 pub async fn run_claude(prompt: String, cwd: String) -> Result<CommandOutput, String> {
     let output = Command::new("claude")
-        .args(["-p", &prompt, "--output-format", "json"])
+        .args(["-p", &prompt, "--output-format", "json", "--permission-mode", "default"])
         .current_dir(&cwd)
         .output()
         .map_err(|e| format!("Failed to execute Claude CLI: {}", e))?;

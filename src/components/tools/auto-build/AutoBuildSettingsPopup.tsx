@@ -19,8 +19,11 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
       {/* Settings Panel */}
       <div className="relative w-80 rounded-lg border border-border bg-bg-primary shadow-2xl animate-in zoom-in-95 duration-100">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h3 className="font-medium">Settings</h3>
+        <div
+          data-tauri-drag-region
+          className="flex items-center justify-between border-b border-border px-4 py-3 cursor-grab active:cursor-grabbing"
+        >
+          <h3 className="font-medium" data-tauri-drag-region>Settings</h3>
           <IconButton size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
           </IconButton>
@@ -91,6 +94,33 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
                 </div>
               </label>
             </div>
+          </div>
+
+          {/* Workflow Section */}
+          <div>
+            <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
+              Workflow
+            </h4>
+            <label
+              className={cn(
+                "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
+                isDisabled && "cursor-not-allowed opacity-50"
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={settings.requireHumanReview}
+                onChange={(e) => updateSettings({ requireHumanReview: e.target.checked })}
+                disabled={isDisabled}
+                className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
+              />
+              <div>
+                <div className="text-sm">Require Human Review</div>
+                <div className="text-xs text-text-secondary">
+                  Review each issue before completion
+                </div>
+              </div>
+            </label>
           </div>
 
           {/* Commit Section */}

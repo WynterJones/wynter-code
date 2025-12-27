@@ -33,7 +33,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
   const { issues, loading, fetchIssues, updateIssue, closeIssue, reopenIssue } =
     useBeadsStore();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<BeadsStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<BeadsStatus | "all">("open");
   const [typeFilter, setTypeFilter] = useState<BeadsIssueType | "all">("all");
   const [closingId, setClosingId] = useState<string | null>(null);
   const [closeReason, setCloseReason] = useState("");

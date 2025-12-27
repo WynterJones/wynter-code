@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useState } from "react";
-import { X, Bot, Play, Pause, Square, SkipForward, Settings } from "lucide-react";
+import { X, Bot, Play, Pause, Square, SkipForward, Settings, HelpCircle, AlertTriangle } from "lucide-react";
 import { createPortal } from "react-dom";
+import { invoke } from "@tauri-apps/api/core";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { useBeadsStore } from "@/stores/beadsStore";
 import { IconButton } from "@/components/ui/IconButton";
@@ -8,6 +9,7 @@ import { Tooltip } from "@/components/ui";
 import { AutoBuildKanban } from "./AutoBuildKanban";
 import { AutoBuildLog } from "./AutoBuildLog";
 import { AutoBuildSettingsPopup } from "./AutoBuildSettingsPopup";
+import { AutoBuildHelpPopup } from "./AutoBuildHelpPopup";
 import { cn } from "@/lib/utils";
 
 interface AutoBuildPopupProps {
@@ -33,13 +35,24 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
 
   const { issues, fetchIssues, setProjectPath: setBeadsProjectPath } = useBeadsStore();
   const [showSettings, setShowSettings] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [beadsInitialized, setBeadsInitialized] = useState<boolean | null>(null);
 
   // Initialize on mount
   useEffect(() => {
     setProjectPath(projectPath);
     setBeadsProjectPath(projectPath);
-    fetchIssues();
-    loadSession();
+
+    // Check if beads is initialized
+    invoke<boolean>("beads_has_init", { projectPath })
+      .then((hasInit) => {
+        setBeadsInitialized(hasInit);
+        if (hasInit) {
+          fetchIssues();
+          loadSession();
+        }
+      })
+      .catch(() => setBeadsInitialized(false));
   }, [projectPath, setProjectPath, setBeadsProjectPath, fetchIssues, loadSession]);
 
   // Cache issues in autoBuildStore
@@ -48,18 +61,35 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
     issues.forEach((issue) => cacheIssue(issue));
   }, [issues]);
 
+  // Filter queue to only include issues that are still open
+  useEffect(() => {
+    if (issues.length === 0) return;
+
+    const { queue, removeFromQueue } = useAutoBuildStore.getState();
+    const openIssueIds = new Set(issues.filter((i) => i.status === "open").map((i) => i.id));
+
+    // Remove any queued issues that are no longer open
+    queue.forEach((id) => {
+      if (!openIssueIds.has(id)) {
+        removeFromQueue(id);
+      }
+    });
+  }, [issues]);
+
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (showSettings) {
           setShowSettings(false);
+        } else if (showHelp) {
+          setShowHelp(false);
         } else {
           closePopup();
         }
       }
     },
-    [closePopup, showSettings]
+    [closePopup, showSettings, showHelp]
   );
 
   useEffect(() => {
@@ -196,6 +226,12 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
 
             <div className="h-6 w-px bg-border" />
 
+            <Tooltip content="How it works">
+              <IconButton size="sm" onClick={() => setShowHelp(true)}>
+                <HelpCircle className="h-4 w-4" />
+              </IconButton>
+            </Tooltip>
+
             <Tooltip content="Settings">
               <IconButton size="sm" onClick={() => setShowSettings(true)}>
                 <Settings className="h-4 w-4" />
@@ -208,9 +244,30 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
           </div>
         </div>
 
-        {/* Main Content - Kanban Board */}
+        {/* Main Content */}
         <div className="flex-1 overflow-hidden p-4">
-          <AutoBuildKanban issues={issues} />
+          {beadsInitialized === false ? (
+            <div className="flex h-full items-center justify-center">
+              <div className="flex max-w-md flex-col items-center gap-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-8 text-center">
+                <AlertTriangle className="h-12 w-12 text-amber-400" />
+                <h2 className="text-xl font-semibold text-amber-200">Beads Not Initialized</h2>
+                <p className="text-text-secondary">
+                  Auto Build requires <strong className="text-text-primary">Beads</strong> issue tracking to manage work items.
+                  Beads is part of the <strong className="text-text-primary">farmwork</strong> CLI suite.
+                </p>
+                <div className="mt-2 rounded-md bg-bg-primary px-4 py-3 font-mono text-sm">
+                  <span className="text-text-secondary"># Install farmwork, then run:</span>
+                  <br />
+                  <span className="text-green-400">bd init</span>
+                </div>
+                <p className="text-sm text-text-secondary">
+                  Run this command in your project root to initialize Beads.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <AutoBuildKanban issues={issues} />
+          )}
         </div>
 
         {/* Bottom Console - Activity Log */}
@@ -222,6 +279,11 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
       {/* Settings Popup */}
       {showSettings && (
         <AutoBuildSettingsPopup onClose={() => setShowSettings(false)} />
+      )}
+
+      {/* Help Popup */}
+      {showHelp && (
+        <AutoBuildHelpPopup onClose={() => setShowHelp(false)} />
       )}
     </div>,
     document.body

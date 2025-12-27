@@ -72,14 +72,19 @@ export function MiniMeditationPlayer() {
       const deltaX = dragStart.current.x - e.clientX;
       const deltaY = dragStart.current.y - e.clientY;
 
-      const newX = Math.max(
-        10,
-        Math.min(window.innerWidth - 200, positionStart.current.x + deltaX)
-      );
-      const newY = Math.max(
-        10,
-        Math.min(window.innerHeight - 80, positionStart.current.y + deltaY)
-      );
+      // Get the actual element dimensions for accurate boundary calculation
+      const elementWidth = containerRef.current?.offsetWidth || 200;
+      const elementHeight = containerRef.current?.offsetHeight || 50;
+
+      // Since we use right/bottom positioning:
+      // - right: 10 means 10px from right edge, max is windowWidth - elementWidth - 10 (so left edge stays visible)
+      // - bottom: 10 means 10px from bottom edge, max is windowHeight - elementHeight - 10 (so top edge stays visible)
+      const minOffset = 10;
+      const maxRightOffset = window.innerWidth - elementWidth - minOffset;
+      const maxBottomOffset = window.innerHeight - elementHeight - minOffset;
+
+      const newX = Math.max(minOffset, Math.min(maxRightOffset, positionStart.current.x + deltaX));
+      const newY = Math.max(minOffset, Math.min(maxBottomOffset, positionStart.current.y + deltaY));
 
       setPosition({ x: newX, y: newY });
     },
@@ -100,6 +105,25 @@ export function MiniMeditationPlayer() {
       };
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // Handle window resize to keep player within bounds
+  useEffect(() => {
+    const handleResize = () => {
+      const elementWidth = containerRef.current?.offsetWidth || 200;
+      const elementHeight = containerRef.current?.offsetHeight || 50;
+      const minOffset = 10;
+      const maxRightOffset = window.innerWidth - elementWidth - minOffset;
+      const maxBottomOffset = window.innerHeight - elementHeight - minOffset;
+
+      setPosition((prev) => ({
+        x: Math.max(minOffset, Math.min(maxRightOffset, prev.x)),
+        y: Math.max(minOffset, Math.min(maxBottomOffset, prev.y)),
+      }));
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Only show when not in meditation mode but mini player is visible
   // For streams, we don't need a track - for custom we do

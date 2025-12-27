@@ -223,6 +223,11 @@ export class VehicleSprite extends Container {
   }
 
   updateData(data: VehicleData): void {
+    // If vehicle is already finished, don't allow state updates that might reset it
+    if (this.isFinished) {
+      return;
+    }
+
     const carryingChanged = this.isCarrying !== data.carrying;
 
     // Preserve the current path and pathIndex - don't let store sync overwrite them

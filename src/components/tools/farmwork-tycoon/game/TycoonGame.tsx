@@ -520,24 +520,30 @@ export function TycoonGame({
       } else {
         sprite.updateData(vehicleData);
 
-        if (sprite.getData().path.length === 0 && navGraph) {
-          const firstDest = vehicleData.route?.[0] || vehicleData.destination;
-          const destBuilding = buildings.find((b) => b.id === firstDest);
-          if (destBuilding) {
-            const to = { x: destBuilding.position.dockX, y: destBuilding.position.dockY };
+        // Only assign a new path if vehicle is not finished/exiting and has no current path
+        // This prevents vehicles that completed their route from being re-routed
+        if (sprite.getData().path.length === 0 && navGraph && !sprite.isMarkedFinished()) {
+          const task = sprite.getTask();
+          // Don't re-assign paths to vehicles that are exiting or have completed their tasks
+          if (task !== "exiting" && task !== "finished") {
+            const firstDest = vehicleData.route?.[0] || vehicleData.destination;
+            const destBuilding = buildings.find((b) => b.id === firstDest);
+            if (destBuilding) {
+              const to = { x: destBuilding.position.dockX, y: destBuilding.position.dockY };
 
-            let path: ReturnType<typeof navigationSystem.findPath> = null;
+              let path: ReturnType<typeof navigationSystem.findPath> = null;
 
-            if (vehicleData.spawnPoint) {
-              path = navigationSystem.findPathFromSpawn(vehicleData.spawnPoint, to);
-            } else {
-              const from = vehicleData.position;
-              path = navigationSystem.findPath(from, to);
-            }
+              if (vehicleData.spawnPoint) {
+                path = navigationSystem.findPathFromSpawn(vehicleData.spawnPoint, to);
+              } else {
+                const from = vehicleData.position;
+                path = navigationSystem.findPath(from, to);
+              }
 
-            if (path && path.length > 0) {
-              sprite.setPath(path);
-              sprite.setTask("traveling_to_pickup", firstDest || undefined);
+              if (path && path.length > 0) {
+                sprite.setPath(path);
+                sprite.setTask("traveling_to_pickup", firstDest || undefined);
+              }
             }
           }
         }

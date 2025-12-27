@@ -41,6 +41,25 @@ export default {
         base: ["0.875rem", { lineHeight: "1.5rem" }],
         lg: ["1rem", { lineHeight: "1.75rem" }],
       },
+      keyframes: {
+        "pulse-glow": {
+          "0%, 100%": { transform: "scale(1)", opacity: "0.3" },
+          "50%": { transform: "scale(1.5)", opacity: "0.6" },
+        },
+        "pulse-ring": {
+          "0%": { transform: "scale(1)", opacity: "0.5" },
+          "100%": { transform: "scale(2)", opacity: "0" },
+        },
+        "shimmer-rotate": {
+          "0%": { transform: "rotate(0deg)" },
+          "100%": { transform: "rotate(360deg)" },
+        },
+      },
+      animation: {
+        "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "pulse-ring": "pulse-ring 2s ease-out infinite",
+        "shimmer-rotate": "shimmer-rotate 3s linear infinite",
+      },
     },
   },
   plugins: [],

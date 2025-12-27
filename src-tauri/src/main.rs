@@ -356,6 +356,8 @@ fn main() {
             auto_build::auto_build_run_claude,
             auto_build::auto_build_run_verification,
             auto_build::auto_build_commit,
+            auto_build::auto_build_read_silo,
+            auto_build::auto_build_write_silo,
             // MCP Server Management
             commands::get_mcp_servers,
             commands::save_mcp_server,

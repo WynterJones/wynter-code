@@ -179,9 +179,12 @@ export function ResponseCarousel({
     setCurrentIndex((i) => Math.min(totalSlides - 1, i + 1));
   }, [totalSlides]);
 
-  // Keyboard navigation
+  // Keyboard navigation - disabled while streaming
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Disable navigation while streaming
+      if (isStreaming) return;
+
       // Only handle if this container or its children are focused, or no specific element is focused
       const activeElement = document.activeElement;
       const isInputFocused =
@@ -202,7 +205,7 @@ export function ResponseCarousel({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToPrevious, goToNext]);
+  }, [goToPrevious, goToNext, isStreaming]);
 
   if (totalSlides === 0) {
     return (
@@ -263,17 +266,17 @@ export function ResponseCarousel({
           )}
         </div>
 
-        {/* Navigation arrows */}
+        {/* Navigation arrows - disabled while streaming */}
         {totalSlides > 1 && (
           <>
             <IconButton
               size="sm"
               onClick={goToPrevious}
-              disabled={currentIndex === 0}
+              disabled={currentIndex === 0 || isStreaming}
               className={cn(
                 "absolute left-1 top-1/2 -translate-y-1/2 z-10",
                 "bg-bg-tertiary/90 border border-border shadow-sm",
-                "disabled:opacity-30"
+                "disabled:opacity-30 disabled:cursor-not-allowed"
               )}
             >
               <ChevronLeft className="w-4 h-4" />
@@ -281,11 +284,11 @@ export function ResponseCarousel({
             <IconButton
               size="sm"
               onClick={goToNext}
-              disabled={currentIndex === totalSlides - 1}
+              disabled={currentIndex === totalSlides - 1 || isStreaming}
               className={cn(
                 "absolute right-1 top-1/2 -translate-y-1/2 z-10",
                 "bg-bg-tertiary/90 border border-border shadow-sm",
-                "disabled:opacity-30"
+                "disabled:opacity-30 disabled:cursor-not-allowed"
               )}
             >
               <ChevronRight className="w-4 h-4" />
@@ -294,18 +297,20 @@ export function ResponseCarousel({
         )}
       </div>
 
-      {/* Pagination pips */}
+      {/* Pagination pips - disabled while streaming */}
       {totalSlides > 1 && (
         <div className="flex justify-center gap-1.5 py-2">
           {Array.from({ length: totalSlides }).map((_, index) => (
             <button
               key={index}
-              onClick={() => setCurrentIndex(index)}
+              onClick={() => !isStreaming && setCurrentIndex(index)}
+              disabled={isStreaming}
               className={cn(
                 "w-2 h-2 rounded-full transition-all duration-200",
                 index === currentIndex
                   ? "bg-accent w-4"
-                  : "bg-border hover:bg-text-secondary"
+                  : "bg-border hover:bg-text-secondary",
+                isStreaming && "cursor-not-allowed opacity-50"
               )}
             />
           ))}

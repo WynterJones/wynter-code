@@ -1,7 +1,14 @@
 import type { BeadsIssue } from "./beads";
 
 export type AutoBuildStatus = "idle" | "running" | "paused" | "error";
-export type AutoBuildPhase = "selecting" | "working" | "testing" | "committing" | null;
+export type AutoBuildPhase =
+  | "selecting"
+  | "working"
+  | "testing"
+  | "fixing"     // Claude is fixing test/lint/build failures
+  | "reviewing"  // Awaiting human review
+  | "committing"
+  | null;
 
 export interface AutoBuildLogEntry {
   id: string;
@@ -18,6 +25,26 @@ export interface AutoBuildSettings {
   runBuild: boolean;
   maxRetries: number;
   priorityThreshold: number;
+  requireHumanReview: boolean;  // default: true
+}
+
+// Streaming state for real-time status display
+export interface AutoBuildStreamingState {
+  isStreaming: boolean;
+  currentTool?: string;
+  currentAction?: string;  // e.g., "Editing Button.tsx"
+  startTime: number;
+}
+
+// Progress tracking for _SILO files
+export interface SiloProgress {
+  issueId: string;
+  issueTitle: string;
+  issueDescription?: string;
+  currentStep: string;
+  whatWasDone: string[];
+  whatsNext: string[];
+  lastUpdated: string;
 }
 
 export interface AutoBuildSession {
@@ -25,6 +52,7 @@ export interface AutoBuildSession {
   status: AutoBuildStatus;
   queue: string[];
   completed: string[];
+  humanReview: string[];  // IDs awaiting human review
   currentIssueId: string | null;
   currentPhase: AutoBuildPhase;
   retryCount: number;
@@ -58,10 +86,14 @@ export interface AutoBuildState {
   // Queue Management
   queue: string[];
   completed: string[];
+  humanReview: string[];  // IDs awaiting human review
   retryCount: number;
 
   // Progress
   progress: number;
+
+  // Streaming
+  streamingState: AutoBuildStreamingState | null;
 
   // Logs
   logs: AutoBuildLogEntry[];
@@ -83,12 +115,15 @@ export const DEFAULT_SETTINGS: AutoBuildSettings = {
   runBuild: true,
   maxRetries: 1,
   priorityThreshold: 4,
+  requireHumanReview: true,
 };
 
 export const PHASE_LABELS: Record<NonNullable<AutoBuildPhase>, string> = {
   selecting: "Selecting next issue",
   working: "Working on code",
   testing: "Running verification",
+  fixing: "Fixing issues",
+  reviewing: "Awaiting review",
   committing: "Committing changes",
 };
 
