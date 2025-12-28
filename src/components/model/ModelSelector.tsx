@@ -14,13 +14,6 @@ interface ModelOption {
 
 const models: ModelOption[] = [
   {
-    value: "claude-sonnet-4-20250514",
-    label: "Sonnet",
-    description: "Best balance of speed and quality",
-    icon: Sparkles,
-    color: "text-accent-purple",
-  },
-  {
     value: "claude-opus-4-20250514",
     label: "Opus",
     description: "Most capable, best for complex tasks",
@@ -28,7 +21,14 @@ const models: ModelOption[] = [
     color: "text-accent-blue",
   },
   {
-    value: "claude-haiku-3-5-20241022",
+    value: "claude-sonnet-4-20250514",
+    label: "Sonnet",
+    description: "Best balance of speed and quality",
+    icon: Sparkles,
+    color: "text-accent-purple",
+  },
+  {
+    value: "claude-3-5-haiku-20241022",
     label: "Haiku",
     description: "Fastest, best for simple tasks",
     icon: Zap,

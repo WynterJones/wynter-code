@@ -6,3 +6,4 @@ export type { ImageAttachment } from "./ImageThumbnail";
 export { FileTagBadge, FileTagBadges } from "./FileTagBadge";
 export type { FileReference } from "./FileTagBadge";
 export { FilePickerDropdown } from "./FilePickerDropdown";
+export { SlashCommandDropdown } from "./SlashCommandDropdown";

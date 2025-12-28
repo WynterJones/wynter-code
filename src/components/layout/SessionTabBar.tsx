@@ -10,6 +10,7 @@ import {
   Waypoints,
   FolderSearch,
   Play,
+  Bot,
 } from "lucide-react";
 import { Tooltip, TabContextMenu } from "@/components/ui";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -18,6 +19,7 @@ import { claudeService } from "@/services/claude";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
+import { useAutoBuildStore } from "@/stores/autoBuildStore";
 
 interface DropdownPosition {
   top: number;
@@ -60,6 +62,9 @@ export function SessionTabBar({
   } = useSessionStore();
   const { getSessionPtyId } = useTerminalStore();
   const { hasFarmwork } = useFarmworkDetection();
+
+  const isAutoBuildRunning = useAutoBuildStore((s) => s.status === "running");
+  const openAutoBuildPopup = useAutoBuildStore((s) => s.openPopup);
 
   const sessions = getSessionsForProject(projectId);
   const activeId = activeSessionId.get(projectId);
@@ -355,6 +360,19 @@ export function SessionTabBar({
             className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
           >
             <Tractor className={cn("w-4 h-4", hasFarmwork && "text-green-500")} />
+          </button>
+        </Tooltip>
+
+        {/* Auto Build */}
+        <Tooltip content="Auto Build">
+          <button
+            onClick={() => openAutoBuildPopup()}
+            className={cn(
+              "p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors",
+              isAutoBuildRunning && "bg-yellow-500/10"
+            )}
+          >
+            <Bot className={cn("w-4 h-4 text-yellow-500", isAutoBuildRunning && "animate-pulse")} />
           </button>
         </Tooltip>
 

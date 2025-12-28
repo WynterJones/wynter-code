@@ -2,9 +2,17 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
+use serde::Deserialize;
 use tauri::{Emitter, State};
 
 use crate::commands::{create_chunk, parse_claude_chunk, PermissionMode};
+
+/// Image data for structured prompts with multimodal content
+#[derive(Debug, Deserialize)]
+pub struct ImageData {
+    pub base64: String,
+    pub media_type: String,
+}
 
 /// Represents a running Claude CLI process
 struct ClaudeProcessInstance {
@@ -404,6 +412,92 @@ pub async fn send_claude_raw_input(
             );
             stdin
                 .write_all(input.as_bytes())
+                .map_err(|e| format!("Failed to write to Claude stdin: {}", e))?;
+            stdin
+                .flush()
+                .map_err(|e| format!("Failed to flush Claude stdin: {}", e))?;
+            Ok(())
+        } else {
+            Err("Claude stdin not available".to_string())
+        }
+    } else {
+        Err("Claude session not found".to_string())
+    }
+}
+
+/// Send structured input to a running Claude session with images and files
+/// This properly formats images as content blocks for multimodal prompts
+#[tauri::command]
+pub async fn send_claude_structured_input(
+    state: State<'_, Arc<ClaudeProcessManager>>,
+    session_id: String,
+    text: String,
+    images: Option<Vec<ImageData>>,
+    files: Option<Vec<String>>,
+) -> Result<(), String> {
+    let mut instances = state.instances.lock().unwrap();
+
+    // Capture counts for logging before consuming the values
+    let image_count = images.as_ref().map_or(0, |i| i.len());
+    let file_count = files.as_ref().map_or(0, |f| f.len());
+
+    if let Some(instance) = instances.get_mut(&session_id) {
+        if let Some(ref mut stdin) = instance.stdin {
+            // Build content array with proper content blocks
+            let mut content: Vec<serde_json::Value> = Vec::new();
+
+            // Add images as proper content blocks
+            if let Some(imgs) = images {
+                for img in imgs {
+                    content.push(serde_json::json!({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": img.media_type,
+                            "data": img.base64
+                        }
+                    }));
+                }
+            }
+
+            // Build text content (prepend file paths if any)
+            let mut text_content = String::new();
+            if let Some(paths) = files {
+                if !paths.is_empty() {
+                    text_content = paths.join(" ") + "\n\n";
+                }
+            }
+            text_content.push_str(&text);
+
+            // Add text content block
+            content.push(serde_json::json!({
+                "type": "text",
+                "text": text_content
+            }));
+
+            // Format as streaming JSON user message with content blocks
+            let json_input = serde_json::json!({
+                "type": "user",
+                "message": {
+                    "role": "user",
+                    "content": content
+                }
+            });
+            let formatted = format!("{}\n", json_input);
+
+            eprintln!(
+                "[Claude] Sending structured input to session {} with {} images, {} files",
+                session_id,
+                image_count,
+                file_count
+            );
+            eprintln!(
+                "[Claude] JSON preview: {}",
+                &formatted[..std::cmp::min(200, formatted.len())]
+            );
+
+            stdin
+                .write_all(formatted.as_bytes())
                 .map_err(|e| format!("Failed to write to Claude stdin: {}", e))?;
             stdin
                 .flush()

@@ -3456,3 +3456,50 @@ pub fn read_claude_stats() -> Result<serde_json::Value, String> {
     serde_json::from_str(&content)
         .map_err(|e| format!("Failed to parse stats JSON: {}", e))
 }
+
+/// List files in a directory with a specific extension
+/// Used for scanning custom slash commands in .claude/commands/
+#[tauri::command]
+pub fn list_directory_files(path: String, extension: String) -> Result<Vec<String>, String> {
+    let dir = Path::new(&path);
+    if !dir.exists() || !dir.is_dir() {
+        return Ok(vec![]);
+    }
+
+    let mut files = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let file_path = entry.path();
+            if file_path.is_file() {
+                if let Some(ext) = file_path.extension() {
+                    if ext == extension.as_str() {
+                        if let Some(path_str) = file_path.to_str() {
+                            files.push(path_str.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(files)
+}
+
+/// Read the first N lines of a file
+/// Used for parsing YAML frontmatter in custom slash commands
+#[tauri::command]
+pub fn read_file_head(path: String, lines: usize) -> Result<String, String> {
+    use std::io::{BufRead, BufReader};
+
+    let file = fs::File::open(&path)
+        .map_err(|e| format!("Failed to open file: {}", e))?;
+
+    let reader = BufReader::new(file);
+    let content: Vec<String> = reader
+        .lines()
+        .take(lines)
+        .filter_map(|l| l.ok())
+        .collect();
+
+    Ok(content.join("\n"))
+}

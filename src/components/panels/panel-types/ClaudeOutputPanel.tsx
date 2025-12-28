@@ -13,7 +13,12 @@ import { claudeService } from "@/services/claude";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps } from "@/types/panel";
-import type { PermissionMode, ToolCall, McpPermissionRequest } from "@/types";
+import type { PermissionMode, ToolCall, McpPermissionRequest, StructuredPrompt } from "@/types";
+import {
+  extractCommandName,
+  isCustomHandledCommand,
+  isLocalOnlyCommand,
+} from "@/lib/slashCommandHandler";
 
 // In stream-json mode, there's no interactive tool approval.
 // The CLI auto-approves or auto-rejects based on --permission-mode:
@@ -62,6 +67,8 @@ export function ClaudeOutputPanel({
     getSession,
     setPendingQuestionSet,
     updateSessionPermissionMode,
+    clearMessages,
+    setLastCommand,
   } = useSessionStore();
   const { claudeSafeMode, defaultModel } = useSettingsStore();
   const { getFiles, loadIndex } = useFileIndexStore();
@@ -287,8 +294,30 @@ export function ClaudeOutputPanel({
     async (prompt: string) => {
       if (!sessionId || !isSessionActive) return;
 
-      // Start streaming state for this message
+      // Check for slash commands with custom handling
+      const commandName = extractCommandName(prompt);
+
+      // Handle /clear locally - no CLI call needed
+      if (commandName && isLocalOnlyCommand(commandName)) {
+        if (commandName === "clear") {
+          clearMessages(sessionId);
+        }
+        return;
+      }
+
+      // Track custom commands for response parsing
+      if (commandName && isCustomHandledCommand(commandName)) {
+        setLastCommand(sessionId, commandName);
+      } else {
+        setLastCommand(sessionId, undefined);
+      }
+
+      // Start streaming state first - this creates the new slide
       startStreaming(sessionId);
+
+      // Wait for slide animation to complete before sending prompt
+      // This creates a smoother UX: slide first, then stream response
+      await new Promise(resolve => setTimeout(resolve, 350));
 
       try {
         await claudeService.sendPrompt(sessionId, prompt);
@@ -298,7 +327,47 @@ export function ClaudeOutputPanel({
         finishStreaming(sessionId);
       }
     },
-    [sessionId, isSessionActive, startStreaming, appendStreamingText, finishStreaming]
+    [sessionId, isSessionActive, startStreaming, appendStreamingText, finishStreaming, clearMessages, setLastCommand]
+  );
+
+  const handleSendStructuredPrompt = useCallback(
+    async (prompt: StructuredPrompt) => {
+      if (!sessionId || !isSessionActive) return;
+
+      // Check for slash commands in structured prompt text
+      const commandName = extractCommandName(prompt.text);
+
+      // Handle /clear locally - no CLI call needed
+      if (commandName && isLocalOnlyCommand(commandName)) {
+        if (commandName === "clear") {
+          clearMessages(sessionId);
+        }
+        return;
+      }
+
+      // Track custom commands for response parsing
+      if (commandName && isCustomHandledCommand(commandName)) {
+        setLastCommand(sessionId, commandName);
+      } else {
+        setLastCommand(sessionId, undefined);
+      }
+
+      // Start streaming state first - this creates the new slide
+      startStreaming(sessionId);
+
+      // Wait for slide animation to complete before sending prompt
+      // This creates a smoother UX: slide first, then stream response
+      await new Promise(resolve => setTimeout(resolve, 350));
+
+      try {
+        await claudeService.sendStructuredPrompt(sessionId, prompt);
+      } catch (error) {
+        console.error("[ClaudeOutputPanel] Failed to send structured prompt:", error);
+        appendStreamingText(sessionId, `\nError: ${error}`);
+        finishStreaming(sessionId);
+      }
+    },
+    [sessionId, isSessionActive, startStreaming, appendStreamingText, finishStreaming, clearMessages, setLastCommand]
   );
 
   const handleApprove = useCallback(
@@ -542,50 +611,48 @@ export function ClaudeOutputPanel({
         {!isSessionActive && !isSessionStarting ? (
           <button
             onClick={handleStartSession}
-            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/30 hover:border-green-500/50 transition-all shadow-sm"
+            className="flex items-center gap-2 px-3 h-7 rounded-md text-xs bg-bg-tertiary border border-accent-green/50 hover:border-accent-green hover:bg-accent-green/10 text-accent-green transition-colors"
+            title="Start Claude session"
           >
-            <Play className="w-3.5 h-3.5 fill-green-400" />
-            <span>Start Server</span>
+            <Play className="w-3.5 h-3.5" />
+            <span>Start</span>
           </button>
         ) : isSessionStarting ? (
-          <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-yellow-400 bg-yellow-500/10 rounded-md border border-yellow-500/20">
+          <div className="flex items-center gap-2 px-3 h-7 rounded-md text-xs bg-bg-tertiary border border-yellow-500/50 text-yellow-400">
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            <div className="flex flex-col">
-              <span>Starting...</span>
-              <span className="text-[10px] font-normal text-yellow-400/60">Initializing Claude CLI</span>
-            </div>
+            <span>Starting...</span>
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-green-400 bg-green-500/10 rounded-md border border-green-500/20">
+            <div className="flex items-center gap-2 px-3 h-7 text-xs text-accent-green bg-bg-tertiary rounded-md border border-accent-green/30">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent-green"></span>
               </span>
-              <div className="flex flex-col">
-                <span>Server Running</span>
-                {claudeSessionState && (
-                  <span className="text-[10px] font-normal text-green-400/60">
-                    {claudeSessionState.model?.replace("claude-", "").split("-")[0] || "Claude"}
-                    {isPlanMode && " • Plan Mode"}
-                  </span>
-                )}
-              </div>
+              <span>Running</span>
+              {claudeSessionState && (
+                <span className="text-accent-green/60">
+                  {claudeSessionState.model?.replace("claude-", "").split("-")[0] || "Claude"}
+                  {isPlanMode && " • Plan"}
+                </span>
+              )}
             </div>
             <button
               onClick={handleStopSession}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 hover:border-red-500/40 transition-all"
+              className="flex items-center gap-2 px-3 h-7 rounded-md text-xs bg-bg-tertiary border border-accent-red/50 hover:border-accent-red hover:bg-accent-red/10 text-accent-red transition-colors"
+              title="Stop Claude session"
             >
-              <Square className="w-3 h-3 fill-red-400" />
+              <Square className="w-3.5 h-3.5" />
               <span>Stop</span>
             </button>
             {isPlanMode && (
               <button
                 onClick={handleExecutePlan}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md bg-accent-green/20 hover:bg-accent-green/30 text-accent-green border border-accent-green/30 transition-all"
+                className="flex items-center gap-2 px-3 h-7 rounded-md text-xs bg-bg-tertiary border border-accent-green/50 hover:border-accent-green hover:bg-accent-green/10 text-accent-green transition-colors"
+                title="Execute Plan"
               >
-                <Play className="w-3 h-3 fill-accent-green" />
-                <span>Execute Plan</span>
+                <Play className="w-3.5 h-3.5" />
+                <span>Execute</span>
               </button>
             )}
           </>
@@ -599,6 +666,7 @@ export function ClaudeOutputPanel({
           sessionId={sessionId}
           projectFiles={projectFiles}
           onSendPrompt={handleSendPrompt}
+          onSendStructuredPrompt={handleSendStructuredPrompt}
           disabled={!isSessionActive}
           placeholder={
             !isSessionActive
@@ -609,8 +677,8 @@ export function ClaudeOutputPanel({
       </div>
 
       {/* Response area */}
-      <div className="flex-1 flex flex-col overflow-hidden px-3 pb-2">
-        <div className="flex-1 overflow-hidden rounded border border-border/50 bg-bg-tertiary/30">
+      <div className="flex-1 flex flex-col min-h-0 px-3 pb-2">
+        <div className="flex-1 min-h-0 overflow-hidden rounded border border-border/50 bg-bg-tertiary/30">
           <ResponseCarousel
             messages={messages}
             streamingText={streamingState?.streamingText || ""}
@@ -618,6 +686,7 @@ export function ClaudeOutputPanel({
             pendingToolCalls={streamingState?.pendingToolCalls || []}
             isStreaming={isStreaming}
             streamingStats={streamingState?.stats}
+            lastCommand={streamingState?.lastCommand}
           />
         </div>
 

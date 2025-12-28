@@ -4,6 +4,7 @@ import { IconButton, ScrollArea } from "@/components/ui";
 import { ClaudeResponseCard } from "./ClaudeResponseCard";
 import { cn } from "@/lib/utils";
 import type { Message, ToolCall, StreamingStats } from "@/types";
+import type { CustomHandledCommand } from "@/types/slashCommandResponse";
 
 interface MessagePair {
   user: Message;
@@ -17,6 +18,7 @@ interface ResponseCarouselProps {
   pendingToolCalls?: ToolCall[];
   isStreaming?: boolean;
   streamingStats?: StreamingStats;
+  lastCommand?: CustomHandledCommand;
 }
 
 // Collapsible user message status bar
@@ -100,6 +102,7 @@ export function ResponseCarousel({
   pendingToolCalls = [],
   isStreaming = false,
   streamingStats,
+  lastCommand,
 }: ResponseCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -233,40 +236,37 @@ export function ResponseCarousel({
           {messagePairs.map((pair) => (
             <div
               key={pair.user.id}
-              className="flex-shrink-0 w-full h-full snap-center px-10"
+              className="flex-shrink-0 w-full h-full snap-center p-4"
             >
               <ScrollArea className="h-full">
-                <div className="py-2">
-                  <UserMessageBar content={pair.user.content} />
-                  {pair.assistant && (
-                    <ClaudeResponseCard content={pair.assistant.content} />
-                  )}
-                </div>
+                <UserMessageBar content={pair.user.content} />
+                {pair.assistant && (
+                  <ClaudeResponseCard content={pair.assistant.content} />
+                )}
               </ScrollArea>
             </div>
           ))}
 
           {/* Streaming slide */}
           {hasStreamingContent && (
-            <div className="flex-shrink-0 w-full h-full snap-center px-10">
+            <div className="flex-shrink-0 w-full h-full snap-center p-4">
               <ScrollArea className="h-full">
-                <div className="py-2">
-                  {lastUserMessage && (
-                    <UserMessageBar content={lastUserMessage.content} />
-                  )}
-                  <ClaudeResponseCard
-                    content={streamingText}
-                    thinkingText={thinkingText}
-                    isStreaming={isStreaming}
-                    streamingStats={streamingStats}
-                  />
-                </div>
+                {lastUserMessage && (
+                  <UserMessageBar content={lastUserMessage.content} />
+                )}
+                <ClaudeResponseCard
+                  content={streamingText}
+                  thinkingText={thinkingText}
+                  isStreaming={isStreaming}
+                  streamingStats={streamingStats}
+                  lastCommand={lastCommand}
+                />
               </ScrollArea>
             </div>
           )}
         </div>
 
-        {/* Navigation arrows - disabled while streaming */}
+        {/* Navigation arrows - positioned at edge */}
         {totalSlides > 1 && (
           <>
             <IconButton
@@ -275,7 +275,8 @@ export function ResponseCarousel({
               disabled={currentIndex === 0 || isStreaming}
               className={cn(
                 "absolute left-1 top-1/2 -translate-y-1/2 z-10",
-                "bg-bg-tertiary/90 border border-border shadow-sm",
+                "bg-bg-secondary/95 backdrop-blur-sm border border-border/50 shadow-lg",
+                "hover:bg-bg-tertiary hover:border-border",
                 "disabled:opacity-30 disabled:cursor-not-allowed"
               )}
             >
@@ -287,7 +288,8 @@ export function ResponseCarousel({
               disabled={currentIndex === totalSlides - 1 || isStreaming}
               className={cn(
                 "absolute right-1 top-1/2 -translate-y-1/2 z-10",
-                "bg-bg-tertiary/90 border border-border shadow-sm",
+                "bg-bg-secondary/95 backdrop-blur-sm border border-border/50 shadow-lg",
+                "hover:bg-bg-tertiary hover:border-border",
                 "disabled:opacity-30 disabled:cursor-not-allowed"
               )}
             >

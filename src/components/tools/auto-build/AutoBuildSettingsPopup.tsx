@@ -210,6 +210,90 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
               </select>
             </div>
           </div>
+
+          {/* AI Audits Section */}
+          <div>
+            <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
+              AI Audits
+            </h4>
+            <div className="flex flex-col gap-2">
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
+                  isDisabled && "cursor-not-allowed opacity-50"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.runSecurityAudit}
+                  onChange={(e) => updateSettings({ runSecurityAudit: e.target.checked })}
+                  disabled={isDisabled}
+                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
+                />
+                <div>
+                  <div className="text-sm">Security Audit</div>
+                  <div className="text-xs text-text-secondary">OWASP vulnerability scan</div>
+                </div>
+              </label>
+
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
+                  isDisabled && "cursor-not-allowed opacity-50"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.runPerformanceAudit}
+                  onChange={(e) => updateSettings({ runPerformanceAudit: e.target.checked })}
+                  disabled={isDisabled}
+                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
+                />
+                <div>
+                  <div className="text-sm">Performance Audit</div>
+                  <div className="text-xs text-text-secondary">Memory leaks, anti-patterns</div>
+                </div>
+              </label>
+
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
+                  isDisabled && "cursor-not-allowed opacity-50"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.runCodeQualityAudit}
+                  onChange={(e) => updateSettings({ runCodeQualityAudit: e.target.checked })}
+                  disabled={isDisabled}
+                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
+                />
+                <div>
+                  <div className="text-sm">Code Quality Audit</div>
+                  <div className="text-xs text-text-secondary">DRY, complexity, naming</div>
+                </div>
+              </label>
+
+              <label
+                className={cn(
+                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
+                  isDisabled && "cursor-not-allowed opacity-50"
+                )}
+              >
+                <input
+                  type="checkbox"
+                  checked={settings.runAccessibilityAudit}
+                  onChange={(e) => updateSettings({ runAccessibilityAudit: e.target.checked })}
+                  disabled={isDisabled}
+                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
+                />
+                <div>
+                  <div className="text-sm">Accessibility Audit</div>
+                  <div className="text-xs text-text-secondary">WCAG 2.1 (UI files only)</div>
+                </div>
+              </label>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}

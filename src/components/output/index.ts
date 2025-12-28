@@ -1,5 +1,6 @@
 export { MarkdownRenderer } from "./MarkdownRenderer";
 export { CodeBlock } from "./CodeBlock";
+export { DiffBlock } from "./DiffBlock";
 export { ToolCallBlock } from "./ToolCallBlock";
 export { StreamingStatus } from "./StreamingStatus";
 export { ResponseCarousel } from "./ResponseCarousel";

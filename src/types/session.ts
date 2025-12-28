@@ -1,4 +1,4 @@
-export type ClaudeModel = "claude-sonnet-4-20250514" | "claude-opus-4-20250514" | "claude-haiku-3-5-20241022";
+export type ClaudeModel = "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-haiku-20241022";
 
 export type SessionType = "claude" | "terminal";
 
@@ -31,6 +31,13 @@ export interface FileReference {
 export interface MessageAttachments {
   images?: ImageAttachment[];
   files?: FileReference[];
+}
+
+/** Structured prompt for sending to Claude with multimodal content */
+export interface StructuredPrompt {
+  text: string;
+  images?: Array<{ base64: string; mediaType: string }>;
+  files?: string[];
 }
 
 export interface Message {

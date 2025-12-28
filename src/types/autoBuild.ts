@@ -4,9 +4,11 @@ export type AutoBuildStatus = "idle" | "running" | "paused" | "error";
 export type AutoBuildPhase =
   | "selecting"
   | "working"
+  | "selfReviewing"      // Claude reviews its own code
+  | "auditing"           // Orchestrator running parallel subagent audits
   | "testing"
-  | "fixing"     // Claude is fixing test/lint/build failures
-  | "reviewing"  // Awaiting human review
+  | "fixing"             // Claude is fixing test/lint/build/audit failures
+  | "reviewing"          // Awaiting human review
   | "committing"
   | null;
 
@@ -28,6 +30,11 @@ export interface AutoBuildSettings {
   requireHumanReview: boolean;  // default: true
   maxConcurrentIssues: number;  // default: 3
   ignoreUnrelatedFailures: boolean;  // default: true
+  // AI Audits (subagent-based quality gates)
+  runSecurityAudit: boolean;      // default: false
+  runPerformanceAudit: boolean;   // default: false
+  runCodeQualityAudit: boolean;   // default: false
+  runAccessibilityAudit: boolean; // default: false (only runs if UI files changed)
 }
 
 // Worker state for concurrent issue processing
@@ -49,14 +56,14 @@ export interface AutoBuildStreamingState {
   startTime: number;
 }
 
-// Progress tracking for _SILO files
+// Progress tracking for _SILO files (context for subsequent phases)
 export interface SiloProgress {
   issueId: string;
   issueTitle: string;
-  issueDescription?: string;
-  currentStep: string;
-  whatWasDone: string[];
-  whatsNext: string[];
+  issueType: string;
+  filesModified: string[];
+  summary: string;           // Brief description of what was done
+  notes?: string;            // Implementation details, approach taken
   lastUpdated: string;
 }
 
@@ -85,6 +92,16 @@ export interface VerificationResult {
   lint: { success: boolean; output: string };
   tests: { success: boolean; output: string };
   build: { success: boolean; output: string };
+}
+
+// File-based audit results from _AUDIT/*.md files
+export interface AuditFileResults {
+  success: boolean;
+  security?: string;
+  performance?: string;
+  codeQuality?: string;
+  accessibility?: string;
+  hasIssues: boolean;
 }
 
 export interface AutoBuildState {
@@ -137,11 +154,18 @@ export const DEFAULT_SETTINGS: AutoBuildSettings = {
   requireHumanReview: true,
   maxConcurrentIssues: 3,
   ignoreUnrelatedFailures: true,
+  // AI Audits - disabled by default for faster iteration
+  runSecurityAudit: false,
+  runPerformanceAudit: false,
+  runCodeQualityAudit: false,
+  runAccessibilityAudit: false,
 };
 
 export const PHASE_LABELS: Record<NonNullable<AutoBuildPhase>, string> = {
   selecting: "Selecting next issue",
   working: "Working on code",
+  selfReviewing: "Self-reviewing code",
+  auditing: "Running AI audits",
   testing: "Running verification",
   fixing: "Fixing issues",
   reviewing: "Awaiting review",

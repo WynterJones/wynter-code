@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import type { StreamChunk, ClaudeModel, StreamingStats, PermissionMode, McpPermissionRequest } from "@/types";
+import type { StreamChunk, ClaudeModel, StreamingStats, PermissionMode, McpPermissionRequest, StructuredPrompt } from "@/types";
 
 export interface McpPermissionEvent {
   request: McpPermissionRequest;
@@ -411,6 +411,25 @@ class ClaudeService {
   /** Send raw input to a running Claude session (for tool approvals like "y" or "n") */
   async sendRawInput(sessionId: string, input: string): Promise<void> {
     await invoke("send_claude_raw_input", { sessionId, input });
+  }
+
+  /** Send a structured prompt with images and files to a running session */
+  async sendStructuredPrompt(sessionId: string, prompt: StructuredPrompt): Promise<void> {
+    console.log("[ClaudeService] sendStructuredPrompt:", {
+      sessionId,
+      text: prompt.text.substring(0, 50),
+      imageCount: prompt.images?.length ?? 0,
+      fileCount: prompt.files?.length ?? 0,
+    });
+    if (!this._sessionActiveMap.get(sessionId)) {
+      throw new Error("Session not active. Start a session first.");
+    }
+    await invoke("send_claude_structured_input", {
+      sessionId,
+      text: prompt.text,
+      images: prompt.images,
+      files: prompt.files,
+    });
   }
 
   /** Check if a Claude session is active on backend */

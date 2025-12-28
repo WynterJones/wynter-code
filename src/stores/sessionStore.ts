@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
 import type { Session, Message, ClaudeModel, ToolCall, StreamingStats, PermissionMode, SessionType } from "@/types";
 import type { PendingQuestion, PendingQuestionSet } from "@/components/output/AskUserQuestionBlock";
+import type { CustomHandledCommand } from "@/types/slashCommandResponse";
 
 export interface ClaudeSessionInfo {
   model?: string;
@@ -22,6 +23,7 @@ interface StreamingState {
   stats: StreamingStats;
   pendingQuestion: PendingQuestion | null;
   pendingQuestionSet: PendingQuestionSet | null;
+  lastCommand?: CustomHandledCommand;
 }
 
 interface SessionStore {
@@ -76,6 +78,7 @@ interface SessionStore {
   getStreamingState: (sessionId: string) => StreamingState;
   setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => void;
   setPendingQuestionSet: (sessionId: string, questionSet: PendingQuestionSet | null) => void;
+  setLastCommand: (sessionId: string, command: CustomHandledCommand | undefined) => void;
 
   // Claude session state (persistent CLI session)
   setClaudeSessionStarting: (sessionId: string) => void;
@@ -555,6 +558,18 @@ export const useSessionStore = create<SessionStore>()(
           newStreamingState.set(sessionId, {
             ...current,
             pendingQuestionSet: questionSet,
+          });
+          return { streamingState: newStreamingState };
+        });
+      },
+
+      setLastCommand: (sessionId: string, command: CustomHandledCommand | undefined) => {
+        set((state) => {
+          const newStreamingState = new Map(state.streamingState);
+          const current = newStreamingState.get(sessionId) || { ...defaultStreamingState };
+          newStreamingState.set(sessionId, {
+            ...current,
+            lastCommand: command,
           });
           return { streamingState: newStreamingState };
         });

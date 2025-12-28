@@ -18,6 +18,11 @@ import { FocusOverlay } from "./FocusOverlay";
 import { ImageThumbnails, type ImageAttachment } from "./ImageThumbnail";
 import { FileTagBadges, type FileReference } from "./FileTagBadge";
 import { FilePickerDropdown } from "./FilePickerDropdown";
+// DISABLED: Slash command dropdown (responses not working correctly)
+// import { SlashCommandDropdown } from "./SlashCommandDropdown";
+// import { BUILTIN_COMMANDS, scanCustomCommands } from "@/lib/slashCommands";
+// import type { SlashCommand } from "@/types/slashCommand";
+import type { StructuredPrompt } from "@/types/session";
 
 const IMAGE_EXTENSIONS = [
   "png",
@@ -62,6 +67,7 @@ interface EnhancedPromptInputProps {
   onImageConsumed?: () => void;
   onRequestImageBrowser?: () => void;
   onSendPrompt?: (prompt: string) => void;
+  onSendStructuredPrompt?: (prompt: StructuredPrompt) => void;
   disabled?: boolean;
   placeholder?: string;
 }
@@ -74,6 +80,7 @@ export function EnhancedPromptInput({
   onImageConsumed,
   onRequestImageBrowser,
   onSendPrompt,
+  onSendStructuredPrompt,
   disabled = false,
   placeholder = "Type a prompt... (@ to add files, paste images)",
 }: EnhancedPromptInputProps) {
@@ -88,6 +95,12 @@ export function EnhancedPromptInput({
     left: 0,
   });
   const [isDragging, setIsDragging] = useState(false);
+
+  // DISABLED: Slash command dropdown state (responses not working correctly)
+  const [showSlashCommands, setShowSlashCommands] = useState(false);
+  // const [slashSearchQuery, setSlashSearchQuery] = useState("");
+  // const [slashPickerPosition, setSlashPickerPosition] = useState({ top: 0, left: 0 });
+  // const [allCommands, setAllCommands] = useState<SlashCommand[]>(BUILTIN_COMMANDS);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -202,6 +215,22 @@ export function EnhancedPromptInput({
     window.addEventListener("focus-prompt", handleFocusPrompt);
     return () => window.removeEventListener("focus-prompt", handleFocusPrompt);
   }, []);
+
+  // DISABLED: Load custom slash commands (responses not working correctly)
+  // useEffect(() => {
+  //   async function loadCommands() {
+  //     try {
+  //       const customCommands = await scanCustomCommands(projectPath);
+  //       setAllCommands([...BUILTIN_COMMANDS, ...customCommands]);
+  //     } catch (error) {
+  //       console.error("Error loading custom commands:", error);
+  //       setAllCommands(BUILTIN_COMMANDS);
+  //     }
+  //   }
+  //   if (projectPath) {
+  //     loadCommands();
+  //   }
+  // }, [projectPath]);
 
   const handlePaste = useCallback((e: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData?.items;
@@ -378,8 +407,26 @@ export function EnhancedPromptInput({
 
       const cursorPos = e.target.selectionStart;
       const textBeforeCursor = value.slice(0, cursorPos);
-      const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
 
+      // Slash command detection - DISABLED for now (responses not working correctly)
+      // const slashMatch = textBeforeCursor.match(/^\/([^\s]*)$/);
+      // if (slashMatch && cursorPos === textBeforeCursor.length) {
+      //   setSlashSearchQuery(slashMatch[1]);
+      //   setShowSlashCommands(true);
+      //   setShowFilePicker(false);
+      //   setFileSearchQuery("");
+      //   if (inputRef.current) {
+      //     const rect = inputRef.current.getBoundingClientRect();
+      //     setSlashPickerPosition({ top: rect.top + 32, left: rect.left });
+      //   }
+      //   return;
+      // } else {
+      //   setShowSlashCommands(false);
+      //   setSlashSearchQuery("");
+      // }
+
+      // @ file picker detection
+      const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
       if (atMatch) {
         setFileSearchQuery(atMatch[1]);
         setShowFilePicker(true);
@@ -435,6 +482,24 @@ export function EnhancedPromptInput({
     [prompt],
   );
 
+  // DISABLED: handleSlashCommandSelect (responses not working correctly)
+  // const handleSlashCommandSelect = useCallback(
+  //   (command: SlashCommand) => {
+  //     const newPrompt = `/${command.name} `;
+  //     setPrompt(newPrompt);
+  //     setShowSlashCommands(false);
+  //     setSlashSearchQuery("");
+  //     setTimeout(() => {
+  //       if (inputRef.current) {
+  //         const newPos = newPrompt.length;
+  //         inputRef.current.setSelectionRange(newPos, newPos);
+  //         inputRef.current.focus();
+  //       }
+  //     }, 0);
+  //   },
+  //   [],
+  // );
+
   const handleRemoveImage = useCallback((id: string) => {
     setImages((prev) => prev.filter((img) => img.id !== id));
   }, []);
@@ -455,7 +520,47 @@ export function EnhancedPromptInput({
     const currentImages = [...images];
     const currentFiles = [...files];
 
-    // Build full prompt with attachments
+    // If we have the structured prompt handler, use proper content blocks for images
+    if (onSendStructuredPrompt) {
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        currentSessionId = createSession(projectPath.split("/").pop() || "project");
+      }
+
+      // Start streaming FIRST - this creates the new slide and triggers navigation
+      // This must happen before addMessage so the user message goes to the streaming slide
+      startStreaming(currentSessionId);
+
+      // Add user message to history (now goes to streaming slide since isStreaming=true)
+      addMessage(currentSessionId, {
+        sessionId: currentSessionId,
+        role: "user",
+        content: userMessage,
+      });
+
+      setPrompt("");
+      setImages([]);
+      setFiles([]);
+      setIsFocused(false);
+
+      // Parse images: extract base64 and mediaType from data URLs
+      const imageData = currentImages.map((img) => {
+        // img.data is like "data:image/png;base64,iVBORw0..."
+        const [header, base64] = img.data.split(",");
+        const mediaType = header.match(/data:([^;]+)/)?.[1] || "image/png";
+        return { base64, mediaType };
+      });
+
+      // Send structured prompt with proper image content blocks
+      onSendStructuredPrompt({
+        text: userMessage,
+        images: imageData.length > 0 ? imageData : undefined,
+        files: currentFiles.length > 0 ? currentFiles.map((f) => f.path) : undefined,
+      });
+      return;
+    }
+
+    // Legacy mode: build full prompt as string (images won't work properly)
     let fullPrompt = userMessage;
 
     // Add file references as @ paths (Claude CLI reads these natively)
@@ -464,7 +569,7 @@ export function EnhancedPromptInput({
       fullPrompt = `${filePaths}\n\n${fullPrompt}`;
     }
 
-    // Add images as base64 data URLs
+    // Add images as base64 data URLs (legacy - won't work properly)
     if (currentImages.length > 0) {
       const imageRefs = currentImages.map((img) => img.data).join("\n");
       fullPrompt = `${imageRefs}\n\n${fullPrompt}`;
@@ -477,7 +582,11 @@ export function EnhancedPromptInput({
         currentSessionId = createSession(projectPath.split("/").pop() || "project");
       }
 
-      // Add user message to history
+      // Start streaming FIRST - this creates the new slide and triggers navigation
+      // This must happen before addMessage so the user message goes to the streaming slide
+      startStreaming(currentSessionId);
+
+      // Add user message to history (now goes to streaming slide since isStreaming=true)
       addMessage(currentSessionId, {
         sessionId: currentSessionId,
         role: "user",
@@ -552,12 +661,14 @@ export function EnhancedPromptInput({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !showFilePicker) {
+    if (e.key === "Enter" && !e.shiftKey && !showFilePicker && !showSlashCommands) {
       e.preventDefault();
       handleSubmit();
     }
     if (e.key === "Escape") {
-      if (showFilePicker) {
+      if (showSlashCommands) {
+        setShowSlashCommands(false);
+      } else if (showFilePicker) {
         setShowFilePicker(false);
       } else if (isStreaming) {
         handleStop();
@@ -678,21 +789,21 @@ export function EnhancedPromptInput({
                 <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                   @
                 </kbd>{" "}
-                to add files •{" "}
+                files •{" "}
                 <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                   ⌘V
                 </kbd>{" "}
-                to paste images
+                paste
               </span>
               <span>
                 <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                   Esc
                 </kbd>{" "}
-                to close •{" "}
+                close •{" "}
                 <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                   Enter
                 </kbd>{" "}
-                to send
+                send
               </span>
             </div>
           )}
@@ -707,6 +818,17 @@ export function EnhancedPromptInput({
         onSelect={handleFileSelect}
         onClose={() => setShowFilePicker(false)}
       />
+
+      {/* SlashCommandDropdown - DISABLED for now (responses not working correctly)
+      <SlashCommandDropdown
+        isOpen={showSlashCommands}
+        searchQuery={slashSearchQuery}
+        commands={allCommands}
+        position={slashPickerPosition}
+        onSelect={handleSlashCommandSelect}
+        onClose={() => setShowSlashCommands(false)}
+      />
+      */}
     </>
   );
 }

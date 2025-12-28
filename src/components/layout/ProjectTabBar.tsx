@@ -11,7 +11,6 @@ import {
   Minus,
   Database,
   Search,
-  Bot,
   Eye,
   Bookmark,
 } from "lucide-react";
@@ -307,7 +306,6 @@ export function ProjectTabBar({
   const setMeditationActive = useMeditationStore((s) => s.setActive);
 
   const isAutoBuildOpen = useAutoBuildStore((s) => s.isPopupOpen);
-  const isAutoBuildRunning = useAutoBuildStore((s) => s.status === "running");
   const openAutoBuildPopup = useAutoBuildStore((s) => s.openPopup);
 
   const {
@@ -886,19 +884,6 @@ export function ProjectTabBar({
         <Tooltip content="Bookmarks">
           <IconButton size="sm" onClick={() => setShowBookmarks(true)}>
             <Bookmark className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
-      </div>
-
-      {/* Auto Build */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content="Auto Build">
-          <IconButton
-            size="sm"
-            onClick={() => openAutoBuildPopup()}
-            className={cn(isAutoBuildRunning && "text-accent bg-accent/10")}
-          >
-            <Bot className={cn("w-4 h-4", isAutoBuildRunning && "animate-pulse")} />
           </IconButton>
         </Tooltip>
       </div>

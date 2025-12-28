@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Inbox, Loader2, FlaskConical, Eye, Check, CheckCircle2, Settings, Layers, ChevronRight, Users, Wrench, TestTube, GitCommit, Clock } from "lucide-react";
+import { Plus, Inbox, Loader2, FlaskConical, Eye, Check, CheckCircle2, Settings, Layers, ChevronRight, Users, Wrench, TestTube, GitCommit, Clock, Search } from "lucide-react";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { AutoBuildIssueCard } from "./AutoBuildIssueCard";
 import { AutoBuildNewIssuePopup } from "./AutoBuildNewIssuePopup";
@@ -39,6 +39,8 @@ function WorkerStatusBar({ workers, getCachedIssue }: { workers: AutoBuildWorker
   const getPhaseIcon = (phase: AutoBuildWorker["phase"]) => {
     switch (phase) {
       case "working": return <Wrench className="w-3 h-3" />;
+      case "selfReviewing": return <Eye className="w-3 h-3 text-cyan-400" />;
+      case "auditing": return <Search className="w-3 h-3 text-purple-400" />;
       case "testing": return <TestTube className="w-3 h-3" />;
       case "fixing": return <Wrench className="w-3 h-3 text-amber-400" />;
       case "committing": return <GitCommit className="w-3 h-3" />;
@@ -108,22 +110,28 @@ export function AutoBuildKanban({ issues }: AutoBuildKanbanProps) {
 
   // Build columns (without Completed - it's now a compact list)
   const columns = useMemo<KanbanColumn[]>(() => {
+    // Phases grouped by column
+    const doingPhases = new Set(["working", "selfReviewing"]);
+    const testingPhases = new Set([
+      "auditing", "testing", "fixing", "committing"
+    ]);
+
     // Get all issue IDs being worked on by workers
-    const workingIssueIds = new Set(workers.filter(w => w.issueId && w.phase === "working").map(w => w.issueId!));
-    const testingIssueIds = new Set(workers.filter(w => w.issueId && (w.phase === "testing" || w.phase === "fixing" || w.phase === "committing")).map(w => w.issueId!));
+    const doingIssueIds = new Set(workers.filter(w => w.issueId && w.phase && doingPhases.has(w.phase)).map(w => w.issueId!));
+    const testingIssueIds = new Set(workers.filter(w => w.issueId && w.phase && testingPhases.has(w.phase)).map(w => w.issueId!));
 
     // Backlog: Issues in queue (not being worked on)
     const backlogIssues = queue
-      .filter((id) => !workingIssueIds.has(id) && !testingIssueIds.has(id))
+      .filter((id) => !doingIssueIds.has(id) && !testingIssueIds.has(id))
       .map((id) => issues.find((i) => i.id === id) || getCachedIssue(id))
       .filter((i): i is BeadsIssue => !!i);
 
-    // Doing: All issues in working phase across all workers
-    const doingIssues = Array.from(workingIssueIds)
+    // Doing: Issues in working/selfReviewing phase
+    const doingIssues = Array.from(doingIssueIds)
       .map((id) => issues.find((i) => i.id === id) || getCachedIssue(id))
       .filter((i): i is BeadsIssue => !!i);
 
-    // Testing: All issues in testing/fixing/committing phase across all workers
+    // Testing: Issues in audit/testing/fixing/committing phases
     const testingIssues = Array.from(testingIssueIds)
       .map((id) => issues.find((i) => i.id === id) || getCachedIssue(id))
       .filter((i): i is BeadsIssue => !!i);

@@ -323,3 +323,52 @@ pub async fn auto_build_commit(
 
     Ok(())
 }
+
+// File-based audit results from _AUDIT/*.md files
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AuditFileResults {
+    pub success: bool,
+    pub security: Option<String>,
+    pub performance: Option<String>,
+    pub code_quality: Option<String>,
+    pub accessibility: Option<String>,
+    pub has_issues: bool,
+}
+
+#[tauri::command]
+pub async fn auto_build_read_audit_files(project_path: String) -> Result<AuditFileResults, String> {
+    let audit_dir = Path::new(&project_path).join("_AUDIT");
+
+    let read_file = |name: &str| -> Option<String> {
+        let path = audit_dir.join(name);
+        fs::read_to_string(&path).ok()
+    };
+
+    let security = read_file("SECURITY.md");
+    let performance = read_file("PERFORMANCE.md");
+    let code_quality = read_file("CODE_QUALITY.md");
+    let accessibility = read_file("ACCESSIBILITY.md");
+
+    // Check if any file contains issues (look for markers like "FAIL", "Issue", severity indicators)
+    let has_issues = [&security, &performance, &code_quality, &accessibility]
+        .iter()
+        .any(|content| {
+            content.as_ref().map_or(false, |c| {
+                c.contains("## Issues") ||
+                c.contains("### Critical") ||
+                c.contains("### High") ||
+                c.contains("### Medium") ||
+                c.contains("FAIL") ||
+                c.contains("❌")
+            })
+        });
+
+    Ok(AuditFileResults {
+        success: true,
+        security,
+        performance,
+        code_quality,
+        accessibility,
+        has_issues,
+    })
+}

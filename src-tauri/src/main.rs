@@ -361,6 +361,7 @@ fn main() {
             auto_build::auto_build_commit,
             auto_build::auto_build_read_silo,
             auto_build::auto_build_write_silo,
+            auto_build::auto_build_read_audit_files,
             // MCP Server Management
             commands::get_mcp_servers,
             commands::save_mcp_server,
@@ -369,6 +370,9 @@ fn main() {
             commands::validate_mcp_command,
             // Claude Code Stats
             commands::read_claude_stats,
+            // Slash Commands (custom command scanning)
+            commands::list_directory_files,
+            commands::read_file_head,
             // Claude Code Limits Monitor
             limits_monitor::calculate_usage_summary,
             // Netlify API
@@ -385,6 +389,7 @@ fn main() {
             claude_process::stop_claude_session,
             claude_process::start_claude_streaming,
             claude_process::send_claude_input,
+            claude_process::send_claude_structured_input,
             claude_process::send_claude_raw_input,
             claude_process::terminate_claude_session,
             claude_process::is_claude_session_active,

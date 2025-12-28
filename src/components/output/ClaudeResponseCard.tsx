@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Copy, Check, Brain } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ToolCallBlock } from "./ToolCallBlock";
 import { InlineStreamingIndicator } from "./InlineStreamingIndicator";
+import { ContextBlock, CostBlock, UsageBlock, StatusBlock, TodosBlock } from "./commands";
+import { parseCommandResponse } from "@/lib/slashCommandHandler";
 import { cn } from "@/lib/utils";
 import type { ToolCall, StreamingStats } from "@/types";
+import type { CustomHandledCommand } from "@/types/slashCommandResponse";
 
 interface ClaudeResponseCardProps {
   content: string;
@@ -13,6 +16,7 @@ interface ClaudeResponseCardProps {
   thinkingText?: string;
   isStreaming?: boolean;
   streamingStats?: StreamingStats;
+  lastCommand?: CustomHandledCommand;
   onApprove?: (toolId: string) => void;
   onReject?: (toolId: string) => void;
 }
@@ -23,11 +27,18 @@ export function ClaudeResponseCard({
   thinkingText,
   isStreaming = false,
   streamingStats,
+  lastCommand,
   onApprove,
   onReject,
 }: ClaudeResponseCardProps) {
   const [copied, setCopied] = useState(false);
   const [showThinking, setShowThinking] = useState(false);
+
+  // Parse command response if this is a custom command
+  const commandResponse = useMemo(() => {
+    if (!lastCommand || !content || isStreaming) return null;
+    return parseCommandResponse(lastCommand, content);
+  }, [lastCommand, content, isStreaming]);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
@@ -88,7 +99,16 @@ export function ClaudeResponseCard({
           </div>
         )}
 
-        {content ? (
+        {/* Render custom command UI or fallback to markdown */}
+        {commandResponse ? (
+          <div className="text-base text-text-primary leading-relaxed">
+            {commandResponse.type === "context" && <ContextBlock data={commandResponse.data} />}
+            {commandResponse.type === "cost" && <CostBlock data={commandResponse.data} />}
+            {commandResponse.type === "usage" && <UsageBlock data={commandResponse.data} />}
+            {commandResponse.type === "status" && <StatusBlock data={commandResponse.data} />}
+            {commandResponse.type === "todos" && <TodosBlock data={commandResponse.data} />}
+          </div>
+        ) : content ? (
           <div className="text-base text-text-primary leading-relaxed prose-sm">
             <MarkdownRenderer content={content} />
           </div>

@@ -13,6 +13,7 @@ import type {
   AutoBuildStreamingState,
   AutoBuildWorker,
   SiloProgress,
+  AuditFileResults,
 } from "@/types/autoBuild";
 import type { StreamChunk } from "@/types";
 
@@ -86,6 +87,11 @@ interface AutoBuildActions {
   commitChanges: (issueId: string) => Promise<void>;
   closeIssue: (issueId: string, reason: string) => Promise<void>;
   markBlocked: (issueId: string) => Promise<void>;
+
+  // AI Quality Gates
+  runSelfReview: (issueId: string, workerId: number) => Promise<boolean>;
+  runSubagentAudits: (issueId: string, filesModified: string[], workerId: number) => Promise<AuditFileResults>;
+  runAuditFixLoop: (issueId: string, auditResults: AuditFileResults, workerId: number) => Promise<boolean>;
 }
 
 const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
@@ -98,6 +104,11 @@ const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
   requireHumanReview: true,
   maxConcurrentIssues: 3,
   ignoreUnrelatedFailures: true,
+  // AI Audits - disabled by default for faster iteration
+  runSecurityAudit: false,
+  runPerformanceAudit: false,
+  runCodeQualityAudit: false,
+  runAccessibilityAudit: false,
 };
 
 // Create empty worker (used in concurrent mode)
@@ -471,26 +482,22 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
     const { projectPath } = get();
     if (!projectPath) return;
 
-    const content = `# Issue: ${progress.issueId}
+    // Concise, well-organized SILO format for context in subsequent phases
+    const filesSection = progress.filesModified.length > 0
+      ? `## Files Modified\n${progress.filesModified.map(f => `- ${f}`).join("\n")}`
+      : "## Files Modified\nNone";
 
-## Task
-${progress.issueTitle}
+    const content = `# ${progress.issueId}
+**${progress.issueType}**: ${progress.issueTitle}
 
-${progress.issueDescription || ""}
+${filesSection}
 
-## Progress
-
-### What Was Done
-${progress.whatWasDone.map((item) => `- ${item}`).join("\n")}
-
-### What's Next
-${progress.whatsNext.map((item) => `- ${item}`).join("\n")}
-
-### Current Step
-${progress.currentStep}
+## Summary
+${progress.summary || "No summary provided"}
+${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
 
 ---
-Last Updated: ${progress.lastUpdated}
+*Updated: ${progress.lastUpdated}*
 `;
 
     try {
@@ -676,6 +683,9 @@ Last Updated: ${progress.lastUpdated}
       closeIssue,
       saveSession,
       getCachedIssue,
+      runSelfReview,
+      runSubagentAudits,
+      runAuditFixLoop,
     } = get();
 
     const issue = getCachedIssue(issueId);
@@ -706,14 +716,65 @@ Last Updated: ${progress.lastUpdated}
         return false;
       }
 
-      // Phase 2: Testing with fix loop
-      updateWorker(workerId, { phase: "testing" });
-      set({ currentPhase: "testing", progress: 50 });
-      addLog("info", "Running verification", issueId);
+      // Write initial SILO context with files modified (for subsequent phases)
+      const workerAfterWork = get().workers.find(w => w.id === workerId);
+      const filesAfterWork = workerAfterWork?.filesModified || [];
+      if (filesAfterWork.length > 0) {
+        await get().updateSiloProgress(issueId, {
+          issueId,
+          issueTitle: issue?.title || issueId,
+          issueType: issue?.issue_type || "task",
+          filesModified: filesAfterWork,
+          summary: "Implementation complete - awaiting verification",
+          lastUpdated: new Date().toISOString(),
+        });
+      }
+
+      // Phase 2: Self-Review (always runs)
+      updateWorker(workerId, { phase: "selfReviewing" });
+      set({ currentPhase: "selfReviewing", progress: 25 });
+      addLog("info", "Running self-review", issueId);
+
+      const selfReviewSuccess = await runSelfReview(issueId, workerId);
+      if (!selfReviewSuccess) {
+        addLog("error", "Self-review failed", issueId);
+        await markBlocked(issueId);
+        set({ queue: get().queue.filter((id) => id !== issueId) });
+        return false;
+      }
 
       // Get files modified by this worker for test attribution
       const worker = get().workers.find(w => w.id === workerId);
       const filesModified = worker?.filesModified || [];
+
+      // Phase 3: Subagent Audits (if any enabled)
+      const hasAuditsEnabled = settings.runSecurityAudit || settings.runPerformanceAudit ||
+        settings.runCodeQualityAudit || settings.runAccessibilityAudit;
+
+      if (hasAuditsEnabled && filesModified.length > 0) {
+        addLog("info", "Running AI audits (orchestrator)", issueId);
+        const auditResults = await runSubagentAudits(issueId, filesModified, workerId);
+
+        if (auditResults.hasIssues) {
+          addLog("warning", "AI audits found issues, attempting to fix", issueId);
+          const fixed = await runAuditFixLoop(issueId, auditResults, workerId);
+          if (!fixed) {
+            addLog("error", "Failed to fix audit issues", issueId);
+            await markBlocked(issueId);
+            set({ queue: get().queue.filter((id) => id !== issueId) });
+            return false;
+          }
+        } else {
+          addLog("success", "All AI audits passed", issueId);
+        }
+      }
+
+      set({ progress: 40 });
+
+      // Phase 4: Testing with fix loop
+      updateWorker(workerId, { phase: "testing" });
+      set({ currentPhase: "testing", progress: 50 });
+      addLog("info", "Running verification", issueId);
 
       let testsPass = false;
       let fixAttempts = 0;
@@ -763,7 +824,7 @@ Last Updated: ${progress.lastUpdated}
 
       set({ progress: 80 });
 
-      // Phase 3: Commit (if not requiring human review)
+      // Phase 5: Commit (if not requiring human review)
       if (!settings.requireHumanReview && settings.autoCommit) {
         updateWorker(workerId, { phase: "committing" });
         set({ currentPhase: "committing" });
@@ -773,7 +834,7 @@ Last Updated: ${progress.lastUpdated}
 
       set({ progress: 90 });
 
-      // Phase 4: Human Review or Complete
+      // Phase 6: Human Review or Complete
       if (settings.requireHumanReview) {
         updateWorker(workerId, { phase: "reviewing" });
         moveToReview(issueId);
@@ -875,32 +936,26 @@ The file coordinator server is running on port ${fileCoordinatorPort}.
     // Build prompt based on mode
     let prompt: string;
     if (fixMode && errors) {
-      prompt = `You are fixing test/lint/build failures for issue ${issue.id}.
-
-Issue: ${issue.title}
-Type: ${issue.issue_type}
+      prompt = `Fix verification failures for ${issue.id}: ${issue.title}
 ${fileCoordinatorInstructions}
-${siloContext ? `Previous context from _SILO file:\n${siloContext}\n` : ""}
-
-Verification failed with:
+${siloContext ? `## Context (what was done)\n${siloContext}\n` : ""}
+## Errors to Fix
 ${errors}
 
-Please fix the issues and ensure lint/tests/build pass. Do NOT commit - I will handle that.`;
+Fix these issues. Do NOT commit.`;
     } else {
-      prompt = `You are implementing issue ${issue.id}.
+      prompt = `Implement ${issue.id}: ${issue.title}
 Type: ${issue.issue_type}
-Title: ${issue.title}
-Description: ${issue.description || "No description provided"}
+${issue.description ? `Description: ${issue.description}` : ""}
 ${fileCoordinatorInstructions}
-${siloContext ? `Previous context:\n${siloContext}` : "No previous context."}
+${siloContext ? `## Previous Context\n${siloContext}` : ""}
 
-Please:
-1. Understand what needs to be done
-2. Implement the changes
-3. Keep code mergeable at all times
-4. Do NOT commit - I will handle that
+Requirements:
+1. Implement the changes
+2. Keep code mergeable
+3. Do NOT commit
 
-When done, your last message should confirm what was completed.`;
+When done, briefly confirm what was completed.`;
     }
 
     // Track files modified by this worker
@@ -1159,5 +1214,324 @@ When done, your last message should confirm what was completed.`;
     } catch (err) {
       console.error("Failed to mark blocked:", err);
     }
+  },
+
+  // AI Quality Gates Implementation
+
+  // Self-review: Claude reviews its own code
+  runSelfReview: async (issueId, workerId) => {
+    const { projectPath, getCachedIssue, addLog, setStreamingState, updateStreamingAction, updateWorker, loadSiloContext } = get();
+
+    if (!projectPath) {
+      addLog("error", "No project path for self-review", issueId);
+      return false;
+    }
+
+    const issue = getCachedIssue(issueId);
+    if (!issue) {
+      addLog("error", "Issue not found for self-review", issueId);
+      return false;
+    }
+
+    const sessionId = `autobuild-selfreview-${issueId}-${Date.now()}`;
+
+    // Load SILO context for targeted review
+    const siloContext = await loadSiloContext(issueId);
+
+    // Self-review prompt with SILO context
+    const prompt = `Review code for ${issue.id}: ${issue.title}
+${siloContext ? `\n## What Was Done\n${siloContext}\n` : ""}
+Check for:
+1. Security (injection, XSS, input validation)
+2. Performance (memory leaks, unnecessary loops)
+3. Code quality (DRY, complexity)
+4. Accessibility (if UI files)
+
+Fix any issues found. Do NOT commit.`;
+
+    // Set up streaming state
+    setStreamingState({
+      isStreaming: true,
+      startTime: Date.now(),
+      currentAction: "Self-reviewing code",
+    });
+
+    addLog("claude", "Running self-review", issueId);
+
+    return new Promise<boolean>((resolve) => {
+      let unlisten: UnlistenFn | null = null;
+      let resolved = false;
+
+      const cleanup = () => {
+        if (unlisten) {
+          unlisten();
+          unlisten = null;
+        }
+        setStreamingState(null);
+      };
+
+      // Set up event listener for claude-stream
+      listen<StreamChunk>("claude-stream", (event) => {
+        const chunk = event.payload;
+        if (chunk.session_id !== sessionId) return;
+
+        switch (chunk.chunk_type) {
+          case "tool_use":
+          case "tool_start": {
+            const toolName = chunk.tool_name || "Reviewing";
+            let action = toolName;
+            if (chunk.tool_input) {
+              try {
+                const input = JSON.parse(chunk.tool_input) as Record<string, unknown>;
+                if (input.file_path) {
+                  const path = String(input.file_path);
+                  const filename = path.split("/").pop() || path;
+                  action = `${toolName}: ${filename}`;
+
+                  // Track file modifications
+                  if (toolName === "Edit" || toolName === "Write") {
+                    const worker = get().workers.find(w => w.id === workerId);
+                    const currentFiles = worker?.filesModified || [];
+                    if (!currentFiles.includes(path)) {
+                      updateWorker(workerId, { filesModified: [...currentFiles, path] });
+                    }
+                  }
+                }
+              } catch {
+                // Ignore JSON parse errors
+              }
+            }
+            updateStreamingAction(action, toolName);
+            break;
+          }
+          case "tool_result":
+            updateStreamingAction("Processing", undefined);
+            break;
+          case "result":
+            if (!resolved) {
+              resolved = true;
+              cleanup();
+              if (chunk.is_error) {
+                addLog("error", `Self-review error: ${chunk.content || "Unknown error"}`, issueId);
+                resolve(false);
+              } else {
+                addLog("success", "Self-review completed", issueId);
+                resolve(true);
+              }
+            }
+            break;
+        }
+      }).then((fn) => {
+        unlisten = fn;
+      });
+
+      // Start the Claude session
+      invoke("start_claude_session", {
+        cwd: projectPath,
+        sessionId,
+        permissionMode: "acceptEdits",
+        safeMode: true,
+      }).then(() => {
+        return invoke("send_claude_input", {
+          sessionId,
+          input: prompt,
+        });
+      }).catch((err) => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          addLog("error", `Failed to start self-review: ${err}`, issueId);
+          resolve(false);
+        }
+      });
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          addLog("error", "Self-review timed out", issueId);
+          invoke("terminate_claude_session", { sessionId }).catch(() => {});
+          resolve(false);
+        }
+      }, 5 * 60 * 1000);
+    });
+  },
+
+  // Run all enabled subagent audits using orchestrator pattern
+  runSubagentAudits: async (issueId, filesModified, workerId) => {
+    const { settings, projectPath, addLog, updateWorker, setStreamingState, updateStreamingAction } = get();
+
+    // Set phase to auditing
+    updateWorker(workerId, { phase: "auditing" });
+    set({ currentPhase: "auditing" });
+
+    // Helper to check if files include UI files
+    const hasUIFiles = (files: string[]): boolean => {
+      const uiExtensions = [".tsx", ".jsx", ".vue", ".svelte"];
+      const uiPaths = ["/components/", "/pages/", "/views/", "/ui/"];
+      return files.some(f => {
+        const isUIExt = uiExtensions.some(ext => f.endsWith(ext));
+        const isUIPath = uiPaths.some(p => f.includes(p));
+        return isUIExt || isUIPath;
+      });
+    };
+
+    // Build list of audits to run
+    const auditsToRun: string[] = [];
+    if (settings.runSecurityAudit) auditsToRun.push("security-auditor");
+    if (settings.runPerformanceAudit) auditsToRun.push("performance-auditor");
+    if (settings.runCodeQualityAudit) auditsToRun.push("code-smell-auditor");
+    if (settings.runAccessibilityAudit && hasUIFiles(filesModified)) auditsToRun.push("accessibility-auditor");
+
+    if (auditsToRun.length === 0 || !projectPath) {
+      return { success: true, hasIssues: false };
+    }
+
+    const sessionId = `autobuild-audit-${issueId}-${Date.now()}`;
+
+    // Build orchestrator prompt
+    const orchestratorPrompt = `You are an audit orchestrator. Run these code audits IN PARALLEL using the Task tool.
+
+Files to audit: ${filesModified.join(", ")}
+
+${auditsToRun.map((agent, i) => `${i + 1}. Use Task with subagent_type="${agent}" to audit the files listed above`).join("\n")}
+
+IMPORTANT: Launch ALL tasks in a SINGLE message for parallel execution. Each Task tool call should include a prompt telling the agent which files to analyze.
+
+When all audits complete, summarize which audits passed and which found issues.`;
+
+    // Set up streaming state
+    setStreamingState({
+      isStreaming: true,
+      startTime: Date.now(),
+      currentAction: "Running audits in parallel",
+    });
+
+    addLog("claude", `Running ${auditsToRun.length} audit(s) via orchestrator`, issueId);
+
+    // Run orchestrator session
+    const orchestratorSuccess = await new Promise<boolean>((resolve) => {
+      let unlisten: UnlistenFn | null = null;
+      let resolved = false;
+
+      const cleanup = () => {
+        if (unlisten) {
+          unlisten();
+          unlisten = null;
+        }
+        setStreamingState(null);
+      };
+
+      // Set up event listener
+      listen<StreamChunk>("claude-stream", (event) => {
+        const chunk = event.payload;
+        if (chunk.session_id !== sessionId) return;
+
+        switch (chunk.chunk_type) {
+          case "tool_use":
+          case "tool_start": {
+            const toolName = chunk.tool_name || "Auditing";
+            updateStreamingAction(`${toolName}`, toolName);
+            break;
+          }
+          case "tool_result":
+            updateStreamingAction("Processing audit results", undefined);
+            break;
+          case "result":
+            if (!resolved) {
+              resolved = true;
+              cleanup();
+              resolve(!chunk.is_error);
+            }
+            break;
+        }
+      }).then((fn) => {
+        unlisten = fn;
+      });
+
+      // Start the Claude session
+      invoke("start_claude_session", {
+        cwd: projectPath,
+        sessionId,
+        permissionMode: "default",
+        safeMode: true,
+      }).then(() => {
+        return invoke("send_claude_input", {
+          sessionId,
+          input: orchestratorPrompt,
+        });
+      }).catch((err) => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          addLog("error", `Orchestrator failed: ${err}`, issueId);
+          resolve(false);
+        }
+      });
+
+      // Timeout after 8 minutes (audits can take time)
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          addLog("error", "Audit orchestrator timed out", issueId);
+          invoke("terminate_claude_session", { sessionId }).catch(() => {});
+          resolve(false);
+        }
+      }, 8 * 60 * 1000);
+    });
+
+    if (!orchestratorSuccess) {
+      addLog("warning", "Audit orchestrator failed, skipping audit checks", issueId);
+      return { success: false, hasIssues: false };
+    }
+
+    // Read audit results from _AUDIT/*.md files
+    try {
+      const auditResults = await invoke<AuditFileResults>("auto_build_read_audit_files", { projectPath });
+
+      if (auditResults.hasIssues) {
+        addLog("warning", "AI audits found issues in _AUDIT files", issueId);
+      } else {
+        addLog("success", "All AI audits passed", issueId);
+      }
+
+      return auditResults;
+    } catch (err) {
+      addLog("error", `Failed to read audit files: ${err}`, issueId);
+      return { success: false, hasIssues: false };
+    }
+  },
+
+  // Fix issues found by audits (uses file contents from _AUDIT/*.md)
+  runAuditFixLoop: async (issueId, auditResults, workerId) => {
+    const { executeStreamingWork, addLog } = get();
+
+    // Build fix prompt from audit file contents
+    const sections: string[] = [];
+
+    if (auditResults.security) {
+      sections.push(`## Security Issues\n${auditResults.security}`);
+    }
+    if (auditResults.performance) {
+      sections.push(`## Performance Issues\n${auditResults.performance}`);
+    }
+    if (auditResults.codeQuality) {
+      sections.push(`## Code Quality Issues\n${auditResults.codeQuality}`);
+    }
+    if (auditResults.accessibility) {
+      sections.push(`## Accessibility Issues\n${auditResults.accessibility}`);
+    }
+
+    if (sections.length === 0) {
+      return true;
+    }
+
+    const errorString = `Fix ALL issues identified in the following audit reports:\n\n${sections.join("\n\n---\n\n")}`;
+    addLog("info", "Fixing audit issues from _AUDIT files", issueId);
+
+    // Use the existing fix loop mechanism
+    return executeStreamingWork(issueId, true, errorString, workerId);
   },
 }));
