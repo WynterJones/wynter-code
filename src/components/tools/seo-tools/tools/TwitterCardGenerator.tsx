@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Copy, Check, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Copy, Check, RefreshCw, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { TwitterCardPreview } from "../previews/TwitterCardPreview";
+import { useSeoDataFromProject } from "../hooks/useSeoDataFromProject";
 
 interface TwitterCardData {
   cardType: "summary" | "summary_large_image";
@@ -14,6 +15,8 @@ interface TwitterCardData {
 }
 
 export function TwitterCardGenerator() {
+  const { data: projectData, isLoading: isLoadingProject, sourcePath, reload } = useSeoDataFromProject();
+  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
   const [data, setData] = useState<TwitterCardData>({
     cardType: "summary_large_image",
     site: "",
@@ -24,6 +27,40 @@ export function TwitterCardGenerator() {
     imageAlt: "",
   });
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!hasAutoLoaded && projectData && !isLoadingProject) {
+      const hasData = projectData.twitterTitle || projectData.twitterDescription || projectData.twitterImage ||
+        projectData.twitterSite || projectData.title || projectData.packageName;
+      if (hasData) {
+        setData({
+          cardType: (projectData.twitterCard as TwitterCardData["cardType"]) || "summary_large_image",
+          site: projectData.twitterSite || "",
+          creator: projectData.twitterCreator || "",
+          title: projectData.twitterTitle || projectData.ogTitle || projectData.title || projectData.packageName || "",
+          description: projectData.twitterDescription || projectData.ogDescription || projectData.description || projectData.packageDescription || "",
+          image: projectData.twitterImage || projectData.ogImage || "",
+          imageAlt: projectData.twitterImageAlt || "",
+        });
+        setHasAutoLoaded(true);
+      }
+    }
+  }, [projectData, isLoadingProject, hasAutoLoaded]);
+
+  const handleLoadFromProject = async () => {
+    await reload();
+    if (projectData) {
+      setData({
+        cardType: (projectData.twitterCard as TwitterCardData["cardType"]) || data.cardType,
+        site: projectData.twitterSite || data.site,
+        creator: projectData.twitterCreator || data.creator,
+        title: projectData.twitterTitle || projectData.ogTitle || projectData.title || projectData.packageName || data.title,
+        description: projectData.twitterDescription || projectData.ogDescription || projectData.description || projectData.packageDescription || data.description,
+        image: projectData.twitterImage || projectData.ogImage || data.image,
+        imageAlt: projectData.twitterImageAlt || data.imageAlt,
+      });
+    }
+  };
 
   const generateCode = () => {
     const lines: string[] = [];
@@ -64,7 +101,27 @@ export function TwitterCardGenerator() {
       <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
         {/* Form Section */}
         <div className="space-y-4 overflow-auto pr-2">
-          <h3 className="font-medium text-text-primary">Twitter Card Settings</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-text-primary">Twitter Card Settings</h3>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleLoadFromProject}
+              disabled={isLoadingProject}
+            >
+              {isLoadingProject ? (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <FolderOpen className="w-3 h-3 mr-1" />
+              )}
+              Load from project
+            </Button>
+          </div>
+          {sourcePath && (
+            <p className="text-xs text-text-tertiary">
+              Loaded from: {sourcePath}
+            </p>
+          )}
 
           {/* Card Type */}
           <div>

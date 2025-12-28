@@ -2,8 +2,8 @@
 
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
-**Last Updated:** 2025-12-26
-**Composted Ideas:** 35
+**Last Updated:** 2025-12-28
+**Composted Ideas:** 37
 
 ---
 
@@ -18,6 +18,14 @@
 ---
 
 ## Composted Ideas
+
+### Screen Studio (Native Screen Recording)
+Native screen recording tool with ScreenCaptureKit integration for audio capture, region selection, and export to MP4/WebM.
+> **Why rejected (2025-12-28):** Too complicated to implement properly with audio sync and ScreenCaptureKit permissions. macOS already has excellent screen recording built-in (Cmd+Shift+5) and dedicated apps like CleanShot X do this better.
+
+### GIF Screen Recorder
+Region select + GIF export tool for quick screen captures and animations.
+> **Why rejected (2025-12-28):** Too complicated for the benefit. Native capture requires complex Rust/ScreenCaptureKit integration. Browser-based tools and apps like CleanShot X, Kap, or GIPHY Capture already handle this well.
 
 ### System-Wide Whispr Flow Clone
 A system-wide speech-to-text tool similar to Whispr Flow. Capture voice input from anywhere and have it automatically transcribed and pasted at your cursor position.

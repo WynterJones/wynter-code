@@ -13,6 +13,7 @@ import {
   Search,
   Eye,
   Bookmark,
+  Upload,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -71,14 +72,12 @@ import { LimitsMonitorPopup } from "@/components/tools/limits-monitor";
 import { WebcamToolPopup } from "@/components/tools/webcam";
 import { DomainToolsPopup } from "@/components/tools/domain-tools";
 import { SeoToolsPopup } from "@/components/tools/seo-tools";
-import { ScreenStudioPopup } from "@/components/tools/screen-studio";
-import { GifRecorderPopup } from "@/components/tools/gif-recorder";
 import { NetlifyFtpPopup } from "@/components/tools/netlify-ftp";
 import { BookmarksPopup } from "@/components/tools/bookmarks";
 import { ProjectSearchPopup } from "@/components/tools/project-search";
 import { AutoBuildPopup } from "@/components/tools/auto-build";
 import { SystemCleanerPopup } from "@/components/tools/system-cleaner";
-import { useMcpStore, useSessionStore } from "@/stores";
+import { useMcpStore } from "@/stores";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
@@ -397,8 +396,6 @@ export function ProjectTabBar({
   const [domainToolsInitialTool, setDomainToolsInitialTool] = useState<string | undefined>();
   const [showSeoTools, setShowSeoTools] = useState(false);
   const [seoToolsInitialTool, setSeoToolsInitialTool] = useState<string | undefined>();
-  const [showScreenStudio, setShowScreenStudio] = useState(false);
-  const [showGifRecorder, setShowGifRecorder] = useState(false);
   const [showNetlifyFtp, setShowNetlifyFtp] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [showProjectSearch, setShowProjectSearch] = useState(false);
@@ -538,12 +535,6 @@ export function ProjectTabBar({
         case "openSeoTools":
           setSeoToolsInitialTool(subToolId || undefined);
           setShowSeoTools(true);
-          break;
-        case "openScreenStudio":
-          setShowScreenStudio(true);
-          break;
-        case "openGifRecorder":
-          setShowGifRecorder(true);
           break;
         case "openNetlifyFtp":
           setShowNetlifyFtp(true);
@@ -750,7 +741,7 @@ export function ProjectTabBar({
             }}
             className="text-[8px] text-text-secondary/50 font-mono hover:text-text-secondary transition-colors"
           >
-            v1.0.2
+            v1.0.3
           </button>
         </Tooltip>
       </div>
@@ -897,6 +888,15 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
+      {/* Netlify FTP */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Netlify FTP">
+          <IconButton size="sm" onClick={() => setShowNetlifyFtp(true)}>
+            <Upload className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
       {/* Tools Dropdown */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <ToolsDropdown
@@ -921,8 +921,6 @@ export function ProjectTabBar({
           onOpenDomainTools={() => setShowDomainTools(true)}
           onOpenSeoTools={() => setShowSeoTools(true)}
           onOpenFloatingWebcam={() => setShowWebcamTool(true)}
-          onOpenScreenStudio={() => setShowScreenStudio(true)}
-          onOpenGifRecorder={() => setShowGifRecorder(true)}
           onOpenNetlifyFtp={() => setShowNetlifyFtp(true)}
           onOpenBookmarks={() => setShowBookmarks(true)}
           onOpenProjectSearch={() => setShowProjectSearch(true)}
@@ -1183,18 +1181,6 @@ export function ProjectTabBar({
         initialTool={seoToolsInitialTool}
       />
 
-      {/* Screen Studio */}
-      <ScreenStudioPopup
-        isOpen={showScreenStudio}
-        onClose={() => setShowScreenStudio(false)}
-      />
-
-      {/* GIF Screen Section Recorder */}
-      <GifRecorderPopup
-        isOpen={showGifRecorder}
-        onClose={() => setShowGifRecorder(false)}
-      />
-
       {/* Netlify FTP */}
       <NetlifyFtpPopup
         isOpen={showNetlifyFtp}
@@ -1245,37 +1231,36 @@ function FarmworkMiniPlayerWrapper({ onExpand }: { onExpand: () => void }) {
   const { showMiniPlayer, hideMiniPlayer, showMiniPlayerFn } = useFarmworkTycoonStore();
   const autoOpenFarmworkMiniPlayer = useSettingsStore((s) => s.autoOpenFarmworkMiniPlayer);
   const { hasFarmwork } = useFarmworkDetection();
-  const streamingState = useSessionStore((s) => s.streamingState);
-  const wasStreamingRef = useRef(false);
+  const prevHasFarmworkRef = useRef<boolean | null>(null);
 
-  // Check if any session is currently streaming
-  const isAnySessionStreaming = useMemo(() => {
-    for (const state of streamingState.values()) {
-      if (state.isStreaming) {
-        return true;
-      }
-    }
-    return false;
-  }, [streamingState]);
-
-  // Auto-open/close mini player based on streaming state
+  // Auto-open/close mini player based on project tab switching
   useEffect(() => {
-    if (!autoOpenFarmworkMiniPlayer || !hasFarmwork) {
+    if (!autoOpenFarmworkMiniPlayer) {
       return;
     }
 
-    // Session just started streaming
-    if (isAnySessionStreaming && !wasStreamingRef.current) {
-      wasStreamingRef.current = true;
+    // Skip the initial render (when prevHasFarmworkRef.current is null)
+    if (prevHasFarmworkRef.current === null) {
+      prevHasFarmworkRef.current = hasFarmwork;
+      // Auto-open on initial load if project has Farmwork
+      if (hasFarmwork) {
+        showMiniPlayerFn();
+      }
+      return;
+    }
+
+    // Switched to a project with Farmwork
+    if (hasFarmwork && !prevHasFarmworkRef.current) {
       showMiniPlayerFn();
     }
 
-    // All sessions stopped streaming
-    if (!isAnySessionStreaming && wasStreamingRef.current) {
-      wasStreamingRef.current = false;
+    // Switched away from a project with Farmwork
+    if (!hasFarmwork && prevHasFarmworkRef.current) {
       hideMiniPlayer();
     }
-  }, [isAnySessionStreaming, autoOpenFarmworkMiniPlayer, hasFarmwork, showMiniPlayerFn, hideMiniPlayer]);
+
+    prevHasFarmworkRef.current = hasFarmwork;
+  }, [hasFarmwork, autoOpenFarmworkMiniPlayer, showMiniPlayerFn, hideMiniPlayer]);
 
   return (
     <MiniGamePlayer

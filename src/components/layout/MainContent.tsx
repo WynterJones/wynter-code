@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { GripHorizontal, FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns, Play, Square, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { GripHorizontal, FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns, ChevronDown, ChevronUp } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { v4 as uuid } from "uuid";
 import { EnhancedPromptInput } from "@/components/prompt/EnhancedPromptInput";
@@ -11,7 +11,7 @@ import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudeDropdown, ClaudePopup } from "@/components/claude";
 import { ModelSelector } from "@/components/model/ModelSelector";
-import { PermissionModeToggle } from "@/components/session";
+import { PermissionModeToggle, StartButton } from "@/components/session";
 import { Tooltip } from "@/components/ui";
 import { PanelLayoutContainer } from "@/components/panels";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -19,9 +19,10 @@ import { useTerminalStore } from "@/stores/terminalStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useFileIndexStore } from "@/stores/fileIndexStore";
 import { claudeService } from "@/services/claude";
+import { codexService } from "@/services/codex";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
-import type { Project, PermissionMode, ToolCall, McpPermissionRequest } from "@/types";
+import type { Project, PermissionMode, ToolCall, McpPermissionRequest, AIProvider } from "@/types";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 // In stream-json mode, there's no interactive tool approval.
@@ -66,18 +67,26 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     updateStats,
     finishStreaming,
     startStreaming,
-    updateClaudeSessionId,
+    updateProviderSessionId,
+    updateSessionProvider,
     getSession,
     setPendingQuestionSet,
   } = useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
-  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, claudeSafeMode, defaultModel } = useSettingsStore();
+  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, claudeSafeMode, defaultModel, defaultCodexModel, installedProviders } = useSettingsStore();
   const { getFiles, loadIndex } = useFileIndexStore();
   const projectFiles = getFiles(project.path);
 
+  // Use selector to get current session with proper reactivity
+  const currentSession = useSessionStore((state) => {
+    const currentSessionId = state.activeSessionId.get(project.id);
+    if (!currentSessionId) return undefined;
+    const projectSessions = state.sessions.get(project.id);
+    return projectSessions?.find(s => s.id === currentSessionId);
+  });
+
   const sessions = getSessionsForProject(project.id);
   const currentSessionId = activeSessionId.get(project.id);
-  const currentSession = sessions.find((s) => s.id === currentSessionId);
   const terminalSessions = sessions.filter((s) => s.type === "terminal");
 
   const messages = currentSessionId ? getMessages(currentSessionId) : [];
@@ -123,16 +132,22 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     console.log("[MainContent] allToolCalls:", allToolCalls);
   }, [pendingApprovalTool, allToolCalls]);
 
-  // Start a persistent Claude session
+  // Start a persistent AI session (Claude or Codex based on provider)
   const handleStartSession = useCallback(async () => {
     if (!currentSessionId) return;
 
     const session = getSession(currentSessionId);
     const permissionMode = session?.permissionMode || "default";
-    const resumeSessionId = session?.claudeSessionId || undefined;
+    const resumeSessionId = session?.providerSessionId || undefined;
+    const provider = session?.provider || "claude";
+
+    // Get the correct model based on provider
+    const model = provider === "codex" ? defaultCodexModel : defaultModel;
 
     console.log("[MainContent] Starting session with:", {
       sessionId: currentSessionId,
+      provider,
+      model,
       permissionMode,
       resumeSessionId,
       isManualMode: permissionMode === "manual",
@@ -140,128 +155,147 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
 
     setClaudeSessionStarting(currentSessionId);
 
+    // Common callbacks for both providers
+    const commonCallbacks = {
+      onSessionStarting: () => {
+        console.log("[MainContent] Session starting...");
+      },
+      onSessionReady: (info: { model?: string; providerSessionId?: string }) => {
+        console.log("[MainContent] Session ready:", info);
+        setClaudeSessionReady(currentSessionId, info);
+        if (info.providerSessionId) {
+          updateProviderSessionId(currentSessionId, info.providerSessionId);
+        }
+      },
+      onSessionEnded: (reason: string) => {
+        console.log("[MainContent] Session ended:", reason);
+        setClaudeSessionEnded(currentSessionId);
+        finishStreaming(currentSessionId);
+      },
+      onText: (text: string) => {
+        appendStreamingText(currentSessionId, text);
+      },
+      onThinking: (text: string) => {
+        appendThinkingText(currentSessionId, text);
+      },
+      onThinkingStart: () => {
+        setThinking(currentSessionId, true);
+      },
+      onThinkingEnd: () => {
+        setThinking(currentSessionId, false);
+      },
+      onToolStart: (toolName: string, toolId: string) => {
+        // Determine if this tool needs permission approval
+        const needsPermission = toolNeedsPermission(toolName, permissionMode);
+        console.log("[MainContent] onToolStart:", {
+          toolName,
+          toolId,
+          permissionMode,
+          needsPermission,
+        });
+        addPendingToolCall(currentSessionId, {
+          id: toolId,
+          name: toolName,
+          input: {},
+          status: needsPermission ? "pending" : "running",
+        });
+        // Notify Farmwork Tycoon bridge
+        farmworkBridge.onToolStart(toolName, toolId);
+      },
+      onToolInputDelta: (toolId: string, partialJson: string) => {
+        appendToolInput(currentSessionId, toolId, partialJson);
+      },
+      onToolEnd: () => {},
+      onToolResult: (toolId: string, content: string, isError?: boolean) => {
+        // If tool had an error, mark as error status; otherwise completed
+        const status = isError ? "error" : "completed";
+        updateToolCallStatus(currentSessionId, toolId, status, content, isError);
+        // Add separator so subsequent text appears as new block
+        appendStreamingText(currentSessionId, "\n\n");
+        // Notify Farmwork Tycoon bridge
+        farmworkBridge.onToolComplete(toolId, isError ?? false);
+      },
+      onInit: (modelName: string, _cwd: string, providerSessionId?: string) => {
+        updateStats(currentSessionId, { model: modelName });
+        if (providerSessionId) {
+          updateProviderSessionId(currentSessionId, providerSessionId);
+        }
+      },
+      onUsage: (stats: Record<string, unknown>) => {
+        updateStats(currentSessionId, stats);
+      },
+      onResult: () => {
+        finishStreaming(currentSessionId);
+      },
+      onError: (error: string) => {
+        console.error("[MainContent] Error:", error);
+        appendStreamingText(currentSessionId, `\nError: ${error}`);
+      },
+    };
+
     try {
-      await claudeService.startSession(
-        project.path,
-        currentSessionId,
-        {
-          onSessionStarting: () => {
-            console.log("[MainContent] Session starting...");
-          },
-          onSessionReady: (info) => {
-            console.log("[MainContent] Session ready:", info);
-            setClaudeSessionReady(currentSessionId, info);
-            if (info.claudeSessionId) {
-              updateClaudeSessionId(currentSessionId, info.claudeSessionId);
-            }
-          },
-          onSessionEnded: (reason) => {
-            console.log("[MainContent] Session ended:", reason);
-            setClaudeSessionEnded(currentSessionId);
-            finishStreaming(currentSessionId);
-          },
-          onText: (text) => {
-            appendStreamingText(currentSessionId, text);
-          },
-          onThinking: (text) => {
-            appendThinkingText(currentSessionId, text);
-          },
-          onThinkingStart: () => {
-            setThinking(currentSessionId, true);
-          },
-          onThinkingEnd: () => {
-            setThinking(currentSessionId, false);
-          },
-          onToolStart: (toolName, toolId) => {
-            // Determine if this tool needs permission approval
-            const needsPermission = toolNeedsPermission(toolName, permissionMode);
-            console.log("[MainContent] onToolStart:", {
-              toolName,
-              toolId,
-              permissionMode,
-              needsPermission,
-            });
-            addPendingToolCall(currentSessionId, {
-              id: toolId,
-              name: toolName,
-              input: {},
-              status: needsPermission ? "pending" : "running",
-            });
-            // Notify Farmwork Tycoon bridge
-            farmworkBridge.onToolStart(toolName, toolId);
-          },
-          onToolInputDelta: (toolId, partialJson) => {
-            appendToolInput(currentSessionId, toolId, partialJson);
-          },
-          onToolEnd: () => {},
-          onToolResult: (toolId, content, isError) => {
-            // If tool had an error, mark as error status; otherwise completed
-            const status = isError ? "error" : "completed";
-            updateToolCallStatus(currentSessionId, toolId, status, content, isError);
-            // Add separator so subsequent text appears as new block
-            appendStreamingText(currentSessionId, "\n\n");
-            // Notify Farmwork Tycoon bridge
-            farmworkBridge.onToolComplete(toolId, isError ?? false);
-          },
-          onAskUserQuestion: (toolId, input) => {
-            const questions = input.questions.map((q, idx) => ({
-              id: `${toolId}-q${idx}`,
-              header: q.header || `Question ${idx + 1}`,
-              question: q.question,
-              options: q.options,
-              multiSelect: q.multiSelect,
-            }));
-            setPendingQuestionSet(currentSessionId, {
-              id: uuid(),
-              toolId,
-              questions,
-            });
-          },
-          onInit: (model, _cwd, claudeSessionId) => {
-            updateStats(currentSessionId, { model });
-            if (claudeSessionId) {
-              updateClaudeSessionId(currentSessionId, claudeSessionId);
-            }
-          },
-          onUsage: (stats) => {
-            updateStats(currentSessionId, stats);
-          },
-          onResult: () => {
-            finishStreaming(currentSessionId);
-          },
-          onError: (error) => {
-            console.error("[MainContent] Error:", error);
-            appendStreamingText(currentSessionId, `\nError: ${error}`);
-          },
-          onPermissionRequest: async (request) => {
-            console.log("[MainContent] MCP Permission request received:", {
-              id: request.id,
-              toolName: request.toolName,
-              sessionId: request.sessionId,
-              inputKeys: Object.keys(request.input || {}),
-            });
+      if (provider === "codex") {
+        // Start Codex session with permission mode support
+        await codexService.startSession(
+          project.path,
+          currentSessionId,
+          commonCallbacks,
+          resumeSessionId,
+          model,
+          permissionMode,
+          claudeSafeMode
+        );
+      } else {
+        // Start Claude session (default)
+        await claudeService.startSession(
+          project.path,
+          currentSessionId,
+          {
+            ...commonCallbacks,
+            onAskUserQuestion: (toolId, input) => {
+              const questions = input.questions.map((q, idx) => ({
+                id: `${toolId}-q${idx}`,
+                header: q.header || `Question ${idx + 1}`,
+                question: q.question,
+                options: q.options,
+                multiSelect: q.multiSelect,
+              }));
+              setPendingQuestionSet(currentSessionId, {
+                id: uuid(),
+                toolId,
+                questions,
+              });
+            },
+            onPermissionRequest: async (request) => {
+              console.log("[MainContent] MCP Permission request received:", {
+                id: request.id,
+                toolName: request.toolName,
+                sessionId: request.sessionId,
+                inputKeys: Object.keys(request.input || {}),
+              });
 
-            // Check if this tool is auto-approved for this session
-            if (autoApprovedToolsRef.current.has(request.toolName)) {
-              console.log("[MainContent] Auto-approving tool:", request.toolName);
-              try {
-                await claudeService.respondToPermission(request.id, true);
-                console.log("[MainContent] Auto-approved successfully");
-              } catch (error) {
-                console.error("[MainContent] Failed to auto-approve:", error);
+              // Check if this tool is auto-approved for this session
+              if (autoApprovedToolsRef.current.has(request.toolName)) {
+                console.log("[MainContent] Auto-approving tool:", request.toolName);
+                try {
+                  await claudeService.respondToPermission(request.id, true);
+                  console.log("[MainContent] Auto-approved successfully");
+                } catch (error) {
+                  console.error("[MainContent] Failed to auto-approve:", error);
+                }
+                return;
               }
-              return;
-            }
 
-            // Show the permission modal
-            setPendingMcpRequest(request);
+              // Show the permission modal
+              setPendingMcpRequest(request);
+            },
           },
-        },
-        permissionMode,
-        resumeSessionId,
-        claudeSafeMode,
-        defaultModel
-      );
+          permissionMode,
+          resumeSessionId,
+          claudeSafeMode,
+          model
+        );
+      }
     } catch (error) {
       console.error("[MainContent] Failed to start session:", error);
       setClaudeSessionEnded(currentSessionId);
@@ -273,7 +307,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     setClaudeSessionStarting,
     setClaudeSessionReady,
     setClaudeSessionEnded,
-    updateClaudeSessionId,
+    updateProviderSessionId,
     appendStreamingText,
     appendThinkingText,
     setThinking,
@@ -285,36 +319,57 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     setPendingQuestionSet,
     claudeSafeMode,
     defaultModel,
+    defaultCodexModel,
   ]);
 
-  // Stop the Claude session
+  // Stop the AI session (Claude or Codex based on provider)
   const handleStopSession = useCallback(async () => {
     if (!currentSessionId) return;
+    const session = getSession(currentSessionId);
+    const provider = session?.provider || "claude";
+
     try {
-      await claudeService.stopSession(currentSessionId);
+      if (provider === "codex") {
+        await codexService.stopSession(currentSessionId);
+      } else {
+        await claudeService.stopSession(currentSessionId);
+      }
       setClaudeSessionEnded(currentSessionId);
       finishStreaming(currentSessionId);
     } catch (error) {
       console.error("[MainContent] Failed to stop session:", error);
     }
-  }, [currentSessionId, setClaudeSessionEnded, finishStreaming]);
+  }, [currentSessionId, getSession, setClaudeSessionEnded, finishStreaming]);
 
-  // Send prompt to active session
+  // Change the AI provider for the current session
+  const handleProviderChange = useCallback((provider: AIProvider) => {
+    if (!currentSessionId) return;
+    updateSessionProvider(currentSessionId, provider);
+  }, [currentSessionId, updateSessionProvider]);
+
+  // Send prompt to active session (Claude or Codex based on provider)
   const handleSendPrompt = useCallback(
     async (prompt: string) => {
       if (!currentSessionId || !isSessionActive) return;
 
+      const session = getSession(currentSessionId);
+      const provider = session?.provider || "claude";
+
       startStreaming(currentSessionId);
 
       try {
-        await claudeService.sendPrompt(currentSessionId, prompt);
+        if (provider === "codex") {
+          await codexService.sendPrompt(currentSessionId, prompt);
+        } else {
+          await claudeService.sendPrompt(currentSessionId, prompt);
+        }
       } catch (error) {
         console.error("[MainContent] Failed to send prompt:", error);
         appendStreamingText(currentSessionId, `\nError: ${error}`);
         finishStreaming(currentSessionId);
       }
     },
-    [currentSessionId, isSessionActive, startStreaming, appendStreamingText, finishStreaming]
+    [currentSessionId, isSessionActive, getSession, startStreaming, appendStreamingText, finishStreaming]
   );
 
   // Handle tool approval - send raw "y" to Claude stdin
@@ -519,38 +574,22 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           style={{ paddingRight: sidebarPosition === "right" ? (sidebarCollapsed ? 28 : 16) : 0 }}
         >
           {currentSession && currentSession.type === "claude" && !useMultiPanelLayout && (
-            <>
-              {!isSessionActive && !isSessionStarting ? (
-                <button
-                  onClick={handleStartSession}
-                  className="flex items-center gap-2 px-3 h-8 rounded-md text-sm bg-bg-tertiary border border-accent-green/50 hover:border-accent-green hover:bg-accent-green/10 text-accent-green transition-colors"
-                  title="Start Claude session"
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  <span>Start</span>
-                </button>
-              ) : isSessionStarting ? (
-                <div className="flex items-center gap-2 px-3 h-8 rounded-md text-sm bg-bg-tertiary border border-yellow-500/50 text-yellow-400">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Starting...</span>
-                </div>
-              ) : (
-                <button
-                  onClick={handleStopSession}
-                  className="flex items-center gap-2 px-3 h-8 rounded-md text-sm bg-bg-tertiary border border-accent-red/50 hover:border-accent-red hover:bg-accent-red/10 text-accent-red transition-colors"
-                  title="Stop Claude session"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  <span>Stop</span>
-                </button>
-              )}
-            </>
+            <StartButton
+              onStart={handleStartSession}
+              onStop={handleStopSession}
+              onProviderChange={handleProviderChange}
+              currentProvider={currentSession.provider}
+              installedProviders={installedProviders}
+              isStarting={isSessionStarting}
+              isActive={isSessionActive}
+            />
           )}
-          <ModelSelector />
+          <ModelSelector projectId={project.id} />
           {currentSession && (
             <PermissionModeToggle
               mode={currentSession.permissionMode || "default"}
               onChange={handleModeChange}
+              provider={currentSession.provider}
             />
           )}
           <div className="w-px h-5 bg-border" />

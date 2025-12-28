@@ -183,7 +183,7 @@ export function SlashCommandDropdown({
       ref={containerRef}
       className={cn(
         "fixed z-50",
-        "bg-bg-secondary border border-border rounded-lg shadow-xl",
+        "bg-bg-secondary border border-border rounded-lg shadow-xl dropdown-solid",
         "overflow-hidden",
         "animate-in fade-in-0 zoom-in-95 duration-100",
         adjustedPosition.showAbove ? "origin-bottom" : "origin-top"

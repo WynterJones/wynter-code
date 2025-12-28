@@ -103,7 +103,7 @@ export function Tooltip({
               opacity: isPositioned ? 1 : 0,
             }}
             className={cn(
-              "z-[99999] px-2.5 py-1.5 text-sm font-medium rounded-md shadow-lg",
+              "tooltip-content z-[99999] px-2.5 py-1.5 text-sm font-medium rounded-md shadow-lg",
               "bg-bg-tertiary border border-border text-text-primary",
               "pointer-events-none max-w-xs",
               className

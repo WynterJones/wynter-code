@@ -14,7 +14,7 @@ interface CommandOutput {
 
 export interface ClaudeSessionInfo {
   model?: string;
-  claudeSessionId?: string;
+  providerSessionId?: string;
   tools?: string[];
   cwd?: string;
   permissionMode?: PermissionMode;
@@ -42,7 +42,7 @@ export interface ClaudeSessionCallbacks {
   onToolEnd: (toolId: string) => void;
   onToolResult: (toolId: string, content: string, isError?: boolean) => void;
   onAskUserQuestion: (toolId: string, input: AskUserQuestionInput) => void;
-  onInit: (model: string, cwd: string, claudeSessionId?: string) => void;
+  onInit: (model: string, cwd: string, providerSessionId?: string) => void;
   onUsage: (stats: Partial<StreamingStats>) => void;
   onResult: (result: string) => void;
   onError: (error: string) => void;
@@ -193,9 +193,10 @@ class ClaudeService {
         case "session_ready":
           this._sessionActiveMap.set(sessionId, true);
           // Parse init info from content (it's the full JSON) or from chunk fields
+          // Map both claude_session_id and thread_id to providerSessionId
           let info: ClaudeSessionInfo = {
             model: chunk.model,
-            claudeSessionId: chunk.claude_session_id,
+            providerSessionId: chunk.claude_session_id || chunk.thread_id,
             tools: chunk.tools,
             permissionMode: chunk.permission_mode,
           };
@@ -204,7 +205,7 @@ class ClaudeService {
               const initData = JSON.parse(chunk.content);
               info = {
                 model: initData.model || chunk.model,
-                claudeSessionId: initData.session_id || chunk.claude_session_id,
+                providerSessionId: initData.session_id || chunk.claude_session_id || chunk.thread_id,
                 tools: initData.tools || chunk.tools,
                 cwd: initData.cwd,
                 permissionMode: initData.permissionMode || chunk.permission_mode,

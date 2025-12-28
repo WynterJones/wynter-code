@@ -87,7 +87,6 @@ pub struct UsageSummary {
 
 struct UsageEntry {
     timestamp: DateTime<Utc>,
-    model: String,
     tier: ModelTier,
     total_tokens: u64,
 }
@@ -267,7 +266,6 @@ fn parse_jsonl_file(path: &PathBuf, entries: &mut Vec<UsageEntry>) {
 
         entries.push(UsageEntry {
             timestamp,
-            model,
             tier,
             total_tokens,
         });

@@ -63,7 +63,7 @@ export function ClaudeOutputPanel({
     updateStats,
     finishStreaming,
     startStreaming,
-    updateClaudeSessionId,
+    updateProviderSessionId,
     getSession,
     setPendingQuestionSet,
     updateSessionPermissionMode,
@@ -145,7 +145,7 @@ export function ClaudeOutputPanel({
 
     const session = getSession(sessionId);
     const permissionMode = session?.permissionMode || "default";
-    const resumeSessionId = session?.claudeSessionId || undefined;
+    const resumeSessionId = session?.providerSessionId || undefined;
 
     setClaudeSessionStarting(sessionId);
 
@@ -160,8 +160,8 @@ export function ClaudeOutputPanel({
           onSessionReady: (info) => {
             console.log("[ClaudeOutputPanel] Session ready:", info);
             setClaudeSessionReady(sessionId, info);
-            if (info.claudeSessionId) {
-              updateClaudeSessionId(sessionId, info.claudeSessionId);
+            if (info.providerSessionId) {
+              updateProviderSessionId(sessionId, info.providerSessionId);
             }
           },
           onSessionEnded: (reason) => {
@@ -227,10 +227,10 @@ export function ClaudeOutputPanel({
               questions,
             });
           },
-          onInit: (model, _cwd, claudeSessionId) => {
+          onInit: (model, _cwd, providerSessionId) => {
             updateStats(sessionId, { model });
-            if (claudeSessionId) {
-              updateClaudeSessionId(sessionId, claudeSessionId);
+            if (providerSessionId) {
+              updateProviderSessionId(sessionId, providerSessionId);
             }
           },
           onUsage: (stats) => {
@@ -265,7 +265,7 @@ export function ClaudeOutputPanel({
     setClaudeSessionStarting,
     setClaudeSessionReady,
     setClaudeSessionEnded,
-    updateClaudeSessionId,
+    updateProviderSessionId,
     appendStreamingText,
     appendThinkingText,
     setThinking,
@@ -440,7 +440,7 @@ export function ClaudeOutputPanel({
 
       // Restart session with new mode
       const session = getSession(sessionId);
-      const resumeSessionId = session?.claudeSessionId || undefined;
+      const resumeSessionId = session?.providerSessionId || undefined;
 
       setClaudeSessionStarting(sessionId);
 
@@ -454,8 +454,8 @@ export function ClaudeOutputPanel({
           onSessionReady: (info) => {
             console.log("[ClaudeOutputPanel] Session ready (execute plan):", info);
             setClaudeSessionReady(sessionId, info);
-            if (info.claudeSessionId) {
-              updateClaudeSessionId(sessionId, info.claudeSessionId);
+            if (info.providerSessionId) {
+              updateProviderSessionId(sessionId, info.providerSessionId);
             }
           },
           onSessionEnded: (reason) => {
@@ -493,9 +493,9 @@ export function ClaudeOutputPanel({
             }));
             setPendingQuestionSet(sessionId, { id: uuid(), toolId, questions });
           },
-          onInit: (model, _cwd, claudeSessionId) => {
+          onInit: (model, _cwd, providerSessionId) => {
             updateStats(sessionId, { model });
-            if (claudeSessionId) updateClaudeSessionId(sessionId, claudeSessionId);
+            if (providerSessionId) updateProviderSessionId(sessionId, providerSessionId);
           },
           onUsage: (stats) => updateStats(sessionId, stats),
           onResult: () => finishStreaming(sessionId),
@@ -522,7 +522,7 @@ export function ClaudeOutputPanel({
     getSession,
     setClaudeSessionStarting,
     setClaudeSessionReady,
-    updateClaudeSessionId,
+    updateProviderSessionId,
     finishStreaming,
     appendStreamingText,
     appendThinkingText,

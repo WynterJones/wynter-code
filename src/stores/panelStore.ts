@@ -187,6 +187,7 @@ export const usePanelStore = create<PanelStore>()(
           const updatedPanel: PanelState = {
             ...current.panels[panelId],
             type: newType,
+            title: undefined,
             terminalPtyId: undefined,
             sessionId: undefined,
             filePath: undefined,

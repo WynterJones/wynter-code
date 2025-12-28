@@ -8,16 +8,17 @@ import {
   Radio,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { getNightrideStationBySlug } from "./radioStations";
-import { cn } from "@/lib/utils";
 
 export function MeditationAudioPlayer() {
   const {
     currentTrack,
     isPlaying,
+    isLoading,
     volume,
     tracks,
     nextTrack,
@@ -111,14 +112,12 @@ export function MeditationAudioPlayer() {
 
         <button
           onClick={togglePlay}
-          className={cn(
-            "p-3 rounded-full transition-colors",
-            isPlaying
-              ? "bg-accent/80 text-white hover:bg-accent"
-              : "bg-white/10 text-white/80 hover:bg-accent/80 hover:text-white"
-          )}
+          disabled={isLoading}
+          className="btn-primary !p-3 !rounded-full"
         >
-          {isPlaying ? (
+          {isLoading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : isPlaying ? (
             <Pause className="w-5 h-5" />
           ) : (
             <Play className="w-5 h-5 ml-0.5" />

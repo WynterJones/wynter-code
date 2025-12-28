@@ -33,11 +33,13 @@ interface TerminalProps {
   projectPath: string;
   ptyId: string | null;
   onPtyCreated: (ptyId: string) => void;
+  onPtyClosed?: () => void;
   isVisible?: boolean;
+  isFocused?: boolean;
   onSearchAddonReady?: (searchAddon: SearchAddon) => void;
 }
 
-export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, onSearchAddonReady }: TerminalProps) {
+export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisible = true, isFocused = true, onSearchAddonReady }: TerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -46,6 +48,9 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
 
   // Track if terminal is ready to be shown (after fit is complete)
   const [isReady, setIsReady] = useState(false);
+  // Track transition overlay to hide flash when returning to terminal
+  const [showTransitionOverlay, setShowTransitionOverlay] = useState(false);
+  const prevFocusedRef = useRef(isFocused);
 
   // Get terminal settings
   const terminalShell = useSettingsStore((s) => s.terminalShell);
@@ -59,10 +64,12 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
   const initialFontSize = useRef(terminalFontSize);
   const initialCursorBlink = useRef(terminalCursorBlink);
   const onPtyCreatedRef = useRef(onPtyCreated);
+  const onPtyClosedRef = useRef(onPtyClosed);
   const onSearchAddonReadyRef = useRef(onSearchAddonReady);
 
   // Keep callback refs updated
   onPtyCreatedRef.current = onPtyCreated;
+  onPtyClosedRef.current = onPtyClosed;
   onSearchAddonReadyRef.current = onSearchAddonReady;
 
   // Handle WebGL context loss gracefully
@@ -87,7 +94,6 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
     // Track if this effect instance is still active (for cleanup race condition)
     let isActive = true;
     let unlisten: UnlistenFn | null = null;
-    let createdPtyId: string | null = null;
     let initRafId: number | null = null;
 
     const term = new XTerm({
@@ -99,7 +105,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
       scrollback: 10000,
       // Critical for proper character rendering
       letterSpacing: 0,
-      lineHeight: 1.1,
+      lineHeight: 1.0,  // Must be 1.0 for TUI apps (btop, claude-cli) to position correctly
       // Font weight settings
       fontWeight: "normal",
       fontWeightBold: "bold",
@@ -225,10 +231,49 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
       // If cleanup already ran, don't proceed
       if (!isActive) return;
 
+      // Wait for fonts to be ready for proper character width calculation
+      try {
+        await document.fonts.ready;
+      } catch {
+        // Font API not available, continue anyway
+      }
+
+      if (!isActive) return;
+
+      // Wait for container to have proper dimensions before creating PTY
+      // This ensures the shell starts with the correct COLUMNS/LINES
+      const waitForDimensions = (): Promise<void> => {
+        return new Promise((resolve) => {
+          const check = () => {
+            if (!isActive) {
+              resolve();
+              return;
+            }
+            const container = terminalRef.current;
+            if (container) {
+              const { width, height } = container.getBoundingClientRect();
+              if (width > 0 && height > 0) {
+                // Container ready - fit terminal to get correct cols/rows
+                fitAddon.fit();
+                resolve();
+                return;
+              }
+            }
+            // Container not ready, try again next frame
+            requestAnimationFrame(check);
+          };
+          requestAnimationFrame(check);
+        });
+      };
+
+      await waitForDimensions();
+      if (!isActive) return;
+
       try {
         // Use initial values from refs - these won't change during the effect lifecycle
         let id = initialPtyId.current;
         if (!id) {
+          // Now term.cols and term.rows have the correct fitted values
           id = await invoke<string>("create_pty", {
             cwd: initialProjectPath.current,
             cols: term.cols,
@@ -243,7 +288,6 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
             return;
           }
 
-          createdPtyId = id;
           onPtyCreatedRef.current(id);
         }
 
@@ -281,6 +325,10 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
             invoke("resize_pty", { ptyId: id, cols, rows });
           }
         });
+
+        // Do a few extra fits after initialization to catch any layout shifts
+        setTimeout(() => { if (isActive) fitAddon.fit(); }, 100);
+        setTimeout(() => { if (isActive) fitAddon.fit(); }, 300);
       } catch (error) {
         if (isActive) {
           term.writeln(`\x1b[31mFailed to initialize terminal: ${error}\x1b[0m`);
@@ -306,10 +354,11 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
         unlisten = null;
       }
 
-      // Close the PTY if we created it
-      if (createdPtyId) {
-        invoke("close_pty", { ptyId: createdPtyId }).catch(() => {});
-      }
+      // NOTE: We intentionally do NOT close the PTY on unmount.
+      // The PTY should persist when switching tabs so we can reconnect to it.
+      // PTY will be closed when:
+      // 1. The process exits naturally
+      // 2. The panel is explicitly closed (handled by Panel.tsx)
 
       // Dispose WebGL addon first (before terminal)
       if (webglAddonRef.current) {
@@ -354,67 +403,39 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
     };
   }, []);
 
-  // Refresh terminal when becoming visible (fixes black screen on tab switch)
+  // Handle focus changes - fit and focus/blur terminal
   useEffect(() => {
-    // When hiding, immediately mark as not ready so next show starts hidden
-    if (!isVisible) {
-      setIsReady(false);
+    if (!isFocused) {
+      // When losing focus, blur the terminal (keyboard capture released)
+      xtermRef.current?.blur();
+      prevFocusedRef.current = false;
       return;
     }
 
-    if (xtermRef.current && fitAddonRef.current && terminalRef.current) {
-
-      let rafId: number | null = null;
-      let showTimeoutId: ReturnType<typeof setTimeout> | null = null;
-      const fitIntervalIds: ReturnType<typeof setTimeout>[] = [];
-
-      // Wait for container to have proper dimensions, then fit
-      const waitForDimensionsAndFit = () => {
-        const container = terminalRef.current;
-        if (!container || !fitAddonRef.current || !xtermRef.current) return;
-
-        // Check if container has real dimensions
-        const { width, height } = container.getBoundingClientRect();
-        if (width > 0 && height > 0) {
-          // Container is ready - fit the terminal multiple times over 500ms
-          const doFit = () => {
-            if (fitAddonRef.current && xtermRef.current) {
-              fitAddonRef.current.fit();
-              xtermRef.current.refresh(0, xtermRef.current.rows);
-            }
-          };
-
-          // Fit immediately
-          doFit();
-          xtermRef.current.focus();
-
-          // Fit again at intervals to ensure sizing is correct
-          fitIntervalIds.push(setTimeout(doFit, 50));
-          fitIntervalIds.push(setTimeout(doFit, 150));
-          fitIntervalIds.push(setTimeout(doFit, 300));
-          fitIntervalIds.push(setTimeout(doFit, 450));
-
-          // Show terminal after 500ms
-          showTimeoutId = setTimeout(() => {
-            doFit(); // One final fit
-            setIsReady(true);
-          }, 500);
-        } else {
-          // Container not ready yet, try again next frame
-          rafId = requestAnimationFrame(waitForDimensionsAndFit);
-        }
-      };
-
-      // Start checking after a brief delay for DOM to settle
-      rafId = requestAnimationFrame(waitForDimensionsAndFit);
-
-      return () => {
-        if (rafId) cancelAnimationFrame(rafId);
-        if (showTimeoutId) clearTimeout(showTimeoutId);
-        fitIntervalIds.forEach(id => clearTimeout(id));
-      };
+    // Show transition overlay when returning to terminal (was unfocused, now focused)
+    if (!prevFocusedRef.current && isFocused && isReady) {
+      setShowTransitionOverlay(true);
+      const timer = setTimeout(() => setShowTransitionOverlay(false), 100);
+      // Cleanup timeout on unmount
+      prevFocusedRef.current = true;
+      return () => clearTimeout(timer);
     }
-  }, [isVisible]);
+
+    prevFocusedRef.current = true;
+
+    // When gaining focus, ensure terminal is fitted and focused
+    if (xtermRef.current && fitAddonRef.current && terminalRef.current) {
+      const rafId = requestAnimationFrame(() => {
+        if (fitAddonRef.current && xtermRef.current) {
+          fitAddonRef.current.fit();
+          xtermRef.current.refresh(0, xtermRef.current.rows);
+          xtermRef.current.focus();
+        }
+      });
+
+      return () => cancelAnimationFrame(rafId);
+    }
+  }, [isFocused, isReady]);
 
   const handleClick = () => {
     // Focus the terminal when clicked to ensure it receives keyboard input
@@ -442,11 +463,22 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, isVisible = true, o
           fontVariantLigatures: "none",
           fontFeatureSettings: '"liga" 0, "calt" 0',
           textRendering: "auto",
-          // Fade in after fit is complete to prevent flash of large text
-          opacity: isReady ? 1 : 0,
-          transition: "opacity 75ms ease-out",
+          // Fade in after fit is complete, dim when unfocused
+          opacity: isReady ? (isFocused ? 1 : 0.6) : 0,
+          transition: "opacity 150ms ease-out, filter 150ms ease-out",
+          // Desaturate slightly when unfocused for visual distinction
+          filter: isFocused ? "none" : "saturate(0.8)",
         }}
         onClick={handleClick}
+      />
+
+      {/* Transition overlay to hide flash when returning to terminal */}
+      <div
+        className="absolute inset-0 bg-bg-tertiary pointer-events-none"
+        style={{
+          opacity: showTransitionOverlay ? 1 : 0,
+          transition: "opacity 900ms ease-out",
+        }}
       />
     </div>
   );

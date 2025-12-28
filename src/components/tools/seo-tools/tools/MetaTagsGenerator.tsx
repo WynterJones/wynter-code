@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Copy, Check, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Copy, Check, RefreshCw, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { GoogleSerpPreview } from "../previews/GoogleSerpPreview";
+import { useSeoDataFromProject } from "../hooks/useSeoDataFromProject";
 
 interface MetaTagsData {
   title: string;
@@ -13,6 +14,8 @@ interface MetaTagsData {
 }
 
 export function MetaTagsGenerator() {
+  const { data: projectData, isLoading: isLoadingProject, sourcePath, reload } = useSeoDataFromProject();
+  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
   const [data, setData] = useState<MetaTagsData>({
     title: "",
     description: "",
@@ -22,6 +25,38 @@ export function MetaTagsGenerator() {
     canonical: "",
   });
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!hasAutoLoaded && projectData && !isLoadingProject) {
+      const hasData = projectData.title || projectData.description || projectData.keywords ||
+        projectData.author || projectData.canonical || projectData.packageName;
+      if (hasData) {
+        setData({
+          title: projectData.title || projectData.packageName || "",
+          description: projectData.description || projectData.packageDescription || "",
+          keywords: projectData.keywords || "",
+          author: projectData.author || "",
+          robots: projectData.robots || "index, follow",
+          canonical: projectData.canonical || "",
+        });
+        setHasAutoLoaded(true);
+      }
+    }
+  }, [projectData, isLoadingProject, hasAutoLoaded]);
+
+  const handleLoadFromProject = async () => {
+    await reload();
+    if (projectData) {
+      setData({
+        title: projectData.title || projectData.packageName || data.title,
+        description: projectData.description || projectData.packageDescription || data.description,
+        keywords: projectData.keywords || data.keywords,
+        author: projectData.author || data.author,
+        robots: projectData.robots || data.robots,
+        canonical: projectData.canonical || data.canonical,
+      });
+    }
+  };
 
   const generateCode = () => {
     const lines: string[] = [];
@@ -76,7 +111,27 @@ export function MetaTagsGenerator() {
       <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
         {/* Form Section */}
         <div className="space-y-4 overflow-auto pr-2">
-          <h3 className="font-medium text-text-primary">Meta Tag Settings</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-text-primary">Meta Tag Settings</h3>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleLoadFromProject}
+              disabled={isLoadingProject}
+            >
+              {isLoadingProject ? (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <FolderOpen className="w-3 h-3 mr-1" />
+              )}
+              Load from project
+            </Button>
+          </div>
+          {sourcePath && (
+            <p className="text-xs text-text-tertiary">
+              Loaded from: {sourcePath}
+            </p>
+          )}
 
           {/* Title */}
           <div>

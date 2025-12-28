@@ -10,6 +10,7 @@ import { AutoBuildKanban } from "./AutoBuildKanban";
 import { AutoBuildLog } from "./AutoBuildLog";
 import { AutoBuildSettingsPopup } from "./AutoBuildSettingsPopup";
 import { AutoBuildHelpPopup } from "./AutoBuildHelpPopup";
+import { autoBuildGameBridge } from "@/services/autoBuildGameBridge";
 import { cn } from "@/lib/utils";
 
 interface AutoBuildPopupProps {
@@ -60,6 +61,18 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
     const { cacheIssue } = useAutoBuildStore.getState();
     issues.forEach((issue) => cacheIssue(issue));
   }, [issues]);
+
+  // Start/stop game bridge based on auto build status
+  useEffect(() => {
+    if (status === "running") {
+      autoBuildGameBridge.start();
+    } else {
+      autoBuildGameBridge.stop();
+    }
+    return () => {
+      autoBuildGameBridge.stop();
+    };
+  }, [status]);
 
   // Filter queue to only include issues that are still open
   useEffect(() => {

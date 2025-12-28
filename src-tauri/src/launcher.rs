@@ -73,6 +73,20 @@ pub fn toggle_launcher_window_sync(app: AppHandle) -> Result<bool, String> {
     .build()
     .map_err(|e| e.to_string())?;
 
+    // Apply vibrancy effect on macOS
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+        let _ = apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None);
+    }
+
+    // Apply acrylic effect on Windows
+    #[cfg(target_os = "windows")]
+    {
+        use window_vibrancy::apply_acrylic;
+        let _ = apply_acrylic(&window, Some((20, 20, 32, 200)));
+    }
+
     // Set window level to floating on macOS
     #[cfg(target_os = "macos")]
     #[allow(deprecated)]

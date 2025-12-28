@@ -5,12 +5,20 @@ import { navigationSystem } from "./navigation/NavigationSystem";
 import { BuildingSprite } from "./entities/Building";
 import { VehicleSprite } from "./entities/Vehicle";
 import { GardenFlowers } from "./entities/GardenFlowers";
+import { FireEffect } from "./entities/FireEffect";
 import { FarmParticleEmitter } from "./particles/FarmParticleEmitter";
 import { BuildingPopup } from "./BuildingPopup";
 import { BUILDING_POSITIONS, type BuildingType } from "../types";
 import { getRandomSpawnPoint } from "./navigation/SpawnPoints";
 
 const GAME_SIZE = 1000;
+
+const MAP_PATHS: Record<string, string> = {
+  "day-summer": "/tycoon/map.png",
+  "night-summer": "/tycoon/map-night.png",
+  "day-winter": "/tycoon/map-day-winter.png",
+  "night-winter": "/tycoon/map-night-winter.png",
+};
 
 interface TycoonGameProps {
   containerWidth?: number;
@@ -33,9 +41,12 @@ export function TycoonGame({
   const buildingSpritesRef = useRef<Map<string, BuildingSprite>>(new Map());
   const vehicleSpritesRef = useRef<Map<string, VehicleSprite>>(new Map());
   const debugGraphicsRef = useRef<Graphics | null>(null);
-  const bgSpriteRef = useRef<Sprite | null>(null);
   const gardenFlowersRef = useRef<GardenFlowers | null>(null);
   const particleEmitterRef = useRef<FarmParticleEmitter | null>(null);
+  const fireEffectRef = useRef<FireEffect | null>(null);
+
+  // Map sprites ref (state is in store, not local refs)
+  const mapSpritesRef = useRef<Map<string, Sprite>>(new Map());
 
   const [scale, setScale] = useState(1);
   const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
@@ -45,6 +56,7 @@ export function TycoonGame({
     buildings,
     vehicles,
     showDebug,
+    hideTooltips,
     isPaused,
     navGraph,
     setNavGraph,
@@ -63,6 +75,7 @@ export function TycoonGame({
       setNavGraph(graph);
     }
   }, [setNavGraph]);
+
 
   const drawDebugOverlay = useCallback(
     (graphics: Graphics) => {
@@ -169,16 +182,33 @@ export function TycoonGame({
       initializedRef.current = true;
       containerRef.current?.appendChild(app.canvas);
 
+      // Load all map variants for day/night and seasonal cycling
       try {
-        const bgTexture = await Assets.load("/tycoon/map.png");
-        if (cancelled || !app.stage) return;
-        const bg = new Sprite(bgTexture);
-        bg.width = 1000;
-        bg.height = 1000;
-        bgSpriteRef.current = bg;
-        app.stage.addChild(bg);
+        const mapContainer = new Container();
+        mapContainer.label = "mapContainer";
+        app.stage.addChild(mapContainer);
+
+        // Load all map textures
+        const mapKeys = Object.keys(MAP_PATHS);
+
+        // Get current map cycle state from store to set initial alpha values
+        const currentMapCycle = useFarmworkTycoonStore.getState().mapCycle;
+        const currentMapKey = `${currentMapCycle.timeOfDay}-${currentMapCycle.season}`;
+
+        for (const key of mapKeys) {
+          const texture = await Assets.load(MAP_PATHS[key]);
+          if (cancelled || !app.stage) return;
+
+          const sprite = new Sprite(texture);
+          sprite.width = 1000;
+          sprite.height = 1000;
+          // Set alpha based on current store state, not just day-summer default
+          sprite.alpha = key === currentMapKey ? 1 : 0;
+          mapContainer.addChild(sprite);
+          mapSpritesRef.current.set(key, sprite);
+        }
       } catch (e) {
-        console.warn("Could not load map background:", e);
+        console.warn("Could not load map backgrounds:", e);
       }
 
       if (cancelled || !app.stage) return;
@@ -206,14 +236,26 @@ export function TycoonGame({
       app.stage.addChild(particleEmitter);
       particleEmitterRef.current = particleEmitter;
 
+      // Add fire effect at the compost fire pit
+      const fireEffect = new FireEffect();
+      fireEffect.label = "fireEffect";
+      // Position at the fire pit (lower, near bottom edge of map)
+      fireEffect.position.set(480, 940);
+      app.stage.addChild(fireEffect);
+      fireEffectRef.current = fireEffect;
+
       const debugGraphics = new Graphics();
       debugGraphics.label = "debug";
       app.stage.addChild(debugGraphics);
       debugGraphicsRef.current = debugGraphics;
 
+      // Get current hideTooltips state for initial badge visibility
+      const initialHideTooltips = useFarmworkTycoonStore.getState().hideTooltips;
+
       for (const buildingData of buildings) {
         const buildingSprite = new BuildingSprite(buildingData);
         buildingSprite.setDebugMode(useFarmworkTycoonStore.getState().showDebug);
+        buildingSprite.setBadgeVisible(!initialHideTooltips);
         buildingsContainer.addChild(buildingSprite);
         buildingSpritesRef.current.set(buildingData.id, buildingSprite);
 
@@ -229,8 +271,46 @@ export function TycoonGame({
 
       if (cancelled) return;
 
+      // Easing function for smooth transitions
+      const easeInOutCubic = (t: number): number => {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      };
+
       app.ticker.add((ticker) => {
         const dt = ticker.deltaMS / 1000;
+
+        // Update map cycling via store (synced between mini player and full view)
+        const maps = mapSpritesRef.current;
+        if (maps.size > 0) {
+          // Tick the map cycle in the store
+          useFarmworkTycoonStore.getState().tickMapCycle(dt);
+
+          // Get current cycle state from store
+          const cycle = useFarmworkTycoonStore.getState().mapCycle;
+
+          // Update map sprite alphas based on store state
+          if (cycle.isTransitioning) {
+            const progress = easeInOutCubic(cycle.transitionProgress);
+            const fromSprite = maps.get(cycle.transitionFrom);
+            const toSprite = maps.get(cycle.transitionTo);
+
+            if (fromSprite) fromSprite.alpha = 1 - progress;
+            if (toSprite) toSprite.alpha = progress;
+
+            // Hide other sprites
+            for (const [key, sprite] of maps) {
+              if (key !== cycle.transitionFrom && key !== cycle.transitionTo) {
+                sprite.alpha = 0;
+              }
+            }
+          } else {
+            // Set final alpha values for current state
+            const currentKey = `${cycle.timeOfDay}-${cycle.season}`;
+            for (const [key, sprite] of maps) {
+              sprite.alpha = key === currentKey ? 1 : 0;
+            }
+          }
+        }
 
         if (gardenFlowersRef.current) {
           gardenFlowersRef.current.update(dt);
@@ -238,6 +318,10 @@ export function TycoonGame({
 
         if (particleEmitterRef.current) {
           particleEmitterRef.current.update(dt);
+        }
+
+        if (fireEffectRef.current) {
+          fireEffectRef.current.update(dt);
         }
 
         for (const buildingSprite of buildingSpritesRef.current.values()) {
@@ -389,6 +473,7 @@ export function TycoonGame({
       appRef.current = null;
       buildingSpritesRef.current.clear();
       vehicleSpritesRef.current.clear();
+      mapSpritesRef.current.clear();
     };
   }, []);
 
@@ -491,7 +576,7 @@ export function TycoonGame({
 
       if (!sprite) {
         sprite = new VehicleSprite(vehicleData);
-        sprite.setBadgeVisible(!isMiniPlayer);
+        sprite.setBadgeVisible(!hideTooltips);
         vehiclesContainer.addChild(sprite);
         vehicleSpritesRef.current.set(vehicleData.id, sprite);
 
@@ -549,7 +634,7 @@ export function TycoonGame({
         }
       }
     }
-  }, [vehicles, navGraph, buildings, isMiniPlayer]);
+  }, [vehicles, navGraph, buildings, isMiniPlayer, hideTooltips]);
 
   useEffect(() => {
     if (debugGraphicsRef.current) {
@@ -561,6 +646,21 @@ export function TycoonGame({
       buildingSprite.setDebugMode(showDebug);
     }
   }, [showDebug, drawDebugOverlay, navGraph]);
+
+  // Toggle badge visibility based on hideTooltips
+  useEffect(() => {
+    const badgeVisible = !hideTooltips;
+
+    // Toggle building badges
+    for (const buildingSprite of buildingSpritesRef.current.values()) {
+      buildingSprite.setBadgeVisible(badgeVisible);
+    }
+
+    // Toggle vehicle badges
+    for (const vehicleSprite of vehicleSpritesRef.current.values()) {
+      vehicleSprite.setBadgeVisible(badgeVisible);
+    }
+  }, [hideTooltips]);
 
   useEffect(() => {
     if (!gardenFlowersRef.current) return;
@@ -606,7 +706,7 @@ export function TycoonGame({
       )}
 
       {/* Flower tooltip */}
-      {!isMiniPlayer && flowerTooltip && (
+      {!isMiniPlayer && !hideTooltips && flowerTooltip && (
         <div
           className="absolute pointer-events-none z-40 px-2 py-1 bg-bg-secondary/95 backdrop-blur-sm rounded-md border border-border/50 shadow-lg text-xs text-text-primary max-w-[200px] truncate"
           style={{

@@ -65,7 +65,7 @@ export class VehicleSprite extends Container {
     this.fallbackGraphic.roundRect(-15, -20, 30, 40, 4);
     this.fallbackGraphic.fill(color);
     this.fallbackGraphic.stroke({ color: 0x000000, width: 2 });
-    this.fallbackGraphic.scale.set(0.5);
+    this.fallbackGraphic.scale.set(0.6);
     // Apply tint to fallback if set
     if (this.tintColor !== 0xffffff) {
       this.fallbackGraphic.tint = this.tintColor;
@@ -74,7 +74,7 @@ export class VehicleSprite extends Container {
 
     this.sprite = new Sprite();
     this.sprite.anchor.set(0.5, 0.5);
-    this.sprite.scale.set(0.5);
+    this.sprite.scale.set(0.6);
     this.addChild(this.sprite);
 
     this.badge = new VehicleBadge();
@@ -131,7 +131,7 @@ export class VehicleSprite extends Container {
 
     let texture: Texture;
     const filled = this.isCarrying;
-    const baseScale = 0.5;
+    const baseScale = 0.6;
 
     switch (this.currentDirection) {
       case "up":

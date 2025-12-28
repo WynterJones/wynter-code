@@ -2,8 +2,9 @@ import { useState } from "react";
 import type { DecartSettings, DecartUsage } from "../types";
 import { DECART_STYLE_EFFECTS, DECART_COST_PER_SECOND } from "../types";
 import { Button } from "@/components/ui/Button";
+import { Toggle } from "@/components/ui/Toggle";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
-import { Eye, EyeOff, Upload, Zap, ExternalLink } from "lucide-react";
+import { Eye, EyeOff, Upload, Zap, ExternalLink, Wand2 } from "lucide-react";
 
 interface DecartTabProps {
   settings: DecartSettings;
@@ -53,18 +54,10 @@ export function DecartTab({
               Enable Decart AI
             </span>
           </div>
-          <button
-            onClick={() => onSettingsChange({ enabled: !settings.enabled })}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
-              settings.enabled ? "bg-accent" : "bg-bg-tertiary"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                settings.enabled ? "left-5" : "left-0.5"
-              }`}
-            />
-          </button>
+          <Toggle
+            checked={settings.enabled}
+            onChange={(checked) => onSettingsChange({ enabled: checked })}
+          />
         </div>
 
         <div className="bg-bg-tertiary/50 border border-border rounded-lg p-3">
@@ -145,7 +138,7 @@ export function DecartTab({
               onClick={() => onSettingsChange({ activeEffect: null })}
               disabled={!isConnected}
               className={`px-3 py-2 rounded-md text-sm transition-colors ${
-                settings.activeEffect === null
+                settings.activeEffect === null && !settings.customPrompt
                   ? "bg-accent text-primary-950"
                   : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary"
               } disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -155,10 +148,10 @@ export function DecartTab({
             {DECART_STYLE_EFFECTS.map((effect) => (
               <button
                 key={effect.id}
-                onClick={() => onSettingsChange({ activeEffect: effect.id })}
+                onClick={() => onSettingsChange({ activeEffect: effect.id, customPrompt: "" })}
                 disabled={!isConnected}
                 className={`px-3 py-2 rounded-md text-sm transition-colors ${
-                  settings.activeEffect === effect.id
+                  settings.activeEffect === effect.id && !settings.customPrompt
                     ? "bg-accent text-primary-950"
                     : "bg-bg-tertiary text-text-secondary hover:bg-bg-secondary"
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
@@ -166,6 +159,24 @@ export function DecartTab({
                 {effect.label}
               </button>
             ))}
+          </div>
+
+          <div className="mt-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Wand2 size={14} className="text-accent" />
+              <label className="text-xs text-text-tertiary">Custom Style Prompt</label>
+            </div>
+            <textarea
+              value={settings.customPrompt}
+              onChange={(e) => onSettingsChange({ customPrompt: e.target.value, activeEffect: null })}
+              placeholder="Describe your own style, e.g. 'cyberpunk neon glow', 'impressionist painting', 'vaporwave aesthetic'..."
+              disabled={!isConnected}
+              rows={3}
+              className="w-full bg-bg-tertiary border border-border rounded-md px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary/50 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed resize-none"
+            />
+            <p className="text-xs text-text-tertiary/70 mt-1">
+              Use a custom prompt instead of preset styles
+            </p>
           </div>
         </div>
 

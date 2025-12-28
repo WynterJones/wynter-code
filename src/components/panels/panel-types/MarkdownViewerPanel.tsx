@@ -369,7 +369,7 @@ export function MarkdownViewerPanel({
               </button>
             </Tooltip>
             {showSettings && (
-              <div className="absolute top-full right-0 mt-1 w-56 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 p-3 space-y-3">
+              <div className="absolute top-full right-0 mt-1 w-56 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 p-3 space-y-3 dropdown-solid">
                 <div className="text-[10px] font-medium text-text-primary uppercase tracking-wider">Preview Settings</div>
                 <div className="space-y-1">
                   <label className="text-[10px] text-text-secondary">Width</label>
@@ -477,6 +477,11 @@ export function MarkdownViewerPanel({
                     cursorBlinking: "smooth",
                     smoothScrolling: true,
                     renderValidationDecorations: "off",
+                    guides: {
+                      indentation: false,
+                      bracketPairs: false,
+                      highlightActiveIndentation: false,
+                    },
                   }}
                 />
               </div>

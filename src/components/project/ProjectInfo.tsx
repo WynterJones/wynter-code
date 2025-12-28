@@ -10,6 +10,7 @@ import {
   Palette,
   Package,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { ScrollArea, Badge } from "@/components/ui";
 import type { Project } from "@/types";
@@ -37,15 +38,25 @@ export function ProjectInfo({ project }: ProjectInfoProps) {
   const [stats, setStats] = useState<DirectoryStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [nodeModulesSize, setNodeModulesSize] = useState<number | null>(null);
+  const [nodeModulesLoading, setNodeModulesLoading] = useState(false);
 
   useEffect(() => {
     loadStats();
   }, [project.path]);
 
+  // Load node_modules size separately (after main stats load)
+  useEffect(() => {
+    if (stats && !loading) {
+      loadNodeModulesSize();
+    }
+  }, [stats, loading, project.path]);
+
   const loadStats = async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
+        setNodeModulesSize(null);
       } else {
         setLoading(true);
       }
@@ -59,6 +70,21 @@ export function ProjectInfo({ project }: ProjectInfoProps) {
     } finally {
       setLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const loadNodeModulesSize = async () => {
+    try {
+      setNodeModulesLoading(true);
+      const size = await invoke<number>("get_node_modules_size", {
+        projectPath: project.path,
+      });
+      setNodeModulesSize(size);
+    } catch (err) {
+      console.error("Failed to load node_modules size:", err);
+      setNodeModulesSize(0);
+    } finally {
+      setNodeModulesLoading(false);
     }
   };
 
@@ -163,17 +189,21 @@ export function ProjectInfo({ project }: ProjectInfoProps) {
                     {formatBytes(stats.totalSize)}
                   </span>
                 </div>
-                {stats.nodeModulesSize > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <Package className="w-3.5 h-3.5 text-accent-purple" />
-                      <span className="text-text-secondary">node_modules</span>
-                    </div>
-                    <span className="text-text-primary font-medium">
-                      {formatBytes(stats.nodeModulesSize)}
-                    </span>
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <Package className="w-3.5 h-3.5 text-accent-purple" />
+                    <span className="text-text-secondary">node_modules</span>
                   </div>
-                )}
+                  {nodeModulesLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 text-text-secondary animate-spin" />
+                  ) : nodeModulesSize && nodeModulesSize > 0 ? (
+                    <span className="text-text-primary font-medium">
+                      {formatBytes(nodeModulesSize)}
+                    </span>
+                  ) : (
+                    <span className="text-text-secondary/50">—</span>
+                  )}
+                </div>
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <FileCode className="w-3.5 h-3.5 text-accent-blue" />

@@ -24,6 +24,7 @@ import {
   Copy,
   Check,
   Terminal,
+  MessageSquareOff,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -45,10 +46,12 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
     isInitialized,
     isPaused,
     showDebug,
+    hideTooltips,
     initialize,
     pause,
     resume,
     toggleDebug,
+    toggleHideTooltips,
     refreshStats,
     showMiniPlayerFn,
     startTestRun,
@@ -323,7 +326,7 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
         {/* Right Sidebar - Fixed width with scroll */}
         <div className="w-80 flex-shrink-0 flex flex-col border-l border-border bg-bg-secondary overflow-hidden min-h-0">
           {/* Mini Farm Bar - Always visible */}
-          <div className="p-3 border-b border-border flex-shrink-0">
+          <div className="p-3 border-b border-border flex-shrink-0 flex items-center gap-2">
             <button
               onClick={() => {
                 showMiniPlayerFn();
@@ -333,6 +336,15 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
             >
               Open Mini Farm
             </button>
+            <Tooltip content={hideTooltips ? "Show Tooltips" : "Hide Tooltips"}>
+              <IconButton
+                size="sm"
+                onClick={toggleHideTooltips}
+                className={cn(hideTooltips && "text-yellow-400 bg-yellow-400/10")}
+              >
+                <MessageSquareOff className="w-3.5 h-3.5" />
+              </IconButton>
+            </Tooltip>
           </div>
 
           {/* Dev Controls - Only visible in development */}

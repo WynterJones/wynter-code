@@ -485,6 +485,11 @@ export function FileViewerPanel({
                   horizontalScrollbarSize: 8,
                 },
                 renderValidationDecorations: "off",
+                guides: {
+                  indentation: false,
+                  bracketPairs: false,
+                  highlightActiveIndentation: false,
+                },
               }}
             />
           )}

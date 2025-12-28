@@ -116,6 +116,54 @@ const githubDarkTheme = {
   },
 };
 
+// Catppuccin Ultrathin theme (matches app UI)
+const catppuccinUltrathinTheme = {
+  base: "vs-dark" as const,
+  inherit: true,
+  rules: [
+    { token: "comment", foreground: "6c7086", fontStyle: "italic" },
+    { token: "keyword", foreground: "cba6f7" },
+    { token: "string", foreground: "a6e3a1" },
+    { token: "number", foreground: "fab387" },
+    { token: "type", foreground: "f9e2af" },
+    { token: "class", foreground: "f9e2af" },
+    { token: "function", foreground: "89b4fa" },
+    { token: "variable", foreground: "f38ba8" },
+    { token: "operator", foreground: "94e2d5" },
+    { token: "constant", foreground: "fab387" },
+    { token: "tag", foreground: "89b4fa" },
+    { token: "attribute.name", foreground: "f9e2af" },
+    { token: "attribute.value", foreground: "a6e3a1" },
+    { token: "delimiter", foreground: "9399b2" },
+    { token: "delimiter.bracket", foreground: "9399b2" },
+    { token: "meta", foreground: "f5c2e7" },
+  ],
+  colors: {
+    "editor.background": "#141420",
+    "editor.foreground": "#cdd6f4",
+    "editor.lineHighlightBackground": "#1e1e2e",
+    "editor.selectionBackground": "#45475a",
+    "editorCursor.foreground": "#f5e0dc",
+    "editorWhitespace.foreground": "#313244",
+    "editorIndentGuide.background": "#313244",
+    "editorIndentGuide.activeBackground": "#45475a",
+    "editor.selectionHighlightBackground": "#45475a50",
+    "editorLineNumber.foreground": "#45475a",
+    "editorLineNumber.activeForeground": "#cdd6f4",
+    "editorGutter.background": "#141420",
+    "scrollbarSlider.background": "#31324450",
+    "scrollbarSlider.hoverBackground": "#45475a80",
+    "scrollbarSlider.activeBackground": "#585b70",
+    "editorWidget.background": "#0f0f18",
+    "editorWidget.border": "#2a2a3a",
+    "editorSuggestWidget.background": "#0f0f18",
+    "editorSuggestWidget.border": "#2a2a3a",
+    "editorSuggestWidget.selectedBackground": "#252535",
+    "editorHoverWidget.background": "#0f0f18",
+    "editorHoverWidget.border": "#2a2a3a",
+  },
+};
+
 // Monokai theme
 const monokaiTheme = {
   base: "vs-dark" as const,
@@ -159,6 +207,7 @@ const themes = {
   dracula: draculaTheme,
   "github-dark": githubDarkTheme,
   monokai: monokaiTheme,
+  "catppuccin-ultrathin": catppuccinUltrathinTheme,
 };
 
 export function useMonacoTheme(

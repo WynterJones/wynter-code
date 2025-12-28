@@ -16,7 +16,8 @@ interface CheckItem {
   installUrl?: string;
 }
 
-const checkItems: CheckItem[] = [
+// Required items must be installed
+const requiredItems: CheckItem[] = [
   {
     key: "node",
     label: "Node.js",
@@ -39,6 +40,18 @@ const checkItems: CheckItem[] = [
     installUrl: "https://docs.anthropic.com/en/docs/claude-code",
   },
 ];
+
+// Optional items enhance functionality but aren't required
+const optionalItems: CheckItem[] = [
+  {
+    key: "codex",
+    label: "Codex CLI (Optional)",
+    installCommand: "npm install -g @openai/codex",
+    installUrl: "https://github.com/openai/codex-cli",
+  },
+];
+
+const checkItems = [...requiredItems, ...optionalItems];
 
 export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckProps) {
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
@@ -63,6 +76,7 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
         npm: null,
         git: null,
         claude: null,
+        codex: null,
       });
     } finally {
       setIsCheckingSystem(false);
@@ -75,13 +89,15 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
     setTimeout(() => setCopiedCommand(null), 2000);
   };
 
+  // Only required items need to pass
   const allPassed =
     systemCheckResults &&
-    checkItems.every((item) => systemCheckResults[item.key] !== null);
+    requiredItems.every((item) => systemCheckResults[item.key] !== null);
 
+  // Show missing items section if any required items are missing
   const hasMissingItems =
     systemCheckResults &&
-    checkItems.some((item) => systemCheckResults[item.key] === null);
+    requiredItems.some((item) => systemCheckResults[item.key] === null);
 
   return (
     <div className="flex flex-col min-h-[450px] px-8 py-10">

@@ -32,7 +32,7 @@ export function SubscriptionDropdown({
   const isEmpty = workspaceSubscriptions.length === 0;
 
   return (
-    <div className="absolute right-0 mt-1 w-80 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 overflow-hidden">
+    <div className="absolute right-0 mt-1 w-80 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 overflow-hidden dropdown-solid">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border bg-bg-tertiary/50">
         <span className="text-sm font-medium text-text-primary">Subscriptions</span>

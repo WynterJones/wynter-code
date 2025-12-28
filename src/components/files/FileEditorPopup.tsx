@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Editor, { type Monaco, type OnMount } from "@monaco-editor/react";
-import { X, Save, RotateCcw, Minus } from "lucide-react";
+import { X, Save, RotateCcw, Minus, Loader2, FileCode, Settings, Plus, MinusIcon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { IconButton, Tooltip, Badge } from "@/components/ui";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { defineMonacoThemes } from "@/hooks/useMonacoTheme";
+import { SettingsPopup } from "@/components/settings/SettingsPopup";
 
 type MonacoEditor = Parameters<OnMount>[0];
 
@@ -55,8 +56,9 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
   const [error, setError] = useState<string | null>(null);
   const editorRef = useRef<MonacoEditor | null>(null);
 
-  const { editorTheme, editorFontSize, editorWordWrap, editorMinimap } =
+  const { editorTheme, editorFontSize, editorWordWrap, editorMinimap, setEditorFontSize } =
     useSettingsStore();
+  const [showSettings, setShowSettings] = useState(false);
 
   const fileName = filePath.split("/").pop() || filePath;
   const language = getLanguageFromPath(filePath);
@@ -131,6 +133,14 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
     setHasChanges(false);
   };
 
+  const handleZoomIn = useCallback(() => {
+    setEditorFontSize(Math.min(editorFontSize + 2, 32));
+  }, [editorFontSize, setEditorFontSize]);
+
+  const handleZoomOut = useCallback(() => {
+    setEditorFontSize(Math.max(editorFontSize - 2, 8));
+  }, [editorFontSize, setEditorFontSize]);
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") {
       onClose();
@@ -141,7 +151,16 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
         handleSave();
       }
     }
-  }, [onClose, hasChanges, handleSave]);
+    // Zoom in/out with Ctrl/Cmd + / -
+    if ((e.metaKey || e.ctrlKey) && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      handleZoomIn();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === "-") {
+      e.preventDefault();
+      handleZoomOut();
+    }
+  }, [onClose, hasChanges, handleSave, handleZoomIn, handleZoomOut]);
 
   useEffect(() => {
     document.addEventListener("keydown", handleKeyDown);
@@ -164,6 +183,22 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
             )}
           </div>
           <div className="flex items-center gap-2">
+            {/* Zoom controls */}
+            <div className="flex items-center gap-1 mr-2 border-r border-border pr-2">
+              <Tooltip content="Zoom Out (⌘-)" side="bottom">
+                <IconButton size="sm" onClick={handleZoomOut}>
+                  <MinusIcon className="w-3.5 h-3.5" />
+                </IconButton>
+              </Tooltip>
+              <span className="text-xs text-text-secondary min-w-[32px] text-center font-mono">
+                {editorFontSize}px
+              </span>
+              <Tooltip content="Zoom In (⌘+)" side="bottom">
+                <IconButton size="sm" onClick={handleZoomIn}>
+                  <Plus className="w-3.5 h-3.5" />
+                </IconButton>
+              </Tooltip>
+            </div>
             {hasChanges && (
               <>
                 <Tooltip content="Reset Changes" side="bottom">
@@ -183,6 +218,11 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
                 </Tooltip>
               </>
             )}
+            <Tooltip content="Editor Settings" side="bottom">
+              <IconButton size="sm" onClick={() => setShowSettings(true)}>
+                <Settings className="w-4 h-4" />
+              </IconButton>
+            </Tooltip>
             {onMinimize && (
               <Tooltip content="Minimize" side="bottom">
                 <IconButton size="sm" onClick={onMinimize}>
@@ -201,8 +241,14 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
         {/* Editor */}
         <div className="flex-1 overflow-hidden">
           {isLoading ? (
-            <div className="flex items-center justify-center h-full text-text-secondary">
-              Loading...
+            <div className="flex flex-col items-center justify-center h-full gap-4 bg-bg-tertiary">
+              <div className="flex items-center justify-center w-16 h-16 rounded-xl bg-bg-secondary border border-border">
+                <FileCode className="w-8 h-8 text-text-tertiary" />
+              </div>
+              <div className="flex items-center gap-2 text-text-secondary">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Loading file...</span>
+              </div>
             </div>
           ) : error ? (
             <div className="flex items-center justify-center h-full text-accent-red">
@@ -218,8 +264,14 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
               beforeMount={handleEditorWillMount}
               onMount={handleEditorDidMount}
               loading={
-                <div className="flex items-center justify-center h-full bg-bg-tertiary text-text-secondary">
-                  Loading editor...
+                <div className="flex flex-col items-center justify-center h-full gap-4 bg-bg-tertiary">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-xl bg-bg-secondary border border-border">
+                    <FileCode className="w-8 h-8 text-text-tertiary" />
+                  </div>
+                  <div className="flex items-center gap-2 text-text-secondary">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Initializing editor...</span>
+                  </div>
                 </div>
               }
               options={{
@@ -235,6 +287,12 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
                 cursorBlinking: "smooth",
                 smoothScrolling: true,
                 renderValidationDecorations: "off",
+                occurrencesHighlight: "off",
+                guides: {
+                  indentation: false,
+                  bracketPairs: false,
+                  highlightActiveIndentation: false,
+                },
               }}
             />
           )}
@@ -249,6 +307,14 @@ export function FileEditorPopup({ filePath, initialLine, onClose, onSave, onMini
           </div>
         </div>
       </div>
+
+      {/* Settings Popup */}
+      {showSettings && (
+        <SettingsPopup
+          onClose={() => setShowSettings(false)}
+          initialTab="editor"
+        />
+      )}
     </div>
   );
 }

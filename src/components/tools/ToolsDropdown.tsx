@@ -22,7 +22,6 @@ import {
   Gauge,
   Video,
   AtSign,
-  MonitorPlay,
   FileCode,
   Upload,
   Bookmark,
@@ -313,6 +312,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Upload,
     actionKey: "openNetlifyFtp",
     category: "production",
+    hiddenInDropdown: true,
   },
   {
     id: "web-backup",
@@ -342,23 +342,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openFloatingWebcam",
     category: "recording",
   },
-  {
-    id: "screen-studio",
-    name: "Screen Studio",
-    description: "Cinematic screen recorder",
-    icon: MonitorPlay,
-    actionKey: "openScreenStudio",
-    category: "recording",
-  },
-  {
-    id: "gif-recorder",
-    name: "GIF Screen Recorder",
-    description: "Record screen as GIF",
-    icon: Image,
-    actionKey: "openGifRecorder",
-    category: "recording",
-  },
-
   // === TOOLKITS ===
   {
     id: "dev-toolkit",
@@ -445,6 +428,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Eye,
     actionKey: "openUniversalViewer",
     category: "utilities",
+    hiddenInDropdown: true,
   },
 
   // === DEV TOOLKIT MINI-TOOLS ===
@@ -556,9 +540,7 @@ interface ToolsDropdownProps {
   onOpenDomainTools: () => void;
   onOpenSeoTools: () => void;
   onOpenFloatingWebcam: () => void;
-  onOpenScreenStudio: () => void;
   onOpenNetlifyFtp: () => void;
-  onOpenGifRecorder: () => void;
   onOpenBookmarks: () => void;
   onOpenMeditation: () => void;
   onOpenDatabaseViewer: () => void;
@@ -595,9 +577,7 @@ export function ToolsDropdown({
   onOpenDomainTools,
   onOpenSeoTools,
   onOpenFloatingWebcam,
-  onOpenScreenStudio,
   onOpenNetlifyFtp,
-  onOpenGifRecorder,
   onOpenBookmarks,
   onOpenMeditation,
   onOpenDatabaseViewer,
@@ -923,6 +903,7 @@ export function ToolsDropdown({
       description: "Deploy with retro FTP",
       icon: <Upload className="w-4 h-4" />,
       category: "production",
+      hiddenInDropdown: true,
       onClick: () => {
         onOpenNetlifyFtp();
         setIsOpen(false);
@@ -951,28 +932,6 @@ export function ToolsDropdown({
       category: "recording",
       onClick: () => {
         onOpenFloatingWebcam();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "screen-studio",
-      name: "Screen Studio",
-      description: "Cinematic screen recorder",
-      icon: <MonitorPlay className="w-4 h-4" />,
-      category: "recording",
-      onClick: () => {
-        onOpenScreenStudio();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "gif-recorder",
-      name: "GIF Screen Recorder",
-      description: "Record screen as GIF",
-      icon: <Image className="w-4 h-4" />,
-      category: "recording",
-      onClick: () => {
-        onOpenGifRecorder();
         setIsOpen(false);
       },
     },
@@ -1093,6 +1052,7 @@ export function ToolsDropdown({
       description: "Open any file type",
       icon: <Eye className="w-4 h-4" />,
       category: "utilities",
+      hiddenInDropdown: true,
       onClick: () => {
         onOpenUniversalViewer();
         setIsOpen(false);
@@ -1283,7 +1243,7 @@ export function ToolsDropdown({
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[9999] w-64 bg-bg-secondary border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100"
+            className="fixed z-[9999] w-64 bg-bg-secondary border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100 dropdown-solid"
             style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
           >
             {/* Search Input */}

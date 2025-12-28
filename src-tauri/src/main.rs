@@ -5,13 +5,13 @@ mod audio_proxy;
 mod auto_build;
 mod beads;
 mod claude_process;
+mod codex_process;
 mod color_picker;
 mod commands;
 mod cost_popup;
 mod database_viewer;
 mod domain_tools;
 mod file_coordinator;
-mod gif_capture;
 mod homebrew;
 mod launcher;
 mod limits_monitor;
@@ -23,8 +23,10 @@ mod storybook;
 mod system_cleaner;
 mod terminal;
 mod tunnel;
+mod vibrancy;
 mod watcher;
 mod webcam_window;
+mod camera_permission;
 
 use std::sync::Arc;
 use tauri::{
@@ -236,6 +238,7 @@ fn main() {
         .manage(Arc::new(storybook::StorybookManager::new()))
         .manage(Arc::new(database_viewer::DatabaseManager::new()))
         .manage(Arc::new(claude_process::ClaudeProcessManager::new()))
+        .manage(Arc::new(codex_process::CodexProcessManager::new()))
         .manage(Arc::new(mcp_permission_server::McpPermissionManager::new()))
         .manage(Arc::new(file_coordinator::FileCoordinatorManager::new()))
         .manage(Arc::new(audio_proxy::AudioProxyManager::new()))
@@ -244,6 +247,7 @@ fn main() {
             commands::read_file_content,
             commands::read_file_base64,
             commands::write_file_content,
+            commands::is_directory,
             commands::find_markdown_files,
             commands::list_project_files,
             commands::search::grep_project,
@@ -266,6 +270,7 @@ fn main() {
             commands::get_git_status,
             commands::check_node_modules_exists,
             commands::get_directory_stats,
+            commands::get_node_modules_size,
             commands::check_system_requirements,
             commands::get_system_resources,
             commands::get_claude_files,
@@ -288,6 +293,7 @@ fn main() {
             commands::check_env_gitignore,
             commands::get_system_env_vars,
             commands::create_zip_archive,
+            commands::zip_folder_to_base64,
             commands::optimize_image,
             commands::optimize_pdf,
             commands::optimize_video,
@@ -373,6 +379,8 @@ fn main() {
             // Slash Commands (custom command scanning)
             commands::list_directory_files,
             commands::read_file_head,
+            // Codex image support
+            commands::save_temp_image,
             // Claude Code Limits Monitor
             limits_monitor::calculate_usage_summary,
             // Netlify API
@@ -394,6 +402,12 @@ fn main() {
             claude_process::terminate_claude_session,
             claude_process::is_claude_session_active,
             claude_process::list_active_claude_sessions,
+            // Codex Process Management
+            codex_process::start_codex_session,
+            codex_process::stop_codex_session,
+            codex_process::send_codex_input,
+            codex_process::is_codex_session_active,
+            codex_process::list_active_codex_sessions,
             // MCP Permission Server
             mcp_permission_server::start_mcp_permission_server,
             mcp_permission_server::stop_mcp_permission_server,
@@ -417,10 +431,6 @@ fn main() {
             cost_popup::close_cost_popup,
             cost_popup::update_cost_popup_position,
             cost_popup::is_cost_popup_open,
-            // GIF Capture
-            gif_capture::capture_screen_frame,
-            gif_capture::check_gif_recording_permission,
-            gif_capture::request_gif_recording_permission,
             // Domain Tools
             domain_tools::whois_lookup,
             domain_tools::dns_lookup,
@@ -482,6 +492,15 @@ fn main() {
             launcher::disable_autostart,
             launcher::is_autostart_enabled,
             launcher::open_tool_in_main_window,
+            // Window Vibrancy
+            vibrancy::get_vibrancy_support,
+            vibrancy::apply_window_vibrancy,
+            vibrancy::clear_window_vibrancy,
+            vibrancy::apply_vibrancy_to_all_windows,
+            // Camera Permission
+            camera_permission::check_camera_permission,
+            camera_permission::request_camera_permission,
+            camera_permission::open_camera_privacy_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

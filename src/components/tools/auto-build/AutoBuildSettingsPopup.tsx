@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { X, Shield, Zap, Code2, Accessibility, GitCommit, Users, RotateCcw, Filter, CheckSquare } from "lucide-react";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/lib/utils";
@@ -17,7 +17,7 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
 
       {/* Settings Panel */}
-      <div className="relative w-80 rounded-lg border border-border bg-bg-primary shadow-2xl animate-in zoom-in-95 duration-100">
+      <div className="relative w-[720px] rounded-lg border border-border bg-[#1a1a1a] shadow-2xl animate-in zoom-in-95 duration-100">
         {/* Header */}
         <div
           data-tauri-drag-region
@@ -29,280 +29,218 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
           </IconButton>
         </div>
 
-        {/* Content */}
-        <div className="flex flex-col gap-4 p-4">
-          {/* Verification Section */}
-          <div>
-            <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
-              Verification
-            </h4>
-            <div className="flex flex-col gap-2">
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <input
-                  type="checkbox"
+        {/* Content - 3 Column Grid */}
+        <div className="grid grid-cols-3 gap-4 p-4">
+          {/* Column 1: Verification & Workflow */}
+          <div className="flex flex-col gap-4">
+            {/* Verification Section */}
+            <div>
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase text-text-secondary">
+                <CheckSquare className="h-3 w-3" />
+                Verification
+              </h4>
+              <div className="flex flex-col gap-1.5">
+                <SettingToggle
+                  label="Lint"
+                  description="npm run lint"
                   checked={settings.runLint}
-                  onChange={(e) => updateSettings({ runLint: e.target.checked })}
+                  onChange={(v) => updateSettings({ runLint: v })}
                   disabled={isDisabled}
-                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
                 />
-                <div>
-                  <div className="text-sm">Run Lint</div>
-                  <div className="text-xs text-text-secondary">npm run lint</div>
-                </div>
-              </label>
-
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <input
-                  type="checkbox"
+                <SettingToggle
+                  label="Tests"
+                  description="npm run test"
                   checked={settings.runTests}
-                  onChange={(e) => updateSettings({ runTests: e.target.checked })}
+                  onChange={(v) => updateSettings({ runTests: v })}
                   disabled={isDisabled}
-                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
                 />
-                <div>
-                  <div className="text-sm">Run Tests</div>
-                  <div className="text-xs text-text-secondary">npm run test</div>
-                </div>
-              </label>
-
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <input
-                  type="checkbox"
+                <SettingToggle
+                  label="Build"
+                  description="npm run build"
                   checked={settings.runBuild}
-                  onChange={(e) => updateSettings({ runBuild: e.target.checked })}
+                  onChange={(v) => updateSettings({ runBuild: v })}
                   disabled={isDisabled}
-                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
                 />
-                <div>
-                  <div className="text-sm">Run Build</div>
-                  <div className="text-xs text-text-secondary">npm run build</div>
-                </div>
-              </label>
+              </div>
             </div>
-          </div>
 
-          {/* Workflow Section */}
-          <div>
-            <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
-              Workflow
-            </h4>
-            <label
-              className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                isDisabled && "cursor-not-allowed opacity-50"
-              )}
-            >
-              <input
-                type="checkbox"
+            {/* Workflow Section */}
+            <div>
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase text-text-secondary">
+                <Users className="h-3 w-3" />
+                Workflow
+              </h4>
+              <SettingToggle
+                label="Human Review"
+                description="Review before completion"
                 checked={settings.requireHumanReview}
-                onChange={(e) => updateSettings({ requireHumanReview: e.target.checked })}
+                onChange={(v) => updateSettings({ requireHumanReview: v })}
                 disabled={isDisabled}
-                className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
               />
-              <div>
-                <div className="text-sm">Require Human Review</div>
-                <div className="text-xs text-text-secondary">
-                  Review each issue before completion
-                </div>
-              </div>
-            </label>
-          </div>
+            </div>
 
-          {/* Commit Section */}
-          <div>
-            <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
-              Git
-            </h4>
-            <label
-              className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                isDisabled && "cursor-not-allowed opacity-50"
-              )}
-            >
-              <input
-                type="checkbox"
+            {/* Git Section */}
+            <div>
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase text-text-secondary">
+                <GitCommit className="h-3 w-3" />
+                Git
+              </h4>
+              <SettingToggle
+                label="Auto Commit"
+                description="Commit after each issue"
                 checked={settings.autoCommit}
-                onChange={(e) => updateSettings({ autoCommit: e.target.checked })}
+                onChange={(v) => updateSettings({ autoCommit: v })}
                 disabled={isDisabled}
-                className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
               />
-              <div>
-                <div className="text-sm">Auto Commit</div>
-                <div className="text-xs text-text-secondary">
-                  Commit after each completed issue
-                </div>
-              </div>
-            </label>
-          </div>
-
-          {/* Error Handling */}
-          <div>
-            <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
-              Error Handling
-            </h4>
-            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-              <div>
-                <div className="text-sm">Max Retries</div>
-                <div className="text-xs text-text-secondary">
-                  Retry before marking blocked
-                </div>
-              </div>
-              <select
-                value={settings.maxRetries}
-                onChange={(e) => updateSettings({ maxRetries: Number(e.target.value) })}
-                disabled={isDisabled}
-                className={cn(
-                  "rounded border border-border bg-bg-secondary px-2 py-1 text-sm",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <option value={0}>0</option>
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
-              </select>
             </div>
           </div>
 
-          {/* Priority Filter */}
-          <div>
-            <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
-              Filter
-            </h4>
-            <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2">
-              <div>
-                <div className="text-sm">Min Priority</div>
-                <div className="text-xs text-text-secondary">
-                  Only work on issues at or above
+          {/* Column 2: Error Handling & Filters */}
+          <div className="flex flex-col gap-4">
+            {/* Error Handling */}
+            <div>
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase text-text-secondary">
+                <RotateCcw className="h-3 w-3" />
+                Error Handling
+              </h4>
+              <div className="rounded-lg border border-border bg-bg-secondary/50 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm">Max Retries</div>
+                    <div className="text-xs text-text-secondary">Before marking blocked</div>
+                  </div>
+                  <select
+                    value={settings.maxRetries}
+                    onChange={(e) => updateSettings({ maxRetries: Number(e.target.value) })}
+                    disabled={isDisabled}
+                    className={cn(
+                      "rounded border border-border bg-bg-primary px-2 py-1 text-sm",
+                      isDisabled && "cursor-not-allowed opacity-50"
+                    )}
+                  >
+                    <option value={0}>0</option>
+                    <option value={1}>1</option>
+                    <option value={2}>2</option>
+                    <option value={3}>3</option>
+                  </select>
                 </div>
               </div>
-              <select
-                value={settings.priorityThreshold}
-                onChange={(e) =>
-                  updateSettings({ priorityThreshold: Number(e.target.value) })
-                }
-                disabled={isDisabled}
-                className={cn(
-                  "rounded border border-border bg-bg-secondary px-2 py-1 text-sm",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <option value={0}>P0 only</option>
-                <option value={1}>P0-P1</option>
-                <option value={2}>P0-P2</option>
-                <option value={3}>P0-P3</option>
-                <option value={4}>All</option>
-              </select>
+            </div>
+
+            {/* Priority Filter */}
+            <div>
+              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-medium uppercase text-text-secondary">
+                <Filter className="h-3 w-3" />
+                Filter
+              </h4>
+              <div className="rounded-lg border border-border bg-bg-secondary/50 px-3 py-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm">Min Priority</div>
+                    <div className="text-xs text-text-secondary">Work on issues at or above</div>
+                  </div>
+                  <select
+                    value={settings.priorityThreshold}
+                    onChange={(e) => updateSettings({ priorityThreshold: Number(e.target.value) })}
+                    disabled={isDisabled}
+                    className={cn(
+                      "rounded border border-border bg-bg-primary px-2 py-1 text-sm",
+                      isDisabled && "cursor-not-allowed opacity-50"
+                    )}
+                  >
+                    <option value={0}>P0 only</option>
+                    <option value={1}>P0-P1</option>
+                    <option value={2}>P0-P2</option>
+                    <option value={3}>P0-P3</option>
+                    <option value={4}>All</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* AI Audits Section */}
+          {/* Column 3: AI Audits */}
           <div>
             <h4 className="mb-2 text-xs font-medium uppercase text-text-secondary">
               AI Audits
             </h4>
-            <div className="flex flex-col gap-2">
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.runSecurityAudit}
-                  onChange={(e) => updateSettings({ runSecurityAudit: e.target.checked })}
-                  disabled={isDisabled}
-                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
-                />
-                <div>
-                  <div className="text-sm">Security Audit</div>
-                  <div className="text-xs text-text-secondary">OWASP vulnerability scan</div>
-                </div>
-              </label>
-
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.runPerformanceAudit}
-                  onChange={(e) => updateSettings({ runPerformanceAudit: e.target.checked })}
-                  disabled={isDisabled}
-                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
-                />
-                <div>
-                  <div className="text-sm">Performance Audit</div>
-                  <div className="text-xs text-text-secondary">Memory leaks, anti-patterns</div>
-                </div>
-              </label>
-
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.runCodeQualityAudit}
-                  onChange={(e) => updateSettings({ runCodeQualityAudit: e.target.checked })}
-                  disabled={isDisabled}
-                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
-                />
-                <div>
-                  <div className="text-sm">Code Quality Audit</div>
-                  <div className="text-xs text-text-secondary">DRY, complexity, naming</div>
-                </div>
-              </label>
-
-              <label
-                className={cn(
-                  "flex cursor-pointer items-center gap-3 rounded-lg border border-border px-3 py-2 transition-colors hover:bg-bg-secondary",
-                  isDisabled && "cursor-not-allowed opacity-50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={settings.runAccessibilityAudit}
-                  onChange={(e) => updateSettings({ runAccessibilityAudit: e.target.checked })}
-                  disabled={isDisabled}
-                  className="h-4 w-4 rounded border-border bg-bg-secondary accent-accent"
-                />
-                <div>
-                  <div className="text-sm">Accessibility Audit</div>
-                  <div className="text-xs text-text-secondary">WCAG 2.1 (UI files only)</div>
-                </div>
-              </label>
+            <div className="flex flex-col gap-1.5">
+              <SettingToggle
+                label="Security"
+                description="OWASP vulnerability scan"
+                icon={<Shield className="h-3.5 w-3.5 text-red-400" />}
+                checked={settings.runSecurityAudit}
+                onChange={(v) => updateSettings({ runSecurityAudit: v })}
+                disabled={isDisabled}
+              />
+              <SettingToggle
+                label="Performance"
+                description="Memory leaks, anti-patterns"
+                icon={<Zap className="h-3.5 w-3.5 text-yellow-400" />}
+                checked={settings.runPerformanceAudit}
+                onChange={(v) => updateSettings({ runPerformanceAudit: v })}
+                disabled={isDisabled}
+              />
+              <SettingToggle
+                label="Code Quality"
+                description="DRY, complexity, naming"
+                icon={<Code2 className="h-3.5 w-3.5 text-blue-400" />}
+                checked={settings.runCodeQualityAudit}
+                onChange={(v) => updateSettings({ runCodeQualityAudit: v })}
+                disabled={isDisabled}
+              />
+              <SettingToggle
+                label="Accessibility"
+                description="WCAG 2.1 (UI files)"
+                icon={<Accessibility className="h-3.5 w-3.5 text-green-400" />}
+                checked={settings.runAccessibilityAudit}
+                onChange={(v) => updateSettings({ runAccessibilityAudit: v })}
+                disabled={isDisabled}
+              />
             </div>
           </div>
         </div>
 
         {/* Footer */}
         {isDisabled && (
-          <div className="border-t border-border px-4 py-3 text-center text-xs text-text-secondary">
-            Settings cannot be changed while running
+          <div className="border-t border-border px-4 py-2 text-center text-xs text-text-secondary">
+            Settings locked while running
           </div>
         )}
       </div>
     </div>
+  );
+}
+
+interface SettingToggleProps {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+  icon?: React.ReactNode;
+}
+
+function SettingToggle({ label, description, checked, onChange, disabled, icon }: SettingToggleProps) {
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-bg-secondary/50 px-3 py-2 transition-colors hover:bg-bg-secondary",
+        disabled && "cursor-not-allowed opacity-50"
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disabled={disabled}
+        className="h-3.5 w-3.5 rounded border-border bg-bg-secondary accent-accent"
+      />
+      {icon}
+      <div className="min-w-0 flex-1">
+        <div className="text-sm">{label}</div>
+        <div className="truncate text-xs text-text-secondary">{description}</div>
+      </div>
+    </label>
   );
 }

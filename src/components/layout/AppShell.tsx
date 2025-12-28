@@ -20,6 +20,7 @@ import { Tooltip } from "@/components/ui";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useCustomMusic } from "@/hooks/useCustomMusic";
 import { useBackupScheduler } from "@/hooks/useBackupScheduler";
+import { DragGhost } from "@/components/files/DragGhost";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
 const SIDEBAR_WIDTH_KEY = "wynter-code-sidebar-width";
@@ -219,6 +220,7 @@ export function AppShell() {
       <CommandPalette />
       <MeditationAudioController />
       <MiniMeditationPlayer />
+      <DragGhost />
 
       {activeProject ? (
         <div className="flex-1 flex flex-col overflow-hidden">

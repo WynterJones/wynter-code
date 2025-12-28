@@ -45,6 +45,20 @@ pub async fn create_cost_popup(app: AppHandle, x: f64, y: f64) -> Result<(), Str
 
     let window = builder.build().map_err(|e| e.to_string())?;
 
+    // Apply vibrancy effect on macOS
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+        let _ = apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None);
+    }
+
+    // Apply acrylic effect on Windows
+    #[cfg(target_os = "windows")]
+    {
+        use window_vibrancy::apply_acrylic;
+        let _ = apply_acrylic(&window, Some((20, 20, 32, 200)));
+    }
+
     #[cfg(target_os = "macos")]
     #[allow(deprecated)]
     {

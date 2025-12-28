@@ -34,7 +34,8 @@ export function TerminalPanelContent({
         projectPath={projectPath}
         ptyId={panel.terminalPtyId ?? null}
         onPtyCreated={handlePtyCreated}
-        isVisible={isFocused}
+        isVisible={true}
+        isFocused={isFocused}
       />
     </div>
   );

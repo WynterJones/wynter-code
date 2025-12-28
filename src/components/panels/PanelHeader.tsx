@@ -82,7 +82,7 @@ export function PanelHeader({ panel, onTypeChange, onClose, isFocused }: PanelHe
               className="fixed inset-0 z-40"
               onClick={() => setShowTypeSelector(false)}
             />
-            <div className="absolute top-full left-0 mt-1 z-50 bg-bg-secondary border border-border rounded-md shadow-lg py-1 min-w-[140px]">
+            <div className="absolute top-full left-0 mt-1 z-50 bg-[#1e1e2e] border border-border rounded-md shadow-lg py-1 min-w-[140px]">
               {selectableTypes.map((typeConfig) => {
                 const TypeIcon = PANEL_ICONS[typeConfig.id];
                 const isActive = typeConfig.id === panel.type;

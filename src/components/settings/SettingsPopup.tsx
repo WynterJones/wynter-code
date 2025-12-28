@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe, Sparkles, Bot, Check, Download } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -22,18 +22,19 @@ import { AvatarSettings } from "./AvatarSettings";
 import { DataManagementTab } from "./DataManagementTab";
 import { WebBackupTab } from "./WebBackupTab";
 import { LightcastTab } from "./LightcastTab";
+import { VibrancyTab } from "./VibrancyTab";
 import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector";
 import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
 import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
 
-type SettingsTab = "general" | "lightcast" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "farmwork" | "about";
+type SettingsTab = "general" | "vibrancy" | "lightcast" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "providers" | "farmwork" | "about";
 
 interface SettingsPopupProps {
   onClose: () => void;
   initialTab?: SettingsTab;
 }
 
-const APP_VERSION = "1.0.2";
+const APP_VERSION = "1.0.3";
 
 export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopupProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
@@ -89,6 +90,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
 
   const tabs: { id: SettingsTab; label: string; icon: typeof Code }[] = [
     { id: "general", label: "General", icon: FolderOpen },
+    { id: "vibrancy", label: "Vibrancy", icon: Sparkles },
     { id: "lightcast", label: "Lightcast", icon: Zap },
     { id: "editor", label: "Editor", icon: Code },
     { id: "markdown", label: "Markdown", icon: FileText },
@@ -100,6 +102,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     { id: "avatar", label: "Avatar", icon: UserCircle },
     { id: "data", label: "Data", icon: HardDrive },
     { id: "backup", label: "Backup", icon: CloudUpload },
+    { id: "providers", label: "AI Providers", icon: Bot },
     { id: "farmwork", label: "Farmwork", icon: Sprout },
     { id: "about", label: "About", icon: Info },
   ];
@@ -144,6 +147,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
           <ScrollArea className="flex-1" scrollbarVisibility="visible">
             <div className="p-6">
               {activeTab === "lightcast" && <LightcastTab />}
+              {activeTab === "vibrancy" && <VibrancyTab />}
               {activeTab === "general" && (
                 <GeneralSettings
                   defaultBrowsePath={defaultBrowsePath}
@@ -202,6 +206,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
               {activeTab === "avatar" && <AvatarSettings />}
               {activeTab === "data" && <DataManagementTab />}
               {activeTab === "backup" && <WebBackupTab />}
+              {activeTab === "providers" && <AIProvidersTab />}
               {activeTab === "farmwork" && <FarmworkTab />}
               {activeTab === "about" && <AboutSection />}
             </div>
@@ -1182,6 +1187,177 @@ function AboutSection() {
           <h3 className="font-medium text-text-primary mb-2">License</h3>
           <p className="text-text-secondary">Polyform Noncommercial 1.0.0</p>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AIProvidersTab() {
+  const {
+    defaultProvider,
+    installedProviders,
+    setDefaultProvider,
+    setInstalledProviders,
+  } = useSettingsStore();
+
+  const [isChecking, setIsChecking] = useState(false);
+
+  const providers = [
+    {
+      id: "claude" as const,
+      name: "Claude Code",
+      description: "Anthropic's AI assistant CLI",
+      color: "text-[#da7756]",
+      installCommand: "npm install -g @anthropic-ai/claude-code",
+      docsUrl: "https://docs.anthropic.com/en/docs/claude-code",
+    },
+    {
+      id: "codex" as const,
+      name: "Codex CLI",
+      description: "OpenAI's coding assistant",
+      color: "text-[#10a37f]",
+      installCommand: "npm install -g @openai/codex",
+      docsUrl: "https://github.com/openai/codex-cli",
+    },
+    {
+      id: "gemini" as const,
+      name: "Gemini CLI",
+      description: "Google's AI assistant (coming soon)",
+      color: "text-[#4285f4]",
+      installCommand: "npm install -g @google/gemini-cli",
+      docsUrl: "https://ai.google.dev",
+      comingSoon: true,
+    },
+  ];
+
+  const checkInstalledProviders = async () => {
+    setIsChecking(true);
+    try {
+      const results = await invoke<{ node: string | null; npm: string | null; git: string | null; claude: string | null; codex: string | null }>("check_system_requirements");
+      const installed: ("claude" | "codex" | "gemini")[] = [];
+      if (results.claude) installed.push("claude");
+      if (results.codex) installed.push("codex");
+      setInstalledProviders(installed);
+    } catch (error) {
+      console.error("Failed to check providers:", error);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  useEffect(() => {
+    checkInstalledProviders();
+  }, []);
+
+  const handleOpenDocs = async (url: string) => {
+    const { open } = await import("@tauri-apps/plugin-shell");
+    await open(url);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-medium text-text-primary">
+          AI Providers
+        </h2>
+        <button
+          onClick={checkInstalledProviders}
+          disabled={isChecking}
+          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-bg-tertiary hover:bg-bg-hover transition-colors disabled:opacity-50"
+        >
+          <RefreshCw className={cn("w-3.5 h-3.5", isChecking && "animate-spin")} />
+          <span>Refresh</span>
+        </button>
+      </div>
+
+      <p className="text-text-secondary text-sm">
+        Configure which AI CLI to use for code assistance. The default provider is used for new sessions.
+      </p>
+
+      <div className="space-y-3">
+        {providers.map((provider) => {
+          const isInstalled = installedProviders.includes(provider.id);
+          const isDefault = defaultProvider === provider.id;
+
+          return (
+            <div
+              key={provider.id}
+              className={cn(
+                "p-4 rounded-lg border transition-colors",
+                isDefault
+                  ? "bg-bg-secondary border-accent/50"
+                  : "bg-bg-tertiary border-border"
+              )}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn("font-medium", provider.color)}>
+                      {provider.name}
+                    </span>
+                    {isInstalled && (
+                      <span className="flex items-center gap-1 text-[10px] text-accent-green bg-accent-green/10 px-1.5 py-0.5 rounded">
+                        <Check className="w-3 h-3" />
+                        Installed
+                      </span>
+                    )}
+                    {!isInstalled && !provider.comingSoon && (
+                      <span className="flex items-center gap-1 text-[10px] text-text-secondary bg-bg-hover px-1.5 py-0.5 rounded">
+                        <Download className="w-3 h-3" />
+                        Not installed
+                      </span>
+                    )}
+                    {provider.comingSoon && (
+                      <span className="text-[10px] text-text-secondary bg-bg-hover px-1.5 py-0.5 rounded">
+                        Coming soon
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-text-secondary mb-2">
+                    {provider.description}
+                  </p>
+                  {!isInstalled && !provider.comingSoon && (
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs bg-bg-primary px-2 py-1 rounded font-mono text-text-secondary">
+                        {provider.installCommand}
+                      </code>
+                      <button
+                        onClick={() => handleOpenDocs(provider.docsUrl)}
+                        className="text-xs text-accent hover:underline flex items-center gap-1"
+                      >
+                        Docs <ExternalLink className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  {isInstalled && (
+                    <button
+                      onClick={() => setDefaultProvider(provider.id)}
+                      disabled={isDefault || provider.comingSoon}
+                      className={cn(
+                        "px-3 py-1.5 text-sm rounded-lg transition-colors",
+                        isDefault
+                          ? "bg-accent text-white cursor-default"
+                          : "bg-bg-primary hover:bg-bg-hover text-text-primary"
+                      )}
+                    >
+                      {isDefault ? "Default" : "Set Default"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="p-4 rounded-lg bg-bg-secondary border border-border">
+        <h3 className="font-medium text-text-primary mb-2">About AI Providers</h3>
+        <p className="text-sm text-text-secondary leading-relaxed">
+          Wynter Code supports multiple AI coding assistants. Install them via npm and they&apos;ll be
+          automatically detected. The selected provider is used for both the chat interface and Auto Build.
+        </p>
       </div>
     </div>
   );

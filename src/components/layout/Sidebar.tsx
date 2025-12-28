@@ -1,6 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
 import { Files, Package, FileJson, GitBranch, Info, FileText, PanelRightOpen, PanelLeftOpen } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { SidebarPosition } from "@/stores/settingsStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "@/components/ui";
 import {
@@ -34,6 +51,67 @@ interface SidebarProps {
 
 type FileViewerType = "editor" | "image" | "markdown" | "video" | "pdf" | "audio" | "font" | null;
 
+// Tab definitions with icons
+const TAB_DEFINITIONS: Record<SidebarTab, { icon: typeof Files; label: string }> = {
+  files: { icon: Files, label: "Files" },
+  modules: { icon: Package, label: "Modules" },
+  package: { icon: FileJson, label: "Package" },
+  git: { icon: GitBranch, label: "Git" },
+  docs: { icon: FileText, label: "Docs" },
+  info: { icon: Info, label: "Info" },
+};
+
+interface SortableSidebarTabProps {
+  id: SidebarTab;
+  isActive: boolean;
+  isDisabled: boolean;
+  onSelect: () => void;
+}
+
+function SortableSidebarTab({ id, isActive, isDisabled, onSelect }: SortableSidebarTabProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id, disabled: isDisabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const tab = TAB_DEFINITIONS[id];
+
+  if (isDisabled) return null;
+
+  return (
+    <Tooltip content={tab.label} side="bottom">
+      <button
+        ref={setNodeRef}
+        style={style}
+        {...attributes}
+        {...listeners}
+        onClick={onSelect}
+        className={cn(
+          "relative p-1.5 rounded transition-colors cursor-grab active:cursor-grabbing",
+          isDragging && "opacity-50 z-50",
+          isActive
+            ? "text-text-primary"
+            : "text-text-secondary hover:text-text-primary"
+        )}
+      >
+        <tab.icon className="w-4 h-4" />
+        {isActive && (
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-accent-blue rounded-full" />
+        )}
+      </button>
+    </Tooltip>
+  );
+}
+
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp", "tiff", "avif"];
 const MARKDOWN_EXTENSIONS = ["md", "mdx", "markdown"];
 const VIDEO_EXTENSIONS = ["mp4", "webm", "mov", "mkv", "avi", "m4v", "ogv"];
@@ -62,6 +140,19 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
 
   const { checkNodeModulesExists, checkFileExists } = useFileOperations();
   const { minimize, pendingRestore, clearPendingRestore } = useMinimizedPopupsStore();
+  const sidebarTabOrder = useSettingsStore((s) => s.sidebarTabOrder);
+  const setSidebarTabOrder = useSettingsStore((s) => s.setSidebarTabOrder);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   const handleMinimize = () => {
     if (openFilePath && fileViewerType) {
@@ -121,27 +212,32 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
     return () => window.removeEventListener("open-file-at-line", handleOpenFileAtLine as EventListener);
   }, []);
 
-  const tabs = useMemo(() => {
-    const baseTabs: { id: SidebarTab; icon: typeof Files; label: string }[] = [
-      { id: "files", icon: Files, label: "Files" },
-    ];
+  // Use saved tab order, filtering out tabs that shouldn't be shown
+  const visibleTabs = useMemo(() => {
+    const isTabVisible = (tabId: SidebarTab): boolean => {
+      if (tabId === "modules") return hasNodeModules;
+      if (tabId === "package") return hasPackageJson;
+      return true;
+    };
 
-    if (hasNodeModules) {
-      baseTabs.push({ id: "modules", icon: Package, label: "Modules" });
+    // Filter the saved order to only include visible tabs
+    return sidebarTabOrder.filter(isTabVisible);
+  }, [sidebarTabOrder, hasNodeModules, hasPackageJson]);
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = sidebarTabOrder.indexOf(active.id as SidebarTab);
+      const newIndex = sidebarTabOrder.indexOf(over.id as SidebarTab);
+
+      const newOrder = [...sidebarTabOrder];
+      newOrder.splice(oldIndex, 1);
+      newOrder.splice(newIndex, 0, active.id as SidebarTab);
+
+      setSidebarTabOrder(newOrder);
     }
-
-    if (hasPackageJson) {
-      baseTabs.push({ id: "package", icon: FileJson, label: "Package" });
-    }
-
-    baseTabs.push(
-      { id: "git", icon: GitBranch, label: "Git" },
-      { id: "docs", icon: FileText, label: "Docs" },
-      { id: "info", icon: Info, label: "Info" }
-    );
-
-    return baseTabs;
-  }, [hasNodeModules, hasPackageJson]);
+  };
 
   useEffect(() => {
     if (activeTab === "modules" && !hasNodeModules) {
@@ -205,29 +301,31 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
             </Tooltip>
           </div>
         )}
-        <div className={cn(
-          "flex items-center justify-evenly flex-1",
-          position === "left" ? "pr-4" : "pl-4"
-        )}>
-          {tabs.map((tab) => (
-            <Tooltip key={tab.id} content={tab.label} side="bottom">
-              <button
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "relative p-1.5 rounded transition-colors",
-                  activeTab === tab.id
-                    ? "text-text-primary"
-                    : "text-text-secondary hover:text-text-primary"
-                )}
-              >
-                <tab.icon className="w-4 h-4" />
-                {activeTab === tab.id && (
-                  <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-0.5 bg-accent-blue rounded-full" />
-                )}
-              </button>
-            </Tooltip>
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <div className={cn(
+            "flex items-center justify-evenly flex-1",
+            position === "left" ? "pr-4" : "pl-4"
+          )}>
+            <SortableContext
+              items={visibleTabs}
+              strategy={horizontalListSortingStrategy}
+            >
+              {visibleTabs.map((tabId) => (
+                <SortableSidebarTab
+                  key={tabId}
+                  id={tabId}
+                  isActive={activeTab === tabId}
+                  isDisabled={false}
+                  onSelect={() => setActiveTab(tabId)}
+                />
+              ))}
+            </SortableContext>
+          </div>
+        </DndContext>
         {position === "left" && (
           <div className="absolute -right-3 top-1/2 -translate-y-1/2 z-20">
             <Tooltip content="Hide sidebar" side="right">

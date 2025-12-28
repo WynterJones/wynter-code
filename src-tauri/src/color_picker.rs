@@ -148,6 +148,20 @@ pub async fn open_color_picker_window(
 
     let window = builder.build().map_err(|e| e.to_string())?;
 
+    // Apply vibrancy effect on macOS
+    #[cfg(target_os = "macos")]
+    {
+        use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
+        let _ = apply_vibrancy(&window, NSVisualEffectMaterial::Popover, None, None);
+    }
+
+    // Apply acrylic effect on Windows
+    #[cfg(target_os = "windows")]
+    {
+        use window_vibrancy::apply_acrylic;
+        let _ = apply_acrylic(&window, Some((20, 20, 32, 200)));
+    }
+
     // Send color to the window after a short delay to ensure it's ready
     if let Some(c) = color {
         let window_clone = window.clone();

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useRef } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
@@ -19,9 +19,11 @@ interface FileTreeNodeProps {
   onContextMenu?: (e: React.MouseEvent, node: FileNode) => void;
   onNodeModulesClick?: () => void;
   onMoveItem?: (sourcePath: string, destinationFolder: string) => Promise<void>;
+  onMoveItems?: (sourcePaths: string[], destinationFolder: string) => Promise<void>;
   gitStatusMap?: GitStatusMap;
   selectedPaths?: Set<string>;
   onSelect?: (node: FileNode, shiftKey: boolean) => void;
+  allNodes?: FileNode[];
 }
 
 export function FileTreeNode({
@@ -32,16 +34,21 @@ export function FileTreeNode({
   onContextMenu,
   onNodeModulesClick,
   onMoveItem,
+  onMoveItems,
   gitStatusMap,
   selectedPaths,
   onSelect,
+  allNodes,
 }: FileTreeNodeProps) {
-  const [isDragOver, setIsDragOver] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const rowRef = useRef<HTMLDivElement>(null);
   const startDrag = useDragStore((s) => s.startDrag);
-  const cancelDrag = useDragStore((s) => s.cancelDrag);
+  const draggedFiles = useDragStore((s) => s.draggedFiles);
+  const isDragging = useDragStore((s) => s.isDragging);
+  const hoverTargetPath = useDragStore((s) => s.hoverTargetPath);
 
   const isSelected = selectedPaths?.has(node.path) ?? false;
+  const isBeingDragged = isDragging && draggedFiles.some(f => f.path === node.path);
 
   // Compute git status for this node
   const gitStatus = useMemo((): GitFileStatusType | undefined => {
@@ -101,119 +108,98 @@ export function FileTreeNode({
     onContextMenu?.(e, node);
   };
 
-  const handleDragStart = (e: React.DragEvent) => {
-    e.stopPropagation();
-    const fileInfo = {
-      path: node.path,
-      name: node.name,
-      isDirectory: node.isDirectory
-    };
+  // Use mousedown for drag initiation (HTML5 drag doesn't work in Tauri)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only left mouse button, and not if clicking on chevron or during text selection
+    if (e.button !== 0) return;
 
-    // Set HTML5 drag data (for internal folder moves)
-    e.dataTransfer.setData("application/x-wynter-file", JSON.stringify(fileInfo));
-    e.dataTransfer.effectAllowed = "copyMove";
+    // Don't start drag if holding modifier keys (those are for selection)
+    if (e.shiftKey || e.metaKey || e.ctrlKey) return;
 
-    // Also store in global drag store (for cross-component drops)
-    startDrag(fileInfo);
-  };
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let hasMoved = false;
 
-  // Cancel drag on mouseup if drag was started but not dropped on valid target
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      // Small delay to allow drop handlers to run first
-      setTimeout(() => {
-        cancelDrag();
-      }, 100);
-    };
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const dx = Math.abs(moveEvent.clientX - startX);
+      const dy = Math.abs(moveEvent.clientY - startY);
 
-    window.addEventListener("mouseup", handleGlobalMouseUp);
-    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
-  }, [cancelDrag]);
+      // Only start drag after moving 5px (to distinguish from clicks)
+      if (!hasMoved && (dx > 5 || dy > 5)) {
+        hasMoved = true;
 
-  const handleDragOver = (e: React.DragEvent) => {
-    if (!node.isDirectory) return;
+        console.log("[DragStart]", node.name, { isSelected, selectedCount: selectedPaths?.size });
+        const fileInfo = {
+          path: node.path,
+          name: node.name,
+          isDirectory: node.isDirectory
+        };
 
-    e.preventDefault();
-    e.stopPropagation();
+        // If this file is selected and there are multiple selections, drag all selected files
+        const additionalFiles: { path: string; name: string; isDirectory: boolean }[] = [];
+        if (isSelected && selectedPaths && selectedPaths.size > 1 && allNodes) {
+          const findNode = (nodes: FileNode[], path: string): FileNode | null => {
+            for (const n of nodes) {
+              if (n.path === path) return n;
+              if (n.children) {
+                const found = findNode(n.children, path);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
 
-    const data = e.dataTransfer.getData("application/x-wynter-file");
-    if (data) {
-      try {
-        const draggedItem = JSON.parse(data);
-        // Don't allow dropping on itself or its parent
-        if (draggedItem.path === node.path) return;
-        // Don't allow dropping a folder into its own descendant
-        if (draggedItem.isDirectory && node.path.startsWith(draggedItem.path + "/")) return;
-      } catch {
-        // Ignore parse errors
+          for (const path of selectedPaths) {
+            if (path !== node.path) {
+              const selectedNode = findNode(allNodes, path);
+              if (selectedNode) {
+                additionalFiles.push({
+                  path: selectedNode.path,
+                  name: selectedNode.name,
+                  isDirectory: selectedNode.isDirectory
+                });
+              }
+            }
+          }
+        }
+
+        // Start drag with mouse position
+        startDrag(fileInfo, additionalFiles, { x: moveEvent.clientX, y: moveEvent.clientY });
       }
-    }
+    };
 
-    e.dataTransfer.dropEffect = "move";
-    setIsDragOver(true);
-  };
+    const handleMouseUp = () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
 
-  const handleDragEnter = (e: React.DragEvent) => {
-    if (!node.isDirectory) return;
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    if (!node.isDirectory || !onMoveItem) return;
-
-    const data = e.dataTransfer.getData("application/x-wynter-file");
-    if (!data) return;
-
-    try {
-      const draggedItem = JSON.parse(data);
-
-      // Don't drop on itself
-      if (draggedItem.path === node.path) return;
-
-      // Don't drop a folder into its own descendant
-      if (draggedItem.isDirectory && node.path.startsWith(draggedItem.path + "/")) return;
-
-      // Don't drop into the same parent folder
-      const parentPath = draggedItem.path.substring(0, draggedItem.path.lastIndexOf("/"));
-      if (parentPath === node.path) return;
-
-      await onMoveItem(draggedItem.path, node.path);
-    } catch (error) {
-      console.error("Failed to move item:", error);
-    }
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
   };
 
   return (
     <div>
       <div
+        ref={rowRef}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        draggable
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnter={handleDragEnter}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onMouseDown={handleMouseDown}
+        onMouseEnter={() => {
+          setIsHovered(true);
+        }}
+        onMouseLeave={() => {
+          setIsHovered(false);
+        }}
+        data-folder={node.isDirectory ? "true" : undefined}
+        data-path={node.path}
         className={cn(
           "flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-bg-hover transition-colors group",
           "text-sm text-text-primary",
           node.isIgnored && "opacity-50",
           isSelected && "bg-accent/20",
-          isDragOver && node.isDirectory && "bg-accent/20 ring-1 ring-accent ring-inset"
+          // Only highlight the folder being hovered during drag
+          hoverTargetPath === node.path && "bg-accent/40 ring-2 ring-accent",
+          isBeingDragged && "opacity-40"
         )}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
@@ -257,9 +243,11 @@ export function FileTreeNode({
               onContextMenu={onContextMenu}
               onNodeModulesClick={onNodeModulesClick}
               onMoveItem={onMoveItem}
+              onMoveItems={onMoveItems}
               gitStatusMap={gitStatusMap}
               selectedPaths={selectedPaths}
               onSelect={onSelect}
+              allNodes={allNodes}
             />
           ))}
         </div>

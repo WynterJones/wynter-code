@@ -71,7 +71,7 @@ export const useClaudeStore = create<ClaudeStore>()(
       isPopupOpen: false,
       isDropdownOpen: false,
       activeTab: "commands",
-      activeScope: "user",
+      activeScope: "project",
       selectedFile: null,
 
       commands: [],

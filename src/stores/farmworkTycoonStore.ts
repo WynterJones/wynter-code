@@ -15,6 +15,9 @@ import type {
   NavGraph,
   Point,
   BuildingType,
+  MapCycleState,
+  TimeOfDay,
+  Season,
 } from "@/components/tools/farmwork-tycoon/types";
 import {
   BUILDING_POSITIONS,
@@ -27,6 +30,29 @@ import {
   getRandomSpawnPoint,
   getNearestExitPoint,
 } from "@/components/tools/farmwork-tycoon/game/navigation/SpawnPoints";
+
+// Map cycle configuration constants
+const DAY_NIGHT_CYCLE_DURATION = 45; // seconds per day/night cycle
+const TRANSITION_DURATION = 14; // seconds for smooth transition
+const WINTER_INTERVAL = 180; // seconds between winter periods (3 minutes)
+const WINTER_DURATION = 60; // seconds to stay in winter
+
+const getMapKey = (timeOfDay: TimeOfDay, season: Season): string => {
+  return `${timeOfDay}-${season}`;
+};
+
+const createInitialMapCycleState = (): MapCycleState => ({
+  timeOfDay: "day",
+  season: "summer",
+  dayNightTimer: 0,
+  winterTimer: 0,
+  isWinter: false,
+  transitionProgress: 0,
+  isTransitioning: false,
+  transitionFrom: "day-summer",
+  transitionTo: "day-summer",
+  lastTickTime: 0,
+});
 
 const createInitialBuildings = (): Building[] => {
   const buildingTypes: BuildingType[] = [
@@ -223,6 +249,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   isInitialized: false,
   isPaused: false,
   showDebug: false,
+  hideTooltips: false,
   showMiniPlayer: false,
 
   vehicles: [],
@@ -244,6 +271,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   navGraph: null,
   simulatedFlowerCount: null,
   celebrationQueue: [],
+  mapCycle: createInitialMapCycleState(),
 
   initialize: async (_projectPath: string) => {
     await get().refreshStats();
@@ -254,6 +282,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   resume: () => set({ isPaused: false }),
 
   toggleDebug: () => set((state) => ({ showDebug: !state.showDebug })),
+  toggleHideTooltips: () => set((state) => ({ hideTooltips: !state.hideTooltips })),
 
   showMiniPlayerFn: () => set({ showMiniPlayer: true }),
   hideMiniPlayer: () => set({ showMiniPlayer: false }),
@@ -714,6 +743,100 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
 
   clearCelebrationQueue: () => {
     set({ celebrationQueue: [] });
+  },
+
+  tickMapCycle: (dt: number) => {
+    const { mapCycle } = get();
+
+    // Prevent double-ticking when multiple TycoonGame instances are mounted
+    // Only allow ticks that are at least 10ms apart
+    const now = performance.now();
+    if (now - mapCycle.lastTickTime < 10) {
+      return;
+    }
+
+    // Handle active transition
+    if (mapCycle.isTransitioning) {
+      const newProgress = mapCycle.transitionProgress + dt / TRANSITION_DURATION;
+
+      if (newProgress >= 1) {
+        // Transition complete
+        set({
+          mapCycle: {
+            ...mapCycle,
+            transitionProgress: 1,
+            isTransitioning: false,
+            lastTickTime: now,
+          },
+        });
+      } else {
+        set({
+          mapCycle: {
+            ...mapCycle,
+            transitionProgress: newProgress,
+            lastTickTime: now,
+          },
+        });
+      }
+      return;
+    }
+
+    // Update timers
+    const newDayNightTimer = mapCycle.dayNightTimer + dt;
+    const newWinterTimer = mapCycle.winterTimer + dt;
+
+    let updates: Partial<MapCycleState> = {
+      dayNightTimer: newDayNightTimer,
+      winterTimer: newWinterTimer,
+      lastTickTime: now,
+    };
+
+    // Check for winter toggle
+    if (!mapCycle.isWinter && newWinterTimer >= WINTER_INTERVAL) {
+      // Enter winter
+      const newKey = getMapKey(mapCycle.timeOfDay, "winter");
+      updates = {
+        ...updates,
+        season: "winter",
+        isWinter: true,
+        winterTimer: 0,
+        transitionProgress: 0,
+        isTransitioning: true,
+        transitionFrom: getMapKey(mapCycle.timeOfDay, mapCycle.season),
+        transitionTo: newKey,
+      };
+    } else if (mapCycle.isWinter && newWinterTimer >= WINTER_DURATION) {
+      // Exit winter
+      const newKey = getMapKey(mapCycle.timeOfDay, "summer");
+      updates = {
+        ...updates,
+        season: "summer",
+        isWinter: false,
+        winterTimer: 0,
+        transitionProgress: 0,
+        isTransitioning: true,
+        transitionFrom: getMapKey(mapCycle.timeOfDay, mapCycle.season),
+        transitionTo: newKey,
+      };
+    }
+
+    // Check for day/night cycle
+    if (newDayNightTimer >= DAY_NIGHT_CYCLE_DURATION) {
+      const newTimeOfDay: TimeOfDay = mapCycle.timeOfDay === "day" ? "night" : "day";
+      const currentSeason = updates.season ?? mapCycle.season;
+      const newKey = getMapKey(newTimeOfDay, currentSeason);
+      updates = {
+        ...updates,
+        timeOfDay: newTimeOfDay,
+        dayNightTimer: 0,
+        transitionProgress: 0,
+        isTransitioning: true,
+        transitionFrom: getMapKey(mapCycle.timeOfDay, currentSeason),
+        transitionTo: newKey,
+      };
+    }
+
+    set({ mapCycle: { ...mapCycle, ...updates } });
   },
 }));
 

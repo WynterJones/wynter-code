@@ -6,8 +6,11 @@ import type {
 } from "../types";
 import { BORDER_EFFECTS } from "../types";
 import { Button } from "@/components/ui/Button";
+import { Slider } from "@/components/ui/Slider";
+import { Toggle } from "@/components/ui/Toggle";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
-import { Upload, Trash2 } from "lucide-react";
+import { Upload, Trash2, AlertTriangle, Settings, ShieldCheck, ShieldX } from "lucide-react";
+import type { CameraPermissionStatus } from "../hooks/useCameraPermission";
 
 interface CameraTabProps {
   devices: WebcamDevice[];
@@ -17,6 +20,10 @@ interface CameraTabProps {
   isStreaming: boolean;
   onStart: () => void;
   onStop: () => void;
+  permissionStatus: CameraPermissionStatus;
+  onRequestPermission: () => void;
+  onOpenSettings: () => void;
+  isRequestingPermission: boolean;
 }
 
 const ASPECT_RATIOS: { value: AspectRatio; label: string }[] = [
@@ -34,7 +41,12 @@ export function CameraTab({
   isStreaming,
   onStart,
   onStop,
+  permissionStatus,
+  onRequestPermission,
+  onOpenSettings,
+  isRequestingPermission,
 }: CameraTabProps) {
+  const needsPermission = permissionStatus === "NotDetermined" || permissionStatus === "Denied";
   const handleSvgMaskUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type === "image/svg+xml") {
@@ -49,6 +61,57 @@ export function CameraTab({
       options={{ scrollbars: { autoHide: "scroll" } }}
     >
       <div className="space-y-5 p-4">
+        {needsPermission && (
+          <div className={`rounded-lg p-3 ${permissionStatus === "Denied" ? "bg-red-500/10 border border-red-500/30" : "bg-yellow-500/10 border border-yellow-500/30"}`}>
+            <div className="flex items-start gap-2">
+              {permissionStatus === "Denied" ? (
+                <ShieldX size={18} className="text-red-400 mt-0.5 flex-shrink-0" />
+              ) : (
+                <AlertTriangle size={18} className="text-yellow-400 mt-0.5 flex-shrink-0" />
+              )}
+              <div className="flex-1">
+                <p className="text-sm text-text-primary font-medium">
+                  {permissionStatus === "Denied" ? "Camera Access Denied" : "Camera Permission Required"}
+                </p>
+                <p className="text-xs text-text-tertiary mt-1">
+                  {permissionStatus === "Denied"
+                    ? "Camera access was denied. Open System Settings to grant permission."
+                    : "Grant camera permission to use the webcam feature."}
+                </p>
+                <div className="flex gap-2 mt-2">
+                  {permissionStatus === "NotDetermined" && (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      onClick={onRequestPermission}
+                      disabled={isRequestingPermission}
+                      className="text-xs"
+                    >
+                      {isRequestingPermission ? "Requesting..." : "Grant Permission"}
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onOpenSettings}
+                    className="text-xs gap-1"
+                  >
+                    <Settings size={12} />
+                    Open Settings
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {permissionStatus === "Authorized" && (
+          <div className="flex items-center gap-2 text-xs text-green-400">
+            <ShieldCheck size={14} />
+            <span>Camera access granted</span>
+          </div>
+        )}
+
         <div>
           <h3 className="text-sm font-medium text-text-secondary mb-2">
             Camera Controls
@@ -58,7 +121,7 @@ export function CameraTab({
               size="sm"
               variant={isStreaming ? "outline" : "primary"}
               onClick={onStart}
-              disabled={isStreaming}
+              disabled={isStreaming || needsPermission}
               className="flex-1"
             >
               Start
@@ -118,51 +181,31 @@ export function CameraTab({
           </h3>
 
           <div className="space-y-4">
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs text-text-tertiary">
-                  Border Radius
-                </label>
-                <span className="text-xs text-text-tertiary">
-                  {settings.border.radius}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={50}
-                value={settings.border.radius}
-                onChange={(e) =>
-                  onSettingsChange({
-                    border: { ...settings.border, radius: Number(e.target.value) },
-                  })
-                }
-                className="w-full h-1.5 bg-bg-tertiary rounded-full appearance-none cursor-pointer accent-accent"
-              />
-            </div>
+            <Slider
+              label="Border Radius"
+              value={settings.border.radius}
+              min={0}
+              max={50}
+              unit="%"
+              onChange={(value) =>
+                onSettingsChange({
+                  border: { ...settings.border, radius: value },
+                })
+              }
+            />
 
-            <div>
-              <div className="flex justify-between items-center mb-1">
-                <label className="text-xs text-text-tertiary">
-                  Border Width
-                </label>
-                <span className="text-xs text-text-tertiary">
-                  {settings.border.width}px
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={20}
-                value={settings.border.width}
-                onChange={(e) =>
-                  onSettingsChange({
-                    border: { ...settings.border, width: Number(e.target.value) },
-                  })
-                }
-                className="w-full h-1.5 bg-bg-tertiary rounded-full appearance-none cursor-pointer accent-accent"
-              />
-            </div>
+            <Slider
+              label="Border Width"
+              value={settings.border.width}
+              min={0}
+              max={20}
+              unit="px"
+              onChange={(value) =>
+                onSettingsChange({
+                  border: { ...settings.border, width: value },
+                })
+              }
+            />
 
             <div>
               <label className="block text-xs text-text-tertiary mb-1">
@@ -224,68 +267,44 @@ export function CameraTab({
           </h3>
 
           <div className="flex items-center justify-between mb-3">
-            <label className="text-xs text-text-tertiary">Enable Shadow</label>
-            <button
-              onClick={() =>
+            <Toggle
+              label="Enable Shadow"
+              checked={settings.shadow.enabled}
+              onChange={(checked) =>
                 onSettingsChange({
-                  shadow: { ...settings.shadow, enabled: !settings.shadow.enabled },
+                  shadow: { ...settings.shadow, enabled: checked },
                 })
               }
-              className={`relative w-10 h-5 rounded-full transition-colors ${
-                settings.shadow.enabled ? "bg-accent" : "bg-bg-tertiary"
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                  settings.shadow.enabled ? "left-5" : "left-0.5"
-                }`}
-              />
-            </button>
+            />
           </div>
 
           {settings.shadow.enabled && (
             <div className="space-y-3">
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs text-text-tertiary">Blur</label>
-                  <span className="text-xs text-text-tertiary">
-                    {settings.shadow.blur}px
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={50}
-                  value={settings.shadow.blur}
-                  onChange={(e) =>
-                    onSettingsChange({
-                      shadow: { ...settings.shadow, blur: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full h-1.5 bg-bg-tertiary rounded-full appearance-none cursor-pointer accent-accent"
-                />
-              </div>
+              <Slider
+                label="Blur"
+                value={settings.shadow.blur}
+                min={0}
+                max={50}
+                unit="px"
+                onChange={(value) =>
+                  onSettingsChange({
+                    shadow: { ...settings.shadow, blur: value },
+                  })
+                }
+              />
 
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-xs text-text-tertiary">Spread</label>
-                  <span className="text-xs text-text-tertiary">
-                    {settings.shadow.spread}px
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={30}
-                  value={settings.shadow.spread}
-                  onChange={(e) =>
-                    onSettingsChange({
-                      shadow: { ...settings.shadow, spread: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full h-1.5 bg-bg-tertiary rounded-full appearance-none cursor-pointer accent-accent"
-                />
-              </div>
+              <Slider
+                label="Spread"
+                value={settings.shadow.spread}
+                min={0}
+                max={30}
+                unit="px"
+                onChange={(value) =>
+                  onSettingsChange({
+                    shadow: { ...settings.shadow, spread: value },
+                  })
+                }
+              />
             </div>
           )}
         </div>

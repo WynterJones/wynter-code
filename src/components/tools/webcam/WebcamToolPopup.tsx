@@ -5,6 +5,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useWebcam } from "./hooks/useWebcam";
 import { useWebcamSettings } from "./hooks/useWebcamSettings";
+import { useCameraPermission } from "./hooks/useCameraPermission";
 import { CropSelector } from "./CropSelector";
 import { CameraTab } from "./controls/CameraTab";
 import { DecartTab } from "./controls/DecartTab";
@@ -45,6 +46,14 @@ export function WebcamToolPopup({ isOpen, onClose }: WebcamToolPopupProps) {
     saveDecartSettings,
     saveFloatingWindow,
   } = useWebcamSettings();
+
+  const {
+    status: permissionStatus,
+    isRequesting: isRequestingPermission,
+    requestPermission,
+    openSettings: openCameraSettings,
+    checkPermission,
+  } = useCameraPermission();
 
   useEffect(() => {
     if (isOpen) {
@@ -136,16 +145,6 @@ export function WebcamToolPopup({ isOpen, onClose }: WebcamToolPopupProps) {
     return () => clearInterval(interval);
   }, [isDecartConnected, decartUsage.sessionStartTime]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   const borderStyle = {
@@ -161,6 +160,15 @@ export function WebcamToolPopup({ isOpen, onClose }: WebcamToolPopupProps) {
       }
     : {};
 
+  const cropArea = settings.cropArea;
+
+  const croppedVideoStyle = {
+    width: `${100 / cropArea.width}%`,
+    height: `${100 / cropArea.height}%`,
+    left: `${-(cropArea.x / cropArea.width) * 100}%`,
+    top: `${-(cropArea.y / cropArea.height) * 100}%`,
+  };
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-bg-primary border border-border rounded-xl w-[900px] max-h-[700px] flex flex-col overflow-hidden shadow-2xl">
@@ -174,7 +182,7 @@ export function WebcamToolPopup({ isOpen, onClose }: WebcamToolPopupProps) {
               Floating Webcam
             </span>
           </div>
-          <Tooltip content="Close (Esc)" side="bottom">
+          <Tooltip content="Close" side="bottom">
             <IconButton size="sm" onClick={onClose}>
               <X className="w-4 h-4" />
             </IconButton>
@@ -183,63 +191,67 @@ export function WebcamToolPopup({ isOpen, onClose }: WebcamToolPopupProps) {
 
         <div className="flex flex-1 overflow-hidden">
           <div className="w-[55%] p-4 flex flex-col gap-4 border-r border-border">
-            <div
-              className={`relative aspect-video bg-black rounded-lg overflow-hidden webcam-border-effect ${settings.border.effect !== "none" ? `border-effect-${settings.border.effect}` : ""}`}
-              style={{
-                ...borderStyle,
-                ...shadowStyle,
-              }}
-            >
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full h-full object-cover"
+            <div className="p-4 bg-bg-secondary rounded-lg">
+              <div
+                className={`relative aspect-video bg-black rounded-lg overflow-hidden webcam-border-effect ${settings.border.effect !== "none" ? `border-effect-${settings.border.effect}` : ""}`}
                 style={{
-                  borderRadius: `${Math.max(0, settings.border.radius - 2)}%`,
-                  clipPath: settings.svgMaskUrl
-                    ? `url(${settings.svgMaskUrl})`
-                    : undefined,
+                  ...borderStyle,
+                  ...shadowStyle,
                 }}
-              />
-              {settings.border.effect === "sparkle" && (
-                <div className="sparkle-container">
-                  {Array.from({ length: 20 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="sparkle-particle"
-                    />
-                  ))}
-                </div>
-              )}
-              {!isStreaming && (
-                <div className="absolute inset-0 flex items-center justify-center text-text-tertiary">
-                  {error || "No camera selected"}
-                </div>
-              )}
+              >
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute object-cover"
+                  style={{
+                    ...croppedVideoStyle,
+                    clipPath: settings.svgMaskUrl
+                      ? `url(${settings.svgMaskUrl})`
+                      : undefined,
+                  }}
+                />
+                {settings.border.effect === "sparkle" && (
+                  <div className="sparkle-container">
+                    {Array.from({ length: 20 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="sparkle-particle"
+                      />
+                    ))}
+                  </div>
+                )}
+                {!isStreaming && (
+                  <div className="absolute inset-0 flex items-center justify-center text-text-tertiary">
+                    {error || "No camera selected"}
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex-1 bg-bg-secondary rounded-lg overflow-hidden relative min-h-[200px]">
+            <div className="flex-1 bg-bg-secondary rounded-lg overflow-hidden relative min-h-[180px]">
               {isStreaming ? (
-                <div className="absolute inset-0">
+                <>
                   <video
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover opacity-50"
+                    className="absolute inset-0 w-full h-full object-cover"
                     ref={(el) => {
                       if (el && videoRef.current) {
                         el.srcObject = videoRef.current.srcObject;
                       }
                     }}
                   />
-                  <CropSelector
-                    cropArea={settings.cropArea}
-                    onCropChange={(crop) => saveSettings({ cropArea: crop })}
-                    aspectRatio={settings.aspectRatio}
-                  />
-                </div>
+                  <div className="absolute inset-0 z-10">
+                    <CropSelector
+                      cropArea={settings.cropArea}
+                      onCropChange={(crop) => saveSettings({ cropArea: crop })}
+                      aspectRatio={settings.aspectRatio}
+                    />
+                  </div>
+                </>
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-text-tertiary text-sm">
                   Start camera to select crop area
@@ -291,7 +303,14 @@ export function WebcamToolPopup({ isOpen, onClose }: WebcamToolPopupProps) {
                   onSettingsChange={saveSettings}
                   onDeviceSelect={handleDeviceSelect}
                   isStreaming={isStreaming}
-                  onStart={() => {
+                  onStart={async () => {
+                    if (permissionStatus !== "Authorized") {
+                      const result = await requestPermission();
+                      if (result !== "Authorized") {
+                        return;
+                      }
+                      await checkPermission();
+                    }
                     if (settings.deviceId) {
                       startStream(settings.deviceId);
                     } else if (devices.length > 0) {
@@ -300,6 +319,10 @@ export function WebcamToolPopup({ isOpen, onClose }: WebcamToolPopupProps) {
                     }
                   }}
                   onStop={stopStream}
+                  permissionStatus={permissionStatus}
+                  onRequestPermission={requestPermission}
+                  onOpenSettings={openCameraSettings}
+                  isRequestingPermission={isRequestingPermission}
                 />
               )}
               {activeTab === "decart" && (

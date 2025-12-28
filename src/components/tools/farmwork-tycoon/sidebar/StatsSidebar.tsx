@@ -38,9 +38,10 @@ interface ScoreBarProps {
   color: string;
   isExpanded: boolean;
   onToggle: () => void;
+  hideTooltip?: boolean;
 }
 
-function ScoreBar({ name, metadata, icon: Icon, color, isExpanded, onToggle }: ScoreBarProps) {
+function ScoreBar({ name, metadata, icon: Icon, color, isExpanded, onToggle, hideTooltip }: ScoreBarProps) {
   const { score, lastUpdated, status, openItems } = metadata;
   const segments = 10;
   const filledSegments = Math.floor(score);
@@ -56,77 +57,85 @@ function ScoreBar({ name, metadata, icon: Icon, color, isExpanded, onToggle }: S
     </div>
   );
 
-  return (
-    <div className="py-2 w-full border-b border-border/30 last:border-b-0">
-      <Tooltip content={tooltipContent} side="left" wrapperClassName="w-full block">
-        <button
-          onClick={hasOpenItems ? onToggle : undefined}
-          className={cn(
-            "w-full text-left block",
-            hasOpenItems && "cursor-pointer"
+  const content = (
+    <button
+      onClick={hasOpenItems ? onToggle : undefined}
+      className={cn(
+        "w-full text-left block",
+        hasOpenItems && "cursor-pointer"
+      )}
+    >
+      {/* Top row: icon + label on left, score + chevron on right */}
+      <div className="flex items-center justify-between mb-1 w-full">
+        <div className="flex items-center gap-1.5">
+          <Icon className="w-3.5 h-3.5" style={{ color }} />
+          <span className="text-[11px] text-text-secondary">{name}</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] font-mono font-bold" style={{ color }}>
+            {score.toFixed(1)}
+          </span>
+          {hasOpenItems && (
+            <ChevronDown
+              className={cn(
+                "w-3 h-3 text-text-tertiary transition-transform",
+                isExpanded && "rotate-180"
+              )}
+            />
           )}
-        >
-          {/* Top row: icon + label on left, score + chevron on right */}
-          <div className="flex items-center justify-between mb-1 w-full">
-            <div className="flex items-center gap-1.5">
-              <Icon className="w-3.5 h-3.5" style={{ color }} />
-              <span className="text-[11px] text-text-secondary">{name}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[11px] font-mono font-bold" style={{ color }}>
-                {score.toFixed(1)}
-              </span>
-              {hasOpenItems && (
-                <ChevronDown
-                  className={cn(
-                    "w-3 h-3 text-text-tertiary transition-transform",
-                    isExpanded && "rotate-180"
-                  )}
+        </div>
+      </div>
+
+      {/* Progress bar - full width with 10 pips */}
+      <div className="flex gap-[3px] h-2 w-full">
+        {Array.from({ length: segments }).map((_, i) => {
+          const isFilled = i < filledSegments;
+          const isPartial = i === filledSegments && partialFill > 0;
+
+          return (
+            <div
+              key={i}
+              className="flex-1 rounded-[3px] relative overflow-hidden"
+              style={{
+                backgroundColor: `${color}15`,
+                boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
+              }}
+            >
+              {isFilled && (
+                <div
+                  className="absolute inset-0 rounded-[3px]"
+                  style={{
+                    backgroundColor: color,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
+                  }}
+                />
+              )}
+              {isPartial && (
+                <div
+                  className="absolute inset-y-0 left-0 rounded-[3px]"
+                  style={{
+                    backgroundColor: color,
+                    width: `${partialFill}%`,
+                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
+                  }}
                 />
               )}
             </div>
-          </div>
+          );
+        })}
+      </div>
+    </button>
+  );
 
-          {/* Progress bar - full width with 10 pips */}
-          <div className="flex gap-[3px] h-2 w-full">
-            {Array.from({ length: segments }).map((_, i) => {
-              const isFilled = i < filledSegments;
-              const isPartial = i === filledSegments && partialFill > 0;
-
-              return (
-                <div
-                  key={i}
-                  className="flex-1 rounded-[3px] relative overflow-hidden"
-                  style={{
-                    backgroundColor: `${color}15`,
-                    boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
-                  }}
-                >
-                  {isFilled && (
-                    <div
-                      className="absolute inset-0 rounded-[3px]"
-                      style={{
-                        backgroundColor: color,
-                        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
-                      }}
-                    />
-                  )}
-                  {isPartial && (
-                    <div
-                      className="absolute inset-y-0 left-0 rounded-[3px]"
-                      style={{
-                        backgroundColor: color,
-                        width: `${partialFill}%`,
-                        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
-                      }}
-                    />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </button>
-      </Tooltip>
+  return (
+    <div className="py-2 w-full border-b border-border/30 last:border-b-0">
+      {hideTooltip ? (
+        content
+      ) : (
+        <Tooltip content={tooltipContent} side="left" wrapperClassName="w-full block">
+          {content}
+        </Tooltip>
+      )}
 
       {/* Open Items Dropdown */}
       {isExpanded && openItems.length > 0 && (
@@ -164,7 +173,7 @@ const AUDIT_CONFIG: { key: AuditKey; name: string; icon: LucideIcon; color: stri
 ];
 
 export function StatsSidebar() {
-  const { auditScores, beadsStats, gardenStats, compostStats, activityFeed } =
+  const { auditScores, beadsStats, gardenStats, compostStats, activityFeed, hideTooltips } =
     useFarmworkTycoonStore();
 
   const [expandedAudit, setExpandedAudit] = useState<AuditKey | null>(null);
@@ -270,6 +279,7 @@ export function StatsSidebar() {
                 color={config.color}
                 isExpanded={expandedAudit === config.key}
                 onToggle={() => toggleAudit(config.key)}
+                hideTooltip={hideTooltips}
               />
             ))}
           </div>

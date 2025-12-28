@@ -11,6 +11,10 @@ export function useWebcam() {
 
   const enumerateDevices = useCallback(async () => {
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera access is not available in this environment");
+      }
+
       await navigator.mediaDevices.getUserMedia({ video: true });
 
       const allDevices = await navigator.mediaDevices.enumerateDevices();
@@ -34,6 +38,10 @@ export function useWebcam() {
   const startStream = useCallback(
     async (deviceId?: string) => {
       try {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          throw new Error("Camera access is not available in this environment");
+        }
+
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((t) => t.stop());
         }

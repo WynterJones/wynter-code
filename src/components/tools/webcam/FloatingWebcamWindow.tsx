@@ -60,16 +60,25 @@ export function FloatingWebcamWindow() {
       }
     : {};
 
+  const cropArea = settings.cropArea;
+
+  const croppedVideoStyle = {
+    width: `${100 / cropArea.width}%`,
+    height: `${100 / cropArea.height}%`,
+    left: `${-(cropArea.x / cropArea.width) * 100}%`,
+    top: `${-(cropArea.y / cropArea.height) * 100}%`,
+  };
+
   return (
     <div
       ref={containerRef}
-      className="relative w-screen h-screen bg-transparent cursor-move select-none"
+      className="relative w-screen h-screen bg-transparent cursor-move select-none p-4"
       onMouseDown={handleMouseDown}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`absolute inset-0 overflow-hidden webcam-border-effect ${settings.border.effect !== "none" ? `border-effect-${settings.border.effect}` : ""}`}
+        className={`relative w-full h-full overflow-hidden webcam-border-effect ${settings.border.effect !== "none" ? `border-effect-${settings.border.effect}` : ""}`}
         style={{
           ...borderStyle,
           ...shadowStyle,
@@ -80,9 +89,9 @@ export function FloatingWebcamWindow() {
           autoPlay
           playsInline
           muted
-          className="w-full h-full object-cover"
+          className="absolute object-cover"
           style={{
-            borderRadius: `${Math.max(0, settings.border.radius - 2)}%`,
+            ...croppedVideoStyle,
             clipPath: settings.svgMaskUrl
               ? `url(${settings.svgMaskUrl})`
               : undefined,
@@ -104,7 +113,7 @@ export function FloatingWebcamWindow() {
       {isHovered && !isDragging && (
         <button
           onClick={handleClose}
-          className="close-button absolute top-2 right-2 w-7 h-7 bg-black/70 hover:bg-red-600 rounded-full flex items-center justify-center transition-all z-10"
+          className="close-button absolute top-6 right-6 w-7 h-7 bg-black/70 hover:bg-red-600 rounded-full flex items-center justify-center transition-all z-10"
         >
           <X size={14} className="text-white" />
         </button>
@@ -113,15 +122,15 @@ export function FloatingWebcamWindow() {
       {isHovered && (
         <>
           <div
-            className="resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize"
+            className="resize-handle absolute bottom-4 right-4 w-4 h-4 cursor-se-resize z-10"
             style={{
               background:
                 "linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.3) 50%)",
             }}
           />
-          <div className="resize-handle absolute bottom-0 left-0 w-4 h-4 cursor-sw-resize opacity-0" />
-          <div className="resize-handle absolute top-0 right-0 w-4 h-4 cursor-ne-resize opacity-0" />
-          <div className="resize-handle absolute top-0 left-0 w-4 h-4 cursor-nw-resize opacity-0" />
+          <div className="resize-handle absolute bottom-4 left-4 w-4 h-4 cursor-sw-resize opacity-0" />
+          <div className="resize-handle absolute top-4 right-4 w-4 h-4 cursor-ne-resize opacity-0" />
+          <div className="resize-handle absolute top-4 left-4 w-4 h-4 cursor-nw-resize opacity-0" />
         </>
       )}
     </div>

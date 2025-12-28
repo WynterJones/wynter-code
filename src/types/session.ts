@@ -1,4 +1,9 @@
 export type ClaudeModel = "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-haiku-20241022";
+export type CodexModel = "gpt-5.2-codex" | "gpt-5.1-codex-max" | "gpt-5.1-codex-mini";
+export type GeminiModel = "gemini-2.0-flash" | "gemini-2.0-pro";
+
+export type AIProvider = "claude" | "codex" | "gemini";
+export type AIModel = ClaudeModel | CodexModel | GeminiModel;
 
 export type SessionType = "claude" | "terminal";
 
@@ -7,8 +12,9 @@ export interface Session {
   projectId: string;
   name: string;
   type: SessionType;
-  model: ClaudeModel;
-  claudeSessionId: string | null;
+  provider: AIProvider;
+  model: AIModel;
+  providerSessionId: string | null;
   isActive: boolean;
   createdAt: Date;
   color?: string;
@@ -85,6 +91,7 @@ export interface StreamChunk {
   duration_ms?: number;
   tool_id?: string;
   claude_session_id?: string;
+  thread_id?: string;
   // Result message fields
   subtype?: ResultSubtype | 'init';
   is_error?: boolean;

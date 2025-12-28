@@ -48,6 +48,7 @@ export interface DecartSettings {
   enabled: boolean;
   apiKey: string;
   activeEffect: string | null;
+  customPrompt: string;
   backgroundEffect: "none" | "blur" | "replace";
   backgroundImage: string | null;
 }
@@ -89,6 +90,7 @@ export const DEFAULT_DECART_SETTINGS: DecartSettings = {
   enabled: false,
   apiKey: "",
   activeEffect: null,
+  customPrompt: "",
   backgroundEffect: "none",
   backgroundImage: null,
 };

@@ -2,7 +2,7 @@
 
 > Nursery for new ideas and concepts. The pre-plan creative thinking stage.
 
-**Last Updated:** 2025-12-26
+**Last Updated:** 2025-12-27
 **Active Ideas:** 0
 
 ---
@@ -28,8 +28,6 @@
 | Idea | Plan | Date |
 |------|------|------|
 | Multi-Model Support | `_PLANS/MULTI_MODEL_SUPPORT.md` | 2025-12-23 |
-| Farmwork Tycoon | `_PLANS/PIXIJS_GAME_MODE.md` | 2025-12-23 |
-| Auto Build | `_PLANS/AUTO_BUILD.md` | 2025-12-26 |
 
 ---
 
@@ -69,7 +67,6 @@
 | Dead Link Checker | `DomainToolsPopup` > SEO category - Crawl website to find broken links, configurable depth (1-5 levels), check internal/external links, reports 404s/5xx/timeouts/redirects, export CSV, highlight anchor text | 2025-12-24 |
 | Lighthouse Auditor | `DomainToolsPopup` > SEO category - Run Google Lighthouse audits via Pagespeed API, Performance/Accessibility/SEO/Best Practices scores, mobile/desktop emulation, Core Web Vitals metrics (FCP, LCP, CLS, TBT, Speed Index), recommendations, export HTML/JSON | 2025-12-24 |
 | Favicon Grabber | `DomainToolsPopup` > Utilities category - Extract favicons from any URL, detect from `<link>` tags/manifest.json/common paths, preview grid (16x16 to 512x512), download individual or ZIP, show source paths | 2025-12-24 |
-| GIF Screen Recorder | `GifRecorderPopup` - Select screen region to record as animated GIF, adjustable frame rate/quality, cursor capture, click indicators, copy to clipboard or save | 2025-12-24 |
 | Netlify FTP | `NetlifyFtpPopup` - FTP-style drag-and-drop Netlify deploys, browse local files vs site, one-click deploys, domain management, deploy history with rollback | 2025-12-24 |
 | Bookmarks | `BookmarksPopup` - Save and organize sites/web apps/services, category folders, icon gallery vs list view, favicon display, AI apps tracking | 2025-12-24 |
 | Project Search | `ProjectSearchPopup` - Project-wide file search with context chunks, regex/case-sensitive/whole-word modes, find & replace, click to open file at line, keyboard navigation | 2025-12-24 |
@@ -79,3 +76,5 @@
 | Homebrew Manager | `HomebrewManagerPopup` - Full Homebrew package management: list installed formulae/casks, search catalog, install/uninstall, upgrade outdated packages, manage taps, run brew doctor, pin packages | 2025-12-26 |
 | Claude Code Limits | `LimitsMonitorPopup` - Monitor Claude API usage limits, 5-hour sliding window tracking, weekly cap display, progress bars, reset timers, color-coded status indicators | 2025-12-26 |
 | System Cleaner | `SystemCleanerPopup` - Full-screen cleaner with 3 categories: Large Files scanner (configurable 50MB-1GB threshold), App Caches (browser/dev/system caches), Installed Apps manager. All deletions go to Trash for safety. | 2025-12-26 |
+| Farmwork Tycoon | `FarmworkStatsPanel` - PixiJS gamified dev dashboard with farmwork stats, live file watching for audit updates, animated sprites, session tracking | 2025-12-27 |
+| Auto Build | `AutoBuildPopup` - File coordinator MCP with concurrent build support, auto-detect project type, live terminal output, file watchers, build queue management | 2025-12-27 |

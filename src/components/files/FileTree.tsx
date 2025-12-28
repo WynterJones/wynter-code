@@ -9,6 +9,7 @@ import { FileDialog } from "./FileDialog";
 import { useFileOperations } from "@/hooks/useFileOperations";
 import { useGitStatus } from "@/hooks/useGitStatus";
 import { useCompression } from "@/hooks/useCompression";
+import { useDragStore } from "@/stores/dragStore";
 import { formatBytes } from "@/lib/storageUtils";
 import type { FileNode } from "@/types";
 
@@ -43,7 +44,21 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
   const { createArchive, optimizeFile } = useCompression();
+  const cancelDrag = useDragStore((s) => s.cancelDrag);
   const isRefreshing = useRef(false);
+
+  // Global mouseup handler to cancel any incomplete drag operations
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      // Small delay to allow drop handlers to run first
+      setTimeout(() => {
+        cancelDrag();
+      }, 100);
+    };
+
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => window.removeEventListener("mouseup", handleGlobalMouseUp);
+  }, [cancelDrag]);
 
   // Refresh contents of expanded folders without collapsing them
   const refreshExpandedFolders = useCallback(async (expandedPaths: Set<string>) => {
@@ -121,6 +136,48 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   useEffect(() => {
     loadFiles();
   }, [loadFiles]);
+
+  // Listen for internal folder drops from drag coordinator
+  useEffect(() => {
+    const handleInternalFolderDrop = async (e: CustomEvent<{
+      files: Array<{ path: string; name: string; isDirectory: boolean }>;
+      targetFolder: string;
+    }>) => {
+      const { files: droppedFiles, targetFolder } = e.detail;
+      if (!droppedFiles || droppedFiles.length === 0 || !targetFolder) return;
+
+      console.log("[FileTree] Handling folder drop:", { files: droppedFiles.length, target: targetFolder });
+
+      // Validate drops - filter out invalid moves
+      const validFiles = droppedFiles.filter(f => {
+        // Not dropping on itself
+        if (f.path === targetFolder) return false;
+        // Not dropping folder into its own child
+        if (f.isDirectory && targetFolder.startsWith(f.path + "/")) return false;
+        // Not dropping into same parent
+        const parentPath = f.path.substring(0, f.path.lastIndexOf("/"));
+        if (parentPath === targetFolder) return false;
+        return true;
+      });
+
+      if (validFiles.length === 0) return;
+
+      try {
+        // Move items sequentially to avoid race conditions
+        for (const file of validFiles) {
+          await moveItem(file.path, targetFolder);
+        }
+        await loadFiles(true);
+        refetchGitStatus();
+        setSelectedPaths(new Set());
+      } catch (err) {
+        console.error("Failed to move items:", err);
+      }
+    };
+
+    window.addEventListener("internal-folder-drop", handleInternalFolderDrop as unknown as EventListener);
+    return () => window.removeEventListener("internal-folder-drop", handleInternalFolderDrop as unknown as EventListener);
+  }, [moveItem, loadFiles, refetchGitStatus]);
 
   // File watcher for auto-refresh
   useEffect(() => {
@@ -283,8 +340,23 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       await moveItem(sourcePath, destinationFolder);
       await loadFiles(true);
       refetchGitStatus();
+      setSelectedPaths(new Set());
     } catch (err) {
       console.error("Failed to move item:", err);
+    }
+  };
+
+  const handleMoveItems = async (sourcePaths: string[], destinationFolder: string) => {
+    try {
+      // Move items sequentially to avoid race conditions
+      for (const sourcePath of sourcePaths) {
+        await moveItem(sourcePath, destinationFolder);
+      }
+      await loadFiles(true);
+      refetchGitStatus();
+      setSelectedPaths(new Set());
+    } catch (err) {
+      console.error("Failed to move items:", err);
     }
   };
 
@@ -423,7 +495,12 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   return (
     <div className="relative flex flex-col h-full">
       <ScrollArea className="flex-1">
-        <div className="py-2 min-h-full" onClick={handleContainerClick}>
+        <div
+          className="py-2 min-h-full"
+          onClick={handleContainerClick}
+          data-folder="true"
+          data-path={projectPath}
+        >
           {files.filter((f) => f.name !== ".DS_Store").map((file) => (
             <FileTreeNode
               key={file.path}
@@ -434,9 +511,11 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
               onContextMenu={handleContextMenu}
               onNodeModulesClick={onNodeModulesClick}
               onMoveItem={handleMoveItem}
+              onMoveItems={handleMoveItems}
               gitStatusMap={gitStatusMap}
               selectedPaths={selectedPaths}
               onSelect={handleSelect}
+              allNodes={files}
             />
           ))}
         </div>

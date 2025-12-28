@@ -697,13 +697,32 @@ fn start_static_server(
         let hot_reload_script = r#"
 <script>
 (function() {
-    var ws = new WebSocket('ws://' + window.location.hostname + ':' + (parseInt(window.location.port) + 1));
-    ws.onmessage = function(e) {
-        if (e.data === 'reload') window.location.reload();
-    };
-    ws.onclose = function() {
-        setTimeout(function() { window.location.reload(); }, 2000);
-    };
+    var wsPort = parseInt(window.location.port) + 1;
+    var retries = 0;
+    var maxRetries = 3;
+    var connected = false;
+
+    function connect() {
+        if (retries >= maxRetries) return;
+        var ws = new WebSocket('ws://' + window.location.hostname + ':' + wsPort);
+        ws.onopen = function() {
+            connected = true;
+            retries = 0;
+        };
+        ws.onmessage = function(e) {
+            if (e.data === 'reload') window.location.reload();
+        };
+        ws.onclose = function() {
+            if (connected) {
+                connected = false;
+                retries = 0;
+                setTimeout(connect, 1000);
+            } else {
+                retries++;
+            }
+        };
+    }
+    connect();
 })();
 </script>
 "#;

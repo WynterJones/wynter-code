@@ -34,6 +34,17 @@ export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) 
     [projectId, panel.id, sessionId, changePanelType]
   );
 
+  // Close PTY when terminal panel is closed
+  const closePtyIfTerminal = useCallback(async () => {
+    if (panel.type === "terminal" && panel.terminalPtyId) {
+      try {
+        await invoke("close_pty", { ptyId: panel.terminalPtyId });
+      } catch {
+        // PTY may already be closed, ignore
+      }
+    }
+  }, [panel.type, panel.terminalPtyId]);
+
   const checkSafeToClose = useCallback(async (): Promise<PanelCloseCheck> => {
     // Check if panel type requires protection
     if (!requiresCloseProtection(panel.type)) {
@@ -86,14 +97,18 @@ export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) 
       setShowCloseConfirm(true);
       return;
     }
+    // Close PTY if this is a terminal panel
+    await closePtyIfTerminal();
     // Set panel to empty state so user can choose new type
     changePanelType(projectId, panel.id, "empty", sessionId);
-  }, [checkSafeToClose, projectId, panel.id, sessionId, changePanelType]);
+  }, [checkSafeToClose, closePtyIfTerminal, projectId, panel.id, sessionId, changePanelType]);
 
-  const handleConfirmClose = useCallback(() => {
+  const handleConfirmClose = useCallback(async () => {
     setShowCloseConfirm(false);
+    // Close PTY if this is a terminal panel
+    await closePtyIfTerminal();
     changePanelType(projectId, panel.id, "empty", sessionId);
-  }, [projectId, panel.id, sessionId, changePanelType]);
+  }, [closePtyIfTerminal, projectId, panel.id, sessionId, changePanelType]);
 
   const handleCancelClose = useCallback(() => {
     setShowCloseConfirm(false);

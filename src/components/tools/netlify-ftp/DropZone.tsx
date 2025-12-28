@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Upload, Loader2 } from "lucide-react";
+import { Upload, Loader2, FolderArchive } from "lucide-react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,45 @@ function isZipFile(filename: string): boolean {
   return filename.toLowerCase().endsWith(".zip");
 }
 
+async function zipFolderToFile(folderPath: string): Promise<File> {
+  const folderName = folderPath.split("/").pop() || "folder";
+  const base64Data = await invoke<string>("zip_folder_to_base64", {
+    folderPath,
+  });
+
+  // Convert base64 to binary
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  return new File([bytes], `${folderName}.zip`, { type: "application/zip" });
+}
+
+async function checkIsDirectory(path: string): Promise<boolean> {
+  try {
+    const result = await invoke<boolean>("is_directory", { path });
+    return result;
+  } catch {
+    // Fallback: check if path has no extension (likely a folder)
+    const fileName = path.split("/").pop() || "";
+    return !fileName.includes(".");
+  }
+}
+
+async function readFileToFile(filePath: string, fileName: string): Promise<File> {
+  const base64Data = await invoke<string>("read_file_base64", {
+    path: filePath,
+  });
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return new File([bytes], fileName, { type: "application/zip" });
+}
+
 export function DropZone({
   onFileDrop,
   isUploading,
@@ -24,10 +63,10 @@ export function DropZone({
   disabled = false,
 }: DropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  // Check if a position is within the dropzone bounds
   const isPositionInDropZone = useCallback((x: number, y: number): boolean => {
     if (!dropZoneRef.current) return false;
     const rect = dropZoneRef.current.getBoundingClientRect();
@@ -42,12 +81,11 @@ export function DropZone({
       try {
         const webview = getCurrentWebview();
         unlisten = await webview.onDragDropEvent(async (event) => {
-          if (disabled || isUploading) return;
+          if (disabled || isUploading || isZipping) return;
 
           const eventType = event.payload.type;
 
           if (eventType === "enter" || eventType === "over") {
-            // Check if position is over our dropzone
             const pos = event.payload.position;
             if (pos && isPositionInDropZone(pos.x, pos.y)) {
               setIsDragging(true);
@@ -57,7 +95,6 @@ export function DropZone({
           } else if (eventType === "drop") {
             setIsDragging(false);
 
-            // Check if drop position is within our dropzone
             const pos = event.payload.position;
             if (!pos || !isPositionInDropZone(pos.x, pos.y)) return;
 
@@ -66,26 +103,27 @@ export function DropZone({
               const filePath = paths[0];
               const fileName = filePath.split("/").pop() || filePath;
 
-              if (isZipFile(fileName)) {
-                try {
-                  // Read the file as binary using Tauri command
-                  const base64Data = await invoke<string>("read_file_base64", {
-                    path: filePath,
-                  });
-                  // Convert base64 to binary
-                  const binaryString = atob(base64Data);
-                  const bytes = new Uint8Array(binaryString.length);
-                  for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
+              try {
+                const isDir = await checkIsDirectory(filePath);
+
+                if (isDir) {
+                  // It's a folder - zip it first
+                  setIsZipping(true);
+                  try {
+                    const file = await zipFolderToFile(filePath);
+                    onFileDrop(file);
+                  } finally {
+                    setIsZipping(false);
                   }
-                  // Create a File object from the data
-                  const file = new File([bytes], fileName, {
-                    type: "application/zip",
-                  });
+                } else if (isZipFile(fileName)) {
+                  // It's a zip file - read and use directly
+                  const file = await readFileToFile(filePath, fileName);
                   onFileDrop(file);
-                } catch (err) {
-                  console.error("Failed to read dropped file:", err);
                 }
+                // Ignore other file types
+              } catch (err) {
+                console.error("Failed to process dropped item:", err);
+                setIsZipping(false);
               }
             }
           } else if (eventType === "leave") {
@@ -102,17 +140,17 @@ export function DropZone({
     return () => {
       unlisten?.();
     };
-  }, [disabled, isUploading, onFileDrop, isPositionInDropZone]);
+  }, [disabled, isUploading, isZipping, onFileDrop, isPositionInDropZone]);
 
   const handleDragEnter = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!disabled && !isUploading) {
+      if (!disabled && !isUploading && !isZipping) {
         setIsDragging(true);
       }
     },
-    [disabled, isUploading]
+    [disabled, isUploading, isZipping]
   );
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
@@ -133,24 +171,28 @@ export function DropZone({
       e.stopPropagation();
       setIsDragging(false);
 
-      if (disabled || isUploading) return;
+      if (disabled || isUploading || isZipping) return;
 
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         const file = files[0];
-        if (isZipFile(file.name) || file.type === "application/zip" || file.type === "application/x-zip-compressed") {
+        if (
+          isZipFile(file.name) ||
+          file.type === "application/zip" ||
+          file.type === "application/x-zip-compressed"
+        ) {
           onFileDrop(file);
         }
       }
     },
-    [disabled, isUploading, onFileDrop]
+    [disabled, isUploading, isZipping, onFileDrop]
   );
 
   const handleClick = useCallback(() => {
-    if (!disabled && !isUploading) {
+    if (!disabled && !isUploading && !isZipping) {
       inputRef.current?.click();
     }
-  }, [disabled, isUploading]);
+  }, [disabled, isUploading, isZipping]);
 
   const handleFileSelect = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,13 +200,14 @@ export function DropZone({
       if (file) {
         onFileDrop(file);
       }
-      // Reset input
       if (inputRef.current) {
         inputRef.current.value = "";
       }
     },
     [onFileDrop]
   );
+
+  const isBusy = isUploading || isZipping;
 
   return (
     <div
@@ -176,7 +219,7 @@ export function DropZone({
           ? "border-accent bg-accent/5"
           : "border-border hover:border-text-secondary",
         disabled && "opacity-50 cursor-not-allowed",
-        !disabled && !isUploading && "cursor-pointer"
+        !disabled && !isBusy && "cursor-pointer"
       )}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -192,11 +235,17 @@ export function DropZone({
         className="hidden"
       />
 
-      {isUploading ? (
+      {isZipping ? (
+        <div className="flex flex-col items-center gap-3 w-full">
+          <FolderArchive className="w-8 h-8 text-accent animate-pulse" />
+          <div className="text-sm text-text-secondary font-mono">
+            Zipping folder...
+          </div>
+        </div>
+      ) : isUploading ? (
         <div className="flex flex-col items-center gap-3 w-full">
           <Loader2 className="w-8 h-8 text-accent animate-spin" />
 
-          {/* Progress bar */}
           <div className="w-full max-w-[200px] h-2 bg-bg-tertiary rounded-full overflow-hidden">
             <div
               className="h-full bg-accent transition-all"
@@ -215,9 +264,11 @@ export function DropZone({
             )}
           />
           <div className="text-sm text-text-primary mb-1">
-            {isDragging ? "Release to deploy!" : "Drop ZIP file here"}
+            {isDragging ? "Release to deploy!" : "Drop ZIP or folder here"}
           </div>
-          <div className="text-xs text-text-secondary">or click to browse</div>
+          <div className="text-xs text-text-secondary">
+            Folders will be auto-zipped
+          </div>
         </>
       )}
     </div>

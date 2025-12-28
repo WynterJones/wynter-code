@@ -384,7 +384,7 @@ export function MarkdownEditorPopup({
                   </button>
                 </Tooltip>
                 {showSettings && (
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 p-4 space-y-4">
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 p-4 space-y-4 dropdown-solid">
                     <div className="text-xs font-medium text-text-primary mb-3">Preview Settings</div>
 
                     {/* Max Width */}
@@ -499,6 +499,11 @@ export function MarkdownEditorPopup({
                       cursorBlinking: "smooth",
                       smoothScrolling: true,
                       renderValidationDecorations: "off",
+                      guides: {
+                        indentation: false,
+                        bracketPairs: false,
+                        highlightActiveIndentation: false,
+                      },
                     }}
                   />
                 </div>

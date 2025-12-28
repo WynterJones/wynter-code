@@ -6,6 +6,7 @@ export interface SystemCheckResults {
   npm: string | null;
   git: string | null;
   claude: string | null;
+  codex: string | null;
 }
 
 interface OnboardingStore {

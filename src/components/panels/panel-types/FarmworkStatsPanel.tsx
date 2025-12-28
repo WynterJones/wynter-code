@@ -118,22 +118,54 @@ interface StatRowProps {
   value: number;
   color: string;
   showBar?: boolean;
-  maxValue?: number;
 }
 
-function StatRow({ icon: Icon, name, value, color, showBar, maxValue = 10 }: StatRowProps) {
-  const percent = (value / maxValue) * 100;
+function StatRow({ icon: Icon, name, value, color, showBar }: StatRowProps) {
+  const segments = 10;
+  const filledSegments = Math.floor(value);
+  const partialFill = (value % 1) * 100;
 
   return (
-    <div className="flex items-center gap-2 py-0.5">
+    <div className="flex items-center gap-2 py-1">
       <Icon className="w-3 h-3 flex-shrink-0" style={{ color }} />
-      <span className="text-[10px] text-text-secondary w-16 truncate">{name}</span>
+      <span className="text-[10px] text-text-secondary w-12 truncate">{name}</span>
       {showBar && (
-        <div className="flex-1 h-1.5 bg-bg-primary rounded-full overflow-hidden">
-          <div
-            className="h-full rounded-full transition-all"
-            style={{ backgroundColor: color, width: `${percent}%` }}
-          />
+        <div className="flex gap-[2px] h-2 flex-1">
+          {Array.from({ length: segments }).map((_, i) => {
+            const isFilled = i < filledSegments;
+            const isPartial = i === filledSegments && partialFill > 0;
+
+            return (
+              <div
+                key={i}
+                className="flex-1 rounded-[3px] relative overflow-hidden"
+                style={{
+                  backgroundColor: `${color}15`,
+                  boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
+                }}
+              >
+                {isFilled && (
+                  <div
+                    className="absolute inset-0 rounded-[3px]"
+                    style={{
+                      backgroundColor: color,
+                      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
+                    }}
+                  />
+                )}
+                {isPartial && (
+                  <div
+                    className="absolute inset-y-0 left-0 rounded-[3px]"
+                    style={{
+                      backgroundColor: color,
+                      width: `${partialFill}%`,
+                      boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       <span className="text-[10px] font-mono font-bold w-8 text-right" style={{ color }}>
@@ -315,32 +347,33 @@ export function FarmworkStatsPanel({
         options={{ scrollbars: { autoHide: "scroll" } }}
       >
         <div className="p-2 space-y-2">
-          {/* Ideas */}
-          <section>
-            <div className="text-[9px] text-text-tertiary uppercase tracking-wider mb-1">Ideas</div>
-            <div className="bg-bg-tertiary rounded px-2 py-1 border border-border/30">
-              <StatRow icon={Sprout} name="Planted" value={gardenStats.planted} color="#a6e3a1" />
-              <StatRow icon={TreeDeciduous} name="Growing" value={gardenStats.growing} color="#94e2d5" />
-              <StatRow icon={Apple} name="Picked" value={gardenStats.picked} color="#f38ba8" />
-              <StatRow icon={LeafyGreen} name="Compost" value={compostStats.rejectedIdeas} color="#fab387" />
-            </div>
-          </section>
+          {/* Ideas & Issues - Two Column Grid */}
+          <div className="grid grid-cols-2 gap-2">
+            {/* Ideas */}
+            <section>
+              <div className="text-[9px] text-text-tertiary uppercase tracking-wider mb-1">Ideas</div>
+              <div className="bg-bg-tertiary rounded px-2 py-1 border border-border/30">
+                <StatRow icon={Sprout} name="Planted" value={gardenStats.planted} color="#a6e3a1" />
+                <StatRow icon={TreeDeciduous} name="Growing" value={gardenStats.growing} color="#94e2d5" />
+                <StatRow icon={Apple} name="Picked" value={gardenStats.picked} color="#f38ba8" />
+                <StatRow icon={LeafyGreen} name="Compost" value={compostStats.rejectedIdeas} color="#fab387" />
+              </div>
+            </section>
 
-          {/* Issues */}
-          {beadsStats && (
+            {/* Issues */}
             <section>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[9px] text-text-tertiary uppercase tracking-wider">Issues</span>
-                <span className="text-[8px] font-mono text-text-tertiary">{beadsStats.total} total</span>
+                <span className="text-[8px] font-mono text-text-tertiary">{beadsStats?.total ?? 0}</span>
               </div>
               <div className="bg-bg-tertiary rounded px-2 py-1 border border-border/30">
-                <StatRow icon={CircleDot} name="Open" value={beadsStats.open} color="#a6e3a1" />
-                <StatRow icon={Clock} name="In Progress" value={beadsStats.in_progress} color="#f9e2af" />
-                <StatRow icon={AlertTriangle} name="Blocked" value={beadsStats.blocked} color="#f38ba8" />
-                <StatRow icon={CheckCircle2} name="Closed" value={beadsStats.closed} color="#6c7086" />
+                <StatRow icon={CircleDot} name="Open" value={beadsStats?.open ?? 0} color="#a6e3a1" />
+                <StatRow icon={Clock} name="Progress" value={beadsStats?.in_progress ?? 0} color="#f9e2af" />
+                <StatRow icon={AlertTriangle} name="Blocked" value={beadsStats?.blocked ?? 0} color="#f38ba8" />
+                <StatRow icon={CheckCircle2} name="Closed" value={beadsStats?.closed ?? 0} color="#6c7086" />
               </div>
             </section>
-          )}
+          </div>
 
           {/* Audit Scores */}
           <section>

@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* JetBrains Mono Nerd Font - bundled for terminal icon support */
+@font-face {
+  font-family: 'JetBrainsMono Nerd Font';
+  src: url('/fonts/JetBrainsMonoNerdFont-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrainsMono Nerd Font';
+  src: url('/fonts/JetBrainsMonoNerdFont-Bold.ttf') format('truetype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --bg-primary: #141420;
   --bg-secondary: #0f0f18;
@@ -51,6 +68,69 @@ body {
   /* Disable text selection globally for native feel */
   user-select: none;
   -webkit-user-select: none;
+}
+
+/* Vibrancy-enabled mode - transparent backgrounds for macOS NSVisualEffectView */
+html.vibrancy-enabled,
+html.vibrancy-enabled body,
+html.vibrancy-enabled #root {
+  background: transparent !important;
+}
+
+/* Dark overlay controlled by --vibrancy-darkness (0 = transparent, 1 = fully dark) */
+html.vibrancy-enabled::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-color: rgba(10, 10, 16, var(--vibrancy-darkness, 0.5));
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Main app container must be transparent for vibrancy to show */
+html.vibrancy-enabled .bg-bg-primary {
+  background-color: transparent !important;
+}
+
+/* Secondary containers can be slightly tinted */
+html.vibrancy-enabled .bg-bg-secondary {
+  background-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+html.vibrancy-enabled .bg-bg-tertiary {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Hover states need some visibility */
+html.vibrancy-enabled .bg-bg-hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Keep dialogs/popovers more opaque for readability */
+html.vibrancy-enabled [role="dialog"],
+html.vibrancy-enabled .fixed.inset-0 {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+html.vibrancy-enabled [role="dialog"] > div,
+html.vibrancy-enabled .settings-popup {
+  background-color: rgba(20, 20, 32, 0.9) !important;
+  backdrop-filter: blur(20px);
+}
+
+/* Tooltips need solid dark backgrounds for readability */
+html.vibrancy-enabled [role="tooltip"],
+html.vibrancy-enabled [data-radix-popper-content-wrapper],
+html.vibrancy-enabled [data-state="delayed-open"],
+html.vibrancy-enabled [data-state="instant-open"],
+html.vibrancy-enabled .tooltip-content {
+  background-color: rgba(15, 15, 24, 0.95) !important;
+}
+
+/* Dropdowns and popovers need solid backgrounds for readability */
+html.vibrancy-enabled .dropdown-solid {
+  background-color: #0f0f18 !important;
+  backdrop-filter: none;
 }
 
 /* Re-enable text selection for editable/readable content */

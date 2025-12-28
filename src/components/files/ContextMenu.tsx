@@ -62,7 +62,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 min-w-[160px] bg-bg-secondary border border-border rounded-md shadow-lg py-1"
+      className="fixed z-50 min-w-[160px] bg-bg-secondary border border-border rounded-md shadow-lg py-1 dropdown-solid"
       style={{ left: x, top: y }}
     >
       {items.map((item, index) => (

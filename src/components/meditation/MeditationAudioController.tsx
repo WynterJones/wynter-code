@@ -24,6 +24,7 @@ export function MeditationAudioController() {
     volume,
     tracks,
     setPlaying,
+    setLoading,
     setTrack,
     setIsStream,
     setStreamMetadata,
@@ -140,6 +141,7 @@ export function MeditationAudioController() {
 
   // Auto-play only on initial activation (not after user pauses)
   const handleCanPlay = () => {
+    setLoading(false);
     if (shouldBeActive && !hasAutoPlayedRef.current && audioRef.current) {
       hasAutoPlayedRef.current = true;
       audioRef.current.play().catch(() => setPlaying(false));
@@ -176,7 +178,10 @@ export function MeditationAudioController() {
         }
       }}
       onEnded={handleEnded}
-      onError={() => setPlaying(false)}
+      onError={() => {
+        setLoading(false);
+        setPlaying(false);
+      }}
     />
   );
 }

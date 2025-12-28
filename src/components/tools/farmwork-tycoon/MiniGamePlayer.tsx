@@ -216,76 +216,93 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
       </div>
 
       {/* Arcade Cabinet Frame */}
-      <div
-        className="relative"
-        style={{
-          height: size - 36,
-          padding: "8px",
-          background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
-        }}
-      >
-        {/* Screen bezel */}
-        <div
-          className="relative h-full overflow-hidden"
-          style={{
-            padding: "4px",
-            background: "#0a0a0a",
-            borderRadius: "4px",
-            border: "2px solid #222",
-          }}
-        >
-          {/* CRT Screen glow effect */}
+      {(() => {
+        // Calculate the square game area size
+        // Header is ~36px, outer padding 8px each side, bezel padding 4px + border 2px each side
+        const headerHeight = 36;
+        const outerPadding = 8;
+        const bezelPadding = 4;
+        const bezelBorder = 2;
+        const totalChrome = outerPadding * 2 + bezelPadding * 2 + bezelBorder * 2; // 28px
+        const availableHeight = size - headerHeight - totalChrome;
+        const availableWidth = size - totalChrome;
+        const gameSize = Math.min(availableWidth, availableHeight);
+
+        return (
           <div
-            className="absolute inset-0 pointer-events-none"
+            className="relative flex items-center justify-center"
             style={{
-              background: "radial-gradient(ellipse at center, rgba(100,255,100,0.03) 0%, transparent 70%)",
-              zIndex: 1,
+              height: size - headerHeight,
+              padding: `${outerPadding}px`,
+              background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
             }}
-          />
-
-          {/* Game canvas */}
-          <div className="relative h-full flex items-center justify-center">
-            <TycoonGame
-              containerWidth={size - 28}
-              containerHeight={size - 60}
-              isMiniPlayer
-            />
-
-            {/* Scanline overlay */}
+          >
+            {/* Screen bezel */}
             <div
-              className="absolute inset-0 pointer-events-none"
+              className="relative overflow-hidden"
               style={{
-                background: `repeating-linear-gradient(
-                  0deg,
-                  transparent,
-                  transparent 2px,
-                  rgba(0, 0, 0, 0.15) 2px,
-                  rgba(0, 0, 0, 0.15) 4px
-                )`,
-                zIndex: 10,
+                width: gameSize + bezelPadding * 2 + bezelBorder * 2,
+                height: gameSize + bezelPadding * 2 + bezelBorder * 2,
+                padding: `${bezelPadding}px`,
+                background: "#0a0a0a",
+                borderRadius: "4px",
+                border: `${bezelBorder}px solid #222`,
               }}
-            />
+            >
+              {/* CRT Screen glow effect */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: "radial-gradient(ellipse at center, rgba(100,255,100,0.03) 0%, transparent 70%)",
+                  zIndex: 1,
+                }}
+              />
 
-            {/* Screen reflection/glare */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)",
-                zIndex: 11,
-              }}
-            />
+              {/* Game canvas */}
+              <div className="relative w-full h-full">
+                <TycoonGame
+                  containerWidth={gameSize}
+                  containerHeight={gameSize}
+                  isMiniPlayer
+                />
 
-            {/* Vignette effect */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                boxShadow: "inset 0 0 40px rgba(0,0,0,0.4)",
-                zIndex: 12,
-              }}
-            />
+                {/* Scanline overlay */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: `repeating-linear-gradient(
+                      0deg,
+                      transparent,
+                      transparent 2px,
+                      rgba(0, 0, 0, 0.15) 2px,
+                      rgba(0, 0, 0, 0.15) 4px
+                    )`,
+                    zIndex: 10,
+                  }}
+                />
+
+                {/* Screen reflection/glare */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)",
+                    zIndex: 11,
+                  }}
+                />
+
+                {/* Vignette effect */}
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    boxShadow: "inset 0 0 40px rgba(0,0,0,0.4)",
+                    zIndex: 12,
+                  }}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Resize Handle */}
       <div

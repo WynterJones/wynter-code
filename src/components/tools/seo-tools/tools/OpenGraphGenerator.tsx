@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Copy, Check, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Copy, Check, RefreshCw, FolderOpen, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FacebookCardPreview } from "../previews/FacebookCardPreview";
+import { useSeoDataFromProject } from "../hooks/useSeoDataFromProject";
 
 interface OpenGraphData {
   title: string;
@@ -16,6 +17,8 @@ interface OpenGraphData {
 }
 
 export function OpenGraphGenerator() {
+  const { data: projectData, isLoading: isLoadingProject, sourcePath, reload } = useSeoDataFromProject();
+  const [hasAutoLoaded, setHasAutoLoaded] = useState(false);
   const [data, setData] = useState<OpenGraphData>({
     title: "",
     description: "",
@@ -28,6 +31,44 @@ export function OpenGraphGenerator() {
     locale: "en_US",
   });
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!hasAutoLoaded && projectData && !isLoadingProject) {
+      const hasData = projectData.ogTitle || projectData.ogDescription || projectData.ogUrl ||
+        projectData.ogSiteName || projectData.ogImage || projectData.title || projectData.packageName;
+      if (hasData) {
+        setData({
+          title: projectData.ogTitle || projectData.title || projectData.packageName || "",
+          description: projectData.ogDescription || projectData.description || projectData.packageDescription || "",
+          url: projectData.ogUrl || projectData.canonical || "",
+          siteName: projectData.ogSiteName || projectData.packageName || "",
+          image: projectData.ogImage || "",
+          imageWidth: "1200",
+          imageHeight: "630",
+          type: (projectData.ogType as OpenGraphData["type"]) || "website",
+          locale: projectData.ogLocale || "en_US",
+        });
+        setHasAutoLoaded(true);
+      }
+    }
+  }, [projectData, isLoadingProject, hasAutoLoaded]);
+
+  const handleLoadFromProject = async () => {
+    await reload();
+    if (projectData) {
+      setData({
+        title: projectData.ogTitle || projectData.title || projectData.packageName || data.title,
+        description: projectData.ogDescription || projectData.description || projectData.packageDescription || data.description,
+        url: projectData.ogUrl || projectData.canonical || data.url,
+        siteName: projectData.ogSiteName || projectData.packageName || data.siteName,
+        image: projectData.ogImage || data.image,
+        imageWidth: data.imageWidth,
+        imageHeight: data.imageHeight,
+        type: (projectData.ogType as OpenGraphData["type"]) || data.type,
+        locale: projectData.ogLocale || data.locale,
+      });
+    }
+  };
 
   const generateCode = () => {
     const lines: string[] = [];
@@ -72,7 +113,27 @@ export function OpenGraphGenerator() {
       <div className="grid grid-cols-2 gap-6 flex-1 min-h-0">
         {/* Form Section */}
         <div className="space-y-4 overflow-auto pr-2">
-          <h3 className="font-medium text-text-primary">Open Graph Settings</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-text-primary">Open Graph Settings</h3>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={handleLoadFromProject}
+              disabled={isLoadingProject}
+            >
+              {isLoadingProject ? (
+                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+              ) : (
+                <FolderOpen className="w-3 h-3 mr-1" />
+              )}
+              Load from project
+            </Button>
+          </div>
+          {sourcePath && (
+            <p className="text-xs text-text-tertiary">
+              Loaded from: {sourcePath}
+            </p>
+          )}
 
           {/* Type */}
           <div>

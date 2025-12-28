@@ -54,7 +54,28 @@ function App() {
         }
       };
 
+      // Initialize vibrancy with saved settings
+      const initVibrancy = async () => {
+        const { vibrancyEnabled, vibrancyDarkness } = useSettingsStore.getState();
+        if (vibrancyEnabled) {
+          try {
+            await invoke("apply_vibrancy_to_all_windows", {
+              material: "dark",
+              opacity: 1.0,
+            });
+            document.documentElement.classList.add("vibrancy-enabled");
+            document.documentElement.style.setProperty(
+              "--vibrancy-darkness",
+              vibrancyDarkness.toString()
+            );
+          } catch (error) {
+            console.error("Failed to initialize vibrancy:", error);
+          }
+        }
+      };
+
       initLightcast();
+      initVibrancy();
     }
   }, []);
 

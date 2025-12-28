@@ -70,7 +70,7 @@ export function ContextMenu({ isOpen, position, onClose, children, className }: 
     <div
       ref={menuRef}
       className={cn(
-        "fixed z-[9999] bg-bg-secondary border border-border rounded-lg shadow-xl p-3",
+        "fixed z-[9999] bg-bg-secondary border border-border rounded-lg shadow-xl p-3 dropdown-solid",
         "animate-in fade-in-0 zoom-in-95 duration-100",
         className
       )}

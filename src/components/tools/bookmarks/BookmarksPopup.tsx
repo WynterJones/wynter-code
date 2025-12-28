@@ -225,7 +225,7 @@ export function BookmarksPopup({ isOpen, onClose }: BookmarksPopupProps) {
                             className="fixed inset-0 z-10"
                             onClick={() => setShowMoveMenu(false)}
                           />
-                          <div className="absolute right-0 top-full mt-1 z-20 bg-bg-secondary border border-border rounded-lg shadow-lg py-1.5 w-[200px] max-h-[280px] overflow-y-auto">
+                          <div className="absolute right-0 top-full mt-1 z-20 bg-bg-secondary border border-border rounded-lg shadow-lg py-1.5 w-[200px] max-h-[280px] overflow-y-auto dropdown-solid">
                             <div className="px-2 pb-1 mb-1 border-b border-border">
                               <span className="text-[10px] font-semibold text-text-secondary uppercase tracking-wider">
                                 Move to Collection

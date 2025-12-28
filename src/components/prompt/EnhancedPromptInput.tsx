@@ -106,79 +106,8 @@ export function EnhancedPromptInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const dragCounterRef = useRef(0);
 
-  // Global drag store for cross-component drag-drop
+  // Global drag store for visual feedback
   const globalIsDragging = useDragStore((s) => s.isDragging);
-  const endDrag = useDragStore((s) => s.endDrag);
-
-  // Attach file immediately when dragged over the dropzone (instant UX)
-  const handleDragDrop = useCallback(async () => {
-    const fileInfo = endDrag();
-    if (!fileInfo) return;
-
-    // Focus the input after attaching
-    setTimeout(() => inputRef.current?.focus(), 0);
-
-    // Handle the dropped file
-    if (fileInfo.isDirectory) {
-      const parts = fileInfo.path.split("/");
-      const displayPath =
-        parts.length > 3
-          ? `${parts[0]}/.../${parts.slice(-2).join("/")}/`
-          : fileInfo.path + "/";
-
-      setFiles((prev) => [
-        ...prev,
-        {
-          id: uuid(),
-          path: fileInfo.path,
-          displayPath,
-        },
-      ]);
-      return;
-    }
-
-    if (isImageFile(fileInfo.name)) {
-      try {
-        const base64 = await invoke<string>("read_file_base64", {
-          path: fileInfo.path,
-        });
-        const mimeType = getMimeType(fileInfo.name);
-        setImages((prev) => [
-          ...prev,
-          {
-            id: uuid(),
-            data: `data:${mimeType};base64,${base64}`,
-            mimeType,
-            name: fileInfo.name,
-          },
-        ]);
-      } catch (error) {
-        console.error("Error reading image:", error);
-      }
-    } else {
-      const parts = fileInfo.path.split("/");
-      const displayPath =
-        parts.length > 3
-          ? `${parts[0]}/.../${parts.slice(-2).join("/")}`
-          : fileInfo.path;
-
-      setFiles((prev) => [
-        ...prev,
-        {
-          id: uuid(),
-          path: fileInfo.path,
-          displayPath,
-        },
-      ]);
-    }
-  }, [endDrag]);
-
-  // Auto-attach when mouse enters dropzone while dragging
-  const handleMouseEnter = useCallback(() => {
-    if (globalIsDragging) {
-      handleDragDrop();
-    }
-  }, [globalIsDragging, handleDragDrop]);
 
   const {
     addMessage,
@@ -214,6 +143,59 @@ export function EnhancedPromptInput({
     };
     window.addEventListener("focus-prompt", handleFocusPrompt);
     return () => window.removeEventListener("focus-prompt", handleFocusPrompt);
+  }, []);
+
+  // Listen for internal file drops from drag coordinator
+  useEffect(() => {
+    const handleInternalFileDrop = async (e: CustomEvent<{ files: Array<{ path: string; name: string; isDirectory: boolean }> }>) => {
+      const { files: droppedFiles } = e.detail;
+      if (!droppedFiles || droppedFiles.length === 0) return;
+
+      // Focus input after attachment
+      setTimeout(() => inputRef.current?.focus(), 0);
+
+      // Process all dropped files
+      for (const fileInfo of droppedFiles) {
+        if (fileInfo.isDirectory) {
+          const parts = fileInfo.path.split("/");
+          const displayPath = parts.length > 3
+            ? `${parts[0]}/.../${parts.slice(-2).join("/")}/`
+            : fileInfo.path + "/";
+
+          setFiles((prev) => [
+            ...prev,
+            { id: uuid(), path: fileInfo.path, displayPath },
+          ]);
+          continue;
+        }
+
+        if (isImageFile(fileInfo.name)) {
+          try {
+            const base64 = await invoke<string>("read_file_base64", { path: fileInfo.path });
+            const mimeType = getMimeType(fileInfo.name);
+            setImages((prev) => [
+              ...prev,
+              { id: uuid(), data: `data:${mimeType};base64,${base64}`, mimeType, name: fileInfo.name },
+            ]);
+          } catch (error) {
+            console.error("Error reading image:", error);
+          }
+        } else {
+          const parts = fileInfo.path.split("/");
+          const displayPath = parts.length > 3
+            ? `${parts[0]}/.../${parts.slice(-2).join("/")}`
+            : fileInfo.path;
+
+          setFiles((prev) => [
+            ...prev,
+            { id: uuid(), path: fileInfo.path, displayPath },
+          ]);
+        }
+      }
+    };
+
+    window.addEventListener("internal-file-drop", handleInternalFileDrop as unknown as EventListener);
+    return () => window.removeEventListener("internal-file-drop", handleInternalFileDrop as unknown as EventListener);
   }, []);
 
   // DISABLED: Load custom slash commands (responses not working correctly)
@@ -296,62 +278,68 @@ export function EnhancedPromptInput({
     const wynterData = e.dataTransfer?.getData("application/x-wynter-file");
     if (wynterData) {
       try {
-        const fileInfo = JSON.parse(wynterData) as {
-          path: string;
-          name: string;
-          isDirectory: boolean;
-        };
+        const parsed = JSON.parse(wynterData);
 
-        // Handle directories as file references (Claude can read directory contents)
-        if (fileInfo.isDirectory) {
-          const parts = fileInfo.path.split("/");
-          const displayPath =
-            parts.length > 3
-              ? `${parts[0]}/.../${parts.slice(-2).join("/")}/`
-              : fileInfo.path + "/";
+        // Handle both single and multi-file formats
+        // Single: { path, name, isDirectory }
+        // Multi: { primary: {...}, additional: [...] }
+        const primaryFile = parsed.primary || parsed;
+        const additionalFiles = parsed.additional || [];
+        const allFiles = [primaryFile, ...additionalFiles];
 
-          setFiles((prev) => [
-            ...prev,
-            {
-              id: uuid(),
+        // Process all dropped files
+        for (const fileInfo of allFiles) {
+          // Handle directories as file references (Claude can read directory contents)
+          if (fileInfo.isDirectory) {
+            const parts = fileInfo.path.split("/");
+            const displayPath =
+              parts.length > 3
+                ? `${parts[0]}/.../${parts.slice(-2).join("/")}/`
+                : fileInfo.path + "/";
+
+            setFiles((prev) => [
+              ...prev,
+              {
+                id: uuid(),
+                path: fileInfo.path,
+                displayPath,
+              },
+            ]);
+            continue;
+          }
+
+          if (isImageFile(fileInfo.name)) {
+            // Read image as base64 via Tauri
+            const base64 = await invoke<string>("read_file_base64", {
               path: fileInfo.path,
-              displayPath,
-            },
-          ]);
-          return;
-        }
+            });
+            const mimeType = getMimeType(fileInfo.name);
+            setImages((prev) => [
+              ...prev,
+              {
+                id: uuid(),
+                data: `data:${mimeType};base64,${base64}`,
+                mimeType,
+                name: fileInfo.name,
+              },
+            ]);
+          } else {
+            // Add as file reference with @ badge
+            const parts = fileInfo.path.split("/");
+            const displayPath =
+              parts.length > 3
+                ? `${parts[0]}/.../${parts.slice(-2).join("/")}`
+                : fileInfo.path;
 
-        if (isImageFile(fileInfo.name)) {
-          // Read image as base64 via Tauri
-          const base64 = await invoke<string>("read_file_base64", {
-            path: fileInfo.path,
-          });
-          const mimeType = getMimeType(fileInfo.name);
-          setImages((prev) => [
-            ...prev,
-            {
-              id: uuid(),
-              data: `data:${mimeType};base64,${base64}`,
-              mimeType,
-              name: fileInfo.name,
-            },
-          ]);
-        } else {
-          // Add as file reference with @ badge
-          const parts = fileInfo.path.split("/");
-          const displayPath =
-            parts.length > 3
-              ? `${parts[0]}/.../${parts.slice(-2).join("/")}`
-              : fileInfo.path;
-
-          setFiles((prev) => [
-            ...prev,
-            {
-              id: uuid(),
-              path: fileInfo.path,
-              displayPath,
-            },
-          ]);
+            setFiles((prev) => [
+              ...prev,
+              {
+                id: uuid(),
+                path: fileInfo.path,
+                displayPath,
+              },
+            ]);
+          }
         }
       } catch (error) {
         console.error("Error handling internal file drop:", error);
@@ -626,7 +614,7 @@ export function EnhancedPromptInput({
     startStreaming(currentSessionId);
 
     const session = getSession(currentSessionId);
-    const claudeSessionId = session?.claudeSessionId || undefined;
+    const providerSessionId = session?.providerSessionId || undefined;
     const permissionMode = session?.permissionMode || "default";
 
     try {
@@ -634,7 +622,7 @@ export function EnhancedPromptInput({
         prompt: fullPrompt.substring(0, 100) + "...",
         projectPath,
         sessionId: currentSessionId,
-        claudeSessionId,
+        providerSessionId,
         permissionMode,
       });
 
@@ -695,10 +683,10 @@ export function EnhancedPromptInput({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onMouseEnter={handleMouseEnter}
         className={cn("relative", isFocused ? "z-50" : "z-10")}
       >
         <div
+          data-dropzone="prompt"
           className={cn(
             "flex flex-col gap-3 p-4 rounded-xl",
             "bg-bg-tertiary border-2 border-solid transition-all duration-150",

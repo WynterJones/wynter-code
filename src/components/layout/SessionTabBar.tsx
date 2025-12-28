@@ -452,7 +452,7 @@ export function SessionTabBar({
         {showNewDropdown && (
           <div
             ref={newDropdownRef}
-            className="fixed p-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[160px]"
+            className="fixed p-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[160px] dropdown-solid"
             style={{
               top: newDropdownPosition.top,
               left: newDropdownPosition.left,
@@ -480,7 +480,7 @@ export function SessionTabBar({
       {closeConfirmSessionId && (
         <div
           ref={closeConfirmRef}
-          className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[200px]"
+          className="fixed p-3 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[200px] dropdown-solid"
           style={{
             top: closeConfirmPosition.top,
             left: closeConfirmPosition.left,

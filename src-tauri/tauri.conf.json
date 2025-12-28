@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Wynter Code",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "identifier": "com.wynter.code",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -23,7 +23,7 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": true,
-        "transparent": false,
+        "transparent": true,
         "center": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
@@ -34,10 +34,12 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http: ws: wss:; frame-src *; child-src 'self' blob:;",
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; img-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost https: http: ws: wss:; frame-src *; child-src 'self' blob:; media-src 'self' blob: data: mediastream:;",
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
@@ -57,7 +59,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "app"],
+    "targets": [
+      "dmg",
+      "app"
+    ],
     "icon": [
       "icons/icon.png",
       "icons/32x32.png",

@@ -80,7 +80,11 @@ export type ActivityEventType =
   | "tool_completed"
   | "subagent_started"
   | "subagent_completed"
-  | "celebration";
+  | "celebration"
+  // Auto Build specific events
+  | "autobuild_phase_change"
+  | "autobuild_worker_started"
+  | "autobuild_issue_completed";
 
 export interface ActivityEvent {
   id: string;
@@ -152,10 +156,28 @@ export interface Grid {
   isWalkable(x: number, y: number): boolean;
 }
 
+// Map cycling types
+export type TimeOfDay = "day" | "night";
+export type Season = "summer" | "winter";
+
+export interface MapCycleState {
+  timeOfDay: TimeOfDay;
+  season: Season;
+  dayNightTimer: number;
+  winterTimer: number;
+  isWinter: boolean;
+  transitionProgress: number;
+  isTransitioning: boolean;
+  transitionFrom: string;
+  transitionTo: string;
+  lastTickTime: number; // Prevents double-ticking when multiple instances are mounted
+}
+
 export interface FarmworkTycoonState {
   isInitialized: boolean;
   isPaused: boolean;
   showDebug: boolean;
+  hideTooltips: boolean;
   showMiniPlayer: boolean;
 
   vehicles: Vehicle[];
@@ -172,10 +194,14 @@ export interface FarmworkTycoonState {
   simulatedFlowerCount: number | null;
   celebrationQueue: string[]; // Building IDs that just hit 10/10
 
+  // Map cycling state (synced between mini player and full view)
+  mapCycle: MapCycleState;
+
   initialize: (projectPath: string) => Promise<void>;
   pause: () => void;
   resume: () => void;
   toggleDebug: () => void;
+  toggleHideTooltips: () => void;
   showMiniPlayerFn: () => void;
   hideMiniPlayer: () => void;
   toggleMiniPlayer: () => void;
@@ -196,6 +222,7 @@ export interface FarmworkTycoonState {
   clearAllVehicles: () => void;
   setSimulatedFlowerCount: (count: number | null) => void;
   clearCelebrationQueue: () => void;
+  tickMapCycle: (dt: number) => void;
 }
 
 export const BUILDING_COLORS: Record<BuildingType, string> = {

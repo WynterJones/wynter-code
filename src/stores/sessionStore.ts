@@ -1,13 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
-import type { Session, Message, ClaudeModel, ToolCall, StreamingStats, PermissionMode, SessionType } from "@/types";
+import type { Session, Message, AIModel, AIProvider, ToolCall, StreamingStats, PermissionMode, SessionType } from "@/types";
 import type { PendingQuestion, PendingQuestionSet } from "@/components/output/AskUserQuestionBlock";
 import type { CustomHandledCommand } from "@/types/slashCommandResponse";
 
 export interface ClaudeSessionInfo {
   model?: string;
-  claudeSessionId?: string;
+  providerSessionId?: string;
   tools?: string[];
   cwd?: string;
   status: "starting" | "ready" | "ended";
@@ -33,7 +33,7 @@ interface SessionStore {
   streamingState: Map<string, StreamingState>;
   claudeSessionState: Map<string, ClaudeSessionInfo>;
 
-  createSession: (projectId: string, type?: SessionType, model?: ClaudeModel) => string;
+  createSession: (projectId: string, type?: SessionType, model?: AIModel, provider?: AIProvider) => string;
   removeSession: (projectId: string, sessionId: string) => void;
   setActiveSession: (projectId: string, sessionId: string) => void;
   getSessionsForProject: (projectId: string) => Session[];
@@ -47,11 +47,12 @@ interface SessionStore {
   getMessages: (sessionId: string) => Message[];
   clearMessages: (sessionId: string) => void;
 
-  updateSessionModel: (sessionId: string, model: ClaudeModel) => void;
+  updateSessionModel: (sessionId: string, model: AIModel) => void;
   updateSessionName: (sessionId: string, name: string) => void;
   updateSessionColor: (sessionId: string, color: string) => void;
   updateSessionPermissionMode: (sessionId: string, mode: PermissionMode) => void;
-  updateClaudeSessionId: (sessionId: string, claudeSessionId: string) => void;
+  updateSessionProvider: (sessionId: string, provider: AIProvider) => void;
+  updateProviderSessionId: (sessionId: string, providerSessionId: string) => void;
   getSession: (sessionId: string) => Session | undefined;
 
   // Streaming state
@@ -121,7 +122,8 @@ export const useSessionStore = create<SessionStore>()(
       createSession: (
         projectId: string,
         type: SessionType = "claude",
-        model: ClaudeModel = "claude-sonnet-4-20250514"
+        model: AIModel = "claude-sonnet-4-20250514",
+        provider: AIProvider = "claude"
       ) => {
         const sessionId = uuid();
         const session: Session = {
@@ -129,8 +131,9 @@ export const useSessionStore = create<SessionStore>()(
           projectId,
           name: type === "terminal" ? "Terminal" : "",
           type,
+          provider,
           model,
-          claudeSessionId: null,
+          providerSessionId: null,
           isActive: true,
           createdAt: new Date(),
           permissionMode: "acceptEdits",
@@ -246,7 +249,7 @@ export const useSessionStore = create<SessionStore>()(
         });
       },
 
-      updateSessionModel: (sessionId: string, model: ClaudeModel) => {
+      updateSessionModel: (sessionId: string, model: AIModel) => {
         set((state) => {
           const newSessions = new Map(state.sessions);
           for (const [projectId, sessions] of newSessions) {
@@ -298,12 +301,25 @@ export const useSessionStore = create<SessionStore>()(
         });
       },
 
-      updateClaudeSessionId: (sessionId: string, claudeSessionId: string) => {
+      updateSessionProvider: (sessionId: string, provider: AIProvider) => {
         set((state) => {
           const newSessions = new Map(state.sessions);
           for (const [projectId, sessions] of newSessions) {
             const updatedSessions = sessions.map((s) =>
-              s.id === sessionId ? { ...s, claudeSessionId } : s
+              s.id === sessionId ? { ...s, provider } : s
+            );
+            newSessions.set(projectId, updatedSessions);
+          }
+          return { sessions: newSessions };
+        });
+      },
+
+      updateProviderSessionId: (sessionId: string, providerSessionId: string) => {
+        set((state) => {
+          const newSessions = new Map(state.sessions);
+          for (const [projectId, sessions] of newSessions) {
+            const updatedSessions = sessions.map((s) =>
+              s.id === sessionId ? { ...s, providerSessionId } : s
             );
             newSessions.set(projectId, updatedSessions);
           }
@@ -642,12 +658,18 @@ export const useSessionStore = create<SessionStore>()(
         const migratedSessions = new Map<string, Session[]>();
         if (data?.sessions) {
           for (const [projectId, sessions] of data.sessions) {
-            const migrated = sessions.map((s) => ({
-              ...s,
-              type: s.type || "claude" as const,
-              permissionMode: s.permissionMode || "acceptEdits" as const,
-              color: s.color || undefined,
-            }));
+            const migrated = sessions.map((s) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const oldSession = s as any;
+              return {
+                ...s,
+                type: s.type || "claude" as const,
+                provider: s.provider || "claude" as const,
+                providerSessionId: s.providerSessionId || oldSession.claudeSessionId || null,
+                permissionMode: s.permissionMode || "acceptEdits" as const,
+                color: s.color || undefined,
+              };
+            });
             migratedSessions.set(projectId, migrated);
           }
         }

@@ -36,6 +36,13 @@ export function DocsViewer({ projectPath, onFileOpen }: DocsViewerProps) {
     }
   }, []);
 
+  // Auto-scan on mount if no cached data
+  useEffect(() => {
+    if (!cachedData && scanState === "idle") {
+      loadDocs(false);
+    }
+  }, [projectPath]);
+
   const loadDocs = async (isRefresh = false) => {
     try {
       if (isRefresh) {

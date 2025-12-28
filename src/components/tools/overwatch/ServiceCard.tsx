@@ -203,7 +203,7 @@ export function ServiceCard({
                 className="fixed inset-0 z-40"
                 onClick={() => setShowMenu(false)}
               />
-              <div className="absolute right-0 top-full mt-1 z-50 w-32 py-1 bg-surface-raised border border-border rounded-lg shadow-lg">
+              <div className="absolute right-0 top-full mt-1 z-50 w-32 py-1 bg-bg-secondary border border-border rounded-lg shadow-lg dropdown-solid">
                 <button
                   onClick={() => {
                     setShowMenu(false);

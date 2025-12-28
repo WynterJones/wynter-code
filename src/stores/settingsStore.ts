@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ClaudeModel } from "@/types";
+import type { ClaudeModel, AIProvider, CodexModel } from "@/types";
+import type { SidebarTab } from "@/types/file";
 import type {
   AudioSourceType,
   NightrideStation,
@@ -13,7 +14,8 @@ export type EditorTheme =
   | "dracula"
   | "vs-dark"
   | "github-dark"
-  | "monokai";
+  | "monokai"
+  | "catppuccin-ultrathin";
 
 export type MarkdownViewMode = "edit" | "split" | "preview";
 export type SidebarPosition = "left" | "right";
@@ -32,6 +34,33 @@ export type LightcastHotkey = "alt-space" | "cmd-space" | "ctrl-space" | "cmd-sh
 
 // Claude subscription plan types
 export type ClaudeSubscriptionPlan = "pro" | "max-100" | "max-200";
+
+// Vibrancy material types (macOS NSVisualEffectMaterial)
+export type VibrancyMaterial =
+  | "sidebar"
+  | "window"
+  | "content"
+  | "under-window"
+  | "hud"
+  | "popover"
+  | "menu"
+  | "titlebar"
+  | "dark"
+  | "ultra-dark"
+  | "acrylic"; // Windows only
+
+export const VIBRANCY_MATERIALS: { id: VibrancyMaterial; name: string; description: string }[] = [
+  { id: "sidebar", name: "Sidebar", description: "Default sidebar appearance" },
+  { id: "window", name: "Window", description: "Standard window background" },
+  { id: "content", name: "Content", description: "Content background" },
+  { id: "under-window", name: "Under Window", description: "Behind window content" },
+  { id: "hud", name: "HUD", description: "Heads-up display style" },
+  { id: "popover", name: "Popover", description: "Popover appearance" },
+  { id: "menu", name: "Menu", description: "Menu bar style" },
+  { id: "titlebar", name: "Titlebar", description: "Title bar appearance" },
+  { id: "dark", name: "Dark", description: "Dark vibrant appearance" },
+  { id: "ultra-dark", name: "Ultra Dark", description: "Very dark appearance" },
+];
 
 export const LIGHTCAST_HOTKEYS: { id: LightcastHotkey; name: string; display: string }[] = [
   { id: "alt-space", name: "Option + Space", display: "⌥ Space" },
@@ -59,6 +88,7 @@ export const TERMINAL_SHELLS: { id: TerminalShell; name: string; path: string | 
 ];
 
 export const EDITOR_THEMES: { id: EditorTheme; name: string }[] = [
+  { id: "catppuccin-ultrathin", name: "Catppuccin Ultrathin" },
   { id: "one-dark", name: "One Dark" },
   { id: "dracula", name: "Dracula" },
   { id: "vs-dark", name: "VS Code Dark" },
@@ -80,6 +110,7 @@ interface SettingsStore {
   sidebarWidth: number;
   sidebarPosition: SidebarPosition;
   sidebarCollapsed: boolean;
+  sidebarTabOrder: SidebarTab[];
   theme: "dark";
   fontSize: number;
   appFont: AppFont;
@@ -104,6 +135,11 @@ interface SettingsStore {
   // Claude safety settings
   claudeSafeMode: boolean; // Prevents bypassPermissions, restricts to project dir
 
+  // AI Provider settings
+  defaultProvider: AIProvider;
+  defaultCodexModel: CodexModel;
+  installedProviders: AIProvider[];
+
   // Avatar
   userAvatar: string | null;
 
@@ -124,10 +160,15 @@ interface SettingsStore {
   // Farmwork settings
   autoOpenFarmworkMiniPlayer: boolean;
 
+  // Vibrancy settings
+  vibrancyEnabled: boolean;
+  vibrancyDarkness: number; // 0.0 to 1.0 - controls dark overlay
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  setSidebarTabOrder: (order: SidebarTab[]) => void;
   setFontSize: (size: number) => void;
   setAppFont: (font: AppFont) => void;
   setEditorTheme: (theme: EditorTheme) => void;
@@ -150,6 +191,11 @@ interface SettingsStore {
   setUserAvatar: (avatar: string | null) => void;
   setClaudeSafeMode: (enabled: boolean) => void;
 
+  // AI Provider setters
+  setDefaultProvider: (provider: AIProvider) => void;
+  setDefaultCodexModel: (model: CodexModel) => void;
+  setInstalledProviders: (providers: AIProvider[]) => void;
+
   // Radio setters
   setAudioSourceType: (type: AudioSourceType) => void;
   setNightrideStation: (station: NightrideStation) => void;
@@ -169,6 +215,10 @@ interface SettingsStore {
 
   // Farmwork setters
   setAutoOpenFarmworkMiniPlayer: (enabled: boolean) => void;
+
+  // Vibrancy setters
+  setVibrancyEnabled: (enabled: boolean) => void;
+  setVibrancyDarkness: (darkness: number) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -178,10 +228,11 @@ export const useSettingsStore = create<SettingsStore>()(
       sidebarWidth: 256,
       sidebarPosition: "right",
       sidebarCollapsed: false,
+      sidebarTabOrder: ["files", "modules", "package", "git", "docs", "info"],
       theme: "dark",
       fontSize: 14,
       appFont: "jetbrains-mono",
-      editorTheme: "github-dark",
+      editorTheme: "catppuccin-ultrathin",
       editorFontSize: 14,
       editorWordWrap: true,
       editorMinimap: true,
@@ -201,6 +252,11 @@ export const useSettingsStore = create<SettingsStore>()(
       userAvatar: null,
       claudeSafeMode: true, // Enabled by default for safety
 
+      // AI Provider defaults
+      defaultProvider: "claude",
+      defaultCodexModel: "gpt-5.2-codex",
+      installedProviders: ["claude"], // Will be updated on system check
+
       // Radio defaults
       audioSourceType: "nightride",
       nightrideStation: "chillsynth",
@@ -218,6 +274,10 @@ export const useSettingsStore = create<SettingsStore>()(
       // Farmwork defaults
       autoOpenFarmworkMiniPlayer: false,
 
+      // Vibrancy defaults
+      vibrancyEnabled: true,
+      vibrancyDarkness: 0.65,
+
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
       },
@@ -232,6 +292,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setSidebarCollapsed: (sidebarCollapsed: boolean) => {
         set({ sidebarCollapsed });
+      },
+
+      setSidebarTabOrder: (sidebarTabOrder: SidebarTab[]) => {
+        set({ sidebarTabOrder });
       },
 
       setFontSize: (size: number) => {
@@ -318,6 +382,19 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ claudeSafeMode });
       },
 
+      // AI Provider setters
+      setDefaultProvider: (defaultProvider: AIProvider) => {
+        set({ defaultProvider });
+      },
+
+      setDefaultCodexModel: (defaultCodexModel: CodexModel) => {
+        set({ defaultCodexModel });
+      },
+
+      setInstalledProviders: (installedProviders: AIProvider[]) => {
+        set({ installedProviders });
+      },
+
       // Radio setters
       setAudioSourceType: (audioSourceType: AudioSourceType) => {
         set({ audioSourceType });
@@ -388,6 +465,15 @@ export const useSettingsStore = create<SettingsStore>()(
       // Farmwork setters
       setAutoOpenFarmworkMiniPlayer: (autoOpenFarmworkMiniPlayer: boolean) => {
         set({ autoOpenFarmworkMiniPlayer });
+      },
+
+      // Vibrancy setters
+      setVibrancyEnabled: (vibrancyEnabled: boolean) => {
+        set({ vibrancyEnabled });
+      },
+
+      setVibrancyDarkness: (vibrancyDarkness: number) => {
+        set({ vibrancyDarkness });
       },
     }),
     {

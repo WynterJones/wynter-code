@@ -15,7 +15,50 @@ import type {
   SiloProgress,
   AuditFileResults,
 } from "@/types/autoBuild";
-import type { StreamChunk } from "@/types";
+import type { StreamChunk, AIProvider } from "@/types";
+import { useSettingsStore } from "@/stores/settingsStore";
+
+/** Get the current default provider from settings */
+function getDefaultProvider(): AIProvider {
+  return useSettingsStore.getState().defaultProvider;
+}
+
+/** Get the Tauri command name for starting a session with the given provider */
+function getStartSessionCommand(provider: AIProvider): string {
+  switch (provider) {
+    case "codex":
+      return "start_codex_session";
+    case "gemini":
+      // Gemini CLI not yet implemented
+      console.warn("[AutoBuild] Gemini CLI not yet implemented, falling back to Claude");
+      return "start_claude_session";
+    case "claude":
+    default:
+      return "start_claude_session";
+  }
+}
+
+/** Get the Tauri command name for sending input with the given provider */
+function getSendInputCommand(provider: AIProvider): string {
+  switch (provider) {
+    case "codex":
+      return "send_codex_input";
+    case "claude":
+    default:
+      return "send_claude_input";
+  }
+}
+
+/** Get the event name for streaming with the given provider */
+function getStreamEventName(provider: AIProvider): string {
+  switch (provider) {
+    case "codex":
+      return "codex-stream";
+    case "claude":
+    default:
+      return "claude-stream";
+  }
+}
 
 interface AutoBuildActions {
   // UI
@@ -961,6 +1004,12 @@ When done, briefly confirm what was completed.`;
     // Track files modified by this worker
     const filesModified: string[] = [];
 
+    // Get provider from settings
+    const provider = getDefaultProvider();
+    const streamEventName = getStreamEventName(provider);
+    const startSessionCommand = getStartSessionCommand(provider);
+    const sendInputCommand = getSendInputCommand(provider);
+
     // Set up streaming state
     setStreamingState({
       isStreaming: true,
@@ -968,7 +1017,8 @@ When done, briefly confirm what was completed.`;
       currentAction: fixMode ? "Fixing issues" : "Implementing",
     });
 
-    addLog("claude", fixMode ? "Invoking Claude to fix issues" : `Invoking Claude for: ${issue.title}`, issueId);
+    const providerLabel = provider === "claude" ? "Claude" : provider === "codex" ? "Codex" : "AI";
+    addLog("claude", fixMode ? `Invoking ${providerLabel} to fix issues` : `Invoking ${providerLabel} for: ${issue.title}`, issueId);
 
     return new Promise<boolean>((resolve) => {
       let unlisten: UnlistenFn | null = null;
@@ -982,8 +1032,8 @@ When done, briefly confirm what was completed.`;
         setStreamingState(null);
       };
 
-      // Set up event listener for claude-stream
-      listen<StreamChunk>("claude-stream", (event) => {
+      // Set up event listener for the provider's stream
+      listen<StreamChunk>(streamEventName, (event) => {
         const chunk = event.payload;
         if (chunk.session_id !== sessionId) return;
 
@@ -1029,10 +1079,10 @@ When done, briefly confirm what was completed.`;
               resolved = true;
               cleanup();
               if (chunk.is_error) {
-                addLog("error", `Claude error: ${chunk.content || "Unknown error"}`, issueId);
+                addLog("error", `${providerLabel} error: ${chunk.content || "Unknown error"}`, issueId);
                 resolve(false);
               } else {
-                addLog("success", fixMode ? "Claude fixed issues" : "Claude completed work", issueId);
+                addLog("success", fixMode ? `${providerLabel} fixed issues` : `${providerLabel} completed work`, issueId);
                 resolve(true);
               }
             }
@@ -1042,15 +1092,15 @@ When done, briefly confirm what was completed.`;
         unlisten = fn;
       });
 
-      // Start the Claude session
-      invoke("start_claude_session", {
+      // Start the AI session
+      invoke(startSessionCommand, {
         cwd: projectPath,
         sessionId,
         permissionMode: "acceptEdits",
         safeMode: true,
       }).then(() => {
         // Send the prompt
-        return invoke("send_claude_input", {
+        return invoke(sendInputCommand, {
           sessionId,
           input: prompt,
         });
@@ -1058,7 +1108,7 @@ When done, briefly confirm what was completed.`;
         if (!resolved) {
           resolved = true;
           cleanup();
-          addLog("error", `Failed to start Claude: ${err}`, issueId);
+          addLog("error", `Failed to start ${providerLabel}: ${err}`, issueId);
           resolve(false);
         }
       });
@@ -1249,6 +1299,13 @@ Check for:
 
 Fix any issues found. Do NOT commit.`;
 
+    // Get provider from settings
+    const provider = getDefaultProvider();
+    const streamEventName = getStreamEventName(provider);
+    const startSessionCommand = getStartSessionCommand(provider);
+    const sendInputCommand = getSendInputCommand(provider);
+    const providerLabel = provider === "claude" ? "Claude" : provider === "codex" ? "Codex" : "AI";
+
     // Set up streaming state
     setStreamingState({
       isStreaming: true,
@@ -1256,7 +1313,7 @@ Fix any issues found. Do NOT commit.`;
       currentAction: "Self-reviewing code",
     });
 
-    addLog("claude", "Running self-review", issueId);
+    addLog("claude", `Running self-review with ${providerLabel}`, issueId);
 
     return new Promise<boolean>((resolve) => {
       let unlisten: UnlistenFn | null = null;
@@ -1270,8 +1327,8 @@ Fix any issues found. Do NOT commit.`;
         setStreamingState(null);
       };
 
-      // Set up event listener for claude-stream
-      listen<StreamChunk>("claude-stream", (event) => {
+      // Set up event listener for the provider's stream
+      listen<StreamChunk>(streamEventName, (event) => {
         const chunk = event.payload;
         if (chunk.session_id !== sessionId) return;
 
@@ -1325,14 +1382,14 @@ Fix any issues found. Do NOT commit.`;
         unlisten = fn;
       });
 
-      // Start the Claude session
-      invoke("start_claude_session", {
+      // Start the AI session
+      invoke(startSessionCommand, {
         cwd: projectPath,
         sessionId,
         permissionMode: "acceptEdits",
         safeMode: true,
       }).then(() => {
-        return invoke("send_claude_input", {
+        return invoke(sendInputCommand, {
           sessionId,
           input: prompt,
         });
@@ -1351,7 +1408,9 @@ Fix any issues found. Do NOT commit.`;
           resolved = true;
           cleanup();
           addLog("error", "Self-review timed out", issueId);
-          invoke("terminate_claude_session", { sessionId }).catch(() => {});
+          // Stop session based on provider
+          const stopCommand = provider === "codex" ? "stop_codex_session" : "stop_claude_session";
+          invoke(stopCommand, { sessionId }).catch(() => {});
           resolve(false);
         }
       }, 5 * 60 * 1000);
@@ -1401,6 +1460,13 @@ IMPORTANT: Launch ALL tasks in a SINGLE message for parallel execution. Each Tas
 
 When all audits complete, summarize which audits passed and which found issues.`;
 
+    // Get provider from settings
+    const provider = getDefaultProvider();
+    const streamEventName = getStreamEventName(provider);
+    const startSessionCommand = getStartSessionCommand(provider);
+    const sendInputCommand = getSendInputCommand(provider);
+    const providerLabel = provider === "claude" ? "Claude" : provider === "codex" ? "Codex" : "AI";
+
     // Set up streaming state
     setStreamingState({
       isStreaming: true,
@@ -1408,7 +1474,7 @@ When all audits complete, summarize which audits passed and which found issues.`
       currentAction: "Running audits in parallel",
     });
 
-    addLog("claude", `Running ${auditsToRun.length} audit(s) via orchestrator`, issueId);
+    addLog("claude", `Running ${auditsToRun.length} audit(s) via ${providerLabel} orchestrator`, issueId);
 
     // Run orchestrator session
     const orchestratorSuccess = await new Promise<boolean>((resolve) => {
@@ -1423,8 +1489,8 @@ When all audits complete, summarize which audits passed and which found issues.`
         setStreamingState(null);
       };
 
-      // Set up event listener
-      listen<StreamChunk>("claude-stream", (event) => {
+      // Set up event listener for the provider's stream
+      listen<StreamChunk>(streamEventName, (event) => {
         const chunk = event.payload;
         if (chunk.session_id !== sessionId) return;
 
@@ -1450,14 +1516,14 @@ When all audits complete, summarize which audits passed and which found issues.`
         unlisten = fn;
       });
 
-      // Start the Claude session
-      invoke("start_claude_session", {
+      // Start the AI session
+      invoke(startSessionCommand, {
         cwd: projectPath,
         sessionId,
         permissionMode: "default",
         safeMode: true,
       }).then(() => {
-        return invoke("send_claude_input", {
+        return invoke(sendInputCommand, {
           sessionId,
           input: orchestratorPrompt,
         });
@@ -1476,7 +1542,9 @@ When all audits complete, summarize which audits passed and which found issues.`
           resolved = true;
           cleanup();
           addLog("error", "Audit orchestrator timed out", issueId);
-          invoke("terminate_claude_session", { sessionId }).catch(() => {});
+          // Stop session based on provider
+          const stopCommand = provider === "codex" ? "stop_codex_session" : "stop_claude_session";
+          invoke(stopCommand, { sessionId }).catch(() => {});
           resolve(false);
         }
       }, 8 * 60 * 1000);

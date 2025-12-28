@@ -123,9 +123,9 @@ pub async fn brew_list_installed() -> Result<Vec<BrewPackage>, String> {
     let brew_path = get_brew_path();
     let mut packages = Vec::new();
 
-    // Get installed formulae with JSON
+    // Get installed formulae with JSON (use `brew info --installed` not `brew list`)
     let formulae_output = Command::new(&brew_path)
-        .args(["list", "--formulae", "--json=v2"])
+        .args(["info", "--json=v2", "--installed", "--formula"])
         .output()
         .map_err(|e| format!("Failed to list formulae: {}", e))?;
 
@@ -171,7 +171,7 @@ pub async fn brew_list_installed() -> Result<Vec<BrewPackage>, String> {
 
     // Get installed casks with JSON
     let casks_output = Command::new(&brew_path)
-        .args(["list", "--casks", "--json=v2"])
+        .args(["info", "--json=v2", "--installed", "--cask"])
         .output()
         .map_err(|e| format!("Failed to list casks: {}", e))?;
 

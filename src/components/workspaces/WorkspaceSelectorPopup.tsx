@@ -159,7 +159,7 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
         createPortal(
           <div
             ref={dropdownRef}
-            className="fixed z-[9999] w-72 bg-bg-secondary border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100"
+            className="fixed z-[9999] w-72 bg-bg-secondary border border-border rounded-lg shadow-xl overflow-hidden animate-in fade-in-0 zoom-in-95 duration-100 dropdown-solid"
             style={{ top: dropdownPosition.top, left: dropdownPosition.left }}
           >
             {/* Header */}

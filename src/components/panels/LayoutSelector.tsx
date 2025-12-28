@@ -63,7 +63,7 @@ export function LayoutSelector({ projectId, sessionId, activeTemplateId }: Layou
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl py-1.5 min-w-[180px]">
+          <div className="absolute top-full right-0 mt-1 z-50 bg-bg-secondary border border-border rounded-lg shadow-xl py-1.5 min-w-[180px] dropdown-solid">
             <div className="px-3 py-1 text-[10px] font-medium text-text-secondary/60 uppercase tracking-wider">
               Layout Templates
             </div>

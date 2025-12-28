@@ -416,6 +416,11 @@ export function ClaudePopup({ projectPath }: ClaudePopupProps) {
                           automaticLayout: true,
                           tabSize: 2,
                           renderValidationDecorations: "off",
+                          guides: {
+                            indentation: false,
+                            bracketPairs: false,
+                            highlightActiveIndentation: false,
+                          },
                         }}
                       />
                     </div>

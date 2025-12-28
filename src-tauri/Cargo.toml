@@ -1,6 +1,6 @@
 [package]
 name = "wynter-code"
-version = "1.0.0"
+version = "1.0.3"
 description = "An opinionated workflow GUI for Claude Code"
 homepage = "https://code.wynter.ai"
 authors = ["Wynter Jones"]
@@ -27,7 +27,8 @@ portable-pty = "0.8"
 uuid = { version = "1", features = ["v4"] }
 dirs = "5"
 open = "5"
-base64 = "0.22"
+base64 = { version = "0.22", features = ["std"] }
+lazy_static = "1.5"
 serde_yaml = "0.9"
 chrono = "0.4"
 notify = "6"
@@ -35,6 +36,7 @@ notify-debouncer-mini = "0.4"
 regex = "1"
 sysinfo = "0.31"
 hex = "0.4"
+window-vibrancy = "0.5"
 
 # Live preview server
 tiny_http = "0.12"

@@ -81,7 +81,7 @@ export function ClaudeDropdown({ projectPath }: ClaudeDropdownProps) {
       </button>
 
       {isDropdownOpen && (
-        <div className="absolute right-0 mt-1 w-64 py-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-50">
+        <div className="absolute right-0 mt-1 w-64 py-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 dropdown-solid">
           <div className="px-3 py-2 border-b border-border">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-text-primary">Claude Code</span>

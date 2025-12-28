@@ -13,6 +13,7 @@ interface MeditationState {
   miniPlayerVisible: boolean;
   currentTrack: number;
   isPlaying: boolean;
+  isLoading: boolean;
   volume: number;
   tracks: Track[];
 
@@ -32,6 +33,7 @@ interface MeditationState {
   prevTrack: () => void;
   togglePlay: () => void;
   setPlaying: (playing: boolean) => void;
+  setLoading: (loading: boolean) => void;
   setVolume: (vol: number) => void;
   closeMiniPlayer: () => void;
   setTracks: (tracks: Track[]) => void;
@@ -52,6 +54,7 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
   miniPlayerVisible: false,
   currentTrack: getRandomTrackIndex(BUILT_IN_TRACKS.length),
   isPlaying: false,
+  isLoading: false,
   volume: 1.0,
   tracks: BUILT_IN_TRACKS,
 
@@ -69,7 +72,8 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
     if (!active && isPlaying) {
       set({ isActive: false, miniPlayerVisible: true });
     } else {
-      set({ isActive: active });
+      // Set loading to true when activating (will be set false on canPlay)
+      set({ isActive: active, isLoading: active ? true : false });
     }
   },
 
@@ -91,6 +95,8 @@ export const useMeditationStore = create<MeditationState>((set, get) => ({
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
 
   setPlaying: (playing) => set({ isPlaying: playing }),
+
+  setLoading: (loading) => set({ isLoading: loading }),
 
   setVolume: (vol) => set({ volume: Math.max(0, Math.min(1, vol)) }),
 

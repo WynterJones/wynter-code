@@ -1,4 +1,4 @@
-use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -15,6 +15,8 @@ pub struct PtyOutput {
 
 struct PtyInstance {
     writer: Box<dyn Write + Send>,
+    // Store the master PTY handle for resize operations
+    master: Box<dyn MasterPty + Send>,
     #[allow(dead_code)] // Kept alive to keep the reader thread running
     reader_handle: Option<std::thread::JoinHandle<()>>,
 }
@@ -112,12 +114,13 @@ pub async fn create_pty(
         }
     });
 
-    // Store PTY instance
+    // Store PTY instance with master handle for resize operations
     let mut instances = state.instances.lock().unwrap();
     instances.insert(
         pty_id.clone(),
         PtyInstance {
             writer,
+            master: pair.master,
             reader_handle: Some(reader_handle),
         },
     );
@@ -160,15 +163,27 @@ pub async fn write_pty(
 
 #[tauri::command]
 pub async fn resize_pty(
-    _state: State<'_, Arc<PtyManager>>,
-    _pty_id: String,
-    _cols: u16,
-    _rows: u16,
+    state: State<'_, Arc<PtyManager>>,
+    pty_id: String,
+    cols: u16,
+    rows: u16,
 ) -> Result<(), String> {
-    // Note: portable-pty doesn't have a direct resize method on the stored writer
-    // For now, resize is a no-op. A more complete implementation would need to
-    // store the master PTY handle and call resize on it.
-    Ok(())
+    let instances = state.instances.lock().unwrap();
+
+    if let Some(instance) = instances.get(&pty_id) {
+        instance
+            .master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Failed to resize PTY: {}", e))?;
+        Ok(())
+    } else {
+        Err("PTY not found".to_string())
+    }
 }
 
 #[tauri::command]

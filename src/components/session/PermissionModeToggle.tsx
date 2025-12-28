@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { ShieldCheck, ShieldAlert, FileText, ChevronDown, Check, ShieldQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PermissionMode } from "@/types";
+import type { PermissionMode, AIProvider } from "@/types";
 
 interface PermissionModeToggleProps {
   mode: PermissionMode;
   onChange: (mode: PermissionMode) => void;
+  provider?: AIProvider;
   className?: string;
 }
 
@@ -52,6 +53,7 @@ const modeOptions: ModeOption[] = [
 export function PermissionModeToggle({
   mode,
   onChange,
+  provider,
   className,
 }: PermissionModeToggleProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -67,8 +69,16 @@ export function PermissionModeToggle({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Filter out 'manual' mode for Codex (doesn't support MCP permission server)
+  const availableOptions = useMemo(() => {
+    if (provider === "codex") {
+      return modeOptions.filter((opt) => opt.value !== "manual");
+    }
+    return modeOptions;
+  }, [provider]);
+
   // Find the selected mode, fallback to Auto if current mode isn't in options
-  const selectedMode = modeOptions.find((m) => m.value === mode) || modeOptions[0];
+  const selectedMode = availableOptions.find((m) => m.value === mode) || availableOptions.find((m) => m.value === "acceptEdits") || availableOptions[0];
 
   return (
     <div ref={ref} className={cn("relative", className)}>
@@ -85,8 +95,8 @@ export function PermissionModeToggle({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-1 w-56 py-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-50">
-          {modeOptions.map((option) => (
+        <div className="absolute right-0 mt-1 w-56 py-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-50 dropdown-solid">
+          {availableOptions.map((option) => (
             <button
               key={option.value}
               onClick={() => {

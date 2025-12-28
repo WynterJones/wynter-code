@@ -40,7 +40,7 @@ export function PackageHoverCard({
     <div
       className={cn(
         "absolute right-full mr-2 w-72 z-50",
-        "bg-bg-secondary border border-border rounded-lg shadow-xl",
+        "bg-bg-secondary border border-border rounded-lg shadow-xl dropdown-solid",
         "animate-in fade-in-0 slide-in-from-right-2 duration-150"
       )}
       style={{ top: Math.max(8, position.top - 40) }}

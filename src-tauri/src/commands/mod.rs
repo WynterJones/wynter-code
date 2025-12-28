@@ -191,6 +191,15 @@ pub fn write_file_content(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn is_directory(path: String) -> Result<bool, String> {
+    let path = Path::new(&path);
+    if !path.exists() {
+        return Err(format!("Path does not exist: {}", path.display()));
+    }
+    Ok(path.is_dir())
+}
+
+#[tauri::command]
 pub fn find_markdown_files(project_path: String) -> Result<Vec<MarkdownFile>, String> {
     let project_path_obj = Path::new(&project_path);
 
@@ -591,6 +600,8 @@ pub struct StreamChunk {
     pub tool_id: Option<String>,
     // Claude's session ID for conversation continuity
     pub claude_session_id: Option<String>,
+    // Codex thread ID for conversation continuity
+    pub thread_id: Option<String>,
     // Result message fields
     pub subtype: Option<String>,      // success, error_max_turns, error_during_execution
     pub is_error: Option<bool>,       // Error flag for result/tool_result
@@ -750,6 +761,7 @@ pub fn create_chunk(chunk_type: &str, session_id: &str) -> StreamChunk {
         duration_ms: None,
         tool_id: None,
         claude_session_id: None,
+        thread_id: None,
         // New fields
         subtype: None,
         is_error: None,
@@ -1328,11 +1340,9 @@ pub fn get_directory_stats(project_path: String) -> Result<DirectoryStats, Strin
         "md", "mdx"
     ].iter().cloned().collect();
 
-    // Calculate node_modules size separately
-    let node_modules_path = project_path_obj.join("node_modules");
-    if node_modules_path.exists() {
-        stats.node_modules_size = calculate_dir_size(&node_modules_path);
-    }
+    // Skip node_modules size calculation here - use get_node_modules_size command separately
+    // This keeps the initial stats load fast
+    stats.node_modules_size = 0;
 
     // Walk the directory tree, skipping excluded directories
     fn walk_dir(
@@ -1384,6 +1394,19 @@ pub fn get_directory_stats(project_path: String) -> Result<DirectoryStats, Strin
         }
     }
 
+    walk_dir(project_path_obj, &mut stats, &code_extensions, &skip_dirs);
+
+    Ok(stats)
+}
+
+#[tauri::command]
+pub async fn get_node_modules_size(project_path: String) -> Result<u64, String> {
+    let node_modules_path = Path::new(&project_path).join("node_modules");
+
+    if !node_modules_path.exists() {
+        return Ok(0);
+    }
+
     fn calculate_dir_size(path: &Path) -> u64 {
         let mut size: u64 = 0;
         if let Ok(entries) = fs::read_dir(path) {
@@ -1399,9 +1422,7 @@ pub fn get_directory_stats(project_path: String) -> Result<DirectoryStats, Strin
         size
     }
 
-    walk_dir(project_path_obj, &mut stats, &code_extensions, &skip_dirs);
-
-    Ok(stats)
+    Ok(calculate_dir_size(&node_modules_path))
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -1410,6 +1431,7 @@ pub struct SystemCheckResults {
     pub npm: Option<String>,
     pub git: Option<String>,
     pub claude: Option<String>,
+    pub codex: Option<String>,
 }
 
 fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
@@ -1461,6 +1483,7 @@ pub fn check_system_requirements() -> SystemCheckResults {
         npm: get_command_version("npm", &["--version"]),
         git: get_command_version("git", &["--version"]),
         claude: get_command_version("claude", &["--version"]),
+        codex: get_command_version("codex", &["--version"]),
     }
 }
 
@@ -2755,6 +2778,74 @@ pub async fn create_zip_archive(
     })
 }
 
+/// Zips a folder and returns the data as base64.
+/// Used for Netlify FTP drop zone to auto-zip folders before deploying.
+#[tauri::command]
+pub fn zip_folder_to_base64(folder_path: String) -> Result<String, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use std::io::{Read, Write, Cursor};
+    use walkdir::WalkDir;
+    use zip::write::SimpleFileOptions;
+    use zip::CompressionMethod;
+
+    let path = Path::new(&folder_path);
+
+    if !path.exists() {
+        return Err(format!("Path does not exist: {}", folder_path));
+    }
+
+    if !path.is_dir() {
+        return Err(format!("Path is not a directory: {}", folder_path));
+    }
+
+    // Create zip in memory
+    let mut buffer = Cursor::new(Vec::new());
+    {
+        let mut zip = zip::ZipWriter::new(&mut buffer);
+        let options = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Deflated)
+            .compression_level(Some(6));
+
+        // Walk the directory and add all files
+        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+            let entry_path = entry.path();
+            // Get path relative to the folder being zipped (not its parent)
+            let relative_path = entry_path
+                .strip_prefix(path)
+                .unwrap_or(entry_path);
+
+            // Skip the root directory itself
+            if relative_path.as_os_str().is_empty() {
+                continue;
+            }
+
+            if entry.file_type().is_dir() {
+                let dir_name = format!("{}/", relative_path.to_string_lossy());
+                zip.add_directory(&dir_name, options)
+                    .map_err(|e| format!("Failed to add directory: {}", e))?;
+            } else {
+                let mut file = fs::File::open(entry_path)
+                    .map_err(|e| format!("Failed to open file: {}", e))?;
+
+                let mut file_buffer = Vec::new();
+                file.read_to_end(&mut file_buffer)
+                    .map_err(|e| format!("Failed to read file: {}", e))?;
+
+                zip.start_file(relative_path.to_string_lossy(), options)
+                    .map_err(|e| format!("Failed to start file in zip: {}", e))?;
+
+                zip.write_all(&file_buffer)
+                    .map_err(|e| format!("Failed to write to zip: {}", e))?;
+            }
+        }
+
+        zip.finish().map_err(|e| format!("Failed to finish zip: {}", e))?;
+    }
+
+    // Return as base64
+    Ok(STANDARD.encode(buffer.into_inner()))
+}
+
 #[tauri::command]
 pub async fn optimize_image(path: String, overwrite: bool) -> Result<CompressionResult, String> {
     let input_path = Path::new(&path);
@@ -3502,4 +3593,40 @@ pub fn read_file_head(path: String, lines: usize) -> Result<String, String> {
         .collect();
 
     Ok(content.join("\n"))
+}
+
+/// Save base64 image data to a temp file for Codex CLI -i flag
+/// Returns the path to the temp file
+#[tauri::command]
+pub async fn save_temp_image(base64_data: String, media_type: String) -> Result<String, String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use std::io::Write;
+
+    // Determine extension from media type
+    let ext = match media_type.as_str() {
+        "image/png" => "png",
+        "image/jpeg" | "image/jpg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        _ => "png", // default
+    };
+
+    // Create temp file with unique name
+    let temp_dir = std::env::temp_dir();
+    let filename = format!("codex-image-{}.{}", uuid::Uuid::new_v4(), ext);
+    let path = temp_dir.join(&filename);
+
+    // Decode base64 and write to file
+    let bytes = STANDARD
+        .decode(&base64_data)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+
+    let mut file =
+        std::fs::File::create(&path).map_err(|e| format!("Failed to create temp file: {}", e))?;
+    file.write_all(&bytes)
+        .map_err(|e| format!("Failed to write temp file: {}", e))?;
+
+    eprintln!("[save_temp_image] Saved {} bytes to {:?}", bytes.len(), path);
+
+    Ok(path.to_string_lossy().to_string())
 }
