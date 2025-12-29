@@ -38,6 +38,11 @@ function findDropTarget(x: number, y: number): string | null {
       if (el.getAttribute("data-dropzone") === "prompt") {
         return "prompt-input";
       }
+
+      // Check for codespace drop zone
+      if (el.getAttribute("data-dropzone") === "codespace") {
+        return "codespace";
+      }
     }
   }
 
@@ -68,7 +73,11 @@ function handleMouseUp(e: MouseEvent) {
     window.dispatchEvent(new CustomEvent("internal-file-drop", {
       detail: { files: state.draggedFiles }
     }));
-  } else if (target && target !== "prompt-input" && state.draggedFiles.length > 0) {
+  } else if (target === "codespace" && state.draggedFiles.length > 0) {
+    window.dispatchEvent(new CustomEvent("codespace-file-drop", {
+      detail: { files: state.draggedFiles }
+    }));
+  } else if (target && target !== "prompt-input" && target !== "codespace" && state.draggedFiles.length > 0) {
     window.dispatchEvent(new CustomEvent("internal-folder-drop", {
       detail: { files: state.draggedFiles, targetFolder: target }
     }));

@@ -11,6 +11,8 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { exists } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
+import { invoke } from "@tauri-apps/api/core";
+import type { BeadsIssue } from "@/types/beads";
 import { open } from "@tauri-apps/plugin-shell";
 import {
   Play,
@@ -56,40 +58,64 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
     showMiniPlayerFn,
     startTestRun,
     clearAllVehicles,
+    setBeadsEnabled,
+    syncBeadVehicles,
   } = useFarmworkTycoonStore();
 
   const [containerSize, setContainerSize] = useState({ width: 600, height: 600 });
-  const [farmworkStatus, setFarmworkStatus] = useState<"checking" | "installed" | "not_installed">("checking");
+  const [farmworkStatus, setFarmworkStatus] = useState<"checking" | "installed" | "not_installed_globally" | "not_initialized_in_project">("checking");
   const [copied, setCopied] = useState(false);
 
+  // Get the appropriate command based on current status
+  const getCommand = useCallback(() => {
+    return farmworkStatus === "not_installed_globally"
+      ? "npm install -g farmwork"
+      : "farmwork init";
+  }, [farmworkStatus]);
+
   const handleCopyCommand = async () => {
-    await navigator.clipboard.writeText("npm install -g farmwork");
+    await navigator.clipboard.writeText(getCommand());
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleInstall = () => {
+  const handleRunCommand = () => {
     if (!activeProjectId) return;
 
     // Create a new terminal session
     const sessionId = createSession(activeProjectId, "terminal");
 
-    // Queue the install command to run when the terminal is ready
-    queueCommand(sessionId, "npm install -g farmwork");
+    // Queue the appropriate command based on status
+    queueCommand(sessionId, getCommand());
 
     // Close the popup
     onClose();
   };
 
-  // Check if .farmwork.json exists in the project
-  const checkFarmworkConfig = useCallback(async (projectPath: string) => {
+  // Check if farmwork CLI is installed globally and if project is initialized
+  const checkFarmworkStatus = useCallback(async (projectPath: string) => {
     try {
+      // First check if farmwork CLI is installed globally
+      const isGloballyInstalled = await invoke<boolean>("validate_mcp_command", { command: "farmwork" });
+
+      if (!isGloballyInstalled) {
+        setFarmworkStatus("not_installed_globally");
+        return false;
+      }
+
+      // CLI is installed, now check if project has .farmwork.json
       const configPath = await join(projectPath, ".farmwork.json");
       const configExists = await exists(configPath);
-      setFarmworkStatus(configExists ? "installed" : "not_installed");
-      return configExists;
+
+      if (!configExists) {
+        setFarmworkStatus("not_initialized_in_project");
+        return false;
+      }
+
+      setFarmworkStatus("installed");
+      return true;
     } catch {
-      setFarmworkStatus("not_installed");
+      setFarmworkStatus("not_installed_globally");
       return false;
     }
   }, []);
@@ -97,8 +123,8 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
   useEffect(() => {
     if (isOpen && activeProject?.path) {
       setFarmworkStatus("checking");
-      checkFarmworkConfig(activeProject.path).then((hasConfig) => {
-        if (hasConfig) {
+      checkFarmworkStatus(activeProject.path).then((isReady) => {
+        if (isReady) {
           window.__FARMWORK_PROJECT_PATH__ = activeProject.path;
           if (!isInitialized) {
             initialize(activeProject.path);
@@ -108,20 +134,49 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
         }
       });
     } else if (isOpen && !activeProject?.path) {
-      setFarmworkStatus("not_installed");
+      setFarmworkStatus("not_installed_globally");
     }
-  }, [isOpen, activeProject?.path, isInitialized, initialize, refreshStats, checkFarmworkConfig]);
+  }, [isOpen, activeProject?.path, isInitialized, initialize, refreshStats, checkFarmworkStatus]);
 
-  // Poll for stats updates every 5 seconds while popup is open
+  // Poll for stats updates and beads issues every 5 seconds while popup is open
   useEffect(() => {
     if (!isOpen || !isInitialized || farmworkStatus !== "installed") return;
 
-    const pollInterval = setInterval(() => {
+    const pollBeadsAndStats = async () => {
+      // Refresh farmwork stats
       refreshStats();
-    }, 5000);
+
+      // Poll beads if installed
+      if (activeProject?.path) {
+        try {
+          const hasBeads = await invoke<boolean>("beads_has_init", {
+            projectPath: activeProject.path,
+          });
+
+          if (hasBeads) {
+            setBeadsEnabled(true);
+            const issues = await invoke<BeadsIssue[]>("beads_list", {
+              projectPath: activeProject.path,
+            });
+            syncBeadVehicles(issues);
+          } else {
+            setBeadsEnabled(false);
+          }
+        } catch {
+          // Beads not available
+          setBeadsEnabled(false);
+        }
+      }
+    };
+
+    // Initial poll
+    pollBeadsAndStats();
+
+    // Poll every 5 seconds
+    const pollInterval = setInterval(pollBeadsAndStats, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [isOpen, isInitialized, refreshStats, farmworkStatus]);
+  }, [isOpen, isInitialized, refreshStats, farmworkStatus, activeProject?.path, setBeadsEnabled, syncBeadVehicles]);
 
   const handleOpenFarmworkSite = async () => {
     await open("https://farmwork.dev");
@@ -140,8 +195,11 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Show install screen if farmwork is not installed
-  if (farmworkStatus === "not_installed") {
+  // Show setup screen if farmwork is not installed globally or not initialized in project
+  if (farmworkStatus === "not_installed_globally" || farmworkStatus === "not_initialized_in_project") {
+    const isGlobalInstall = farmworkStatus === "not_installed_globally";
+    const command = getCommand();
+
     return (
       <Modal
         isOpen={isOpen}
@@ -154,21 +212,29 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
             <Tractor className="w-10 h-10 text-lime-500" />
           </div>
           <h2 className="text-xl font-semibold text-text-primary mb-3">
-            Set Up Farmwork
+            {isGlobalInstall ? "Set Up Farmwork" : "Initialize Farmwork"}
           </h2>
-          <p className="text-sm text-text-secondary max-w-md mb-2">
-            Farmwork is an agentic development harness that brings AI-assisted workflows to your project.
-          </p>
-          <p className="text-sm text-text-secondary max-w-md mb-6">
-            Install globally via npm, then run <code className="px-1.5 py-0.5 bg-bg-tertiary rounded text-xs font-mono">farmwork init</code> in your project to create the config file.
-          </p>
+          {isGlobalInstall ? (
+            <>
+              <p className="text-sm text-text-secondary max-w-md mb-2">
+                Farmwork is an agentic development harness that brings AI-assisted workflows to your project.
+              </p>
+              <p className="text-sm text-text-secondary max-w-md mb-6">
+                Install globally via npm, then run <code className="px-1.5 py-0.5 bg-bg-tertiary rounded text-xs font-mono">farmwork init</code> in your project to create the config file.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-text-secondary max-w-md mb-6">
+              Farmwork is installed! Initialize it in this project to enable AI-assisted workflows and start tracking your development metrics.
+            </p>
+          )}
 
           {/* Terminal-style code block */}
           <div className="w-full max-w-sm mb-6">
             <div className="flex items-center justify-between bg-neutral-900 rounded-lg border border-neutral-700 px-4 py-3">
               <code className="text-sm font-mono text-neutral-100">
                 <span className="text-neutral-500">$ </span>
-                npm install -g farmwork
+                {command}
               </code>
               <button
                 onClick={handleCopyCommand}
@@ -186,11 +252,11 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
 
           <div className="flex items-center gap-3">
             <button
-              onClick={handleInstall}
+              onClick={handleRunCommand}
               className="btn-primary flex items-center gap-2"
             >
               <Terminal className="w-4 h-4" />
-              <span>Install in Terminal</span>
+              <span>{isGlobalInstall ? "Install in Terminal" : "Initialize in Terminal"}</span>
             </button>
             <button
               onClick={handleOpenFarmworkSite}

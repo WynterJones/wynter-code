@@ -14,10 +14,10 @@ import { getRandomSpawnPoint } from "./navigation/SpawnPoints";
 const GAME_SIZE = 1000;
 
 const MAP_PATHS: Record<string, string> = {
-  "day-summer": "/tycoon/map.png",
-  "night-summer": "/tycoon/map-night.png",
-  "day-winter": "/tycoon/map-day-winter.png",
-  "night-winter": "/tycoon/map-night-winter.png",
+  "day-summer": "tycoon/map.png",
+  "night-summer": "tycoon/map-night.png",
+  "day-winter": "tycoon/map-day-winter.png",
+  "night-winter": "tycoon/map-night-winter.png",
 };
 
 interface TycoonGameProps {
@@ -71,7 +71,7 @@ export function TycoonGame({
 
   const initializeNavigation = useCallback(async () => {
     if (!navigationSystem.isInitialized()) {
-      const graph = await navigationSystem.initialize("/tycoon/map-mask.png", 16);
+      const graph = await navigationSystem.initialize("tycoon/map-mask.png", 16);
       setNavGraph(graph);
     }
   }, [setNavGraph]);
@@ -341,8 +341,8 @@ export function TycoonGame({
 
           updateVehiclePosition(data.id, data.position);
 
-          // Check for vehicles waiting that should now exit (tool completed)
-          if (data.task === "waiting_for_completion" && data.shouldExit) {
+          // Check for vehicles waiting that should now exit (tool completed or beads issue closed)
+          if ((data.task === "waiting_for_completion" || data.task === "waiting_at_office") && data.shouldExit) {
             // Start exiting
             vehicleSprite.setTask("exiting");
             const exitPoint = getRandomSpawnPoint("exit");
@@ -356,10 +356,24 @@ export function TycoonGame({
             continue;
           }
 
+          // Handle traveling_to_farmhouse: when a bead vehicle needs to move from office to farmhouse
+          if (data.task === "traveling_to_farmhouse" && data.path.length === 0) {
+            // Calculate path to farmhouse
+            const farmhouse = BUILDING_POSITIONS["farmhouse"];
+            if (farmhouse) {
+              const path = navigationSystem.findPath(data.position, { x: farmhouse.dockX, y: farmhouse.dockY });
+              if (path && path.length > 0) {
+                vehicleSprite.setPath(path);
+              }
+            }
+          }
+
           // Fallback timeout: if waiting > 5 minutes, auto-exit (prevents orphaned vehicles)
+          // Note: waiting_at_office vehicles (beads issues) don't have timeout - they wait until issue changes
           const MAX_WAIT_TIME = 5 * 60 * 1000; // 5 minutes
           if (
             data.task === "waiting_for_completion" &&
+            !data.issueId && // Only timeout non-beads vehicles
             data.waitStartTime &&
             Date.now() - data.waitStartTime > MAX_WAIT_TIME
           ) {
@@ -387,6 +401,21 @@ export function TycoonGame({
               setTimeout(() => {
                 removeVehicle(data.id);
               }, 100);
+              continue;
+            }
+
+            // Handle bead vehicle arriving at farmhouse after status change to in_progress
+            if (task === "traveling_to_farmhouse") {
+              vehicleSprite.setTask("waiting_for_completion", "farmhouse");
+              vehicleSprite.setPath([]);
+              continue;
+            }
+
+            // Handle bead vehicle arriving at office (waiting_at_office)
+            // When entering task completes and route leads to office
+            if (data.issueId && currentDest === "office" && task !== "waiting_at_office" && task !== "exiting") {
+              vehicleSprite.setTask("waiting_at_office", "office");
+              vehicleSprite.setPath([]);
               continue;
             }
 

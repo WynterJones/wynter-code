@@ -10,6 +10,7 @@ import { AskUserQuestionModal } from "@/components/output/AskUserQuestionModal";
 import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudePopup } from "@/components/claude";
+import { CodespaceEditor } from "@/components/codespace";
 import { ProviderDropdown } from "@/components/provider/ProviderDropdown";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle, StartButton } from "@/components/session";
@@ -533,6 +534,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
 
   const isStreaming = streamingState?.isStreaming || false;
   const isTerminalSession = currentSession?.type === "terminal";
+  const isCodespaceSession = currentSession?.type === "codespace";
 
   const handleTerminalPtyCreated = async (sessionId: string, ptyId: string) => {
     setSessionPtyId(sessionId, ptyId);
@@ -660,8 +662,13 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         </div>
       ))}
 
+      {/* Codespace Session */}
+      {isCodespaceSession && currentSessionId && (
+        <CodespaceEditor sessionId={currentSessionId} projectPath={project.path} />
+      )}
+
       {/* Multi-panel layout mode */}
-      {useMultiPanelLayout && !isTerminalSession && (
+      {useMultiPanelLayout && !isTerminalSession && !isCodespaceSession && (
         <PanelLayoutContainer projectId={project.id} projectPath={project.path} sessionId={currentSessionId} />
       )}
 
@@ -676,7 +683,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
       )}
 
       {/* Claude session content */}
-      {currentSessionId && !isTerminalSession && !useMultiPanelLayout && (
+      {currentSessionId && !isTerminalSession && !isCodespaceSession && !useMultiPanelLayout && (
         <>
           <div className="px-4 pt-3">
             <EnhancedPromptInput

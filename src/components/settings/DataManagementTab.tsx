@@ -18,6 +18,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSubscriptionStore } from "@/stores/subscriptionStore";
 import { useApiTesterStore } from "@/stores/apiTesterStore";
 import { useDatabaseViewerStore } from "@/stores/databaseViewerStore";
+import { useKanbanStore } from "@/stores/kanbanStore";
 import { usePanelStore } from "@/stores/panelStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useLivePreviewStore } from "@/stores/livePreviewStore";
@@ -47,6 +48,7 @@ export function DataManagementTab() {
   const subscriptionReset = useSubscriptionStore((s) => s.reset);
   const apiTesterReset = useApiTesterStore((s) => s.reset);
   const databaseViewerReset = useDatabaseViewerStore((s) => s.reset);
+  const kanbanReset = useKanbanStore((s) => s.reset);
   const panelReset = usePanelStore((s) => s.reset);
   const terminalReset = useTerminalStore((s) => s.reset);
   const livePreviewReset = useLivePreviewStore((s) => s.reset);
@@ -107,6 +109,7 @@ export function DataManagementTab() {
       subscriptionReset?.();
       apiTesterReset?.();
       databaseViewerReset?.();
+      kanbanReset?.();
       panelReset?.();
       terminalReset?.();
       livePreviewReset?.();
@@ -130,6 +133,7 @@ export function DataManagementTab() {
           case "tools":
             apiTesterReset?.();
             databaseViewerReset?.();
+            kanbanReset?.();
             storybookReset?.();
             break;
           case "ui":
@@ -162,6 +166,7 @@ export function DataManagementTab() {
     subscriptionReset,
     apiTesterReset,
     databaseViewerReset,
+    kanbanReset,
     panelReset,
     terminalReset,
     livePreviewReset,

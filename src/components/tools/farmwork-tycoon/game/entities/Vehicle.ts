@@ -175,8 +175,8 @@ export class VehicleSprite extends Container {
       return false;
     }
 
-    // Pulsing effect while waiting for tool completion
-    if (this.data.task === "waiting_for_completion") {
+    // Pulsing effect while waiting (for tool completion or at office for beads issues)
+    if (this.data.task === "waiting_for_completion" || this.data.task === "waiting_at_office") {
       this.pulseTimer += dtSeconds;
       const pulse = Math.sin(this.pulseTimer * 3) * 0.08 + 1.0; // Gentle 0.92 to 1.08 scale
       this.sprite.scale.set(0.6 * pulse);

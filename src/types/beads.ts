@@ -75,3 +75,12 @@ export const PRIORITY_COLORS: Record<number, string> = {
   3: "text-blue-400",
   4: "text-neutral-400",
 };
+
+// Hex colors for PixiJS vehicle tinting (Farmwork Tycoon visualization)
+export const PRIORITY_HEX_COLORS: Record<number, number> = {
+  0: 0xf87171, // red-400 - Critical
+  1: 0xfb923c, // orange-400 - High
+  2: 0xfacc15, // yellow-400 - Medium
+  3: 0x60a5fa, // blue-400 - Low
+  4: 0xa3a3a3, // neutral-400 - Trivial
+};

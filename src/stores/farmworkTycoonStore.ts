@@ -2,7 +2,8 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { join } from "@tauri-apps/api/path";
-import type { BeadsStats } from "@/types/beads";
+import type { BeadsStats, BeadsIssue, BeadsStatus } from "@/types/beads";
+import { PRIORITY_HEX_COLORS } from "@/types/beads";
 import type {
   FarmworkTycoonState,
   Building,
@@ -18,6 +19,7 @@ import type {
   MapCycleState,
   TimeOfDay,
   Season,
+  BeadVehicleMapping,
 } from "@/components/tools/farmwork-tycoon/types";
 import {
   BUILDING_POSITIONS,
@@ -272,6 +274,10 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   simulatedFlowerCount: null,
   celebrationQueue: [],
   mapCycle: createInitialMapCycleState(),
+
+  // Beads issue vehicle tracking
+  beadsEnabled: false,
+  beadVehicleMap: new Map<string, BeadVehicleMapping>(),
 
   initialize: async (_projectPath: string) => {
     await get().refreshStats();
@@ -845,6 +851,177 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
         v.id === vehicleId ? { ...v, shouldExit: true } : v
       ),
     }));
+  },
+
+  // Beads issue vehicle tracking methods
+  setBeadsEnabled: (enabled: boolean) => {
+    set({ beadsEnabled: enabled });
+  },
+
+  syncBeadVehicles: (issues: BeadsIssue[]) => {
+    const { beadVehicleMap, spawnBeadVehicle, signalVehicleExit } = get();
+    const MAX_BEAD_VEHICLES = 15;
+
+    // Filter to only open/in_progress issues, sorted by priority
+    const activeIssues = issues
+      .filter((i) => i.status === "open" || i.status === "in_progress")
+      .sort((a, b) => a.priority - b.priority)
+      .slice(0, MAX_BEAD_VEHICLES);
+
+    const activeIssueIds = new Set(activeIssues.map((i) => i.id));
+
+    // Remove vehicles for closed/blocked issues
+    for (const [issueId, mapping] of beadVehicleMap) {
+      if (!activeIssueIds.has(issueId)) {
+        // Issue was closed - signal vehicle to exit
+        signalVehicleExit(mapping.vehicleId);
+        set((state) => {
+          const newMap = new Map(state.beadVehicleMap);
+          newMap.delete(issueId);
+          return { beadVehicleMap: newMap };
+        });
+      }
+    }
+
+    // Add or update vehicles for active issues
+    for (const issue of activeIssues) {
+      const existing = beadVehicleMap.get(issue.id);
+
+      if (!existing) {
+        // New issue - spawn vehicle
+        spawnBeadVehicle(issue);
+      } else if (existing.status !== issue.status) {
+        // Status changed - update vehicle destination
+        get().updateBeadVehicleStatus(issue.id, issue.status);
+      }
+    }
+  },
+
+  spawnBeadVehicle: (issue: BeadsIssue) => {
+    const destination = issue.status === "open" ? "office" : "farmhouse";
+    const tint = PRIORITY_HEX_COLORS[issue.priority] ?? 0xa3a3a3;
+
+    const id = `bead-vehicle-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const type = getVehicleTypeForDestination(destination);
+
+    const spawnPoint = getRandomSpawnPoint("enter");
+    const exitPoint = getNearestExitPoint({ x: 500, y: 500 });
+
+    // For bead vehicles, route is just to the waiting building
+    const route = [destination];
+
+    const newVehicle: Vehicle = {
+      id,
+      type,
+      position: { ...spawnPoint.position },
+      destination,
+      route,
+      currentRouteIndex: 0,
+      task: "entering",
+      spawnPoint: spawnPoint.id,
+      exitPoint: exitPoint.id,
+      path: [],
+      pathIndex: 0,
+      speed: VEHICLE_SPEED.BASE + Math.random() * VEHICLE_SPEED.VARIANCE,
+      carrying: false,
+      direction: spawnPoint.edge === "top" ? "down" : "up",
+      tint,
+      issueId: issue.id,
+      issueTitle: issue.title,
+    };
+
+    set((state) => ({
+      vehicles: [...state.vehicles, newVehicle],
+    }));
+
+    // Store mapping
+    set((state) => {
+      const newMap = new Map(state.beadVehicleMap);
+      newMap.set(issue.id, {
+        issueId: issue.id,
+        vehicleId: id,
+        status: issue.status,
+        priority: issue.priority,
+        title: issue.title,
+      });
+      return { beadVehicleMap: newMap };
+    });
+
+    get().addActivity({
+      type: "issue_created",
+      message: `Issue: ${issue.title.slice(0, 30)}${issue.title.length > 30 ? "..." : ""}`,
+      buildingId: destination,
+    });
+
+    return id;
+  },
+
+  updateBeadVehicleStatus: (issueId: string, newStatus: BeadsStatus) => {
+    const { beadVehicleMap, vehicles, signalVehicleExit } = get();
+    const mapping = beadVehicleMap.get(issueId);
+    if (!mapping) return;
+
+    const vehicle = vehicles.find((v) => v.id === mapping.vehicleId);
+    if (!vehicle) return;
+
+    if (newStatus === "in_progress" && mapping.status === "open") {
+      // Issue started - move vehicle from office to farmhouse
+      set((state) => ({
+        vehicles: state.vehicles.map((v) =>
+          v.id === mapping.vehicleId
+            ? {
+                ...v,
+                route: ["farmhouse"],
+                currentRouteIndex: 0,
+                destination: "farmhouse",
+                task: "traveling_to_farmhouse" as const,
+                path: [], // Will be recalculated by game loop
+                pathIndex: 0,
+              }
+            : v
+        ),
+        beadVehicleMap: new Map(state.beadVehicleMap).set(issueId, {
+          ...mapping,
+          status: newStatus,
+        }),
+      }));
+
+      get().addActivity({
+        type: "issue_started",
+        message: `Started: ${mapping.title.slice(0, 30)}${mapping.title.length > 30 ? "..." : ""}`,
+        buildingId: "farmhouse",
+      });
+    } else if (newStatus === "closed") {
+      // Issue closed - signal vehicle to exit
+      signalVehicleExit(mapping.vehicleId);
+
+      // Remove from mapping
+      set((state) => {
+        const newMap = new Map(state.beadVehicleMap);
+        newMap.delete(issueId);
+        return { beadVehicleMap: newMap };
+      });
+
+      get().addActivity({
+        type: "issue_closed",
+        message: `Closed: ${mapping.title.slice(0, 30)}${mapping.title.length > 30 ? "..." : ""}`,
+        buildingId: "farmhouse",
+      });
+    }
+  },
+
+  removeBeadVehicle: (issueId: string) => {
+    const { beadVehicleMap, signalVehicleExit } = get();
+    const mapping = beadVehicleMap.get(issueId);
+    if (!mapping) return;
+
+    signalVehicleExit(mapping.vehicleId);
+
+    set((state) => {
+      const newMap = new Map(state.beadVehicleMap);
+      newMap.delete(issueId);
+      return { beadVehicleMap: newMap };
+    });
   },
 }));
 

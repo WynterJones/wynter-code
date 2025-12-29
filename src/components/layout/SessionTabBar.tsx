@@ -12,15 +12,34 @@ import {
   Play,
   Bot,
   Search,
+  Code,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Tooltip, TabContextMenu } from "@/components/ui";
 import { useSessionStore } from "@/stores/sessionStore";
+import type { StreamingState } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { claudeService } from "@/services/claude";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
+import type { Session } from "@/types";
 
 interface DropdownPosition {
   top: number;
@@ -43,6 +62,146 @@ interface SessionTabBarProps {
   onOpenProjectSearch?: () => void;
 }
 
+interface SortableSessionTabProps {
+  session: Session;
+  index: number;
+  isActive: boolean;
+  streamingState: StreamingState;
+  onSelect: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+  onClose: (e: React.MouseEvent) => void;
+  onStop: (e: React.MouseEvent) => void;
+}
+
+function SortableSessionTab({
+  session,
+  index,
+  isActive,
+  streamingState,
+  onSelect,
+  onContextMenu,
+  onClose,
+  onStop,
+}: SortableSessionTabProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: session.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={onSelect}
+      onContextMenu={onContextMenu}
+      className={cn(
+        "group flex items-center gap-1.5 px-2 h-9 cursor-pointer transition-colors relative w-[200px] min-w-[140px] max-w-[200px] flex-shrink",
+        "border-r border-border/50",
+        isActive
+          ? "bg-bg-secondary text-text-primary"
+          : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50",
+        isDragging && "opacity-50 z-50"
+      )}
+    >
+      {/* Session color indicator */}
+      {isActive && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-0.5"
+          style={{ backgroundColor: session.color || "var(--border)" }}
+        />
+      )}
+
+      {/* Session icon */}
+      <div className="flex-shrink-0">
+        {session.type === "terminal" ? (
+          <Terminal
+            className="w-3.5 h-3.5"
+            style={{ color: session.color || "currentColor" }}
+          />
+        ) : session.type === "codespace" ? (
+          <Code
+            className="w-3.5 h-3.5"
+            style={{ color: session.color || "currentColor" }}
+          />
+        ) : (
+          <MessageSquare
+            className="w-3.5 h-3.5"
+            style={{ color: session.color || "currentColor" }}
+          />
+        )}
+      </div>
+
+      {/* Streaming indicator */}
+      {session.type === "claude" && streamingState?.isStreaming && (
+        <div className="relative flex items-center flex-shrink-0">
+          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+          <div className="absolute w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75" />
+        </div>
+      )}
+
+      {/* Session name */}
+      <span className="text-sm truncate flex-1 min-w-0">
+        {session.name || `Session ${index + 1}`}
+      </span>
+
+      {/* Action buttons */}
+      <div
+        className={cn(
+          "absolute inset-y-0 right-0 flex items-center pr-1 pl-4",
+          "opacity-0 group-hover:opacity-100 transition-opacity"
+        )}
+        style={{
+          background: isActive
+            ? "linear-gradient(to right, transparent 0%, var(--bg-secondary) 30%)"
+            : "linear-gradient(to right, transparent 0%, var(--bg-primary) 30%)",
+        }}
+      >
+        {/* Stop button for streaming Claude sessions */}
+        {session.type === "claude" && streamingState?.isStreaming && (
+          <button
+            onClick={onStop}
+            className="p-0.5 rounded hover:bg-bg-hover/80 text-accent-red transition-colors"
+            title="Stop streaming"
+          >
+            <StopCircle className="w-3 h-3" />
+          </button>
+        )}
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="p-0.5 rounded hover:bg-bg-hover/80 text-text-secondary hover:text-accent-red transition-colors"
+        >
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SessionTabBar({
   projectId,
   hasBeads,
@@ -58,6 +217,7 @@ export function SessionTabBar({
     setActiveSession,
     createSession,
     removeSession,
+    reorderSessions,
     updateSessionName,
     updateSessionColor,
     getStreamingState,
@@ -179,7 +339,7 @@ export function SessionTabBar({
     setShowNewDropdown(!showNewDropdown);
   };
 
-  const handleCreateSession = (type: "claude" | "terminal") => {
+  const handleCreateSession = (type: "claude" | "terminal" | "codespace") => {
     createSession(projectId, type);
     setShowNewDropdown(false);
   };
@@ -235,6 +395,29 @@ export function SessionTabBar({
     [finishStreaming],
   );
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        const oldIndex = sessions.findIndex((s) => s.id === active.id);
+        const newIndex = sessions.findIndex((s) => s.id === over.id);
+        reorderSessions(projectId, oldIndex, newIndex);
+      }
+    },
+    [sessions, projectId, reorderSessions]
+  );
+
   return (
     <div
       className="flex items-center h-9 bg-bg-primary border-b border-border"
@@ -264,102 +447,30 @@ export function SessionTabBar({
             Add a new session to start working...
           </span>
         ) : (
-          sessions.map((session, index) => (
-            <div
-              key={session.id}
-              onClick={() => setActiveSession(projectId, session.id)}
-              onContextMenu={(e) => handleContextMenu(e, session.id)}
-              className={cn(
-                "group flex items-center gap-1.5 px-2 h-9 cursor-pointer transition-colors relative w-[200px] min-w-[140px] max-w-[200px] flex-shrink",
-                "border-r border-border/50",
-                activeId === session.id
-                  ? "bg-bg-secondary text-text-primary"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50",
-              )}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={sessions.map((s) => s.id)}
+              strategy={horizontalListSortingStrategy}
             >
-              {/* Session color indicator - show color when has color, subtle border when no color */}
-              {activeId === session.id && (
-                <div
-                  className="absolute bottom-0 left-0 right-0 h-0.5"
-                  style={{ backgroundColor: session.color || "var(--border)" }}
+              {sessions.map((session, index) => (
+                <SortableSessionTab
+                  key={session.id}
+                  session={session}
+                  index={index}
+                  isActive={activeId === session.id}
+                  streamingState={getStreamingState(session.id)}
+                  onSelect={() => setActiveSession(projectId, session.id)}
+                  onContextMenu={(e) => handleContextMenu(e, session.id)}
+                  onClose={(e) => handleSessionClose(e, session.id, session.type)}
+                  onStop={(e) => handleStopClaudeSession(e, session.id)}
                 />
-              )}
-
-              {/* Session icon */}
-              <div className="flex-shrink-0">
-                {session.type === "terminal" ? (
-                  <Terminal
-                    className="w-3.5 h-3.5"
-                    style={{ color: session.color || "currentColor" }}
-                  />
-                ) : (
-                  <MessageSquare
-                    className="w-3.5 h-3.5"
-                    style={{ color: session.color || "currentColor" }}
-                  />
-                )}
-              </div>
-
-              {/* Streaming indicator - pulsing green dot */}
-              {session.type === "claude" &&
-                getStreamingState(session.id)?.isStreaming && (
-                  <div className="relative flex items-center flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                    <div className="absolute w-2 h-2 rounded-full bg-green-500 animate-ping opacity-75" />
-                  </div>
-                )}
-
-              {/* Session name */}
-              <span className="text-sm truncate flex-1 min-w-0">
-                {session.name || `Session ${index + 1}`}
-              </span>
-
-              {/* Action buttons - overlay with gradient fade on hover */}
-              <div
-                className={cn(
-                  "absolute inset-y-0 right-0 flex items-center pr-1 pl-4",
-                  "opacity-0 group-hover:opacity-100 transition-opacity",
-                )}
-                style={{
-                  background: activeId === session.id
-                    ? "linear-gradient(to right, transparent 0%, var(--bg-secondary) 30%)"
-                    : "linear-gradient(to right, transparent 0%, var(--bg-primary) 30%)",
-                }}
-              >
-                {/* Stop button for streaming Claude sessions */}
-                {session.type === "claude" &&
-                  getStreamingState(session.id)?.isStreaming && (
-                    <button
-                      onClick={(e) => handleStopClaudeSession(e, session.id)}
-                      className="p-0.5 rounded hover:bg-bg-hover/80 text-accent-red transition-colors"
-                      title="Stop streaming"
-                    >
-                      <StopCircle className="w-3 h-3" />
-                    </button>
-                  )}
-
-                {/* Close button */}
-                <button
-                  onClick={(e) => handleSessionClose(e, session.id, session.type)}
-                  className="p-0.5 rounded hover:bg-bg-hover/80 text-text-secondary hover:text-accent-red transition-colors"
-                >
-                  <svg
-                    className="w-3 h-3"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
@@ -391,9 +502,9 @@ export function SessionTabBar({
         </button>
       </div>
 
-      {/* New Session Button */}
+      {/* New Tab Button */}
       <div className="h-full flex items-center border-l border-border px-2 relative">
-        <Tooltip content="New Session">
+        <Tooltip content="New Tab">
           <button
             ref={plusButtonRef}
             onClick={handlePlusClick}
@@ -426,6 +537,22 @@ export function SessionTabBar({
             >
               <Terminal className="w-4 h-4" />
               New Terminal
+            </button>
+            <button
+              onClick={() => handleCreateSession("codespace")}
+              disabled={sessions.some((s) => s.type === "codespace")}
+              className={cn(
+                "w-full flex items-center gap-2 px-3 py-2 text-sm rounded transition-colors",
+                sessions.some((s) => s.type === "codespace")
+                  ? "text-text-secondary/50 cursor-not-allowed"
+                  : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+              )}
+            >
+              <Code className="w-4 h-4" />
+              New Codespace
+              {sessions.some((s) => s.type === "codespace") && (
+                <span className="text-[10px] text-text-secondary/50 ml-auto">(1 max)</span>
+              )}
             </button>
           </div>
         )}

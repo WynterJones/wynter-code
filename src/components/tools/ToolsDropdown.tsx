@@ -32,6 +32,7 @@ import {
   FileSearch,
   CreditCard,
   Wheat,
+  CheckSquare,
   ChevronsUpDown,
   ChevronRight,
   // Mini-tool icons
@@ -178,6 +179,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Audit & dev workflow",
     icon: Wheat,
     actionKey: "openFarmwork",
+    category: "project",
+    hiddenInDropdown: true,
+  },
+  {
+    id: "kanban-board",
+    name: "Workspace Board",
+    description: "Kanban board for workspace tasks",
+    icon: CheckSquare,
+    actionKey: "openKanbanBoard",
     category: "project",
     hiddenInDropdown: true,
   },

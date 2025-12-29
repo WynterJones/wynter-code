@@ -125,10 +125,11 @@ export const DATA_CATEGORIES: DataCategory[] = [
   {
     id: "tools",
     name: "Tools Data",
-    description: "API tester requests, database connections, Storybook configs, justfile recipes",
+    description: "API tester requests, database connections, Kanban boards, Storybook configs",
     keys: [
       "wynter-code-api-tester",
       "database-viewer-storage",
+      "wynter-code-kanban",
       "wynter-code-storybook",
       "wynter-code-justfile",
       "wynter-code-search",

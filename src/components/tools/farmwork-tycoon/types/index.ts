@@ -1,4 +1,4 @@
-import type { BeadsStats } from "@/types/beads";
+import type { BeadsStats, BeadsStatus } from "@/types/beads";
 
 export interface Point {
   x: number;
@@ -47,6 +47,8 @@ export type VehicleTaskStatus =
   | "traveling_to_delivery"
   | "delivering"
   | "waiting_for_completion"
+  | "waiting_at_office" // Beads: open issues wait at office
+  | "traveling_to_farmhouse" // Beads: in_progress issues go to farmhouse
   | "exiting"
   | "finished";
 
@@ -69,6 +71,8 @@ export interface Vehicle {
   tint?: number; // Hex color for PixiJS sprite tinting (tool call visualization)
   shouldExit?: boolean; // Signals vehicle to start exiting (set by tool completion)
   waitStartTime?: number; // Timestamp when vehicle started waiting (for timeout fallback)
+  issueId?: string; // Beads: associated issue ID for bead vehicles
+  issueTitle?: string; // Beads: issue title for badge display
 }
 
 export type ActivityEventType =
@@ -131,6 +135,15 @@ export interface GardenStats {
 export interface CompostStats {
   rejectedIdeas: number;
   ideas: string[];
+}
+
+// Beads issue vehicle tracking
+export interface BeadVehicleMapping {
+  issueId: string;
+  vehicleId: string;
+  status: BeadsStatus;
+  priority: number;
+  title: string;
 }
 
 export interface NavNode {
@@ -227,6 +240,15 @@ export interface FarmworkTycoonState {
   clearCelebrationQueue: () => void;
   tickMapCycle: (dt: number) => void;
   signalVehicleExit: (vehicleId: string) => void;
+
+  // Beads issue vehicle tracking
+  beadsEnabled: boolean;
+  beadVehicleMap: Map<string, BeadVehicleMapping>;
+  setBeadsEnabled: (enabled: boolean) => void;
+  syncBeadVehicles: (issues: import("@/types/beads").BeadsIssue[]) => void;
+  spawnBeadVehicle: (issue: import("@/types/beads").BeadsIssue) => string;
+  updateBeadVehicleStatus: (issueId: string, newStatus: BeadsStatus) => void;
+  removeBeadVehicle: (issueId: string) => void;
 }
 
 export const BUILDING_COLORS: Record<BuildingType, string> = {
@@ -320,22 +342,22 @@ export const VEHICLE_SPRITE_PATHS: Record<
   }
 > = {
   "blue-truck": {
-    up: "/tycoon/blue-truck-up.png",
-    upFilled: "/tycoon/blue-truck-up-filled.png",
-    left: "/tycoon/blue-truck-left.png",
-    leftFilled: "/tycoon/blue-truck-left-filled.png",
+    up: "tycoon/blue-truck-up.png",
+    upFilled: "tycoon/blue-truck-up-filled.png",
+    left: "tycoon/blue-truck-left.png",
+    leftFilled: "tycoon/blue-truck-left-filled.png",
   },
   "white-truck": {
-    up: "/tycoon/white-truck-up.png",
-    upFilled: "/tycoon/white-truck-up-filled.png",
-    left: "/tycoon/white-truck-left.png",
-    leftFilled: "/tycoon/white-truck-left-filled.png",
+    up: "tycoon/white-truck-up.png",
+    upFilled: "tycoon/white-truck-up-filled.png",
+    left: "tycoon/white-truck-left.png",
+    leftFilled: "tycoon/white-truck-left-filled.png",
   },
   tractor: {
-    up: "/tycoon/tractor-up.png",
-    upFilled: "/tycoon/tractor-up-filled.png",
-    left: "/tycoon/tractor-left.png",
-    leftFilled: "/tycoon/tractor-left-filled.png",
+    up: "tycoon/tractor-up.png",
+    upFilled: "tycoon/tractor-up-filled.png",
+    left: "tycoon/tractor-left.png",
+    leftFilled: "tycoon/tractor-left-filled.png",
   },
 };
 
@@ -377,6 +399,10 @@ export function getTaskMessage(
       return `Unloading at ${destName}`;
     case "waiting_for_completion":
       return `Working at ${destName}...`;
+    case "waiting_at_office":
+      return "Ready to start";
+    case "traveling_to_farmhouse":
+      return "In progress...";
     case "exiting":
       return "Task Complete!";
     case "finished":

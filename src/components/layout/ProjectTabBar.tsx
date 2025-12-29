@@ -13,6 +13,7 @@ import {
   Eye,
   Bookmark,
   CloudUpload,
+  CheckSquare,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -78,8 +79,11 @@ import { BookmarksPopup } from "@/components/tools/bookmarks";
 import { ProjectSearchPopup } from "@/components/tools/project-search";
 import { AutoBuildPopup } from "@/components/tools/auto-build";
 import { SystemCleanerPopup } from "@/components/tools/system-cleaner";
+import { KanbanBoardPopup } from "@/components/tools/kanban-board";
 import { useMcpStore } from "@/stores";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import { useCodespaceStore } from "@/stores/codespaceStore";
 import { cn } from "@/lib/utils";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useStorybookDetection } from "@/hooks/useStorybookDetection";
@@ -403,6 +407,7 @@ export function ProjectTabBar({
   const [showProjectSearch, setShowProjectSearch] = useState(false);
   const [showJustCommandManager, setShowJustCommandManager] = useState(false);
   const [showUniversalViewer, setShowUniversalViewer] = useState(false);
+  const [showKanbanBoard, setShowKanbanBoard] = useState(false);
   const [appVersion, setAppVersion] = useState<string>("");
 
   // Fetch app version on mount
@@ -580,6 +585,9 @@ export function ProjectTabBar({
           break;
         case "openUniversalViewer":
           setShowUniversalViewer(true);
+          break;
+        case "openKanbanBoard":
+          setShowKanbanBoard(true);
           break;
       }
     };
@@ -868,6 +876,15 @@ export function ProjectTabBar({
             className={cn(isMeditating && "text-accent")}
           >
             <Music className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Workspace Board (Kanban) */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Workspace Board">
+          <IconButton size="sm" onClick={() => setShowKanbanBoard(true)}>
+            <CheckSquare className="w-4 h-4" />
           </IconButton>
         </Tooltip>
       </div>
@@ -1215,11 +1232,26 @@ export function ProjectTabBar({
       <ProjectSearchPopup
         isOpen={showProjectSearch}
         onClose={() => setShowProjectSearch(false)}
-        onOpenFile={(path, line) => {
+        onOpenFile={(path, _line) => {
           setShowProjectSearch(false);
+
+          // Check if current project has a Codespace session
+          if (activeProjectId) {
+            const sessions = useSessionStore.getState().getSessionsForProject(activeProjectId);
+            const codespaceSession = sessions.find(s => s.type === "codespace");
+
+            if (codespaceSession) {
+              // Open file in codespace and switch to that session (with line number)
+              useCodespaceStore.getState().openFile(codespaceSession.id, path, _line);
+              useSessionStore.getState().setActiveSession(activeProjectId, codespaceSession.id);
+              return;
+            }
+          }
+
+          // No codespace - open as popup
           window.dispatchEvent(
             new CustomEvent("open-file-at-line", {
-              detail: { path, line },
+              detail: { path, line: _line },
             })
           );
         }}
@@ -1236,6 +1268,15 @@ export function ProjectTabBar({
         <UniversalViewerPopup
           onClose={() => setShowUniversalViewer(false)}
           projectPath={activeProject?.path}
+        />
+      )}
+
+      {/* Kanban Board */}
+      {activeWorkspaceId && (
+        <KanbanBoardPopup
+          isOpen={showKanbanBoard}
+          onClose={() => setShowKanbanBoard(false)}
+          workspaceId={activeWorkspaceId}
         />
       )}
 

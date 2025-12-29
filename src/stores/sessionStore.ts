@@ -24,7 +24,7 @@ export interface SessionContextStats {
   lastUpdated: number;
 }
 
-interface StreamingState {
+export interface StreamingState {
   isStreaming: boolean;
   streamingText: string;
   thinkingText: string;
@@ -48,6 +48,7 @@ interface SessionStore {
   setActiveSession: (projectId: string, sessionId: string) => void;
   getSessionsForProject: (projectId: string) => Session[];
   getActiveSession: (projectId: string) => Session | undefined;
+  reorderSessions: (projectId: string, fromIndex: number, toIndex: number) => void;
 
   addMessage: (
     sessionId: string,
@@ -144,7 +145,7 @@ export const useSessionStore = create<SessionStore>()(
         const session: Session = {
           id: sessionId,
           projectId,
-          name: type === "terminal" ? "Terminal" : "",
+          name: type === "terminal" ? "Terminal" : type === "codespace" ? "Codespace" : "",
           type,
           provider,
           model,
@@ -219,6 +220,17 @@ export const useSessionStore = create<SessionStore>()(
         const sessions = get().sessions.get(projectId) || [];
         const activeId = get().activeSessionId.get(projectId);
         return sessions.find((s) => s.id === activeId);
+      },
+
+      reorderSessions: (projectId: string, fromIndex: number, toIndex: number) => {
+        set((state) => {
+          const newSessions = new Map(state.sessions);
+          const projectSessions = [...(newSessions.get(projectId) || [])];
+          const [removed] = projectSessions.splice(fromIndex, 1);
+          projectSessions.splice(toIndex, 0, removed);
+          newSessions.set(projectId, projectSessions);
+          return { sessions: newSessions };
+        });
       },
 
       addMessage: (

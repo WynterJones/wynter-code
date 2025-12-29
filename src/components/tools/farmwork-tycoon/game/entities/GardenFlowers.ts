@@ -3,10 +3,10 @@ import { BUILDING_POSITIONS } from "../../types";
 
 const GRID_SIZE = 6;
 const FLOWER_PATHS = [
-  "/tycoon/flower1.png",
-  "/tycoon/flower2.png",
-  "/tycoon/flower3.png",
-  "/tycoon/flower4.png",
+  "tycoon/flower1.png",
+  "tycoon/flower2.png",
+  "tycoon/flower3.png",
+  "tycoon/flower4.png",
 ];
 
 interface FlowerSlot {

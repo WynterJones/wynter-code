@@ -11,4 +11,5 @@ export interface CodespaceTab {
 export interface CodespaceState {
   tabs: CodespaceTab[];
   activeTabId: string | null;
+  pendingGoToLine: number | null;
 }
