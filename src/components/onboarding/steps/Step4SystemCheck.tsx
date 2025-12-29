@@ -106,6 +106,10 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
     systemCheckResults &&
     requiredItems.some((item) => systemCheckResults[item.key] === null);
 
+  const missingItemsWithCommands = checkItems.filter(
+    (item) => systemCheckResults?.[item.key] === null && item.installCommand
+  );
+
   return (
     <div className="flex flex-col min-h-[450px] px-8 py-10">
       <div className="flex-1">
@@ -113,7 +117,7 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
           System Check
         </h2>
 
-        <p className="text-text-secondary text-center mb-8">
+        <p className="text-text-secondary text-center mb-6">
           {isCheckingSystem
             ? "Checking your system..."
             : allPassed
@@ -121,8 +125,8 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
             : "Some requirements are missing"}
         </p>
 
-        <div className="space-y-3 max-w-md mx-auto">
-          {checkItems.map((item) => {
+        <div className="max-w-md mx-auto rounded-lg bg-bg-tertiary/50 border border-border overflow-hidden">
+          {checkItems.map((item, index) => {
             const version = systemCheckResults?.[item.key];
             const isLoading = isCheckingSystem && !systemCheckResults;
             const isInstalled = version !== null;
@@ -130,11 +134,13 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
             return (
               <div
                 key={item.key}
-                className="flex items-center justify-between p-4 rounded-lg bg-bg-tertiary/50 border border-border"
+                className={`flex items-center justify-between px-3 py-2 ${
+                  index !== checkItems.length - 1 ? "border-b border-border/50" : ""
+                }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    className={`w-5 h-5 rounded-full flex items-center justify-center ${
                       isLoading
                         ? "bg-text-secondary/20"
                         : isInstalled
@@ -143,74 +149,59 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
                     }`}
                   >
                     {isLoading ? (
-                      <Loader2 className="w-4 h-4 text-text-secondary animate-spin" />
+                      <Loader2 className="w-3 h-3 text-text-secondary animate-spin" />
                     ) : isInstalled ? (
-                      <Check className="w-4 h-4 text-accent-green" />
+                      <Check className="w-3 h-3 text-accent-green" />
                     ) : (
-                      <X className="w-4 h-4 text-accent-red" />
+                      <X className="w-3 h-3 text-accent-red" />
                     )}
                   </div>
-                  <div>
-                    <span className="font-medium text-text-primary">
-                      {item.label}
+                  <span className="text-sm text-text-primary">
+                    {item.label}
+                  </span>
+                  {version && (
+                    <span className="text-xs text-text-secondary">
+                      {version}
                     </span>
-                    {version && (
-                      <span className="ml-2 text-sm text-text-secondary">
-                        {version}
-                      </span>
-                    )}
-                  </div>
+                  )}
                 </div>
 
                 {!isInstalled && !isLoading && item.installUrl && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
+                  <button
                     onClick={() => window.open(item.installUrl, "_blank")}
-                    className="gap-1"
+                    className="text-xs text-accent hover:text-accent-light flex items-center gap-1"
                   >
                     Install
                     <ExternalLink className="w-3 h-3" />
-                  </Button>
+                  </button>
                 )}
               </div>
             );
           })}
         </div>
 
-        {hasMissingItems && !isCheckingSystem && (
-          <div className="mt-6 max-w-md mx-auto">
-            {checkItems
-              .filter(
-                (item) =>
-                  systemCheckResults?.[item.key] === null && item.installCommand
-              )
-              .map((item) => (
-                <div
-                  key={item.key}
-                  className="p-4 rounded-lg bg-bg-primary/50 border border-border mb-3"
-                >
-                  <p className="text-sm text-text-secondary mb-2">
-                    To install {item.label}:
-                  </p>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 px-3 py-2 rounded bg-bg-tertiary text-sm font-mono text-accent">
-                      {item.installCommand}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => copyCommand(item.installCommand!)}
-                    >
-                      {copiedCommand === item.installCommand ? (
-                        <Check className="w-4 h-4 text-accent-green" />
-                      ) : (
-                        <Copy className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
+        {missingItemsWithCommands.length > 0 && !isCheckingSystem && (
+          <div className="mt-4 max-w-md mx-auto p-3 rounded-lg bg-bg-primary/50 border border-border">
+            <p className="text-xs text-text-secondary mb-2">Install commands:</p>
+            <div className="space-y-1.5">
+              {missingItemsWithCommands.map((item) => (
+                <div key={item.key} className="flex items-center gap-2">
+                  <code className="flex-1 px-2 py-1 rounded bg-bg-tertiary text-xs font-mono text-accent truncate">
+                    {item.installCommand}
+                  </code>
+                  <button
+                    onClick={() => copyCommand(item.installCommand!)}
+                    className="p-1 hover:bg-bg-tertiary rounded"
+                  >
+                    {copiedCommand === item.installCommand ? (
+                      <Check className="w-3 h-3 text-accent-green" />
+                    ) : (
+                      <Copy className="w-3 h-3 text-text-secondary" />
+                    )}
+                  </button>
                 </div>
               ))}
+            </div>
           </div>
         )}
       </div>

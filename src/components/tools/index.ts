@@ -15,6 +15,7 @@ export { DatabaseViewerPopup } from "./database-viewer";
 export { OverwatchPopup } from "./overwatch";
 export { BeadsTrackerPopup } from "./BeadsTrackerPopup";
 export { FaviconGeneratorPopup } from "./favicon-generator";
+export { DesignerToolPopup } from "./designer-tool";
 export { FarmworkTycoonPopup, MiniGamePlayer } from "./farmwork-tycoon";
 export { NetlifyFtpPopup } from "./netlify-ftp";
 export { ProjectSearchPopup } from "./project-search";

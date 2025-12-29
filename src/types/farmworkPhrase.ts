@@ -13,4 +13,5 @@ export type FarmworkPhraseCategory =
   | "planning"
   | "ideas"
   | "research"
-  | "production";
+  | "production"
+  | "office";

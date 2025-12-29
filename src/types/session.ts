@@ -5,7 +5,7 @@ export type GeminiModel = "gemini-2.5-flash" | "gemini-2.5-pro";
 export type AIProvider = "claude" | "codex" | "gemini";
 export type AIModel = ClaudeModel | CodexModel | GeminiModel;
 
-export type SessionType = "claude" | "terminal";
+export type SessionType = "claude" | "terminal" | "codespace";
 
 export interface Session {
   id: string;

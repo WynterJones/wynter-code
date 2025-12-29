@@ -70,6 +70,7 @@ import {
   Map,
   Languages,
   Beer,
+  Paintbrush,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -332,6 +333,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     actionKey: "openFaviconGenerator",
     category: "design",
   },
+  {
+    id: "designer-tool",
+    name: "Designer Tool",
+    description: "AI-powered image generation",
+    icon: Paintbrush,
+    actionKey: "openDesignerTool",
+    category: "design",
+  },
 
   // === RECORDING ===
   {
@@ -550,6 +559,7 @@ interface ToolsDropdownProps {
   onOpenFarmwork: () => void;
   onOpenJustCommandManager: () => void;
   onOpenUniversalViewer: () => void;
+  onOpenDesignerTool: () => void;
   hasStorybook?: boolean;
   hasJustfile?: boolean;
 }
@@ -587,6 +597,7 @@ export function ToolsDropdown({
   onOpenFarmwork,
   onOpenJustCommandManager,
   onOpenUniversalViewer,
+  onOpenDesignerTool,
   hasStorybook = false,
   hasJustfile = false,
 }: ToolsDropdownProps) {
@@ -919,6 +930,17 @@ export function ToolsDropdown({
       category: "design",
       onClick: () => {
         onOpenFaviconGenerator();
+        setIsOpen(false);
+      },
+    },
+    {
+      id: "designer-tool",
+      name: "Designer Tool",
+      description: "AI-powered image generation",
+      icon: <Paintbrush className="w-4 h-4" />,
+      category: "design",
+      onClick: () => {
+        onOpenDesignerTool();
         setIsOpen(false);
       },
     },

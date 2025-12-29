@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { Copy, Check, RefreshCw, FolderOpen, Loader2 } from "lucide-react";
+import { Copy, Check, RefreshCw, FolderOpen, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { FacebookCardPreview } from "../previews/FacebookCardPreview";
 import { useSeoDataFromProject } from "../hooks/useSeoDataFromProject";
+import { AiImageGeneratorModal } from "../components/AiImageGeneratorModal";
 
 interface OpenGraphData {
   title: string;
@@ -31,6 +32,7 @@ export function OpenGraphGenerator() {
     locale: "en_US",
   });
   const [copied, setCopied] = useState(false);
+  const [showAiGenerator, setShowAiGenerator] = useState(false);
 
   useEffect(() => {
     if (!hasAutoLoaded && projectData && !isLoadingProject) {
@@ -200,7 +202,18 @@ export function OpenGraphGenerator() {
 
           {/* Image */}
           <div>
-            <label className="block text-sm text-text-secondary mb-1">Image URL</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm text-text-secondary">Image URL</label>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowAiGenerator(true)}
+                className="text-accent hover:text-accent/80"
+              >
+                <Sparkles className="w-3 h-3 mr-1" />
+                Generate with AI
+              </Button>
+            </div>
             <input
               type="url"
               value={data.image}
@@ -285,6 +298,16 @@ export function OpenGraphGenerator() {
           </div>
         </div>
       </div>
+
+      {/* AI Image Generator Modal */}
+      <AiImageGeneratorModal
+        isOpen={showAiGenerator}
+        onClose={() => setShowAiGenerator(false)}
+        presetType="og-image"
+        onImageGenerated={(imagePath) => {
+          setData({ ...data, image: imagePath });
+        }}
+      />
     </div>
   );
 }

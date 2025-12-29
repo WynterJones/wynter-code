@@ -7,7 +7,6 @@ mod beads;
 mod claude_process;
 mod codex_process;
 mod gemini_process;
-mod color_picker;
 mod commands;
 mod cost_popup;
 mod database_viewer;
@@ -20,6 +19,7 @@ mod live_preview;
 mod mcp_permission_server;
 mod netlify_backup;
 mod overwatch;
+mod path_utils;
 mod storybook;
 mod system_cleaner;
 mod terminal;
@@ -31,9 +31,7 @@ mod camera_permission;
 
 use std::sync::Arc;
 use tauri::{
-    image::Image,
-    menu::{Menu, MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
-    tray::TrayIconBuilder,
+    menu::{Menu, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
     Emitter, Manager,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -122,56 +120,6 @@ fn main() {
         .setup(|app| {
             let menu = create_menu(app.handle())?;
             app.set_menu(menu)?;
-
-            // Setup system tray for color picker
-            let tray_menu = MenuBuilder::new(app)
-                .item(&MenuItemBuilder::with_id("pick_color", "Pick Color").build(app)?)
-                .item(&MenuItemBuilder::with_id("show_picker", "Show Color Picker").build(app)?)
-                .separator()
-                .item(&MenuItemBuilder::with_id("tray_quit", "Quit").build(app)?)
-                .build()?;
-
-            let _tray = TrayIconBuilder::new()
-                .icon(Image::from_path("icons/icon.png").unwrap_or_else(|_| {
-                    app.default_window_icon().cloned().unwrap()
-                }))
-                .menu(&tray_menu)
-                .show_menu_on_left_click(false)
-                .on_menu_event(|app, event| {
-                    match event.id.as_ref() {
-                        "pick_color" => {
-                            let app_handle = app.clone();
-                            tauri::async_runtime::spawn(async move {
-                                let _ = color_picker::start_color_picking_mode(app_handle).await;
-                            });
-                        }
-                        "show_picker" => {
-                            let app_handle = app.clone();
-                            tauri::async_runtime::spawn(async move {
-                                let _ = color_picker::open_color_picker_window(app_handle, None).await;
-                            });
-                        }
-                        "tray_quit" => {
-                            app.exit(0);
-                        }
-                        _ => {}
-                    }
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::Click {
-                        button: tauri::tray::MouseButton::Left,
-                        button_state: tauri::tray::MouseButtonState::Up,
-                        ..
-                    } = event
-                    {
-                        // Left click on tray icon triggers color pick magnifier
-                        let app_handle = tray.app_handle().clone();
-                        tauri::async_runtime::spawn(async move {
-                            let _ = color_picker::start_color_picking_mode(app_handle).await;
-                        });
-                    }
-                })
-                .build(app)?;
 
             // Handle menu events
             app.on_menu_event(|app, event| {
@@ -268,6 +216,8 @@ fn main() {
             commands::delete_to_trash,
             commands::move_item,
             commands::get_home_dir,
+            commands::get_downloads_dir,
+            commands::write_binary_file,
             commands::scan_music_folder,
             commands::get_git_status,
             commands::check_node_modules_exists,
@@ -312,18 +262,6 @@ fn main() {
             tunnel::start_tunnel,
             tunnel::stop_tunnel,
             tunnel::list_tunnels,
-            color_picker::pick_screen_color,
-            color_picker::open_color_picker_window,
-            color_picker::close_color_picker_window,
-            color_picker::get_cursor_position,
-            color_picker::pick_color_and_show,
-            color_picker::check_screen_recording_permission,
-            color_picker::request_screen_recording_permission,
-            color_picker::save_color_picker_position,
-            color_picker::capture_magnifier_region,
-            color_picker::start_color_picking_mode,
-            color_picker::stop_color_picking_mode,
-            color_picker::update_magnifier_position,
             live_preview::detect_project_type,
             live_preview::get_local_ip,
             live_preview::start_preview_server,
@@ -395,6 +333,7 @@ fn main() {
             netlify_backup::netlify_update_site,
             netlify_backup::netlify_deploy_zip,
             netlify_backup::netlify_rollback_deploy,
+            netlify_backup::netlify_fetch_backup_html,
             // Claude Process Management
             claude_process::start_claude_session,
             claude_process::stop_claude_session,

@@ -11,16 +11,18 @@ export function Step1Welcome({ onNext }: Step1WelcomeProps) {
       <img
         src="/icons/icon1.png"
         alt="Wynter Code"
-        className="w-28 h-28 mb-8 rounded-2xl shadow-lg shadow-accent/30"
+        className="w-28 h-28 mb-8"
       />
 
-      <h1 className="text-3xl font-bold text-text-primary mb-4">
-        Welcome to Wynter Code
-      </h1>
+      <h1 className="text-3xl font-bold text-text-primary mb-4">Howdy! 🤠</h1>
 
-      <p className="text-lg text-text-secondary max-w-md mb-8">
-        A beautiful desktop companion for Claude Code CLI.
-        Let's get you set up in just a few steps.
+      <p className="text-lg text-text-secondary max-w-md mb-4">
+        A companion for building with AI agents. Let's get you set up in just a
+        few steps.
+      </p>
+
+      <p className="text-sm text-text-secondary opacity-60 max-w-md mb-8">
+        Supports: Claude Code / Codex / Gemini
       </p>
 
       <Button variant="primary" size="lg" onClick={onNext} className="gap-2">

@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State};
 
 use crate::commands::{create_chunk, PermissionMode, StreamChunk};
+use crate::path_utils::get_enhanced_path;
 
 /// Represents a running Codex CLI process
 struct CodexProcessInstance {
@@ -288,12 +289,7 @@ pub async fn start_codex_session(
 
     // Build enhanced environment for Codex CLI
     let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
-    let current_path = std::env::var("PATH").unwrap_or_default();
-
-    let enhanced_path = format!(
-        "{}/.local/bin:/usr/local/bin:/opt/homebrew/bin:{}/.nvm/versions/node/v22.11.0/bin:{}/.nvm/versions/node/v20.18.0/bin:{}/.nvm/versions/node/v18.20.0/bin:{}",
-        home, home, home, home, current_path
-    );
+    let enhanced_path = get_enhanced_path();
 
     eprintln!("[Codex] Starting session with args: {:?}", args);
     eprintln!("[Codex] Working directory: {}", cwd);
@@ -499,11 +495,7 @@ pub async fn send_codex_input(
 
     // Build environment
     let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
-    let current_path = std::env::var("PATH").unwrap_or_default();
-    let enhanced_path = format!(
-        "{}/.local/bin:/usr/local/bin:/opt/homebrew/bin:{}/.nvm/versions/node/v22.11.0/bin:{}",
-        home, home, current_path
-    );
+    let enhanced_path = get_enhanced_path();
 
     eprintln!("[Codex] Starting new exec process with args: {:?}", args);
 

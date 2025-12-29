@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Palette, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe, Sparkles, Bot, Check, Download } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe, Sparkles, Bot, Check, Download } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -16,7 +16,6 @@ import {
 } from "@/stores/settingsStore";
 import { KEYBOARD_SHORTCUTS, formatShortcut, type KeyboardShortcut } from "@/hooks/useKeyboardShortcuts";
 import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
-import { ColorsTab } from "./ColorsTab";
 import { CompressionSettings } from "./CompressionSettings";
 import { AvatarSettings } from "./AvatarSettings";
 import { DataManagementTab } from "./DataManagementTab";
@@ -27,7 +26,7 @@ import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector
 import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
 import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
 
-type SettingsTab = "general" | "vibrancy" | "lightcast" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "providers" | "farmwork" | "about";
+type SettingsTab = "general" | "vibrancy" | "lightcast" | "editor" | "markdown" | "music" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "providers" | "farmwork" | "about";
 
 interface SettingsPopupProps {
   onClose: () => void;
@@ -95,7 +94,6 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     { id: "editor", label: "Editor", icon: Code },
     { id: "markdown", label: "Markdown", icon: FileText },
     { id: "music", label: "Music", icon: Music },
-    { id: "colors", label: "Colors", icon: Palette },
     { id: "compression", label: "Compression", icon: Archive },
     { id: "terminal", label: "Terminal", icon: TerminalSquare },
     { id: "keyboard", label: "Keyboard", icon: Keyboard },
@@ -192,7 +190,6 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
                   onCustomMusicPathChange={setCustomMusicPath}
                 />
               )}
-              {activeTab === "colors" && <ColorsTab />}
               {activeTab === "compression" && <CompressionSettings />}
               {activeTab === "terminal" && (
                 <TerminalSettings

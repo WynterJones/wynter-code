@@ -1,5 +1,11 @@
 import { Button } from "@/components/ui/Button";
-import { ChevronRight, ChevronLeft, FolderOpen, Keyboard, Zap } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  FolderOpen,
+  Keyboard,
+  Zap,
+} from "lucide-react";
 
 interface Step3WorkflowProps {
   onNext: () => void;
@@ -17,12 +23,12 @@ const steps = [
     number: 2,
     icon: Keyboard,
     title: "Type your prompt",
-    description: "Describe what you want Claude to do",
+    description: "Describe what you want to do",
   },
   {
     number: 3,
     icon: Zap,
-    title: "Claude Code does the work",
+    title: "The AI agent does the work",
     description: "Watch as your code is analyzed and modified",
   },
 ];
@@ -63,7 +69,7 @@ export function Step3Workflow({ onNext, onPrevious }: Step3WorkflowProps) {
           Back
         </Button>
         <Button variant="primary" onClick={onNext} className="gap-2">
-          Next
+          System Check
           <ChevronRight className="w-4 h-4" />
         </Button>
       </div>

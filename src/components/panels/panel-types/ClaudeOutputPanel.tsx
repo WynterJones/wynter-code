@@ -233,8 +233,8 @@ export function ClaudeOutputPanel({
               updateProviderSessionId(sessionId, providerSessionId);
             }
           },
-          onUsage: (stats) => {
-            updateStats(sessionId, stats);
+          onUsage: (stats, isFinal) => {
+            updateStats(sessionId, stats, isFinal);
           },
           onResult: () => {
             // Result from a turn - finish streaming for this turn
@@ -497,7 +497,7 @@ export function ClaudeOutputPanel({
             updateStats(sessionId, { model });
             if (providerSessionId) updateProviderSessionId(sessionId, providerSessionId);
           },
-          onUsage: (stats) => updateStats(sessionId, stats),
+          onUsage: (stats, isFinal) => updateStats(sessionId, stats, isFinal),
           onResult: () => finishStreaming(sessionId),
           onError: (error) => {
             console.error("[ClaudeOutputPanel] Error (execute plan):", error);

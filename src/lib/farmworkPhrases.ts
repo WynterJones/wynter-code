@@ -102,8 +102,16 @@ export const FARMWORK_PHRASES: FarmworkPhrase[] = [
   {
     id: "go-to-production",
     phrase: "go to production",
-    description: "UX production check: update _OFFICE/ docs with audit trail",
+    description: "Update BROWNFIELD.md, check GREENFIELD alignment, note doc impacts",
     category: "production",
+  },
+
+  // Office category
+  {
+    id: "setup-office",
+    phrase: "setup office",
+    description: "Interactive guided setup: GREENFIELD vision, strategy, optional docs",
+    category: "office",
   },
 ];
 
@@ -113,6 +121,7 @@ export const CATEGORY_LABELS: Record<FarmworkPhraseCategory, string> = {
   ideas: "Ideas & Garden",
   research: "Research",
   production: "Production",
+  office: "Office Phrases",
 };
 
 export const CATEGORY_ORDER: FarmworkPhraseCategory[] = [
@@ -121,4 +130,5 @@ export const CATEGORY_ORDER: FarmworkPhraseCategory[] = [
   "ideas",
   "research",
   "production",
+  "office",
 ];

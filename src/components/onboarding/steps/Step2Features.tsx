@@ -1,5 +1,12 @@
 import { Button } from "@/components/ui/Button";
-import { ChevronRight, ChevronLeft, FolderOpen, MessageSquare, ListChecks, Sparkles } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  FolderOpen,
+  MessageSquare,
+  ListChecks,
+  Sparkles,
+} from "lucide-react";
 
 interface Step2FeaturesProps {
   onNext: () => void;
@@ -10,21 +17,21 @@ const features = [
   {
     icon: FolderOpen,
     title: "Manage multiple projects",
-    description: "Switch between projects seamlessly with organized tabs",
+    description: "Switch between projects with organized tabs",
   },
   {
     icon: MessageSquare,
     title: "Beautiful chat interface",
-    description: "Interact with Claude in a clean, intuitive interface",
+    description: "Interact with AI in a clean, intuitive interface",
   },
   {
     icon: ListChecks,
-    title: "Smart prompt subscriptions",
-    description: "Save and reuse your favorite prompts across sessions",
+    title: "Developer Tools",
+    description: "A tonne of tools for every situation as a developer",
   },
   {
     icon: Sparkles,
-    title: "Focus with meditation mode",
+    title: "Focus with music mode",
     description: "Take breaks with built-in relaxation features",
   },
 ];

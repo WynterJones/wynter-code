@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useRef } from "react";
-import { Download, Trash2, AlertTriangle, HardDrive, Shield, Upload, CheckCircle2, FileJson } from "lucide-react";
+import { useState, useMemo, useCallback } from "react";
+import { Download, Trash2, AlertTriangle, HardDrive, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DATA_CATEGORIES,
@@ -20,7 +20,6 @@ import { useApiTesterStore } from "@/stores/apiTesterStore";
 import { useDatabaseViewerStore } from "@/stores/databaseViewerStore";
 import { usePanelStore } from "@/stores/panelStore";
 import { useTerminalStore } from "@/stores/terminalStore";
-import { useColorPickerStore } from "@/stores/colorPickerStore";
 import { useLivePreviewStore } from "@/stores/livePreviewStore";
 import { useStorybookStore } from "@/stores/storybookStore";
 import { useEnvStore } from "@/stores/envStore";
@@ -34,12 +33,6 @@ interface ConfirmDialogState {
   isResetAll: boolean;
 }
 
-interface ImportState {
-  status: "idle" | "loading" | "success" | "error";
-  message: string;
-  categoriesImported: string[];
-}
-
 export function DataManagementTab() {
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>({
     isOpen: false,
@@ -47,14 +40,6 @@ export function DataManagementTab() {
     categoryName: "",
     isResetAll: false,
   });
-
-  const [importState, setImportState] = useState<ImportState>({
-    status: "idle",
-    message: "",
-    categoriesImported: [],
-  });
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get reset functions from stores
   const sessionReset = useSessionStore((s) => s.reset);
@@ -64,7 +49,6 @@ export function DataManagementTab() {
   const databaseViewerReset = useDatabaseViewerStore((s) => s.reset);
   const panelReset = usePanelStore((s) => s.reset);
   const terminalReset = useTerminalStore((s) => s.reset);
-  const colorPickerReset = useColorPickerStore((s) => s.reset);
   const livePreviewReset = useLivePreviewStore((s) => s.reset);
   const storybookReset = useStorybookStore((s) => s.reset);
   const envReset = useEnvStore((s) => s.reset);
@@ -125,7 +109,6 @@ export function DataManagementTab() {
       databaseViewerReset?.();
       panelReset?.();
       terminalReset?.();
-      colorPickerReset?.();
       livePreviewReset?.();
       storybookReset?.();
       envReset?.();
@@ -152,7 +135,6 @@ export function DataManagementTab() {
           case "ui":
             panelReset?.();
             terminalReset?.();
-            colorPickerReset?.();
             livePreviewReset?.();
             break;
           case "system":
@@ -182,7 +164,6 @@ export function DataManagementTab() {
     databaseViewerReset,
     panelReset,
     terminalReset,
-    colorPickerReset,
     livePreviewReset,
     storybookReset,
     envReset,
@@ -197,74 +178,6 @@ export function DataManagementTab() {
       categoryName: "",
       isResetAll: false,
     });
-  }, []);
-
-  const handleImportClick = useCallback(() => {
-    fileInputRef.current?.click();
-  }, []);
-
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setImportState({ status: "loading", message: "Reading file...", categoriesImported: [] });
-
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-
-      // Check if this is a backup file with metadata
-      if (data.metadata && data.data) {
-        // This is a full backup file from web backup
-        const categoriesImported: string[] = [];
-
-        for (const [categoryId, categoryData] of Object.entries(data.data)) {
-          if (typeof categoryData === "object" && categoryData !== null) {
-            for (const [storeKey, storeData] of Object.entries(categoryData as Record<string, unknown>)) {
-              localStorage.setItem(storeKey, JSON.stringify(storeData));
-            }
-            categoriesImported.push(categoryId);
-          }
-        }
-
-        setImportState({
-          status: "success",
-          message: `Imported ${categoriesImported.length} categories from backup`,
-          categoriesImported,
-        });
-
-        // Reload after short delay to apply changes
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      } else {
-        // This is a single category export
-        for (const [key, value] of Object.entries(data)) {
-          localStorage.setItem(key, JSON.stringify(value));
-        }
-
-        setImportState({
-          status: "success",
-          message: "Import complete! Reloading...",
-          categoriesImported: [],
-        });
-
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
-      }
-    } catch (error) {
-      setImportState({
-        status: "error",
-        message: error instanceof Error ? error.message : "Failed to parse JSON file",
-        categoriesImported: [],
-      });
-    }
-
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   }, []);
 
   // Storage usage percentage (assuming ~5MB limit)
@@ -297,84 +210,6 @@ export function DataManagementTab() {
         <p className="text-xs text-text-secondary mt-2">
           localStorage is limited to ~5MB per domain
         </p>
-      </div>
-
-      {/* Import from Backup */}
-      <div className="p-4 rounded-lg bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/30">
-        <div className="flex items-start gap-3">
-          <div className="p-2 rounded-lg bg-accent/20">
-            <FileJson className="w-5 h-5 text-accent" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-sm font-medium text-text-primary mb-1">
-              Import from Backup
-            </h3>
-            <p className="text-xs text-text-secondary mb-3">
-              Import data from a backup JSON file downloaded from your web backup page
-            </p>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".json,application/json"
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-
-            {importState.status === "idle" && (
-              <button
-                onClick={handleImportClick}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 transition-colors"
-              >
-                <Upload className="w-4 h-4" />
-                Select Backup JSON
-              </button>
-            )}
-
-            {importState.status === "loading" && (
-              <div className="flex items-center gap-2 text-sm text-text-secondary">
-                <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
-                <span>{importState.message}</span>
-              </div>
-            )}
-
-            {importState.status === "success" && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-green-400">
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{importState.message}</span>
-                </div>
-                {importState.categoriesImported.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {importState.categoriesImported.map((cat) => (
-                      <span
-                        key={cat}
-                        className="px-2 py-0.5 rounded text-xs bg-green-500/20 text-green-400"
-                      >
-                        {cat}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {importState.status === "error" && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm text-red-400">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>{importState.message}</span>
-                </div>
-                <button
-                  onClick={() => setImportState({ status: "idle", message: "", categoriesImported: [] })}
-                  className="text-xs text-text-secondary hover:text-text-primary"
-                >
-                  Try again
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Data Categories */}

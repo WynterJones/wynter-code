@@ -1134,6 +1134,22 @@ pub fn get_home_dir() -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn get_downloads_dir() -> Result<String, String> {
+    dirs::download_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .ok_or_else(|| "Could not determine downloads directory".to_string())
+}
+
+#[tauri::command]
+pub fn write_binary_file(path: String, base64_data: String) -> Result<(), String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    let bytes = STANDARD
+        .decode(&base64_data)
+        .map_err(|e| format!("Failed to decode base64: {}", e))?;
+    fs::write(&path, bytes).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
 pub fn scan_music_folder(folder_path: String) -> Result<Vec<AudioFile>, String> {
     let folder = Path::new(&folder_path);
 
@@ -1438,6 +1454,7 @@ pub struct SystemCheckResults {
 fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
     let output = Command::new(cmd)
         .args(args)
+        .env("PATH", crate::path_utils::get_enhanced_path())
         .output()
         .ok()?;
 

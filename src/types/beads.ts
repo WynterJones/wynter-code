@@ -25,6 +25,7 @@ export interface BeadsIssue {
   labels?: string[];
   dependencies?: BeadsDependency[];
   phase?: number; // For concurrent auto-build ordering (1 = first, 2 = second, etc.)
+  parent_id?: string; // For hierarchical issues (epics)
 }
 
 export interface BeadsUpdate {

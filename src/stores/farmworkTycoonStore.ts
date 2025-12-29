@@ -838,6 +838,14 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
 
     set({ mapCycle: { ...mapCycle, ...updates } });
   },
+
+  signalVehicleExit: (vehicleId: string) => {
+    set((state) => ({
+      vehicles: state.vehicles.map((v) =>
+        v.id === vehicleId ? { ...v, shouldExit: true } : v
+      ),
+    }));
+  },
 }));
 
 declare global {

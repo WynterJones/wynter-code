@@ -46,6 +46,7 @@ export type VehicleTaskStatus =
   | "loading"
   | "traveling_to_delivery"
   | "delivering"
+  | "waiting_for_completion"
   | "exiting"
   | "finished";
 
@@ -66,6 +67,8 @@ export interface Vehicle {
   carrying: boolean;
   direction: VehicleDirection;
   tint?: number; // Hex color for PixiJS sprite tinting (tool call visualization)
+  shouldExit?: boolean; // Signals vehicle to start exiting (set by tool completion)
+  waitStartTime?: number; // Timestamp when vehicle started waiting (for timeout fallback)
 }
 
 export type ActivityEventType =
@@ -223,6 +226,7 @@ export interface FarmworkTycoonState {
   setSimulatedFlowerCount: (count: number | null) => void;
   clearCelebrationQueue: () => void;
   tickMapCycle: (dt: number) => void;
+  signalVehicleExit: (vehicleId: string) => void;
 }
 
 export const BUILDING_COLORS: Record<BuildingType, string> = {
@@ -371,6 +375,8 @@ export function getTaskMessage(
       return `Delivering to ${destName}`;
     case "delivering":
       return `Unloading at ${destName}`;
+    case "waiting_for_completion":
+      return `Working at ${destName}...`;
     case "exiting":
       return "Task Complete!";
     case "finished":

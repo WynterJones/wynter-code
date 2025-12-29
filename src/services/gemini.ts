@@ -20,7 +20,7 @@ export interface GeminiSessionCallbacks {
   onToolEnd: (toolId: string) => void;
   onToolResult: (toolId: string, content: string, isError?: boolean) => void;
   onInit: (model: string, cwd: string, providerSessionId?: string) => void;
-  onUsage: (stats: Partial<StreamingStats>) => void;
+  onUsage: (stats: Partial<StreamingStats>, isFinal?: boolean) => void;
   onResult: (result: string) => void;
   onError: (error: string) => void;
 }
@@ -151,12 +151,12 @@ class GeminiService {
         case "result":
           // Turn/prompt completed
           cb.onResult(chunk.content || "");
-          // Extract usage from result if present
+          // Extract usage from result if present - these are final values
           if (chunk.input_tokens || chunk.output_tokens) {
             cb.onUsage({
               inputTokens: chunk.input_tokens,
               outputTokens: chunk.output_tokens,
-            });
+            }, true);
           }
           break;
 

@@ -13,7 +13,6 @@ import {
   Download,
   Upload,
   Lock,
-  RefreshCw,
   Eye,
   EyeOff,
   Plus,
@@ -63,7 +62,6 @@ export function WebBackupTab() {
   const [showCreateSite, setShowCreateSite] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [importPassword, setImportPassword] = useState("");
-  const [showImportSection, setShowImportSection] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
   useEffect(() => {
@@ -112,7 +110,10 @@ export function WebBackupTab() {
     if (success) {
       setImportUrl("");
       setImportPassword("");
-      setShowImportSection(false);
+      // Reload the page after a short delay to reflect imported data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     }
   };
 
@@ -570,64 +571,6 @@ export function WebBackupTab() {
                 </div>
               </div>
 
-              {/* Import Section */}
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-text-primary border-b border-border pb-2">
-                  Restore from Backup
-                </h3>
-
-                <button
-                  onClick={() => setShowImportSection(!showImportSection)}
-                  className={cn(
-                    "w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
-                    showImportSection
-                      ? "bg-bg-secondary border border-border text-text-secondary"
-                      : "bg-accent text-white hover:bg-accent/90"
-                  )}
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  <span>{showImportSection ? "Hide Restore Options" : "Restore from Backup URL"}</span>
-                </button>
-
-                {showImportSection && (
-                  <div className="p-4 rounded-lg bg-bg-secondary border border-border space-y-3">
-                    <div className="space-y-2">
-                      <label className="text-xs text-text-secondary">
-                        Backup URL
-                      </label>
-                      <input
-                        type="url"
-                        value={importUrl}
-                        onChange={(e) => setImportUrl(e.target.value)}
-                        placeholder="https://your-backup-site.netlify.app"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-secondary text-sm focus:outline-none focus:border-accent"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-xs text-text-secondary">
-                        Backup password
-                      </label>
-                      <input
-                        type="password"
-                        value={importPassword}
-                        onChange={(e) => setImportPassword(e.target.value)}
-                        placeholder="Enter your backup password"
-                        className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary placeholder:text-text-secondary text-sm focus:outline-none focus:border-accent"
-                      />
-                    </div>
-
-                    <button
-                      onClick={handleImport}
-                      disabled={!importUrl || !importPassword || isBackingUp}
-                      className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-border text-text-primary hover:bg-bg-hover disabled:opacity-50 transition-colors"
-                    >
-                      <Download className="w-4 h-4" />
-                      <span>Import Data</span>
-                    </button>
-                  </div>
-                )}
-              </div>
             </>
           )}
 
@@ -646,6 +589,52 @@ export function WebBackupTab() {
           </div>
         </>
       )}
+
+      {/* Import from Backup - Always visible */}
+      <div className="p-4 rounded-lg bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/30">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-accent/20">
+            <Globe className="w-5 h-5 text-accent" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-sm font-medium text-text-primary mb-1">
+              Import from Backup
+            </h3>
+            <p className="text-xs text-text-secondary mb-3">
+              Enter your Netlify backup site URL and password to restore your data
+            </p>
+
+            <div className="space-y-3">
+              <input
+                type="url"
+                value={importUrl}
+                onChange={(e) => setImportUrl(e.target.value)}
+                placeholder="https://your-backup.netlify.app"
+                className="w-full px-3 py-2 rounded-lg bg-bg-primary border border-border text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <input
+                type="password"
+                value={importPassword}
+                onChange={(e) => setImportPassword(e.target.value)}
+                placeholder="Backup password"
+                className="w-full px-3 py-2 rounded-lg bg-bg-primary border border-border text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
+              />
+              <button
+                onClick={handleImport}
+                disabled={!importUrl || !importPassword || isBackingUp}
+                className="btn-primary flex items-center gap-2"
+              >
+                {isBackingUp ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Import from URL
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

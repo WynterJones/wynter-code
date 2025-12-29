@@ -17,6 +17,7 @@ import type {
 } from "@/types/autoBuild";
 import type { StreamChunk, AIProvider } from "@/types";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { gitService } from "@/services/git";
 
 /** Get the current default provider from settings */
 function getDefaultProvider(): AIProvider {
@@ -137,6 +138,12 @@ interface AutoBuildActions {
   runSelfReview: (issueId: string, workerId: number) => Promise<boolean>;
   runSubagentAudits: (issueId: string, filesModified: string[], workerId: number) => Promise<AuditFileResults>;
   runAuditFixLoop: (issueId: string, auditResults: AuditFileResults, workerId: number) => Promise<boolean>;
+
+  // Branch Management
+  setupBranchForSession: () => Promise<boolean>;
+  returnToOriginalBranch: () => Promise<void>;
+  getBranchNameForIssue: (issueId: string) => string;
+  createPullRequest: () => Promise<boolean>;
 }
 
 const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
@@ -154,6 +161,9 @@ const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
   runPerformanceAudit: false,
   runCodeQualityAudit: false,
   runAccessibilityAudit: false,
+  // Branch Management - disabled by default
+  useFeatureBranches: false,
+  autoCreatePR: false,
 };
 
 // Create empty worker (used in concurrent mode)
@@ -210,6 +220,10 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
   projectPath: null,
   issueCache: new Map(),
   fileCoordinatorPort: null,
+  // Branch Management
+  currentBranch: null,
+  originalBranch: null,
+  epicBranches: new Map(),
 
   // UI Actions
   openPopup: () => set({ isPopupOpen: true }),
@@ -247,7 +261,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
 
   // Agent Control
   start: async () => {
-    const { status, queue, settings, runAgentLoop, addLog, saveSession, initializeWorkers, startFileCoordinator } = get();
+    const { status, queue, settings, runAgentLoop, addLog, saveSession, initializeWorkers, startFileCoordinator, setupBranchForSession } = get();
     if (status === "running") return;
     if (queue.length === 0) {
       addLog("warning", "No issues in queue");
@@ -261,6 +275,16 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
 
     // Initialize worker pool
     initializeWorkers();
+
+    // Set up feature branch if enabled
+    if (settings.useFeatureBranches) {
+      const branchSetupSuccess = await setupBranchForSession();
+      if (!branchSetupSuccess) {
+        addLog("error", "Failed to set up feature branch, aborting");
+        set({ status: "error" });
+        return;
+      }
+    }
 
     set({ status: "running", retryCount: 0 });
     addLog("info", `Starting Auto Build with ${queue.length} issues (${settings.maxConcurrentIssues} concurrent workers)`);
@@ -439,7 +463,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
   },
 
   completeReview: async (issueId) => {
-    const { humanReview, completed, projectPath, addLog, getCachedIssue, closeIssue, commitChanges, settings } = get();
+    const { humanReview, completed, projectPath, addLog, getCachedIssue, closeIssue, commitChanges, settings, createPullRequest, returnToOriginalBranch, clearSession } = get();
     const issue = getCachedIssue(issueId);
 
     // Commit if auto-commit is enabled
@@ -454,11 +478,27 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
     // Close the issue
     await closeIssue(issueId, "Completed by Auto Build (reviewed)");
 
+    const remainingReviews = humanReview.filter((id) => id !== issueId);
     set({
-      humanReview: humanReview.filter((id) => id !== issueId),
+      humanReview: remainingReviews,
       completed: [...completed.slice(-9), issueId],
     });
     addLog("success", `Review approved: ${issue?.title || issueId}`, issueId);
+
+    // If this was the last review item, finalize the session
+    if (remainingReviews.length === 0 && get().queue.length === 0) {
+      if (settings.useFeatureBranches) {
+        // Create PR if enabled
+        if (settings.autoCreatePR) {
+          await createPullRequest();
+        }
+        // Return to original branch
+        await returnToOriginalBranch();
+      }
+      set({ status: "idle" });
+      addLog("success", "All reviews completed");
+      clearSession();
+    }
   },
 
   requestRefactor: async (issueId, reason) => {
@@ -566,7 +606,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
 
   // Session Persistence
   saveSession: async () => {
-    const { projectPath, status, queue, completed, humanReview, currentIssueId, currentPhase, retryCount, settings } = get();
+    const { projectPath, status, queue, completed, humanReview, currentIssueId, currentPhase, retryCount, settings, currentBranch, originalBranch, epicBranches } = get();
     if (!projectPath) return;
 
     try {
@@ -584,6 +624,10 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
           startedAt: new Date().toISOString(),
           lastActivityAt: new Date().toISOString(),
           settings,
+          // Branch state
+          currentBranch,
+          originalBranch,
+          epicBranches: Object.fromEntries(epicBranches),
         },
       });
     } catch (err) {
@@ -606,6 +650,10 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
         currentPhase: AutoBuildPhase;
         retryCount: number;
         settings: AutoBuildSettings;
+        // Branch state
+        currentBranch?: string | null;
+        originalBranch?: string | null;
+        epicBranches?: Record<string, string>;
       } | null>("auto_build_load_session", { projectPath });
 
       if (session) {
@@ -622,6 +670,10 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
           currentPhase: wasActive ? session.currentPhase : null,
           retryCount: wasActive ? session.retryCount : 0,
           settings: session.settings || get().settings,
+          // Restore branch state
+          currentBranch: session.currentBranch || null,
+          originalBranch: session.originalBranch || null,
+          epicBranches: new Map(Object.entries(session.epicBranches || {})),
         });
 
         if (wasActive) {
@@ -651,7 +703,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
 
   // Agent Loop - Concurrent Worker Pool
   runAgentLoop: async () => {
-    const { settings, addLog, runWorker, saveSession, stopFileCoordinator } = get();
+    const { settings, addLog, runWorker, saveSession, stopFileCoordinator, createPullRequest, returnToOriginalBranch } = get();
 
     // Spawn workers concurrently
     const activeWorkerCount = Math.min(settings.maxConcurrentIssues, get().queue.length);
@@ -674,6 +726,16 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
         set({ status: "paused", currentIssueId: null, currentPhase: null, workers: [] });
         addLog("info", `Queue complete. ${humanReview.length} issue(s) awaiting review`);
       } else {
+        // All issues completed - handle branch cleanup
+        if (settings.useFeatureBranches) {
+          // Create PR if enabled
+          if (settings.autoCreatePR) {
+            await createPullRequest();
+          }
+          // Return to original branch
+          await returnToOriginalBranch();
+        }
+
         set({ status: "idle", currentIssueId: null, currentPhase: null, workers: [] });
         addLog("success", "All issues completed");
         get().clearSession();
@@ -1603,5 +1665,167 @@ When all audits complete, summarize which audits passed and which found issues.`
 
     // Use the existing fix loop mechanism
     return executeStreamingWork(issueId, true, errorString, workerId);
+  },
+
+  // Branch Management
+  getBranchNameForIssue: (issueId: string) => {
+    // Check if issue has a parent (is part of an epic)
+    const issue = get().issueCache.get(issueId);
+    if (issue?.parent_id) {
+      return `autobuild/epic-${issue.parent_id}`;
+    }
+    return `autobuild/issue-${issueId}`;
+  },
+
+  setupBranchForSession: async () => {
+    const { projectPath, settings, queue, addLog, saveSession, getCachedIssue, getBranchNameForIssue } = get();
+    if (!projectPath || !settings.useFeatureBranches) {
+      return true; // Branch management disabled, continue normally
+    }
+
+    try {
+      // Get current branch to save as original
+      const currentBranch = await gitService.getCurrentBranch(projectPath);
+      if (!currentBranch) {
+        addLog("error", "Failed to get current branch");
+        return false;
+      }
+
+      // Determine branch name based on first issue in queue
+      const firstIssueId = queue[0];
+      if (!firstIssueId) {
+        return true; // No issues to process
+      }
+
+      const branchName = getBranchNameForIssue(firstIssueId);
+
+      // Check if we need to stash changes
+      const status = await gitService.getStatus(projectPath);
+      const hasChanges = status.staged.length > 0 || status.modified.length > 0 || status.untracked.length > 0;
+
+      if (hasChanges) {
+        addLog("info", "Stashing uncommitted changes before switching branches");
+        const stashResult = await gitService.stashChanges(projectPath);
+        if (!stashResult.success) {
+          addLog("error", `Failed to stash changes: ${stashResult.error}`);
+          return false;
+        }
+      }
+
+      // Check if branch already exists
+      const branchExists = await gitService.branchExists(projectPath, branchName);
+
+      if (branchExists) {
+        // Checkout existing branch
+        addLog("info", `Checking out existing branch: ${branchName}`);
+        const checkoutResult = await gitService.checkoutBranch(projectPath, branchName);
+        if (!checkoutResult.success) {
+          addLog("error", `Failed to checkout branch: ${checkoutResult.error}`);
+          return false;
+        }
+      } else {
+        // Create new branch
+        addLog("info", `Creating branch: ${branchName}`);
+        const createResult = await gitService.createBranch(projectPath, branchName);
+        if (!createResult.success) {
+          addLog("error", `Failed to create branch: ${createResult.error}`);
+          return false;
+        }
+      }
+
+      // Update state
+      const issue = getCachedIssue(firstIssueId);
+      const epicBranches = new Map(get().epicBranches);
+      if (issue?.parent_id) {
+        epicBranches.set(issue.parent_id, branchName);
+      }
+
+      set({
+        originalBranch: currentBranch,
+        currentBranch: branchName,
+        epicBranches,
+      });
+
+      await saveSession();
+      addLog("success", `Working on branch: ${branchName}`);
+      return true;
+    } catch (err) {
+      addLog("error", `Branch setup failed: ${err}`);
+      return false;
+    }
+  },
+
+  returnToOriginalBranch: async () => {
+    const { projectPath, originalBranch, currentBranch, settings, addLog, saveSession } = get();
+    if (!projectPath || !settings.useFeatureBranches || !originalBranch) {
+      return;
+    }
+
+    try {
+      // Only switch if we're on an autobuild branch
+      if (currentBranch && currentBranch.startsWith("autobuild/")) {
+        addLog("info", `Returning to original branch: ${originalBranch}`);
+        const result = await gitService.checkoutBranch(projectPath, originalBranch);
+        if (!result.success) {
+          addLog("warning", `Failed to return to original branch: ${result.error}`);
+          return;
+        }
+
+        set({
+          currentBranch: originalBranch,
+          originalBranch: null,
+        });
+
+        await saveSession();
+        addLog("success", `Returned to branch: ${originalBranch}`);
+      }
+    } catch (err) {
+      addLog("error", `Failed to return to original branch: ${err}`);
+    }
+  },
+
+  createPullRequest: async () => {
+    const { projectPath, currentBranch, originalBranch, settings, addLog } = get();
+    if (!projectPath || !settings.autoCreatePR || !currentBranch || !originalBranch) {
+      return false;
+    }
+
+    // Only create PR for autobuild branches
+    if (!currentBranch.startsWith("autobuild/")) {
+      return false;
+    }
+
+    try {
+      addLog("info", `Creating PR from ${currentBranch} to ${originalBranch}`);
+
+      // Push the branch first
+      const pushResult = await gitService.push(projectPath, { setUpstream: true });
+      if (!pushResult.success) {
+        addLog("error", `Failed to push branch: ${pushResult.error}`);
+        return false;
+      }
+
+      // Create PR using gh CLI
+      const prTitle = currentBranch.startsWith("autobuild/epic-")
+        ? `Auto Build: Epic ${currentBranch.replace("autobuild/epic-", "")}`
+        : `Auto Build: Issue ${currentBranch.replace("autobuild/issue-", "")}`;
+
+      const result = await invoke<{ success: boolean; output: string; error?: string }>("run_command", {
+        command: "gh",
+        args: ["pr", "create", "--title", prTitle, "--body", "Automated PR created by Auto Build", "--base", originalBranch],
+        cwd: projectPath,
+      });
+
+      if (result.success) {
+        addLog("success", `PR created: ${result.output.trim()}`);
+        return true;
+      } else {
+        addLog("warning", `Failed to create PR: ${result.error || result.output}`);
+        return false;
+      }
+    } catch (err) {
+      addLog("error", `PR creation failed: ${err}`);
+      return false;
+    }
   },
 }));

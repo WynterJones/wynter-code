@@ -6,6 +6,7 @@ use serde::Deserialize;
 use tauri::{Emitter, State};
 
 use crate::commands::{create_chunk, parse_claude_chunk, PermissionMode};
+use crate::path_utils::get_enhanced_path;
 
 /// Image data for structured prompts with multimodal content
 #[derive(Debug, Deserialize)]
@@ -122,12 +123,7 @@ pub async fn start_claude_session(
 
     // Build enhanced environment for Claude CLI
     let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
-    let current_path = std::env::var("PATH").unwrap_or_default();
-
-    let enhanced_path = format!(
-        "{}/.local/bin:/usr/local/bin:/opt/homebrew/bin:{}/.nvm/versions/node/v22.11.0/bin:{}/.nvm/versions/node/v20.18.0/bin:{}/.nvm/versions/node/v18.20.0/bin:{}",
-        home, home, home, home, current_path
-    );
+    let enhanced_path = get_enhanced_path();
 
     eprintln!("[Claude] Starting persistent session with args: {:?}", args);
     eprintln!("[Claude] Working directory: {}", cwd);

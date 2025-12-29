@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -59,6 +60,7 @@ import {
   OverwatchPopup,
   BeadsTrackerPopup,
   FaviconGeneratorPopup,
+  DesignerToolPopup,
   FarmworkTycoonPopup,
   MiniGamePlayer,
   HomebrewManagerPopup,
@@ -385,6 +387,7 @@ export function ProjectTabBar({
   const [showDatabaseViewer, setShowDatabaseViewer] = useState(false);
   const [showBeadsTracker, setShowBeadsTracker] = useState(false);
   const [showFaviconGenerator, setShowFaviconGenerator] = useState(false);
+  const [showDesignerTool, setShowDesignerTool] = useState(false);
   const [showDevToolkit, setShowDevToolkit] = useState(false);
   const [devToolkitInitialTool, setDevToolkitInitialTool] = useState<string | undefined>();
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
@@ -400,6 +403,12 @@ export function ProjectTabBar({
   const [showProjectSearch, setShowProjectSearch] = useState(false);
   const [showJustCommandManager, setShowJustCommandManager] = useState(false);
   const [showUniversalViewer, setShowUniversalViewer] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>("");
+
+  // Fetch app version on mount
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(console.error);
+  }, []);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const { hasStorybook } = useStorybookDetection();
@@ -510,6 +519,9 @@ export function ProjectTabBar({
           break;
         case "openFaviconGenerator":
           setShowFaviconGenerator(true);
+          break;
+        case "openDesignerTool":
+          setShowDesignerTool(true);
           break;
         case "openDevToolkit":
           setDevToolkitInitialTool(subToolId || undefined);
@@ -716,7 +728,7 @@ export function ProjectTabBar({
       {/* Traffic light spacer for macOS with version */}
       <div
         data-tauri-drag-region
-        className="w-20 h-full flex-shrink-0 flex flex-col items-center justify-end pb-0.5"
+        className="w-20 h-full flex-shrink-0 flex flex-col items-start justify-end pb-0.5 pl-2"
       >
         <Tooltip content="Check for Updates" side="bottom">
           <button
@@ -740,7 +752,7 @@ export function ProjectTabBar({
             }}
             className="text-[8px] text-text-secondary/50 font-mono hover:text-text-secondary transition-colors"
           >
-            v1.0.3
+            {appVersion ? `v${appVersion}` : ""}
           </button>
         </Tooltip>
       </div>
@@ -914,6 +926,7 @@ export function ProjectTabBar({
           onOpenOverwatch={() => setShowOverwatch(true)}
           onOpenMcpManager={() => useMcpStore.getState().openPopup()}
           onOpenFaviconGenerator={() => setShowFaviconGenerator(true)}
+          onOpenDesignerTool={() => setShowDesignerTool(true)}
           onOpenDevToolkit={() => setShowDevToolkit(true)}
           onOpenClaudeCodeStats={() => setShowClaudeCodeStats(true)}
           onOpenLimitsMonitor={() => setShowLimitsMonitor(true)}
@@ -1124,6 +1137,12 @@ export function ProjectTabBar({
       <FaviconGeneratorPopup
         isOpen={showFaviconGenerator}
         onClose={() => setShowFaviconGenerator(false)}
+      />
+
+      {/* Designer Tool */}
+      <DesignerToolPopup
+        isOpen={showDesignerTool}
+        onClose={() => setShowDesignerTool(false)}
       />
 
       {/* Dev Toolkit */}

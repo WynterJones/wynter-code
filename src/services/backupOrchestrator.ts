@@ -244,28 +244,56 @@ export async function importFromUrl(
   const store = useWebBackupStore.getState();
 
   try {
-    // Step 1: Fetch HTML
+    // Step 1: Fetch HTML (via Tauri to bypass CORS)
     store.setProgress(20, "Fetching backup...");
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch backup: ${response.status}`);
+    let html: string;
+    try {
+      html = await invoke<string>("netlify_fetch_backup_html", { url });
+    } catch (fetchError) {
+      throw new Error(`Failed to fetch backup: ${fetchError instanceof Error ? fetchError.message : "Network error"}`);
     }
-
-    const html = await response.text();
 
     // Step 2: Extract payload
     store.setProgress(40, "Extracting data...");
-    const payload = extractPayloadFromHtml(html);
+    let payload;
+    try {
+      payload = extractPayloadFromHtml(html);
+    } catch {
+      throw new Error("Invalid backup page: Could not find encrypted data. Make sure the URL points to a valid Wynter Code backup.");
+    }
 
     // Step 3: Decrypt
     store.setProgress(50, "Decrypting...");
-    const decrypted = await decrypt(payload, password);
+    let decrypted;
+    try {
+      decrypted = await decrypt(payload, password);
+    } catch (decryptError) {
+      // Re-throw with clearer message if it's a password error
+      if (decryptError instanceof Error) {
+        if (decryptError.message === "Incorrect password") {
+          throw new Error("Incorrect password. Please check your backup password and try again.");
+        }
+        if (decryptError.message.includes("integrity")) {
+          throw new Error("Backup data is corrupted or was modified. The backup cannot be restored.");
+        }
+      }
+      throw decryptError;
+    }
 
     // Step 4: Decompress
     store.setProgress(70, "Decompressing...");
-    const jsonString = await decompressData(decrypted);
-    const backupData: BackupData = JSON.parse(jsonString);
+    let backupData: BackupData;
+    try {
+      const jsonString = await decompressData(decrypted);
+      backupData = JSON.parse(jsonString);
+    } catch {
+      throw new Error("Failed to decompress backup data. The backup file may be corrupted.");
+    }
+
+    // Validate backup structure
+    if (!backupData.metadata || !backupData.data) {
+      throw new Error("Invalid backup format: Missing required data structure.");
+    }
 
     // Step 5: Import
     store.setProgress(90, "Importing data...");

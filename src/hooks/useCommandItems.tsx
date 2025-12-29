@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Folder, MessageSquare, Terminal } from "lucide-react";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -7,13 +6,7 @@ import { TOOL_DEFINITIONS } from "@/components/tools";
 import type { CommandItem } from "@/types";
 
 function dispatchToolAction(actionKey: string) {
-  if (actionKey === "openColorPicker") {
-    invoke("start_color_picking_mode").catch((err) => {
-      console.error("Failed to start color picking mode:", err);
-    });
-  } else {
-    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: actionKey } }));
-  }
+  window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: actionKey } }));
 }
 
 export function useCommandItems(): CommandItem[] {

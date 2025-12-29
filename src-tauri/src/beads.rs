@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
 
+use crate::path_utils::get_enhanced_path;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BeadsDependency {
     pub issue_id: String,
@@ -66,6 +68,7 @@ fn run_bd_command(project_path: &str, args: &[&str]) -> Result<String, String> {
     let output = Command::new("bd")
         .args(args)
         .current_dir(project_path)
+        .env("PATH", get_enhanced_path())
         .output()
         .map_err(|e| format!("Failed to run bd command: {}", e))?;
 

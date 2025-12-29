@@ -47,6 +47,7 @@ export class VehicleSprite extends Container {
   private badge: VehicleBadge;
   private isFinished = false;
   private tintColor: number = 0xffffff; // Default: no tint
+  private pulseTimer = 0; // Timer for pulsing effect while waiting
 
   constructor(data: VehicleData) {
     super();
@@ -174,6 +175,17 @@ export class VehicleSprite extends Container {
       return false;
     }
 
+    // Pulsing effect while waiting for tool completion
+    if (this.data.task === "waiting_for_completion") {
+      this.pulseTimer += dtSeconds;
+      const pulse = Math.sin(this.pulseTimer * 3) * 0.08 + 1.0; // Gentle 0.92 to 1.08 scale
+      this.sprite.scale.set(0.6 * pulse);
+      this.fallbackGraphic.scale.set(0.6 * pulse);
+    } else {
+      // Reset pulse when not waiting
+      this.pulseTimer = 0;
+    }
+
     // If no path yet, wait (don't mark as arrived)
     if (this.data.path.length === 0) {
       return false;
@@ -235,6 +247,7 @@ export class VehicleSprite extends Container {
     const currentPathIndex = this.data.pathIndex;
     const currentTask = this.data.task;
     const currentRouteIndex = this.data.currentRouteIndex;
+    const currentWaitStartTime = this.data.waitStartTime;
 
     this.data = data;
 
@@ -248,6 +261,15 @@ export class VehicleSprite extends Container {
     // This prevents "exiting" vehicles from being reset to "entering" and re-routed
     this.data.task = currentTask;
     this.data.currentRouteIndex = currentRouteIndex;
+
+    // Preserve waitStartTime if set (sprite-local)
+    if (currentWaitStartTime) {
+      this.data.waitStartTime = currentWaitStartTime;
+    }
+
+    // Sync shouldExit flag from store - this is how the bridge signals the vehicle to exit
+    // This is intentionally synced FROM the store data, not preserved locally
+    this.data.shouldExit = data.shouldExit;
 
     this.position.set(data.position.x, data.position.y);
     this.isCarrying = data.carrying;
@@ -289,7 +311,10 @@ export class VehicleSprite extends Container {
     this.data.currentRouteIndex++;
 
     if (this.data.currentRouteIndex >= this.data.route.length) {
-      this.setTask("exiting");
+      // Route complete - wait for tool completion signal before exiting
+      const lastDest = this.data.route[this.data.route.length - 1];
+      this.setTask("waiting_for_completion", lastDest);
+      this.data.waitStartTime = Date.now();
       return true;
     }
 

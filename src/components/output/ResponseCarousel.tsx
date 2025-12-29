@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
-import { IconButton, ScrollArea } from "@/components/ui";
+import { OverlayScrollbarsComponent, type OverlayScrollbarsComponentRef } from "overlayscrollbars-react";
+import { IconButton } from "@/components/ui";
 import { ClaudeResponseCard } from "./ClaudeResponseCard";
 import { cn } from "@/lib/utils";
 import type { Message, ToolCall, StreamingStats } from "@/types";
@@ -106,6 +107,8 @@ export function ResponseCarousel({
 }: ResponseCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const streamingScrollRef = useRef<OverlayScrollbarsComponentRef>(null);
+  const slideScrollRefs = useRef<Map<string, OverlayScrollbarsComponentRef>>(new Map());
   const [currentIndex, setCurrentIndex] = useState(0);
 
   // Check if we have streaming content
@@ -174,6 +177,45 @@ export function ResponseCarousel({
     }
   }, [currentIndex]);
 
+  // Helper to scroll a slide to bottom
+  const scrollSlideToBottom = useCallback((ref: OverlayScrollbarsComponentRef | null, smooth = true) => {
+    if (!ref) return;
+    const osInstance = ref.osInstance();
+    if (osInstance) {
+      const { viewport } = osInstance.elements();
+      if (viewport) {
+        viewport.scrollTo({
+          top: viewport.scrollHeight,
+          behavior: smooth ? "smooth" : "instant"
+        });
+      }
+    }
+  }, []);
+
+  // Auto-scroll to bottom when streaming text changes
+  useEffect(() => {
+    if (isStreaming) {
+      scrollSlideToBottom(streamingScrollRef.current);
+    }
+  }, [isStreaming, streamingText, thinkingText, scrollSlideToBottom]);
+
+  // Auto-scroll to bottom when switching slides or on mount
+  useEffect(() => {
+    // Small delay to ensure the slide is rendered
+    const timer = setTimeout(() => {
+      const isStreamingSlide = hasStreamingContent && currentIndex === messagePairs.length;
+
+      if (isStreamingSlide) {
+        scrollSlideToBottom(streamingScrollRef.current, false);
+      } else if (messagePairs[currentIndex]) {
+        const slideRef = slideScrollRefs.current.get(messagePairs[currentIndex].user.id);
+        scrollSlideToBottom(slideRef || null, false);
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, messagePairs, hasStreamingContent, scrollSlideToBottom]);
+
   const goToPrevious = useCallback(() => {
     setCurrentIndex((i) => Math.max(0, i - 1));
   }, []);
@@ -238,19 +280,51 @@ export function ResponseCarousel({
               key={pair.user.id}
               className="flex-shrink-0 w-full h-full snap-center p-4"
             >
-              <ScrollArea className="h-full">
+              <OverlayScrollbarsComponent
+                ref={(ref) => {
+                  if (ref) {
+                    slideScrollRefs.current.set(pair.user.id, ref);
+                  } else {
+                    slideScrollRefs.current.delete(pair.user.id);
+                  }
+                }}
+                className="os-theme-custom h-full"
+                options={{
+                  scrollbars: {
+                    theme: "os-theme-custom",
+                    visibility: "auto",
+                    autoHide: "leave",
+                    autoHideDelay: 400,
+                  },
+                  overflow: { x: "scroll", y: "scroll" },
+                }}
+                defer
+              >
                 <UserMessageBar content={pair.user.content} />
                 {pair.assistant && (
                   <ClaudeResponseCard content={pair.assistant.content} />
                 )}
-              </ScrollArea>
+              </OverlayScrollbarsComponent>
             </div>
           ))}
 
           {/* Streaming slide */}
           {hasStreamingContent && (
             <div className="flex-shrink-0 w-full h-full snap-center p-4">
-              <ScrollArea className="h-full">
+              <OverlayScrollbarsComponent
+                ref={streamingScrollRef}
+                className="os-theme-custom h-full"
+                options={{
+                  scrollbars: {
+                    theme: "os-theme-custom",
+                    visibility: "auto",
+                    autoHide: "leave",
+                    autoHideDelay: 400,
+                  },
+                  overflow: { x: "scroll", y: "scroll" },
+                }}
+                defer
+              >
                 {lastUserMessage && (
                   <UserMessageBar content={lastUserMessage.content} />
                 )}
@@ -261,7 +335,7 @@ export function ResponseCarousel({
                   streamingStats={streamingStats}
                   lastCommand={lastCommand}
                 />
-              </ScrollArea>
+              </OverlayScrollbarsComponent>
             </div>
           )}
         </div>

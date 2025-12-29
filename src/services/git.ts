@@ -335,6 +335,54 @@ class GitService {
       return false;
     }
   }
+
+  async getCurrentBranch(cwd: string): Promise<string | null> {
+    try {
+      const output = await runGit(["rev-parse", "--abbrev-ref", "HEAD"], cwd);
+      if (output.code === 0) {
+        return output.stdout.trim();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async branchExists(cwd: string, branchName: string): Promise<boolean> {
+    try {
+      const output = await runGit(["rev-parse", "--verify", branchName], cwd);
+      return output.code === 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async stashChanges(cwd: string): Promise<GitOperationResult> {
+    try {
+      const output = await runGit(["stash", "push", "-m", "autobuild-stash"], cwd);
+      return { success: output.code === 0, error: output.stderr };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async stashPop(cwd: string): Promise<GitOperationResult> {
+    try {
+      const output = await runGit(["stash", "pop"], cwd);
+      return { success: output.code === 0, error: output.stderr };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  }
+
+  async getDiffWithBranch(cwd: string, baseBranch: string): Promise<string> {
+    try {
+      const output = await runGit(["diff", `${baseBranch}...HEAD`, "--stat"], cwd);
+      return output.stdout;
+    } catch {
+      return "";
+    }
+  }
 }
 
 export const gitService = new GitService();

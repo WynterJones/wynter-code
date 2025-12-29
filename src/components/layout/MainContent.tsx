@@ -13,6 +13,7 @@ import { ClaudePopup } from "@/components/claude";
 import { ProviderDropdown } from "@/components/provider/ProviderDropdown";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle, StartButton } from "@/components/session";
+import { ContextProgressBar } from "@/components/context";
 import { Tooltip } from "@/components/ui";
 import { PanelLayoutContainer } from "@/components/panels";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -227,8 +228,8 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           updateProviderSessionId(currentSessionId, providerSessionId);
         }
       },
-      onUsage: (stats: Record<string, unknown>) => {
-        updateStats(currentSessionId, stats);
+      onUsage: (stats: Record<string, unknown>, isFinal?: boolean) => {
+        updateStats(currentSessionId, stats, isFinal);
       },
       onResult: () => {
         finishStreaming(currentSessionId);
@@ -583,7 +584,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       <div className="h-[45px] px-4 flex items-center justify-between border-b border-border bg-bg-secondary" data-tauri-drag-region>
         <div
-          className="flex items-center gap-2 text-sm text-text-secondary transition-[padding] duration-200 flex-1 min-w-0 overflow-hidden"
+          className="flex items-center gap-2 text-sm text-text-secondary transition-[padding] duration-200 flex-1 min-w-0 overflow-hidden pr-6"
           data-tauri-drag-region
           style={{ paddingLeft: sidebarPosition === "left" ? (sidebarCollapsed ? 28 : 16) : 0 }}
         >
@@ -738,9 +739,12 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
                   )}
                   <span className="text-xs font-medium text-text-secondary">Activity</span>
                 </div>
-                <span className="text-xs text-text-secondary/60">
-                  {allToolCalls.length} tool call{allToolCalls.length !== 1 ? "s" : ""}
-                </span>
+                <div className="flex items-center gap-3">
+                  <ContextProgressBar />
+                  <span className="text-xs text-text-secondary/60">
+                    {allToolCalls.length} tool call{allToolCalls.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
               </button>
               {!isActivityCollapsed && (
                 <div style={{ height: activityHeight - 32 }}>

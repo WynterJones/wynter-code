@@ -119,6 +119,9 @@ class FarmworkBridge {
     if (vehicleId) {
       const store = useFarmworkTycoonStore.getState();
 
+      // Signal the vehicle to exit
+      store.signalVehicleExit(vehicleId);
+
       store.addActivity({
         type: isError ? "tool_completed" : "tool_completed",
         message: isError ? "Tool failed" : "Tool completed",

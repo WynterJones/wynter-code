@@ -215,3 +215,26 @@ pub async fn netlify_rollback_deploy(
         Err(format!("Rollback failed: {} - {}", status, error_text))
     }
 }
+
+/// Fetch HTML content from a URL (bypasses CORS)
+#[tauri::command]
+pub async fn netlify_fetch_backup_html(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(60))
+        .build()
+        .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
+
+    let response = client
+        .get(&url)
+        .header("Accept", "text/html")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch backup: {}", e))?;
+
+    if response.status().is_success() {
+        response.text().await.map_err(|e| format!("Failed to read response: {}", e))
+    } else {
+        let status = response.status();
+        Err(format!("Failed to fetch backup: HTTP {}", status))
+    }
+}

@@ -6,6 +6,7 @@ import { SessionTabBar } from "./SessionTabBar";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
 import { MinimizedPopupTabs } from "./MinimizedPopupTabs";
+import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
 import { useProjectStore } from "@/stores/projectStore";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useOnboardingStore } from "@/stores";
@@ -29,7 +30,7 @@ const MAX_SIDEBAR_WIDTH = 700;
 const DEFAULT_SIDEBAR_WIDTH = 400;
 
 export function AppShell() {
-  const { projects, activeProjectId } = useProjectStore();
+  const { projects, activeProjectId, addProject } = useProjectStore();
   const activeProject = projects.find((p) => p.id === activeProjectId);
   const isMeditating = useMeditationStore((s) => s.isActive);
   const { hasCompletedOnboarding } = useOnboardingStore();
@@ -49,6 +50,8 @@ export function AppShell() {
   const [pendingImage, setPendingImage] = useState<ImageAttachment | null>(null);
   const [requestImageBrowser, setRequestImageBrowser] = useState(false);
   const [hasBeads, setHasBeads] = useState(false);
+  const [showProjectFileBrowser, setShowProjectFileBrowser] = useState(false);
+  const [projectBrowserInitialPath, setProjectBrowserInitialPath] = useState<string | undefined>();
 
   const handleSendToPrompt = useCallback((image: ImageAttachment) => {
     setPendingImage(image);
@@ -115,6 +118,21 @@ export function AppShell() {
   const handleOpenProjectSearch = useCallback(() => {
     window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openProjectSearch" } }));
   }, []);
+
+  const handleOpenProjectFromWelcome = useCallback(async () => {
+    try {
+      const homeDir = await invoke<string>("get_home_dir");
+      setProjectBrowserInitialPath(homeDir);
+    } catch {
+      setProjectBrowserInitialPath(undefined);
+    }
+    setShowProjectFileBrowser(true);
+  }, []);
+
+  const handleSelectProjectFromWelcome = useCallback((path: string) => {
+    addProject(path);
+    setShowProjectFileBrowser(false);
+  }, [addProject]);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -215,7 +233,7 @@ export function AppShell() {
             setShowSettings(false);
             setSettingsInitialTab(undefined);
           }}
-          initialTab={settingsInitialTab as "general" | "editor" | "markdown" | "music" | "colors" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "farmwork" | "about" | undefined}
+          initialTab={settingsInitialTab as "general" | "editor" | "markdown" | "music" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "farmwork" | "about" | undefined}
         />
       )}
       {showSubscriptions && <SubscriptionPopup onClose={() => setShowSubscriptions(false)} />}
@@ -287,7 +305,7 @@ export function AppShell() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center blueprint-grid">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-text-primary mb-2">
               Welcome to Wynter Code
@@ -296,13 +314,18 @@ export function AppShell() {
               Open a project folder to get started
             </p>
             <button
-              onClick={() => {
-                // Will trigger folder dialog
-              }}
+              onClick={handleOpenProjectFromWelcome}
               className="btn-primary"
             >
               Open Project
             </button>
+            <FileBrowserPopup
+              isOpen={showProjectFileBrowser}
+              onClose={() => setShowProjectFileBrowser(false)}
+              initialPath={projectBrowserInitialPath}
+              mode="selectProject"
+              onSelectProject={handleSelectProjectFromWelcome}
+            />
           </div>
         </div>
       )}

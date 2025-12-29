@@ -43,7 +43,7 @@ export interface ClaudeSessionCallbacks {
   onToolResult: (toolId: string, content: string, isError?: boolean) => void;
   onAskUserQuestion: (toolId: string, input: AskUserQuestionInput) => void;
   onInit: (model: string, cwd: string, providerSessionId?: string) => void;
-  onUsage: (stats: Partial<StreamingStats>) => void;
+  onUsage: (stats: Partial<StreamingStats>, isFinal?: boolean) => void;
   onResult: (result: string) => void;
   onError: (error: string) => void;
   onPermissionRequest?: (request: McpPermissionRequest) => void;
@@ -318,6 +318,7 @@ class ClaudeService {
           if (chunk.content) {
             cb.onResult(chunk.content);
           }
+          // Pass isFinal=true for result events - these contain accurate final token counts
           cb.onUsage({
             inputTokens: chunk.input_tokens,
             outputTokens: chunk.output_tokens,
@@ -329,7 +330,7 @@ class ClaudeService {
             numTurns: chunk.num_turns,
             resultSubtype: chunk.subtype as 'success' | 'error_max_turns' | 'error_during_execution' | undefined,
             isError: chunk.is_error,
-          });
+          }, true);
           break;
 
         case "error":

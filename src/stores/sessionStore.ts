@@ -15,6 +15,15 @@ export interface ClaudeSessionInfo {
   permissionMode?: PermissionMode;
 }
 
+// Persistent context stats that survive between streaming turns
+export interface SessionContextStats {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  lastUpdated: number;
+}
+
 interface StreamingState {
   isStreaming: boolean;
   streamingText: string;
@@ -32,6 +41,7 @@ interface SessionStore {
   messages: Map<string, Message[]>;
   streamingState: Map<string, StreamingState>;
   claudeSessionState: Map<string, ClaudeSessionInfo>;
+  sessionContextStats: Map<string, SessionContextStats>;
 
   createSession: (projectId: string, type?: SessionType, model?: AIModel, provider?: AIProvider) => string;
   removeSession: (projectId: string, sessionId: string) => void;
@@ -61,7 +71,7 @@ interface SessionStore {
   appendThinkingText: (sessionId: string, text: string) => void;
   setThinking: (sessionId: string, isThinking: boolean) => void;
   setCurrentTool: (sessionId: string, toolName: string | undefined) => void;
-  updateStats: (sessionId: string, stats: Partial<StreamingStats>) => void;
+  updateStats: (sessionId: string, stats: Partial<StreamingStats>, isFinal?: boolean) => void;
   addPendingToolCall: (sessionId: string, toolCall: ToolCall) => void;
   updateToolCallStatus: (
     sessionId: string,
@@ -87,6 +97,10 @@ interface SessionStore {
   setClaudeSessionEnded: (sessionId: string) => void;
   getClaudeSessionState: (sessionId: string) => ClaudeSessionInfo | undefined;
   isClaudeSessionActive: (sessionId: string) => boolean;
+
+  // Context stats (persistent across streaming turns)
+  getContextStats: (sessionId: string) => SessionContextStats | undefined;
+  clearContextStats: (sessionId: string) => void;
 
   reset: () => void;
 }
@@ -118,6 +132,7 @@ export const useSessionStore = create<SessionStore>()(
       messages: new Map(),
       streamingState: new Map(),
       claudeSessionState: new Map(),
+      sessionContextStats: new Map(),
 
       createSession: (
         projectId: string,
@@ -175,11 +190,15 @@ export const useSessionStore = create<SessionStore>()(
           const newStreamingState = new Map(state.streamingState);
           newStreamingState.delete(sessionId);
 
+          const newContextStats = new Map(state.sessionContextStats);
+          newContextStats.delete(sessionId);
+
           return {
             sessions: newSessions,
             activeSessionId: newActiveSessionId,
             messages: newMessages,
             streamingState: newStreamingState,
+            sessionContextStats: newContextStats,
           };
         });
       },
@@ -408,7 +427,7 @@ export const useSessionStore = create<SessionStore>()(
         });
       },
 
-      updateStats: (sessionId: string, newStats: Partial<StreamingStats>) => {
+      updateStats: (sessionId: string, newStats: Partial<StreamingStats>, isFinal?: boolean) => {
         set((state) => {
           const newStreamingState = new Map(state.streamingState);
           const current = newStreamingState.get(sessionId) || {
@@ -418,6 +437,21 @@ export const useSessionStore = create<SessionStore>()(
             ...current,
             stats: { ...current.stats, ...newStats },
           });
+
+          // Only update persistent context stats when isFinal=true (from result events)
+          // This ensures we store accurate final values, not intermediate streaming values
+          if (isFinal && (newStats.inputTokens !== undefined || newStats.outputTokens !== undefined)) {
+            const newContextStats = new Map(state.sessionContextStats);
+            newContextStats.set(sessionId, {
+              inputTokens: newStats.inputTokens ?? 0,
+              outputTokens: newStats.outputTokens ?? 0,
+              cacheReadTokens: newStats.cacheReadTokens ?? 0,
+              cacheWriteTokens: newStats.cacheWriteTokens ?? 0,
+              lastUpdated: Date.now(),
+            });
+            return { streamingState: newStreamingState, sessionContextStats: newContextStats };
+          }
+
           return { streamingState: newStreamingState };
         });
       },
@@ -630,6 +664,19 @@ export const useSessionStore = create<SessionStore>()(
         return state?.status === "ready";
       },
 
+      // Context stats methods
+      getContextStats: (sessionId: string) => {
+        return get().sessionContextStats.get(sessionId);
+      },
+
+      clearContextStats: (sessionId: string) => {
+        set((state) => {
+          const newContextStats = new Map(state.sessionContextStats);
+          newContextStats.delete(sessionId);
+          return { sessionContextStats: newContextStats };
+        });
+      },
+
       reset: () => {
         set({
           sessions: new Map(),
@@ -637,6 +684,7 @@ export const useSessionStore = create<SessionStore>()(
           messages: new Map(),
           streamingState: new Map(),
           claudeSessionState: new Map(),
+          sessionContextStats: new Map(),
         });
       },
     }),
@@ -646,12 +694,14 @@ export const useSessionStore = create<SessionStore>()(
         sessions: Array.from(state.sessions.entries()),
         activeSessionId: Array.from(state.activeSessionId.entries()),
         messages: Array.from(state.messages.entries()),
+        sessionContextStats: Array.from(state.sessionContextStats.entries()),
       }),
       merge: (persisted: unknown, current) => {
         const data = persisted as {
           sessions?: [string, Session[]][];
           activeSessionId?: [string, string][];
           messages?: [string, Message[]][];
+          sessionContextStats?: [string, SessionContextStats][];
         } | null;
 
         // Migrate old sessions to include new required fields
@@ -680,6 +730,7 @@ export const useSessionStore = create<SessionStore>()(
           activeSessionId: new Map(data?.activeSessionId || []),
           messages: new Map(data?.messages || []),
           streamingState: new Map(),
+          sessionContextStats: new Map(data?.sessionContextStats || []),
         };
       },
     }

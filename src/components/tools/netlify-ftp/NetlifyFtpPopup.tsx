@@ -291,11 +291,13 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
       <Popup.Content scrollable={false} padding="none">
         <div className={cn("flex h-full", isResizing && "select-none")}>
           {!apiToken || connectionStatus === "disconnected" ? (
-            <TokenSetup
-              onSubmit={handleConnect}
-              isConnecting={connectionStatus === "connecting"}
-              error={connectionError}
-            />
+            <div className="w-full">
+              <TokenSetup
+                onSubmit={handleConnect}
+                isConnecting={connectionStatus === "connecting"}
+                error={connectionError}
+              />
+            </div>
           ) : connectionStatus === "connecting" ? (
             <div className="flex items-center justify-center w-full">
               <div className="text-center">

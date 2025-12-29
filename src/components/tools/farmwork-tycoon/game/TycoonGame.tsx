@@ -341,6 +341,41 @@ export function TycoonGame({
 
           updateVehiclePosition(data.id, data.position);
 
+          // Check for vehicles waiting that should now exit (tool completed)
+          if (data.task === "waiting_for_completion" && data.shouldExit) {
+            // Start exiting
+            vehicleSprite.setTask("exiting");
+            const exitPoint = getRandomSpawnPoint("exit");
+            const exitPath = navigationSystem.findPathToExit(data.position, exitPoint.id);
+            if (exitPath && exitPath.length > 0) {
+              vehicleSprite.setPath(exitPath);
+            } else {
+              vehicleSprite.markFinished();
+              setTimeout(() => removeVehicle(data.id), 500);
+            }
+            continue;
+          }
+
+          // Fallback timeout: if waiting > 5 minutes, auto-exit (prevents orphaned vehicles)
+          const MAX_WAIT_TIME = 5 * 60 * 1000; // 5 minutes
+          if (
+            data.task === "waiting_for_completion" &&
+            data.waitStartTime &&
+            Date.now() - data.waitStartTime > MAX_WAIT_TIME
+          ) {
+            // Force exit after timeout
+            vehicleSprite.setTask("exiting");
+            const exitPoint = getRandomSpawnPoint("exit");
+            const exitPath = navigationSystem.findPathToExit(data.position, exitPoint.id);
+            if (exitPath && exitPath.length > 0) {
+              vehicleSprite.setPath(exitPath);
+            } else {
+              vehicleSprite.markFinished();
+              setTimeout(() => removeVehicle(data.id), 500);
+            }
+            continue;
+          }
+
           if (arrived) {
             const currentDest = vehicleSprite.getCurrentDestination();
             const task = vehicleSprite.getTask();
@@ -375,36 +410,15 @@ export function TycoonGame({
             const routeComplete = vehicleSprite.advanceRoute();
             const nextTask = vehicleSprite.getTask();
 
-            if (routeComplete && nextTask === "exiting") {
-              // Route complete - vehicle is at farmhouse, wait 200ms then exit
+            if (routeComplete && nextTask === "waiting_for_completion") {
+              // Route complete - vehicle waits at building until tool completes
               vehicleSprite.setCarrying(false);
 
               // Clear path immediately to prevent re-triggering arrival detection
-              // while waiting for the exit timeout
               vehicleSprite.setPath([]);
-
-              // Capture sprite reference for timeout closure
-              const sprite = vehicleSprite;
-              const vehicleId = data.id;
-              const currentPos = { ...data.position };
-
-              setTimeout(() => {
-                // Check if vehicle was already removed
-                if (sprite.isMarkedFinished()) return;
-
-                // Pick a random exit point
-                const exitPoint = getRandomSpawnPoint("exit");
-                const exitPath = navigationSystem.findPathToExit(currentPos, exitPoint.id);
-                if (exitPath && exitPath.length > 0) {
-                  sprite.setPath(exitPath);
-                } else {
-                  // If no path found, just remove the vehicle
-                  sprite.markFinished();
-                  setTimeout(() => removeVehicle(vehicleId), 500);
-                }
-              }, 200);
+              // Vehicle will stay parked here until shouldExit flag is set
             } else if (routeComplete) {
-              // Fallback: mark as finished if somehow route is complete but not exiting
+              // Fallback: if route is complete but not waiting, mark as finished
               vehicleSprite.markFinished();
               setTimeout(() => {
                 removeVehicle(data.id);

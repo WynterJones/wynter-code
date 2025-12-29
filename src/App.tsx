@@ -1,6 +1,4 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { ColorPickerWindow } from "@/components/colorpicker/ColorPickerWindow";
-import { MagnifierWindow } from "@/components/colorpicker/MagnifierWindow";
 import { FloatingWebcamWindow, CostTrackingPopup } from "@/components/tools/webcam";
 import { LauncherWindow } from "@/components/launcher";
 import { useEffect, useState } from "react";
@@ -8,7 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAppFont } from "@/hooks/useAppFont";
 import { useSettingsStore } from "@/stores/settingsStore";
 
-type WindowType = "main" | "color-picker" | "color-magnifier" | "floating-webcam" | "webcam-cost-popup" | "launcher";
+type WindowType = "main" | "floating-webcam" | "webcam-cost-popup" | "launcher";
 
 function App() {
   useAppFont();
@@ -18,11 +16,7 @@ function App() {
     document.documentElement.classList.add("dark");
     // Check window type based on path
     const path = window.location.pathname;
-    if (path === "/color-picker") {
-      setWindowType("color-picker");
-    } else if (path === "/color-magnifier") {
-      setWindowType("color-magnifier");
-    } else if (path === "/floating-webcam") {
+    if (path === "/floating-webcam") {
       setWindowType("floating-webcam");
     } else if (path === "/webcam-cost-popup") {
       setWindowType("webcam-cost-popup");
@@ -80,14 +74,6 @@ function App() {
   }, []);
 
   // Render appropriate window based on type
-  if (windowType === "color-picker") {
-    return <ColorPickerWindow />;
-  }
-
-  if (windowType === "color-magnifier") {
-    return <MagnifierWindow />;
-  }
-
   if (windowType === "floating-webcam") {
     return <FloatingWebcamWindow />;
   }

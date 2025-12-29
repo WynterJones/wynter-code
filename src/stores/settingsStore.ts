@@ -165,6 +165,9 @@ interface SettingsStore {
   vibrancyEnabled: boolean;
   vibrancyDarkness: number; // 0.0 to 1.0 - controls dark overlay
 
+  // Designer Tool settings
+  geminiImageApiKey: string;
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
@@ -221,6 +224,9 @@ interface SettingsStore {
   // Vibrancy setters
   setVibrancyEnabled: (enabled: boolean) => void;
   setVibrancyDarkness: (darkness: number) => void;
+
+  // Designer Tool setters
+  setGeminiImageApiKey: (key: string) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -280,6 +286,9 @@ export const useSettingsStore = create<SettingsStore>()(
       // Vibrancy defaults
       vibrancyEnabled: true,
       vibrancyDarkness: 0.65,
+
+      // Designer Tool defaults
+      geminiImageApiKey: "",
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -481,6 +490,11 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setVibrancyDarkness: (vibrancyDarkness: number) => {
         set({ vibrancyDarkness });
+      },
+
+      // Designer Tool setters
+      setGeminiImageApiKey: (geminiImageApiKey: string) => {
+        set({ geminiImageApiKey });
       },
     }),
     {

@@ -22,7 +22,7 @@ export interface CodexSessionCallbacks {
   onToolEnd: (toolId: string) => void;
   onToolResult: (toolId: string, content: string, isError?: boolean) => void;
   onInit: (model: string, cwd: string, providerSessionId?: string) => void;
-  onUsage: (stats: Partial<StreamingStats>) => void;
+  onUsage: (stats: Partial<StreamingStats>, isFinal?: boolean) => void;
   onResult: (result: string) => void;
   onError: (error: string) => void;
 }
@@ -141,11 +141,12 @@ class CodexService {
           break;
 
         case "usage":
+          // For Codex, usage events come from turn.completed - these are final values
           cb.onUsage({
             inputTokens: chunk.input_tokens,
             outputTokens: chunk.output_tokens,
             cacheReadTokens: chunk.cache_read_tokens,
-          });
+          }, true);
           break;
 
         case "turn_start":

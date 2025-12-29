@@ -3,7 +3,7 @@
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
 **Last Updated:** 2025-12-28
-**Composted Ideas:** 37
+**Composted Ideas:** 38
 
 ---
 
@@ -18,6 +18,10 @@
 ---
 
 ## Composted Ideas
+
+### Color Picker Tool
+System-wide color picker with magnifier overlay, HSL controls, format conversion (HEX/RGB/HSL), and color history.
+> **Why rejected (2025-12-28):** Too annoying - macOS screen recording permissions and NSPanel integration unreliable. The tool required constant permission prompts and didn't work consistently across macOS versions.
 
 ### Screen Studio (Native Screen Recording)
 Native screen recording tool with ScreenCaptureKit integration for audio capture, region selection, and export to MP4/WebM.

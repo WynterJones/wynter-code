@@ -35,6 +35,9 @@ export interface AutoBuildSettings {
   runPerformanceAudit: boolean;   // default: false
   runCodeQualityAudit: boolean;   // default: false
   runAccessibilityAudit: boolean; // default: false (only runs if UI files changed)
+  // Branch Management
+  useFeatureBranches: boolean;    // default: false - create per-epic/issue branches
+  autoCreatePR: boolean;          // default: false - create PR on epic/issue completion
 }
 
 // Worker state for concurrent issue processing
@@ -79,6 +82,10 @@ export interface AutoBuildSession {
   startedAt: string;
   lastActivityAt: string;
   settings: AutoBuildSettings;
+  // Branch state (for session resume)
+  currentBranch?: string | null;
+  originalBranch?: string | null;
+  epicBranches?: Record<string, string>; // serialized Map
 }
 
 export interface AutoBuildResult {
@@ -142,6 +149,11 @@ export interface AutoBuildState {
 
   // File Coordinator
   fileCoordinatorPort: number | null;
+
+  // Branch Management
+  currentBranch: string | null;     // The autobuild branch we're working on
+  originalBranch: string | null;    // Branch we started from (to return to)
+  epicBranches: Map<string, string>; // epicId → branch name
 }
 
 export const DEFAULT_SETTINGS: AutoBuildSettings = {
@@ -159,6 +171,9 @@ export const DEFAULT_SETTINGS: AutoBuildSettings = {
   runPerformanceAudit: false,
   runCodeQualityAudit: false,
   runAccessibilityAudit: false,
+  // Branch Management - disabled by default
+  useFeatureBranches: false,
+  autoCreatePR: false,
 };
 
 export const PHASE_LABELS: Record<NonNullable<AutoBuildPhase>, string> = {

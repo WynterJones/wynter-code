@@ -1,23 +1,47 @@
-import { X, Shield, Zap, Code2, Accessibility, GitCommit, Users, RotateCcw, Filter, CheckSquare } from "lucide-react";
+import { X, Shield, Zap, Code2, Accessibility, GitCommit, Users, RotateCcw, Filter, CheckSquare, GitBranch, GitPullRequest, AlertCircle } from "lucide-react";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import { IconButton } from "@/components/ui/IconButton";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 
 interface AutoBuildSettingsPopupProps {
   onClose: () => void;
 }
 
 export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps) {
-  const { settings, updateSettings, status } = useAutoBuildStore();
+  const { settings, updateSettings, status, projectPath } = useAutoBuildStore();
   const isDisabled = status === "running";
+  const [ghAvailable, setGhAvailable] = useState<boolean | null>(null);
+
+  // Check if gh CLI is installed
+  useEffect(() => {
+    async function checkGh() {
+      if (!projectPath) {
+        setGhAvailable(false);
+        return;
+      }
+      try {
+        const result = await invoke<{ success: boolean; output: string }>("run_command", {
+          command: "gh",
+          args: ["--version"],
+          cwd: projectPath,
+        });
+        setGhAvailable(result.success);
+      } catch {
+        setGhAvailable(false);
+      }
+    }
+    checkGh();
+  }, [projectPath]);
 
   return (
     <div className="absolute inset-0 z-10 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       {/* Settings Panel */}
-      <div className="relative w-[720px] rounded-lg border border-border bg-[#1a1a1a] shadow-2xl animate-in zoom-in-95 duration-100">
+      <div className="relative w-[720px] rounded-lg border border-border bg-[#0a0a0a] shadow-2xl animate-in zoom-in-95 duration-100">
         {/* Header */}
         <div
           data-tauri-drag-region
@@ -85,13 +109,34 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
                 <GitCommit className="h-3 w-3" />
                 Git
               </h4>
-              <SettingToggle
-                label="Auto Commit"
-                description="Commit after each issue"
-                checked={settings.autoCommit}
-                onChange={(v) => updateSettings({ autoCommit: v })}
-                disabled={isDisabled}
-              />
+              <div className="flex flex-col gap-1.5">
+                <SettingToggle
+                  label="Auto Commit"
+                  description="Commit after each issue"
+                  checked={settings.autoCommit}
+                  onChange={(v) => updateSettings({ autoCommit: v })}
+                  disabled={isDisabled}
+                />
+                <SettingToggle
+                  label="Feature Branches"
+                  description="Create per-epic branches"
+                  icon={<GitBranch className="h-3.5 w-3.5 text-purple-400" />}
+                  checked={settings.useFeatureBranches}
+                  onChange={(v) => updateSettings({ useFeatureBranches: v })}
+                  disabled={isDisabled}
+                />
+                <SettingToggle
+                  label="Auto PR"
+                  description={ghAvailable === false ? "gh CLI not installed" : "Create PR on completion"}
+                  icon={ghAvailable === false
+                    ? <AlertCircle className="h-3.5 w-3.5 text-yellow-400" />
+                    : <GitPullRequest className="h-3.5 w-3.5 text-cyan-400" />
+                  }
+                  checked={settings.autoCreatePR}
+                  onChange={(v) => updateSettings({ autoCreatePR: v })}
+                  disabled={isDisabled || !settings.useFeatureBranches || ghAvailable === false}
+                />
+              </div>
             </div>
           </div>
 

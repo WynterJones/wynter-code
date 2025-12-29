@@ -3,6 +3,8 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use crate::path_utils::get_enhanced_path;
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AutoBuildSession {
     pub session_id: String,
@@ -185,6 +187,7 @@ When done, your last message should confirm what was completed."#,
         .arg("--permission-mode")
         .arg("default")
         .current_dir(&project_path)
+        .env("PATH", get_enhanced_path())
         .output()
         .map_err(|e| format!("Failed to run claude: {}", e))?;
 
@@ -225,6 +228,7 @@ pub async fn auto_build_run_verification(
         let lint_output = Command::new("npm")
             .args(["run", "lint"])
             .current_dir(&project_path)
+            .env("PATH", get_enhanced_path())
             .output()
             .map_err(|e| format!("Failed to run lint: {}", e))?;
 
@@ -244,6 +248,7 @@ pub async fn auto_build_run_verification(
         let test_output = Command::new("npm")
             .args(["run", "test"])
             .current_dir(&project_path)
+            .env("PATH", get_enhanced_path())
             .output()
             .map_err(|e| format!("Failed to run tests: {}", e))?;
 
@@ -263,6 +268,7 @@ pub async fn auto_build_run_verification(
         let build_output = Command::new("npm")
             .args(["run", "build"])
             .current_dir(&project_path)
+            .env("PATH", get_enhanced_path())
             .output()
             .map_err(|e| format!("Failed to run build: {}", e))?;
 
@@ -290,6 +296,7 @@ pub async fn auto_build_commit(
     let add_output = Command::new("git")
         .args(["add", "-A"])
         .current_dir(&project_path)
+        .env("PATH", get_enhanced_path())
         .output()
         .map_err(|e| format!("Failed to stage changes: {}", e))?;
 
@@ -310,6 +317,7 @@ pub async fn auto_build_commit(
     let commit_output = Command::new("git")
         .args(["commit", "-m", &full_message])
         .current_dir(&project_path)
+        .env("PATH", get_enhanced_path())
         .output()
         .map_err(|e| format!("Failed to commit: {}", e))?;
 
