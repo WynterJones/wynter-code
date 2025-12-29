@@ -96,7 +96,7 @@ function SortableSidebarTab({ id, isActive, isDisabled, onSelect }: SortableSide
         {...listeners}
         onClick={onSelect}
         className={cn(
-          "relative p-1.5 rounded transition-colors cursor-grab active:cursor-grabbing",
+          "relative p-1.5 rounded transition-colors",
           isDragging && "opacity-50 z-50",
           isActive
             ? "text-text-primary"

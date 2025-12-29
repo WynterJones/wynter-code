@@ -856,7 +856,7 @@ export function EnhancedPromptInput({
                     <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                       !
                     </kbd>{" "}
-                    <span className="text-lime-500">farmwork</span>
+                    <span className="text-[#a6e3a1]">farmwork</span>
                   </>
                 )}
                 {" "}•{" "}

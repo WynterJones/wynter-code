@@ -9,7 +9,8 @@ import { PermissionApprovalModal } from "@/components/output/PermissionApprovalM
 import { AskUserQuestionModal } from "@/components/output/AskUserQuestionModal";
 import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
-import { ClaudeDropdown, ClaudePopup } from "@/components/claude";
+import { ClaudePopup } from "@/components/claude";
+import { ProviderDropdown } from "@/components/provider/ProviderDropdown";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle, StartButton } from "@/components/session";
 import { Tooltip } from "@/components/ui";
@@ -582,12 +583,12 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       <div className="h-[45px] px-4 flex items-center justify-between border-b border-border bg-bg-secondary" data-tauri-drag-region>
         <div
-          className="flex items-center gap-2 text-sm text-text-secondary transition-[padding] duration-200"
+          className="flex items-center gap-2 text-sm text-text-secondary transition-[padding] duration-200 flex-1 min-w-0 overflow-hidden"
           data-tauri-drag-region
           style={{ paddingLeft: sidebarPosition === "left" ? (sidebarCollapsed ? 28 : 16) : 0 }}
         >
           <FolderOpen className="w-4 h-4 text-text-secondary flex-shrink-0" data-tauri-drag-region />
-          <span className="font-mono truncate" data-tauri-drag-region>{project.path}</span>
+          <span className="font-mono truncate min-w-0" data-tauri-drag-region>{project.path}</span>
         </div>
         <div
           className="flex items-center gap-2 transition-[padding] duration-200"
@@ -613,9 +614,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
             />
           )}
           <div className="w-px h-5 bg-border" />
-          <Tooltip content="Claude Code Manager" side="bottom">
-            <ClaudeDropdown projectPath={project.path} />
-          </Tooltip>
+          <ProviderDropdown provider={currentSession?.provider || "claude"} projectPath={project.path} />
           {!isTerminalSession && !useMultiPanelLayout && (
             <Tooltip content="Quick Terminal" side="bottom">
               <button

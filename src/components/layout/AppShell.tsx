@@ -112,6 +112,10 @@ export function AppShell() {
     setRequestImageBrowser(true);
   }, []);
 
+  const handleOpenProjectSearch = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openProjectSearch" } }));
+  }, []);
+
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizingSidebar(true);
@@ -231,6 +235,7 @@ export function AppShell() {
             onOpenBeads={handleOpenBeads}
             onBrowseFiles={handleBrowseFiles}
             onOpenLivePreview={handleOpenLivePreview}
+            onOpenProjectSearch={handleOpenProjectSearch}
           />
 
           <div className={`flex-1 flex overflow-hidden relative ${isResizingSidebar ? "select-none" : ""}`}>

@@ -225,11 +225,11 @@ export function FarmworkPhraseDropdown({
       }}
     >
       {/* Header */}
-      <div className="px-3 py-2 border-b border-border/50 bg-bg-tertiary/50">
+      <div className="px-3 py-2 border-b border-border/50 bg-[#181825]">
         <div className="flex items-center gap-2 text-xs text-text-secondary">
-          <Tractor className="w-3.5 h-3.5 text-lime-500" />
+          <Tractor className="w-3.5 h-3.5 text-[#a6e3a1]" />
           <span>Farmwork Phrases</span>
-          <span className="ml-auto opacity-60">
+          <span className="ml-auto text-text-secondary/60">
             {filteredPhrases.length} phrases
           </span>
         </div>
@@ -247,7 +247,7 @@ export function FarmworkPhraseDropdown({
             groupedPhrases.map((group) => (
               <div key={group.category}>
                 {/* Category header */}
-                <div className="px-3 py-1.5 text-[10px] font-medium text-text-secondary/70 bg-bg-secondary sticky top-0 uppercase tracking-wider border-b border-border/30">
+                <div className="px-3 py-1.5 text-[10px] font-medium text-[#6c7086] bg-[#181825] sticky top-0 z-10 uppercase tracking-wider border-b border-[#313244]">
                   {group.label}
                 </div>
 
@@ -264,30 +264,33 @@ export function FarmworkPhraseDropdown({
                         "w-full flex items-center gap-3 px-3 py-2",
                         "text-left text-sm transition-colors",
                         isSelected
-                          ? "bg-lime-500/10 text-text-primary"
-                          : "text-text-secondary hover:bg-bg-hover"
+                          ? "bg-[#313244] text-[#cdd6f4]"
+                          : "text-[#a6adc8] hover:bg-[#1e1e2e]"
                       )}
                       onClick={() => onSelect(item.phrase)}
                       onMouseEnter={() => setSelectedIndex(index)}
                     >
                       <div
                         className={cn(
-                          "w-0.5 h-8 rounded-full",
-                          isSelected ? "bg-lime-500" : "bg-lime-500/30"
+                          "w-0.5 h-8 rounded-full transition-colors",
+                          isSelected ? "bg-[#a6e3a1]" : "bg-[#45475a]"
                         )}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-lime-400 text-xs">
+                          <span className={cn(
+                            "font-mono text-xs",
+                            isSelected ? "text-[#a6e3a1]" : "text-[#94e2d5]"
+                          )}>
                             "{item.phrase.phrase}"
                           </span>
                           {item.phrase.argumentHint && (
-                            <span className="text-[10px] text-text-secondary/50">
+                            <span className="text-[10px] text-[#6c7086]">
                               {item.phrase.argumentHint}
                             </span>
                           )}
                         </div>
-                        <div className="text-xs text-text-secondary/70 truncate">
+                        <div className="text-xs text-[#6c7086] truncate">
                           {item.phrase.description}
                         </div>
                       </div>

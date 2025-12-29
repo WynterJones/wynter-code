@@ -11,6 +11,7 @@ import {
   FolderSearch,
   Play,
   Bot,
+  Search,
 } from "lucide-react";
 import { Tooltip, TabContextMenu } from "@/components/ui";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -39,6 +40,7 @@ interface SessionTabBarProps {
   onOpenBeads?: () => void;
   onBrowseFiles?: () => void;
   onOpenLivePreview?: () => void;
+  onOpenProjectSearch?: () => void;
 }
 
 export function SessionTabBar({
@@ -48,6 +50,7 @@ export function SessionTabBar({
   onOpenBeads,
   onBrowseFiles,
   onOpenLivePreview,
+  onOpenProjectSearch,
 }: SessionTabBarProps) {
   const {
     getSessionsForProject,
@@ -243,6 +246,15 @@ export function SessionTabBar({
         id="sessionToolbar"
         className="flex items-center flex-1 overflow-x-auto scrollbar-none"
         data-tauri-drag-region
+        onWheel={(e) => {
+          if (scrollContainerRef.current && e.deltaY !== 0) {
+            e.preventDefault();
+            scrollContainerRef.current.scrollBy({
+              left: e.deltaY,
+              behavior: "auto",
+            });
+          }
+        }}
       >
         {sessions.length === 0 ? (
           <span
@@ -351,6 +363,74 @@ export function SessionTabBar({
         )}
       </div>
 
+      {/* Scroll buttons */}
+      <div className="flex items-center h-full border-l border-border">
+        <button
+          onClick={scrollLeft}
+          disabled={!canScrollLeft}
+          className={cn(
+            "p-1.5 transition-colors",
+            canScrollLeft
+              ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+              : "text-text-secondary/30 cursor-not-allowed",
+          )}
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <button
+          onClick={scrollRight}
+          disabled={!canScrollRight}
+          className={cn(
+            "p-1.5 transition-colors",
+            canScrollRight
+              ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+              : "text-text-secondary/30 cursor-not-allowed",
+          )}
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* New Session Button */}
+      <div className="h-full flex items-center border-l border-border px-2 relative">
+        <Tooltip content="New Session">
+          <button
+            ref={plusButtonRef}
+            onClick={handlePlusClick}
+            className="p-1.5 rounded-md border border-border bg-bg-tertiary hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </Tooltip>
+
+        {/* New session dropdown */}
+        {showNewDropdown && (
+          <div
+            ref={newDropdownRef}
+            className="fixed p-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[160px] dropdown-solid"
+            style={{
+              top: newDropdownPosition.top,
+              left: newDropdownPosition.left,
+            }}
+          >
+            <button
+              onClick={() => handleCreateSession("claude")}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+            >
+              <MessageSquare className="w-4 h-4" />
+              New Session
+            </button>
+            <button
+              onClick={() => handleCreateSession("terminal")}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+            >
+              <Terminal className="w-4 h-4" />
+              New Terminal
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* Toolbar buttons */}
       <div className="flex items-center h-full border-l border-border gap-1 px-2">
         {/* Farmwork */}
@@ -398,6 +478,16 @@ export function SessionTabBar({
           </Tooltip>
         )}
 
+        {/* Project Search */}
+        <Tooltip content="Project Search">
+          <button
+            onClick={onOpenProjectSearch}
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        </Tooltip>
+
         {/* Browse Files */}
         <Tooltip content="Browse Files">
           <button
@@ -407,73 +497,6 @@ export function SessionTabBar({
             <FolderSearch className="w-4 h-4" />
           </button>
         </Tooltip>
-      </div>
-
-      {/* Scroll buttons */}
-      <div className="flex items-center h-full border-l border-border">
-        <button
-          onClick={scrollLeft}
-          disabled={!canScrollLeft}
-          className={cn(
-            "p-1.5 transition-colors",
-            canScrollLeft
-              ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
-              : "text-text-secondary/30 cursor-not-allowed",
-          )}
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <button
-          onClick={scrollRight}
-          disabled={!canScrollRight}
-          className={cn(
-            "p-1.5 transition-colors",
-            canScrollRight
-              ? "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
-              : "text-text-secondary/30 cursor-not-allowed",
-          )}
-        >
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      <div className="h-full flex items-center border-l border-border px-2 relative">
-        <Tooltip content="New Session">
-          <button
-            ref={plusButtonRef}
-            onClick={handlePlusClick}
-            className="p-1.5 rounded-md border border-border bg-bg-tertiary hover:bg-bg-hover text-text-secondary hover:text-text-primary transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-        </Tooltip>
-
-        {/* New session dropdown */}
-        {showNewDropdown && (
-          <div
-            ref={newDropdownRef}
-            className="fixed p-1 bg-bg-secondary border border-border rounded-lg shadow-xl z-[9999] min-w-[160px] dropdown-solid"
-            style={{
-              top: newDropdownPosition.top,
-              left: newDropdownPosition.left,
-            }}
-          >
-            <button
-              onClick={() => handleCreateSession("claude")}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
-            >
-              <MessageSquare className="w-4 h-4" />
-              New Session
-            </button>
-            <button
-              onClick={() => handleCreateSession("terminal")}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
-            >
-              <Terminal className="w-4 h-4" />
-              New Terminal
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Close confirmation dropdown */}

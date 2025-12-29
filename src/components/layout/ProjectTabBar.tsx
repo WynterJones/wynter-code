@@ -10,10 +10,9 @@ import {
   FolderPlus,
   Minus,
   Database,
-  Search,
   Eye,
   Bookmark,
-  Upload,
+  CloudUpload,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -761,6 +760,15 @@ export function ProjectTabBar({
           ref={scrollContainerRef}
           data-tauri-drag-region
           className="flex items-center flex-1 gap-0.5 overflow-x-auto scrollbar-none h-full"
+          onWheel={(e) => {
+            if (scrollContainerRef.current && e.deltaY !== 0) {
+              e.preventDefault();
+              scrollContainerRef.current.scrollBy({
+                left: e.deltaY,
+                behavior: "auto",
+              });
+            }
+          }}
         >
           <SortableContext
             items={projectIds}
@@ -839,15 +847,6 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
-      {/* Project Search */}
-      <div className="border-l border-border px-2 h-full flex items-center">
-        <Tooltip content="Project Search">
-          <IconButton size="sm" onClick={() => setShowProjectSearch(true)}>
-            <Search className="w-4 h-4" />
-          </IconButton>
-        </Tooltip>
-      </div>
-
       {/* Meditation Mode */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content={isMeditating ? "Exit Meditation" : "Meditation Mode"}>
@@ -892,7 +891,7 @@ export function ProjectTabBar({
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Netlify FTP">
           <IconButton size="sm" onClick={() => setShowNetlifyFtp(true)}>
-            <Upload className="w-4 h-4" />
+            <CloudUpload className="w-4 h-4" />
           </IconButton>
         </Tooltip>
       </div>

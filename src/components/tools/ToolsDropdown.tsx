@@ -1230,7 +1230,7 @@ export function ToolsDropdown({
           ref={buttonRef}
           onClick={handleToggle}
           className={cn(
-            "flex items-center gap-1 px-2 py-1.5 rounded-md transition-colors",
+            "inline-flex items-center justify-center h-6 w-6 rounded-md transition-colors",
             "text-text-secondary hover:text-text-primary hover:bg-bg-hover",
             isOpen && "bg-bg-hover text-text-primary",
           )}

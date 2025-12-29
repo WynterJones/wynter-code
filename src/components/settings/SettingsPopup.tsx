@@ -125,22 +125,24 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
 
         <div className="flex flex-1 min-h-[400px] max-h-[70vh]">
           {/* Sidebar */}
-          <div className="w-48 border-r border-border bg-bg-secondary p-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
-                  activeTab === tab.id
-                    ? "bg-bg-hover text-text-primary"
-                    : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
-                )}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
+          <div className="w-48 border-r border-border bg-bg-secondary flex flex-col">
+            <ScrollArea className="flex-1 p-2" scrollbarVisibility="auto">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors",
+                    activeTab === tab.id
+                      ? "bg-bg-hover text-text-primary"
+                      : "text-text-secondary hover:text-text-primary hover:bg-bg-hover/50"
+                  )}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              ))}
+            </ScrollArea>
           </div>
 
           {/* Content */}

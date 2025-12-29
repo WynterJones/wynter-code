@@ -7,6 +7,8 @@ import { Tooltip } from "@/components/ui/Tooltip";
 import {
   X,
   Maximize2,
+  Minus,
+  Plus,
   GripVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,7 +21,7 @@ interface MiniGamePlayerProps {
 
 const MIN_SIZE = 200;
 const MAX_SIZE = 600;
-const DEFAULT_SIZE = 300;
+const DEFAULT_SIZE = 306; // Results in 368px container height (306 + 16 chrome + 46 header)
 
 interface Position {
   x: number;
@@ -40,13 +42,21 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
     return () => clearInterval(pollInterval);
   }, [isOpen, isInitialized, refreshStats]);
 
-  const [position, setPosition] = useState<Position>(() => ({
-    x: window.innerWidth - DEFAULT_SIZE - 20,
-    y: window.innerHeight - DEFAULT_SIZE - 80,
-  }));
+  const [position, setPosition] = useState<Position>(() => {
+    // Initial position accounts for total container size (game + chrome + header)
+    const initTotalChrome = 16; // outerPadding(8)*2
+    const initHeaderHeight = 46;
+    const initContainerWidth = DEFAULT_SIZE + initTotalChrome;
+    const initContainerHeight = initHeaderHeight + DEFAULT_SIZE + initTotalChrome;
+    return {
+      x: window.innerWidth - initContainerWidth - 20,
+      y: window.innerHeight - initContainerHeight - 80,
+    };
+  });
   const [size, setSize] = useState(DEFAULT_SIZE);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dragStartRef = useRef<{ x: number; y: number; posX: number; posY: number }>({ x: 0, y: 0, posX: 0, posY: 0 });
@@ -76,14 +86,20 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
+      const headerHeight = 46;
+      const minimizedHeight = 50;
+      const totalChrome = 16;
+
       if (isDragging) {
         const dx = e.clientX - dragStartRef.current.x;
         const dy = e.clientY - dragStartRef.current.y;
 
         // Constrain to viewport boundaries with a small margin
         const margin = 10;
-        const newX = Math.max(margin, Math.min(window.innerWidth - size - margin, dragStartRef.current.posX + dx));
-        const newY = Math.max(margin, Math.min(window.innerHeight - size - margin, dragStartRef.current.posY + dy));
+        const currentWidth = size + totalChrome;
+        const currentHeight = isMinimized ? minimizedHeight : headerHeight + size + totalChrome;
+        const newX = Math.max(margin, Math.min(window.innerWidth - currentWidth - margin, dragStartRef.current.posX + dx));
+        const newY = Math.max(margin, Math.min(window.innerHeight - currentHeight - margin, dragStartRef.current.posY + dy));
 
         setPosition({ x: newX, y: newY });
       }
@@ -98,8 +114,10 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
         // Calculate new position with boundary constraints
         const margin = 10;
         const sizeDiff = newSize - resizeStartRef.current.size;
-        const newX = Math.max(margin, Math.min(window.innerWidth - newSize - margin, dragStartRef.current.posX - sizeDiff));
-        const newY = Math.max(margin, Math.min(window.innerHeight - newSize - margin, dragStartRef.current.posY - sizeDiff));
+        const newWidth = newSize + totalChrome;
+        const newHeight = headerHeight + newSize + totalChrome;
+        const newX = Math.max(margin, Math.min(window.innerWidth - newWidth - margin, dragStartRef.current.posX - sizeDiff));
+        const newY = Math.max(margin, Math.min(window.innerHeight - newHeight - margin, dragStartRef.current.posY - sizeDiff));
 
         setSize(newSize);
         setPosition({ x: newX, y: newY });
@@ -120,7 +138,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
       document.removeEventListener("mousemove", handleMouseMove);
       document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging, isResizing, size]);
+  }, [isDragging, isResizing, size, isMinimized]);
 
   useEffect(() => {
     if (isResizing) {
@@ -133,17 +151,35 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
   useEffect(() => {
     const handleResize = () => {
       const margin = 10;
+      const headerHeight = 46;
+      const minimizedHeight = 56;
+      const totalChrome = 16;
+      const contentSize = size + totalChrome;
+      const currentWidth = contentSize;
+      const currentHeight = isMinimized ? minimizedHeight : headerHeight + contentSize;
       setPosition((prev) => ({
-        x: Math.max(margin, Math.min(window.innerWidth - size - margin, prev.x)),
-        y: Math.max(margin, Math.min(window.innerHeight - size - margin, prev.y)),
+        x: Math.max(margin, Math.min(window.innerWidth - currentWidth - margin, prev.x)),
+        y: Math.max(margin, Math.min(window.innerHeight - currentHeight - margin, prev.y)),
       }));
     };
 
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [size]);
+  }, [size, isMinimized]);
 
   if (!isOpen) return null;
+
+  // Calculate dimensions for equal padding around game area
+  const headerHeight = 46;
+  const minimizedHeight = 50; // Extra height when minimized
+  const outerPadding = 8;
+  const totalChrome = outerPadding * 2; // 16px - just outer padding, no bezel
+
+  // `size` represents the game area size for cleaner semantics
+  const gameSize = size;
+  const contentSize = gameSize + totalChrome; // Square content area with equal padding
+  const containerWidth = contentSize;
+  const containerHeight = isMinimized ? minimizedHeight : headerHeight + contentSize;
 
   const content = (
     <div
@@ -156,22 +192,25 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
       style={{
         left: position.x,
         top: position.y,
-        width: size,
+        width: containerWidth,
+        height: containerHeight,
         borderRadius: "12px",
         border: "3px solid #3a3a3a",
         boxShadow: "0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
         background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
+        transition: isMinimized ? "height 0.2s ease-out" : undefined,
       }}
     >
       {/* Header - Drag Handle */}
       <div
         className={cn(
-          "flex items-center justify-between px-2 py-1.5 cursor-grab",
+          "flex items-center justify-between px-2 py-2.5 cursor-grab",
           isDragging && "cursor-grabbing"
         )}
         style={{
+          height: headerHeight,
           background: "linear-gradient(180deg, #333 0%, #222 100%)",
-          borderBottom: "1px solid #444",
+          borderBottom: isMinimized ? "none" : "1px solid #444",
         }}
         onMouseDown={handleDragStart}
       >
@@ -188,6 +227,18 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
           </span>
         </div>
         <div className="flex items-center gap-0.5">
+          <Tooltip content={isMinimized ? "Restore" : "Minimize"}>
+            <IconButton
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsMinimized(!isMinimized);
+              }}
+              className="!p-1"
+            >
+              {isMinimized ? <Plus className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+            </IconButton>
+          </Tooltip>
           <Tooltip content="Expand">
             <IconButton
               size="sm"
@@ -215,106 +266,64 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
         </div>
       </div>
 
-      {/* Arcade Cabinet Frame */}
-      {(() => {
-        // Calculate the square game area size
-        // Header is ~36px, outer padding 8px each side, bezel padding 4px + border 2px each side
-        const headerHeight = 36;
-        const outerPadding = 8;
-        const bezelPadding = 4;
-        const bezelBorder = 2;
-        const totalChrome = outerPadding * 2 + bezelPadding * 2 + bezelBorder * 2; // 28px
-        const availableHeight = size - headerHeight - totalChrome;
-        const availableWidth = size - totalChrome;
-        const gameSize = Math.min(availableWidth, availableHeight);
+      {/* Game Area - Hidden when minimized */}
+      {!isMinimized && (
+        <div
+          className="relative"
+          style={{
+            height: contentSize,
+            padding: `${outerPadding}px`,
+            background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
+          }}
+        >
+          {/* Game canvas */}
+          <div className="relative w-full h-full overflow-hidden rounded">
+            <TycoonGame
+              containerWidth={gameSize}
+              containerHeight={gameSize}
+              isMiniPlayer
+            />
 
-        return (
-          <div
-            className="relative flex items-center justify-center"
-            style={{
-              height: size - headerHeight,
-              padding: `${outerPadding}px`,
-              background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
-            }}
-          >
-            {/* Screen bezel */}
+            {/* Scanline overlay */}
             <div
-              className="relative overflow-hidden"
+              className="absolute inset-0 pointer-events-none"
               style={{
-                width: gameSize + bezelPadding * 2 + bezelBorder * 2,
-                height: gameSize + bezelPadding * 2 + bezelBorder * 2,
-                padding: `${bezelPadding}px`,
-                background: "#0a0a0a",
-                borderRadius: "4px",
-                border: `${bezelBorder}px solid #222`,
+                background: `repeating-linear-gradient(
+                  0deg,
+                  transparent,
+                  transparent 2px,
+                  rgba(0, 0, 0, 0.1) 2px,
+                  rgba(0, 0, 0, 0.1) 4px
+                )`,
+                zIndex: 10,
               }}
-            >
-              {/* CRT Screen glow effect */}
-              <div
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: "radial-gradient(ellipse at center, rgba(100,255,100,0.03) 0%, transparent 70%)",
-                  zIndex: 1,
-                }}
-              />
+            />
 
-              {/* Game canvas */}
-              <div className="relative w-full h-full">
-                <TycoonGame
-                  containerWidth={gameSize}
-                  containerHeight={gameSize}
-                  isMiniPlayer
-                />
-
-                {/* Scanline overlay */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background: `repeating-linear-gradient(
-                      0deg,
-                      transparent,
-                      transparent 2px,
-                      rgba(0, 0, 0, 0.15) 2px,
-                      rgba(0, 0, 0, 0.15) 4px
-                    )`,
-                    zIndex: 10,
-                  }}
-                />
-
-                {/* Screen reflection/glare */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(255,255,255,0.02) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)",
-                    zIndex: 11,
-                  }}
-                />
-
-                {/* Vignette effect */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    boxShadow: "inset 0 0 40px rgba(0,0,0,0.4)",
-                    zIndex: 12,
-                  }}
-                />
-              </div>
-            </div>
+            {/* Vignette effect */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                boxShadow: "inset 0 0 30px rgba(0,0,0,0.3)",
+                zIndex: 12,
+              }}
+            />
           </div>
-        );
-      })()}
+        </div>
+      )}
 
-      {/* Resize Handle */}
-      <div
-        className={cn(
-          "absolute top-0 left-0 w-4 h-4 cursor-nw-resize",
-          "hover:bg-accent/20 transition-colors"
-        )}
-        style={{
-          background: "linear-gradient(-45deg, transparent 50%, var(--color-border) 50%)",
-        }}
-        onMouseDown={handleResizeStart}
-      />
+      {/* Resize Handle - Hidden when minimized */}
+      {!isMinimized && (
+        <div
+          className={cn(
+            "absolute top-0 left-0 w-4 h-4 cursor-nw-resize",
+            "hover:bg-accent/20 transition-colors"
+          )}
+          style={{
+            background: "linear-gradient(-45deg, transparent 50%, var(--color-border) 50%)",
+          }}
+          onMouseDown={handleResizeStart}
+        />
+      )}
     </div>
   );
 
