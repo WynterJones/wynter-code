@@ -18,8 +18,8 @@ interface ModeOption {
   description: string;
 }
 
-// Order: Manual, Auto, Bypass, Plan
-const modeOptions: ModeOption[] = [
+// All permission mode options with metadata
+const allModeOptions: ModeOption[] = [
   {
     value: "manual",
     icon: ShieldQuestion,
@@ -50,6 +50,16 @@ const modeOptions: ModeOption[] = [
   },
 ];
 
+// Permission modes available per provider
+// Claude: All modes (has MCP permission server for manual mode)
+// Codex: No manual mode (no MCP permission server support)
+// Gemini: Only Manual (ask) and Auto (yolo) - Plan/Bypass have no unique behavior
+const providerModes: Record<AIProvider, PermissionMode[]> = {
+  claude: ["manual", "acceptEdits", "bypassPermissions", "plan"],
+  codex: ["acceptEdits", "bypassPermissions", "plan"],
+  gemini: ["manual", "acceptEdits"],
+};
+
 export function PermissionModeToggle({
   mode,
   onChange,
@@ -69,12 +79,10 @@ export function PermissionModeToggle({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Filter out 'manual' mode for Codex (doesn't support MCP permission server)
+  // Filter modes based on what each provider supports
   const availableOptions = useMemo(() => {
-    if (provider === "codex") {
-      return modeOptions.filter((opt) => opt.value !== "manual");
-    }
-    return modeOptions;
+    const allowedModes = provider ? providerModes[provider] : providerModes.claude;
+    return allModeOptions.filter((opt) => allowedModes.includes(opt.value));
   }, [provider]);
 
   // Find the selected mode, fallback to Auto if current mode isn't in options

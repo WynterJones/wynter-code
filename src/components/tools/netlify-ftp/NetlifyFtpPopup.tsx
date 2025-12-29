@@ -9,13 +9,21 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
+import { invoke } from "@tauri-apps/api/core";
 import { Popup, Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useNetlifyFtpStore } from "@/stores/netlifyFtpStore";
+import { useProjectStore } from "@/stores/projectStore";
 import { DropZone } from "./DropZone";
 import { SiteList } from "./SiteList";
 import { DeployHistory } from "./DeployHistory";
 import { TokenSetup } from "./TokenSetup";
+
+interface DeployZipResult {
+  base64: string;
+  folder_name: string;
+  is_build_folder: boolean;
+}
 
 interface NetlifyFtpPopupProps {
   isOpen: boolean;
@@ -31,7 +39,16 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
   const [newSiteName, setNewSiteName] = useState("");
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const [isResizing, setIsResizing] = useState(false);
+  const [isDeployingProject, setIsDeployingProject] = useState(false);
+  const [deployProjectMessage, setDeployProjectMessage] = useState("");
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  // Get active project
+  const { projects, activeProjectId } = useProjectStore();
+  const activeProject = useMemo(
+    () => projects.find((p) => p.id === activeProjectId),
+    [projects, activeProjectId]
+  );
 
   const {
     apiToken,
@@ -162,6 +179,50 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     },
     [currentSiteId, rollbackDeploy],
   );
+
+  const handleDeployProject = useCallback(async () => {
+    if (!currentSiteId || !activeProject?.path) return;
+
+    setIsDeployingProject(true);
+    setDeployProjectMessage("Preparing project...");
+
+    try {
+      // Call Tauri command to zip the project
+      setDeployProjectMessage("Detecting build folder...");
+      const result = await invoke<DeployZipResult>("zip_folder_for_deploy", {
+        projectPath: activeProject.path,
+      });
+
+      const folderLabel = result.is_build_folder
+        ? result.folder_name
+        : "project";
+      setDeployProjectMessage(`Zipping ${folderLabel}...`);
+
+      // Convert base64 to File
+      const binaryString = atob(result.base64);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const file = new File([bytes], `${result.folder_name}.zip`, {
+        type: "application/zip",
+      });
+
+      // Deploy using existing store method
+      setDeployProjectMessage("Uploading to Netlify...");
+      await deployZip({
+        siteId: currentSiteId,
+        file,
+      });
+
+      setDeployProjectMessage("");
+    } catch (error) {
+      console.error("Failed to deploy project:", error);
+      setDeployProjectMessage("");
+    } finally {
+      setIsDeployingProject(false);
+    }
+  }, [currentSiteId, activeProject?.path, deployZip]);
 
   const handleOpenSite = useCallback(async () => {
     if (currentSite) {
@@ -339,6 +400,11 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                         progress={deployProgress}
                         message={deployMessage}
                         disabled={!currentSite}
+                        projectPath={activeProject?.path}
+                        projectName={activeProject?.name}
+                        onDeployProject={handleDeployProject}
+                        isDeployingProject={isDeployingProject}
+                        deployProjectMessage={deployProjectMessage}
                       />
                     </div>
 

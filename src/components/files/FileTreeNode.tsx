@@ -128,7 +128,6 @@ export function FileTreeNode({
       if (!hasMoved && (dx > 5 || dy > 5)) {
         hasMoved = true;
 
-        console.log("[DragStart]", node.name, { isSelected, selectedCount: selectedPaths?.size });
         const fileInfo = {
           path: node.path,
           name: node.name,

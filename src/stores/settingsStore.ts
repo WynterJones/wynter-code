@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ClaudeModel, AIProvider, CodexModel } from "@/types";
+import type { ClaudeModel, AIProvider, CodexModel, GeminiModel } from "@/types";
 import type { SidebarTab } from "@/types/file";
 import type {
   AudioSourceType,
@@ -138,6 +138,7 @@ interface SettingsStore {
   // AI Provider settings
   defaultProvider: AIProvider;
   defaultCodexModel: CodexModel;
+  defaultGeminiModel: GeminiModel;
   installedProviders: AIProvider[];
 
   // Avatar
@@ -194,6 +195,7 @@ interface SettingsStore {
   // AI Provider setters
   setDefaultProvider: (provider: AIProvider) => void;
   setDefaultCodexModel: (model: CodexModel) => void;
+  setDefaultGeminiModel: (model: GeminiModel) => void;
   setInstalledProviders: (providers: AIProvider[]) => void;
 
   // Radio setters
@@ -255,6 +257,7 @@ export const useSettingsStore = create<SettingsStore>()(
       // AI Provider defaults
       defaultProvider: "claude",
       defaultCodexModel: "gpt-5.2-codex",
+      defaultGeminiModel: "gemini-2.5-flash",
       installedProviders: ["claude"], // Will be updated on system check
 
       // Radio defaults
@@ -389,6 +392,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setDefaultCodexModel: (defaultCodexModel: CodexModel) => {
         set({ defaultCodexModel });
+      },
+
+      setDefaultGeminiModel: (defaultGeminiModel: GeminiModel) => {
+        set({ defaultGeminiModel });
       },
 
       setInstalledProviders: (installedProviders: AIProvider[]) => {

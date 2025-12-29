@@ -1432,6 +1432,7 @@ pub struct SystemCheckResults {
     pub git: Option<String>,
     pub claude: Option<String>,
     pub codex: Option<String>,
+    pub gemini: Option<String>,
 }
 
 fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
@@ -1484,6 +1485,7 @@ pub fn check_system_requirements() -> SystemCheckResults {
         git: get_command_version("git", &["--version"]),
         claude: get_command_version("claude", &["--version"]),
         codex: get_command_version("codex", &["--version"]),
+        gemini: get_command_version("gemini", &["--version"]),
     }
 }
 
@@ -2844,6 +2846,176 @@ pub fn zip_folder_to_base64(folder_path: String) -> Result<String, String> {
 
     // Return as base64
     Ok(STANDARD.encode(buffer.into_inner()))
+}
+
+/// Result of zipping a folder for deploy
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeployZipResult {
+    pub base64: String,
+    pub folder_name: String,
+    pub is_build_folder: bool,
+}
+
+/// Zips a project folder for Netlify deployment.
+/// Auto-detects build folders (dist, build, out) and uses those if found.
+/// Otherwise zips the entire project with smart exclusions.
+#[tauri::command]
+pub fn zip_folder_for_deploy(project_path: String) -> Result<DeployZipResult, String> {
+    use base64::{Engine as _, engine::general_purpose::STANDARD};
+    use std::io::{Read, Write, Cursor};
+    use walkdir::WalkDir;
+    use zip::write::SimpleFileOptions;
+    use zip::CompressionMethod;
+
+    let project = Path::new(&project_path);
+
+    if !project.exists() {
+        return Err(format!("Path does not exist: {}", project_path));
+    }
+
+    if !project.is_dir() {
+        return Err(format!("Path is not a directory: {}", project_path));
+    }
+
+    // Check for common build output folders in priority order
+    let build_folders = ["dist", "build", "out", ".next/out"];
+    let mut target_path = None;
+    let mut is_build_folder = false;
+
+    for folder in &build_folders {
+        let candidate = project.join(folder);
+        if candidate.exists() && candidate.is_dir() {
+            // Make sure it's not empty
+            if let Ok(mut entries) = fs::read_dir(&candidate) {
+                if entries.next().is_some() {
+                    target_path = Some(candidate);
+                    is_build_folder = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    // If no build folder found, use the project root
+    let project_path_buf = project.to_path_buf();
+    let path = target_path.as_ref().unwrap_or(&project_path_buf);
+    let folder_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("deploy")
+        .to_string();
+
+    // Exclusion patterns for full project deploy (only used when is_build_folder is false)
+    let excluded_dirs: std::collections::HashSet<&str> = [
+        ".git",
+        "node_modules",
+        "target",
+        ".next",
+        "__pycache__",
+        ".cache",
+        ".turbo",
+        "coverage",
+        ".nyc_output",
+        ".pytest_cache",
+        "venv",
+        ".venv",
+        "vendor",
+    ]
+    .iter()
+    .cloned()
+    .collect();
+
+    let excluded_files: &[&str] = &[
+        ".DS_Store",
+        "Thumbs.db",
+        ".env",
+        ".env.local",
+        ".env.development.local",
+        ".env.test.local",
+        ".env.production.local",
+    ];
+
+    let excluded_extensions: &[&str] = &["log", "tmp", "swp", "swo"];
+
+    // Create zip in memory
+    let mut buffer = Cursor::new(Vec::new());
+    {
+        let mut zip = zip::ZipWriter::new(&mut buffer);
+        let options = SimpleFileOptions::default()
+            .compression_method(CompressionMethod::Deflated)
+            .compression_level(Some(6));
+
+        // Walk the directory and add files
+        for entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+            let entry_path = entry.path();
+            let relative_path = entry_path.strip_prefix(path).unwrap_or(entry_path);
+
+            // Skip the root directory itself
+            if relative_path.as_os_str().is_empty() {
+                continue;
+            }
+
+            // Apply exclusions only when zipping full project (not build folder)
+            if !is_build_folder {
+                // Check if any parent component matches excluded dirs
+                let should_exclude = relative_path.components().any(|c| {
+                    if let std::path::Component::Normal(name) = c {
+                        if let Some(name_str) = name.to_str() {
+                            return excluded_dirs.contains(name_str);
+                        }
+                    }
+                    false
+                });
+
+                if should_exclude {
+                    continue;
+                }
+
+                // Check file-specific exclusions
+                if entry.file_type().is_file() {
+                    if let Some(file_name) = entry_path.file_name().and_then(|n| n.to_str()) {
+                        // Check excluded files
+                        if excluded_files.iter().any(|f| file_name == *f) {
+                            continue;
+                        }
+                        // Check excluded extensions
+                        if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
+                            if excluded_extensions.contains(&ext) {
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if entry.file_type().is_dir() {
+                let dir_name = format!("{}/", relative_path.to_string_lossy());
+                zip.add_directory(&dir_name, options)
+                    .map_err(|e| format!("Failed to add directory: {}", e))?;
+            } else {
+                let mut file = fs::File::open(entry_path)
+                    .map_err(|e| format!("Failed to open file: {}", e))?;
+
+                let mut file_buffer = Vec::new();
+                file.read_to_end(&mut file_buffer)
+                    .map_err(|e| format!("Failed to read file: {}", e))?;
+
+                zip.start_file(relative_path.to_string_lossy(), options)
+                    .map_err(|e| format!("Failed to start file in zip: {}", e))?;
+
+                zip.write_all(&file_buffer)
+                    .map_err(|e| format!("Failed to write to zip: {}", e))?;
+            }
+        }
+
+        zip.finish().map_err(|e| format!("Failed to finish zip: {}", e))?;
+    }
+
+    Ok(DeployZipResult {
+        base64: STANDARD.encode(buffer.into_inner()),
+        folder_name,
+        is_build_folder,
+    })
 }
 
 #[tauri::command]

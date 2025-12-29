@@ -214,10 +214,7 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
 
       await fetchServers();
       setPreferredPort(port);
-
-      if (autoOpenBrowser) {
-        open(`http://localhost:${port}`);
-      }
+      // Browser opening is handled by the "ready" event listener
     } catch (err) {
       setError(`Failed to start server: ${err}`);
     } finally {

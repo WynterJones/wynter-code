@@ -65,12 +65,10 @@ function handleMouseUp(e: MouseEvent) {
   const target = findDropTarget(e.clientX, e.clientY);
 
   if (target === "prompt-input" && state.draggedFiles.length > 0) {
-    console.log("[DragStore] Dispatching internal-file-drop");
     window.dispatchEvent(new CustomEvent("internal-file-drop", {
       detail: { files: state.draggedFiles }
     }));
   } else if (target && target !== "prompt-input" && state.draggedFiles.length > 0) {
-    console.log("[DragStore] Dispatching internal-folder-drop to:", target);
     window.dispatchEvent(new CustomEvent("internal-folder-drop", {
       detail: { files: state.draggedFiles, targetFolder: target }
     }));
@@ -85,7 +83,6 @@ function handleKeyDown(e: KeyboardEvent) {
   if (e.key === "Escape") {
     const state = useDragStore.getState();
     if (state.isDragging) {
-      console.log("[DragStore] Escape pressed - cancelling drag");
       removeMouseListeners();
       state.cancelDrag();
     }
@@ -94,7 +91,6 @@ function handleKeyDown(e: KeyboardEvent) {
 
 function attachMouseListeners() {
   if (mouseListenersAttached) return;
-  console.log("[DragStore] Attaching mouse listeners");
   document.addEventListener("mousemove", handleMouseMove, true);
   document.addEventListener("mouseup", handleMouseUp, true);
   document.addEventListener("keydown", handleKeyDown, true);
@@ -103,7 +99,6 @@ function attachMouseListeners() {
 
 function removeMouseListeners() {
   if (!mouseListenersAttached) return;
-  console.log("[DragStore] Removing mouse listeners");
   document.removeEventListener("mousemove", handleMouseMove, true);
   document.removeEventListener("mouseup", handleMouseUp, true);
   document.removeEventListener("keydown", handleKeyDown, true);
@@ -119,7 +114,6 @@ export const useDragStore = create<DragState>((set, get) => ({
 
   startDrag: (file, additionalFiles = [], startPos) => {
     const allFiles = [file, ...additionalFiles.filter(f => f.path !== file.path)];
-    console.log("[DragStore] startDrag", { file: file.name, totalFiles: allFiles.length });
 
     // Attach mouse listeners for tracking
     attachMouseListeners();

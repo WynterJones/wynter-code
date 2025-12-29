@@ -3,7 +3,7 @@ import { ChevronDown, Sparkles, Zap, Brain, Check, Cpu, Rocket } from "lucide-re
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { ClaudeModel, CodexModel, AIModel, AIProvider } from "@/types";
+import type { ClaudeModel, CodexModel, GeminiModel, AIModel, AIProvider } from "@/types";
 
 interface ModelOption {
   value: AIModel;
@@ -63,16 +63,16 @@ const codexModels: ModelOption[] = [
 
 const geminiModels: ModelOption[] = [
   {
-    value: "gemini-2.0-flash",
-    label: "Flash",
-    description: "Fast and efficient",
+    value: "gemini-2.5-flash",
+    label: "Flash 2.5",
+    description: "Fast and efficient, great for most tasks",
     icon: Zap,
     color: "text-[#4285f4]",
   },
   {
-    value: "gemini-2.0-pro",
-    label: "Pro",
-    description: "More capable",
+    value: "gemini-2.5-pro",
+    label: "Pro 2.5",
+    description: "Most capable, best for complex tasks",
     icon: Brain,
     color: "text-[#4285f4]",
   },
@@ -95,7 +95,7 @@ function getDefaultModelForProvider(provider: AIProvider): AIModel {
     case "codex":
       return "gpt-5.2-codex";
     case "gemini":
-      return "gemini-2.0-flash";
+      return "gemini-2.5-flash";
     case "claude":
     default:
       return "claude-sonnet-4-20250514";
@@ -107,7 +107,7 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ projectId }: ModelSelectorProps) {
-  const { defaultModel, defaultCodexModel, setDefaultModel, setDefaultCodexModel } = useSettingsStore();
+  const { defaultModel, defaultCodexModel, defaultGeminiModel, setDefaultModel, setDefaultCodexModel, setDefaultGeminiModel } = useSettingsStore();
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -129,6 +129,9 @@ export function ModelSelector({ projectId }: ModelSelectorProps) {
     if (currentProvider === "codex") {
       return defaultCodexModel;
     }
+    if (currentProvider === "gemini") {
+      return defaultGeminiModel;
+    }
     return defaultModel;
   };
 
@@ -138,6 +141,8 @@ export function ModelSelector({ projectId }: ModelSelectorProps) {
   const handleModelSelect = (model: AIModel) => {
     if (currentProvider === "codex") {
       setDefaultCodexModel(model as CodexModel);
+    } else if (currentProvider === "gemini") {
+      setDefaultGeminiModel(model as GeminiModel);
     } else {
       setDefaultModel(model as ClaudeModel);
     }

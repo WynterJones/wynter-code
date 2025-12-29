@@ -243,8 +243,8 @@ pub async fn start_codex_session(
     // Map permission modes to Codex CLI flags
     match mode {
         PermissionMode::Default => {
-            args.push("--ask-for-approval".to_string());
-            args.push("on-request".to_string());
+            // Default behavior: use --full-auto for sandboxed execution with approvals
+            args.push("--full-auto".to_string());
         }
         PermissionMode::Plan => {
             args.push("--sandbox".to_string());
@@ -254,13 +254,13 @@ pub async fn start_codex_session(
             args.push("--full-auto".to_string());
         }
         PermissionMode::BypassPermissions => {
-            args.push("--yolo".to_string());
+            args.push("--dangerously-bypass-approvals-and-sandbox".to_string());
         }
         PermissionMode::Manual => {
-            // Manual mode not supported for Codex - fall back to on-request
-            eprintln!("[Codex] Manual mode not supported, using on-request");
-            args.push("--ask-for-approval".to_string());
-            args.push("on-request".to_string());
+            // Manual mode: use read-only sandbox for maximum safety
+            eprintln!("[Codex] Manual mode: using read-only sandbox");
+            args.push("--sandbox".to_string());
+            args.push("read-only".to_string());
         }
     }
 

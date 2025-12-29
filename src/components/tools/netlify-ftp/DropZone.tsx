@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import { Upload, Loader2, FolderArchive } from "lucide-react";
+import { Upload, Loader2, FolderArchive, Rocket } from "lucide-react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,11 @@ interface DropZoneProps {
   progress: number;
   message: string;
   disabled?: boolean;
+  projectPath?: string;
+  projectName?: string;
+  onDeployProject?: () => void;
+  isDeployingProject?: boolean;
+  deployProjectMessage?: string;
 }
 
 function isZipFile(filename: string): boolean {
@@ -61,6 +66,11 @@ export function DropZone({
   progress,
   message,
   disabled = false,
+  projectPath,
+  projectName,
+  onDeployProject,
+  isDeployingProject = false,
+  deployProjectMessage,
 }: DropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
@@ -208,68 +218,100 @@ export function DropZone({
   );
 
   const isBusy = isUploading || isZipping;
+  const isProjectBusy = isDeployingProject;
 
   return (
-    <div
-      ref={dropZoneRef}
-      className={cn(
-        "border-2 border-dashed rounded-lg p-6 transition-colors",
-        "flex flex-col items-center justify-center text-center min-h-[140px]",
-        isDragging
-          ? "border-accent bg-accent/5"
-          : "border-border hover:border-text-secondary",
-        disabled && "opacity-50 cursor-not-allowed",
-        !disabled && !isBusy && "cursor-pointer"
-      )}
-      onDragEnter={handleDragEnter}
-      onDragLeave={handleDragLeave}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onClick={handleClick}
-    >
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".zip,application/zip"
-        onChange={handleFileSelect}
-        className="hidden"
-      />
+    <div className="flex flex-col gap-3">
+      <div
+        ref={dropZoneRef}
+        className={cn(
+          "border-2 border-dashed rounded-lg p-6 transition-colors",
+          "flex flex-col items-center justify-center text-center min-h-[140px]",
+          isDragging
+            ? "border-accent bg-accent/5"
+            : "border-border hover:border-text-secondary",
+          disabled && "opacity-50 cursor-not-allowed",
+          !disabled && !isBusy && "cursor-pointer"
+        )}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={handleClick}
+      >
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".zip,application/zip"
+          onChange={handleFileSelect}
+          className="hidden"
+        />
 
-      {isZipping ? (
-        <div className="flex flex-col items-center gap-3 w-full">
-          <FolderArchive className="w-8 h-8 text-accent animate-pulse" />
-          <div className="text-sm text-text-secondary font-mono">
-            Zipping folder...
+        {isZipping ? (
+          <div className="flex flex-col items-center gap-3 w-full">
+            <FolderArchive className="w-8 h-8 text-accent animate-pulse" />
+            <div className="text-sm text-text-secondary font-mono">
+              Zipping folder...
+            </div>
           </div>
-        </div>
-      ) : isUploading ? (
-        <div className="flex flex-col items-center gap-3 w-full">
-          <Loader2 className="w-8 h-8 text-accent animate-spin" />
+        ) : isUploading ? (
+          <div className="flex flex-col items-center gap-3 w-full">
+            <Loader2 className="w-8 h-8 text-accent animate-spin" />
 
-          <div className="w-full max-w-[200px] h-2 bg-bg-tertiary rounded-full overflow-hidden">
-            <div
-              className="h-full bg-accent transition-all"
-              style={{ width: `${progress}%` }}
+            <div className="w-full max-w-[200px] h-2 bg-bg-tertiary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-accent transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            <div className="text-sm text-text-secondary font-mono">{message}</div>
+          </div>
+        ) : (
+          <>
+            <Upload
+              className={cn(
+                "w-8 h-8 mb-2",
+                isDragging ? "text-accent" : "text-text-secondary"
+              )}
             />
-          </div>
+            <div className="text-sm text-text-primary mb-1">
+              {isDragging ? "Release to deploy!" : "Drop ZIP or folder here"}
+            </div>
+            <div className="text-xs text-text-secondary">
+              Folders will be auto-zipped
+            </div>
+          </>
+        )}
+      </div>
 
-          <div className="text-sm text-text-secondary font-mono">{message}</div>
-        </div>
-      ) : (
-        <>
-          <Upload
-            className={cn(
-              "w-8 h-8 mb-2",
-              isDragging ? "text-accent" : "text-text-secondary"
-            )}
-          />
-          <div className="text-sm text-text-primary mb-1">
-            {isDragging ? "Release to deploy!" : "Drop ZIP or folder here"}
-          </div>
-          <div className="text-xs text-text-secondary">
-            Folders will be auto-zipped
-          </div>
-        </>
+      {projectPath && onDeployProject && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeployProject();
+          }}
+          disabled={disabled || isBusy || isProjectBusy}
+          className={cn(
+            "w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg",
+            "text-sm font-medium transition-colors",
+            "bg-accent/10 text-accent hover:bg-accent/20",
+            "border border-accent/20",
+            (disabled || isBusy || isProjectBusy) && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          {isProjectBusy ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>{deployProjectMessage || "Deploying..."}</span>
+            </>
+          ) : (
+            <>
+              <Rocket className="w-4 h-4" />
+              <span>Deploy {projectName || "Project"}</span>
+            </>
+          )}
+        </button>
       )}
     </div>
   );

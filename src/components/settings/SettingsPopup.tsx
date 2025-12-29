@@ -1222,21 +1222,21 @@ function AIProvidersTab() {
     {
       id: "gemini" as const,
       name: "Gemini CLI",
-      description: "Google's AI assistant (coming soon)",
+      description: "Google's AI coding assistant",
       color: "text-[#4285f4]",
       installCommand: "npm install -g @google/gemini-cli",
       docsUrl: "https://ai.google.dev",
-      comingSoon: true,
     },
   ];
 
   const checkInstalledProviders = async () => {
     setIsChecking(true);
     try {
-      const results = await invoke<{ node: string | null; npm: string | null; git: string | null; claude: string | null; codex: string | null }>("check_system_requirements");
+      const results = await invoke<{ node: string | null; npm: string | null; git: string | null; claude: string | null; codex: string | null; gemini: string | null }>("check_system_requirements");
       const installed: ("claude" | "codex" | "gemini")[] = [];
       if (results.claude) installed.push("claude");
       if (results.codex) installed.push("codex");
+      if (results.gemini) installed.push("gemini");
       setInstalledProviders(installed);
     } catch (error) {
       console.error("Failed to check providers:", error);
@@ -1301,22 +1301,17 @@ function AIProvidersTab() {
                         Installed
                       </span>
                     )}
-                    {!isInstalled && !provider.comingSoon && (
+                    {!isInstalled && (
                       <span className="flex items-center gap-1 text-[10px] text-text-secondary bg-bg-hover px-1.5 py-0.5 rounded">
                         <Download className="w-3 h-3" />
                         Not installed
-                      </span>
-                    )}
-                    {provider.comingSoon && (
-                      <span className="text-[10px] text-text-secondary bg-bg-hover px-1.5 py-0.5 rounded">
-                        Coming soon
                       </span>
                     )}
                   </div>
                   <p className="text-sm text-text-secondary mb-2">
                     {provider.description}
                   </p>
-                  {!isInstalled && !provider.comingSoon && (
+                  {!isInstalled && (
                     <div className="flex items-center gap-2">
                       <code className="text-xs bg-bg-primary px-2 py-1 rounded font-mono text-text-secondary">
                         {provider.installCommand}
@@ -1334,7 +1329,7 @@ function AIProvidersTab() {
                   {isInstalled && (
                     <button
                       onClick={() => setDefaultProvider(provider.id)}
-                      disabled={isDefault || provider.comingSoon}
+                      disabled={isDefault}
                       className={cn(
                         "px-3 py-1.5 text-sm rounded-lg transition-colors",
                         isDefault

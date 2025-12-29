@@ -29,9 +29,7 @@ function getStartSessionCommand(provider: AIProvider): string {
     case "codex":
       return "start_codex_session";
     case "gemini":
-      // Gemini CLI not yet implemented
-      console.warn("[AutoBuild] Gemini CLI not yet implemented, falling back to Claude");
-      return "start_claude_session";
+      return "start_gemini_session";
     case "claude":
     default:
       return "start_claude_session";
@@ -43,6 +41,8 @@ function getSendInputCommand(provider: AIProvider): string {
   switch (provider) {
     case "codex":
       return "send_codex_input";
+    case "gemini":
+      return "send_gemini_input";
     case "claude":
     default:
       return "send_claude_input";
@@ -54,6 +54,8 @@ function getStreamEventName(provider: AIProvider): string {
   switch (provider) {
     case "codex":
       return "codex-stream";
+    case "gemini":
+      return "gemini-stream";
     case "claude":
     default:
       return "claude-stream";
@@ -1409,7 +1411,7 @@ Fix any issues found. Do NOT commit.`;
           cleanup();
           addLog("error", "Self-review timed out", issueId);
           // Stop session based on provider
-          const stopCommand = provider === "codex" ? "stop_codex_session" : "stop_claude_session";
+          const stopCommand = provider === "codex" ? "stop_codex_session" : provider === "gemini" ? "stop_gemini_session" : "stop_claude_session";
           invoke(stopCommand, { sessionId }).catch(() => {});
           resolve(false);
         }
@@ -1543,7 +1545,7 @@ When all audits complete, summarize which audits passed and which found issues.`
           cleanup();
           addLog("error", "Audit orchestrator timed out", issueId);
           // Stop session based on provider
-          const stopCommand = provider === "codex" ? "stop_codex_session" : "stop_claude_session";
+          const stopCommand = provider === "codex" ? "stop_codex_session" : provider === "gemini" ? "stop_gemini_session" : "stop_claude_session";
           invoke(stopCommand, { sessionId }).catch(() => {});
           resolve(false);
         }

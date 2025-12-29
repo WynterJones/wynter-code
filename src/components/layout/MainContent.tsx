@@ -20,6 +20,7 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useFileIndexStore } from "@/stores/fileIndexStore";
 import { claudeService } from "@/services/claude";
 import { codexService } from "@/services/codex";
+import { geminiService } from "@/services/gemini";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
 import type { Project, PermissionMode, ToolCall, McpPermissionRequest, AIProvider } from "@/types";
@@ -73,7 +74,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     setPendingQuestionSet,
   } = useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
-  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, claudeSafeMode, defaultModel, defaultCodexModel, installedProviders } = useSettingsStore();
+  const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, claudeSafeMode, defaultModel, defaultCodexModel, defaultGeminiModel, installedProviders } = useSettingsStore();
   const { getFiles, loadIndex } = useFileIndexStore();
   const projectFiles = getFiles(project.path);
 
@@ -142,7 +143,11 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     const provider = session?.provider || "claude";
 
     // Get the correct model based on provider
-    const model = provider === "codex" ? defaultCodexModel : defaultModel;
+    const model = provider === "codex"
+      ? defaultCodexModel
+      : provider === "gemini"
+        ? defaultGeminiModel
+        : defaultModel;
 
     console.log("[MainContent] Starting session with:", {
       sessionId: currentSessionId,
@@ -245,6 +250,16 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           permissionMode,
           claudeSafeMode
         );
+      } else if (provider === "gemini") {
+        // Start Gemini session (stateless, no resume support)
+        await geminiService.startSession(
+          project.path,
+          currentSessionId,
+          commonCallbacks,
+          model,
+          permissionMode,
+          claudeSafeMode
+        );
       } else {
         // Start Claude session (default)
         await claudeService.startSession(
@@ -320,6 +335,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     claudeSafeMode,
     defaultModel,
     defaultCodexModel,
+    defaultGeminiModel,
   ]);
 
   // Stop the AI session (Claude or Codex based on provider)
@@ -331,6 +347,8 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     try {
       if (provider === "codex") {
         await codexService.stopSession(currentSessionId);
+      } else if (provider === "gemini") {
+        await geminiService.stopSession(currentSessionId);
       } else {
         await claudeService.stopSession(currentSessionId);
       }
@@ -360,6 +378,8 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
       try {
         if (provider === "codex") {
           await codexService.sendPrompt(currentSessionId, prompt);
+        } else if (provider === "gemini") {
+          await geminiService.sendPrompt(currentSessionId, prompt);
         } else {
           await claudeService.sendPrompt(currentSessionId, prompt);
         }

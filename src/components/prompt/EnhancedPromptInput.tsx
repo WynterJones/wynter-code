@@ -18,6 +18,9 @@ import { FocusOverlay } from "./FocusOverlay";
 import { ImageThumbnails, type ImageAttachment } from "./ImageThumbnail";
 import { FileTagBadges, type FileReference } from "./FileTagBadge";
 import { FilePickerDropdown } from "./FilePickerDropdown";
+import { FarmworkPhraseDropdown } from "./FarmworkPhraseDropdown";
+import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
+import type { FarmworkPhrase } from "@/types/farmworkPhrase";
 // DISABLED: Slash command dropdown (responses not working correctly)
 // import { SlashCommandDropdown } from "./SlashCommandDropdown";
 // import { BUILTIN_COMMANDS, scanCustomCommands } from "@/lib/slashCommands";
@@ -101,6 +104,17 @@ export function EnhancedPromptInput({
   // const [slashSearchQuery, setSlashSearchQuery] = useState("");
   // const [slashPickerPosition, setSlashPickerPosition] = useState({ top: 0, left: 0 });
   // const [allCommands, setAllCommands] = useState<SlashCommand[]>(BUILTIN_COMMANDS);
+
+  // Farmwork phrase dropdown state
+  const [showFarmworkPhrases, setShowFarmworkPhrases] = useState(false);
+  const [farmworkSearchQuery, setFarmworkSearchQuery] = useState("");
+  const [farmworkPickerPosition, setFarmworkPickerPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  // Check if farmwork is installed
+  const { hasFarmwork, hasGarden, hasFarmhouse } = useFarmworkDetection();
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -413,6 +427,25 @@ export function EnhancedPromptInput({
       //   setSlashSearchQuery("");
       // }
 
+      // ! farmwork phrase detection (only if farmwork is installed)
+      if (hasFarmwork) {
+        const exclamationMatch = textBeforeCursor.match(/^!([^\s]*)$/);
+        if (exclamationMatch && cursorPos === textBeforeCursor.length) {
+          setFarmworkSearchQuery(exclamationMatch[1]);
+          setShowFarmworkPhrases(true);
+          setShowFilePicker(false);
+          setFileSearchQuery("");
+          if (inputRef.current) {
+            const rect = inputRef.current.getBoundingClientRect();
+            setFarmworkPickerPosition({ top: rect.top + 32, left: rect.left });
+          }
+          return;
+        } else {
+          setShowFarmworkPhrases(false);
+          setFarmworkSearchQuery("");
+        }
+      }
+
       // @ file picker detection
       const atMatch = textBeforeCursor.match(/@([^\s@]*)$/);
       if (atMatch) {
@@ -433,7 +466,7 @@ export function EnhancedPromptInput({
         setFileSearchQuery("");
       }
     },
-    [],
+    [hasFarmwork],
   );
 
   const handleFileSelect = useCallback(
@@ -466,6 +499,41 @@ export function EnhancedPromptInput({
       setFileSearchQuery("");
 
       setTimeout(() => inputRef.current?.focus(), 0);
+    },
+    [prompt],
+  );
+
+  const handleFarmworkPhraseSelect = useCallback(
+    (phrase: FarmworkPhrase) => {
+      // Replace the ! and any typed characters with the phrase
+      const cursorPos = inputRef.current?.selectionStart || 0;
+      const textBeforeCursor = prompt.slice(0, cursorPos);
+      const textAfterCursor = prompt.slice(cursorPos);
+
+      // Find where ! starts (should be at position 0 for this to trigger)
+      const exclamationIndex = textBeforeCursor.lastIndexOf("!");
+      const newTextBefore = textBeforeCursor.slice(0, exclamationIndex);
+
+      // Insert phrase (remove trailing "..." if present, add space for typing)
+      let insertPhrase = phrase.phrase;
+      if (insertPhrase.endsWith("...")) {
+        insertPhrase = insertPhrase.slice(0, -3) + " ";
+      }
+
+      const newPrompt = newTextBefore + insertPhrase + textAfterCursor;
+      setPrompt(newPrompt);
+
+      setShowFarmworkPhrases(false);
+      setFarmworkSearchQuery("");
+
+      // Position cursor after the phrase
+      setTimeout(() => {
+        if (inputRef.current) {
+          const newPos = newTextBefore.length + insertPhrase.length;
+          inputRef.current.setSelectionRange(newPos, newPos);
+          inputRef.current.focus();
+        }
+      }, 0);
     },
     [prompt],
   );
@@ -649,12 +717,14 @@ export function EnhancedPromptInput({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !showFilePicker && !showSlashCommands) {
+    if (e.key === "Enter" && !e.shiftKey && !showFilePicker && !showSlashCommands && !showFarmworkPhrases) {
       e.preventDefault();
       handleSubmit();
     }
     if (e.key === "Escape") {
-      if (showSlashCommands) {
+      if (showFarmworkPhrases) {
+        setShowFarmworkPhrases(false);
+      } else if (showSlashCommands) {
         setShowSlashCommands(false);
       } else if (showFilePicker) {
         setShowFilePicker(false);
@@ -704,11 +774,12 @@ export function EnhancedPromptInput({
             </div>
           )}
 
-          <div className="flex items-start gap-3">
+          <div className={cn("flex items-start gap-3", globalIsDragging && "select-none")}>
             <span
               className={cn(
                 "font-mono",
                 isFocused ? "text-accent text-lg" : "text-accent/70 text-sm",
+                globalIsDragging && "pointer-events-none",
               )}
             >
               $
@@ -729,6 +800,7 @@ export function EnhancedPromptInput({
                 "disabled:opacity-50",
                 "transition-all duration-300 ease-out",
                 isFocused ? "text-base leading-relaxed" : "text-sm",
+                globalIsDragging && "pointer-events-none select-none",
               )}
               style={{
                 minHeight: isFocused ? "120px" : "24px",
@@ -777,7 +849,17 @@ export function EnhancedPromptInput({
                 <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                   @
                 </kbd>{" "}
-                files •{" "}
+                files
+                {hasFarmwork && (
+                  <>
+                    {" "}•{" "}
+                    <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
+                      !
+                    </kbd>{" "}
+                    <span className="text-lime-500">farmwork</span>
+                  </>
+                )}
+                {" "}•{" "}
                 <kbd className="px-1.5 py-0.5 rounded bg-bg-hover font-mono">
                   ⌘V
                 </kbd>{" "}
@@ -806,6 +888,18 @@ export function EnhancedPromptInput({
         onSelect={handleFileSelect}
         onClose={() => setShowFilePicker(false)}
       />
+
+      {hasFarmwork && (
+        <FarmworkPhraseDropdown
+          isOpen={showFarmworkPhrases}
+          searchQuery={farmworkSearchQuery}
+          position={farmworkPickerPosition}
+          onSelect={handleFarmworkPhraseSelect}
+          onClose={() => setShowFarmworkPhrases(false)}
+          hasGarden={hasGarden}
+          hasFarmhouse={hasFarmhouse}
+        />
+      )}
 
       {/* SlashCommandDropdown - DISABLED for now (responses not working correctly)
       <SlashCommandDropdown

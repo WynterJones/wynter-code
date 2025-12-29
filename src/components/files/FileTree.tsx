@@ -146,8 +146,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       const { files: droppedFiles, targetFolder } = e.detail;
       if (!droppedFiles || droppedFiles.length === 0 || !targetFolder) return;
 
-      console.log("[FileTree] Handling folder drop:", { files: droppedFiles.length, target: targetFolder });
-
       // Validate drops - filter out invalid moves
       const validFiles = droppedFiles.filter(f => {
         // Not dropping on itself
