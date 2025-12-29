@@ -57,6 +57,7 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
   const [systemEnvVars, setSystemEnvVars] = useState<SystemEnvVar[]>([]);
   const [systemEnvLoading, setSystemEnvLoading] = useState(false);
   const [systemEnvFilter, setSystemEnvFilter] = useState("");
+  const [revealedSystemKeys, setRevealedSystemKeys] = useState<Set<string>>(new Set());
 
   const loadEnvFiles = useCallback(async () => {
     if (!activeProject?.path) return;
@@ -110,6 +111,7 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
   useEffect(() => {
     if (!isOpen) {
       hideAllValues();
+      setRevealedSystemKeys(new Set());
     }
   }, [isOpen, hideAllValues]);
 
@@ -327,15 +329,18 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
             </>
           ) : (
             <div className="flex-1 overflow-y-auto p-4">
-              {/* Stored Global Variables Section */}
+              {/* App Environment Variables Section */}
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-3">
                   <Key className="w-4 h-4 text-accent" />
                   <h3 className="text-sm font-medium text-text-primary">
-                    Stored Variables
+                    App Variables
                   </h3>
                   <span className="text-xs text-text-secondary">
                     ({globalVariables.length})
+                  </span>
+                  <span className="text-[10px] text-text-secondary/60 ml-1">
+                    Available to terminals & builds
                   </span>
                 </div>
 
@@ -426,20 +431,41 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
                           .toLowerCase()
                           .includes(systemEnvFilter.toLowerCase())
                     )
-                    .map((variable) => (
-                      <div
-                        key={variable.key}
-                        className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-tertiary/50 hover:bg-bg-tertiary text-sm group"
-                      >
-                        <span className="font-mono text-accent truncate min-w-0 flex-shrink-0 max-w-[180px]">
-                          {variable.key}
-                        </span>
-                        <span className="text-text-secondary">=</span>
-                        <span className="font-mono text-text-secondary truncate min-w-0 flex-1">
-                          {variable.value}
-                        </span>
-                      </div>
-                    ))}
+                    .map((variable) => {
+                      const isRevealed = revealedSystemKeys.has(variable.key);
+                      const isSensitive = detectSensitive(variable.key);
+                      const toggleReveal = () => {
+                        setRevealedSystemKeys((prev) => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(variable.key)) {
+                            newSet.delete(variable.key);
+                          } else {
+                            newSet.add(variable.key);
+                          }
+                          return newSet;
+                        });
+                      };
+                      return (
+                        <div
+                          key={variable.key}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-tertiary/50 hover:bg-bg-tertiary text-sm group"
+                        >
+                          <span className="font-mono text-accent truncate min-w-0 flex-shrink-0 max-w-[180px]">
+                            {variable.key}
+                          </span>
+                          <span className="text-text-secondary">=</span>
+                          <button
+                            onClick={toggleReveal}
+                            className={cn(
+                              "font-mono text-text-secondary truncate min-w-0 flex-1 text-left transition-all",
+                              isSensitive && !isRevealed && "blur-sm hover:blur-[3px] cursor-pointer select-none"
+                            )}
+                          >
+                            {variable.value}
+                          </button>
+                        </div>
+                      );
+                    })}
 
                   {systemEnvVars.length === 0 && !systemEnvLoading && (
                     <div className="text-center py-4 text-text-secondary text-sm">
@@ -463,7 +489,7 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
           <p className="text-[11px] text-text-secondary/70">
             {activeTab === "project"
               ? "Manage environment variables for this project. Sensitive values are hidden by default."
-              : "Stored variables persist across projects. System variables are read from your shell environment."}
+              : "App variables are set in the system environment and available to terminals & child processes. System variables are read-only."}
           </p>
         </div>
 

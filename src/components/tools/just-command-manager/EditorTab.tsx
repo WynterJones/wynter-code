@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Plus, Save, Trash2, GripVertical, Loader2 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import { Button, Checkbox } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { JustfileData, JustRecipe } from "./types";
 
@@ -120,23 +121,19 @@ export function EditorTab({ justfileData, onSave }: EditorTabProps) {
           {hasChanges && (
             <span className="text-xs text-yellow-500">Unsaved changes</span>
           )}
-          <button
+          <Button
+            variant="primary"
+            size="sm"
             onClick={handleSave}
             disabled={isSaving || !hasChanges}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors",
-              hasChanges
-                ? "bg-accent text-white hover:bg-accent/90"
-                : "bg-bg-tertiary text-text-secondary"
-            )}
           >
             {isSaving ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : (
-              <Save className="w-4 h-4" />
+              <Save className="w-4 h-4 mr-2" />
             )}
             {isSaving ? "Saving..." : "Save"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -189,7 +186,7 @@ export function EditorTab({ justfileData, onSave }: EditorTabProps) {
             scrollbars: { theme: "os-theme-custom", autoHide: "leave" },
           }}
         >
-          <div className="p-4">
+          <div className="p-4 pb-8">
             {editingRecipe ? (
               <div className="space-y-4">
                 <div>
@@ -228,39 +225,26 @@ export function EditorTab({ justfileData, onSave }: EditorTabProps) {
                 </div>
 
                 <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editingRecipe.isQuiet || false}
-                      onChange={(e) =>
-                        handleUpdateRecipe({
-                          ...editingRecipe,
-                          isQuiet: e.target.checked,
-                        })
-                      }
-                      className="rounded border-border"
-                    />
-                    <span className="text-sm text-text-secondary">
-                      Quiet (@)
-                    </span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editingRecipe.isPrivate || false}
-                      onChange={(e) =>
-                        handleUpdateRecipe({
-                          ...editingRecipe,
-                          isPrivate: e.target.checked,
-                        })
-                      }
-                      className="rounded border-border"
-                    />
-                    <span className="text-sm text-text-secondary">
-                      Private (_)
-                    </span>
-                  </label>
+                  <Checkbox
+                    label="Quiet (@)"
+                    checked={editingRecipe.isQuiet || false}
+                    onChange={(e) =>
+                      handleUpdateRecipe({
+                        ...editingRecipe,
+                        isQuiet: e.target.checked,
+                      })
+                    }
+                  />
+                  <Checkbox
+                    label="Private (_)"
+                    checked={editingRecipe.isPrivate || false}
+                    onChange={(e) =>
+                      handleUpdateRecipe({
+                        ...editingRecipe,
+                        isPrivate: e.target.checked,
+                      })
+                    }
+                  />
                 </div>
 
                 <div>

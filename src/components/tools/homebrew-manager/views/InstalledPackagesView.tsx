@@ -44,16 +44,12 @@ export function InstalledPackagesView() {
       {/* Header with filter and search */}
       <div className="flex items-center gap-3">
         {/* Filter buttons */}
-        <div className="flex items-center gap-1 bg-bg-secondary rounded-lg p-1">
+        <div className="flex items-center gap-2">
           {filterButtons.map((btn) => (
             <button
               key={btn.type}
               onClick={() => setFilterType(btn.type)}
-              className={`px-3 py-1.5 text-sm rounded-md transition-colors flex items-center gap-2 ${
-                filterType === btn.type
-                  ? "bg-accent text-white"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-tertiary"
-              }`}
+              className={filterType === btn.type ? "btn-primary" : "btn-secondary"}
             >
               {btn.type === "formula" && <Package className="w-3.5 h-3.5" />}
               {btn.type === "cask" && <Box className="w-3.5 h-3.5" />}

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { invoke } from "@tauri-apps/api/core";
 import { v4 as uuid } from "uuid";
 import type { GlobalEnvVariable } from "@/types";
 
@@ -34,6 +35,7 @@ export function detectSensitive(key: string): boolean {
 interface EnvStore {
   globalVariables: GlobalEnvVariable[];
   revealedKeys: Set<string>;
+  initialized: boolean;
 
   addGlobalVariable: (key: string, value: string, isSensitive?: boolean) => void;
   updateGlobalVariable: (
@@ -46,15 +48,17 @@ interface EnvStore {
   hideValue: (key: string) => void;
   hideAllValues: () => void;
 
-  // Reset
+  initializeEnvVars: () => Promise<void>;
+
   reset: () => void;
 }
 
 export const useEnvStore = create<EnvStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       globalVariables: [],
       revealedKeys: new Set<string>(),
+      initialized: false,
 
       addGlobalVariable: (key, value, isSensitive) => {
         const variable: GlobalEnvVariable = {
@@ -65,12 +69,38 @@ export const useEnvStore = create<EnvStore>()(
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
+
+        // Set in system environment
+        invoke("set_system_env_var", { key, value }).catch((err) => {
+          console.error("Failed to set system env var:", err);
+        });
+
         set((state) => ({
           globalVariables: [...state.globalVariables, variable],
         }));
       },
 
       updateGlobalVariable: (id, updates) => {
+        const state = get();
+        const existing = state.globalVariables.find((v) => v.id === id);
+
+        if (existing) {
+          const newKey = updates.key ?? existing.key;
+          const newValue = updates.value ?? existing.value;
+
+          // If key changed, remove old key from system
+          if (updates.key && updates.key !== existing.key) {
+            invoke("remove_system_env_var", { key: existing.key }).catch((err) => {
+              console.error("Failed to remove old system env var:", err);
+            });
+          }
+
+          // Set new/updated key-value
+          invoke("set_system_env_var", { key: newKey, value: newValue }).catch((err) => {
+            console.error("Failed to set system env var:", err);
+          });
+        }
+
         set((state) => ({
           globalVariables: state.globalVariables.map((v) =>
             v.id === id ? { ...v, ...updates, updatedAt: Date.now() } : v
@@ -79,6 +109,16 @@ export const useEnvStore = create<EnvStore>()(
       },
 
       deleteGlobalVariable: (id) => {
+        const state = get();
+        const variable = state.globalVariables.find((v) => v.id === id);
+
+        if (variable) {
+          // Remove from system environment
+          invoke("remove_system_env_var", { key: variable.key }).catch((err) => {
+            console.error("Failed to remove system env var:", err);
+          });
+        }
+
         set((state) => ({
           globalVariables: state.globalVariables.filter((v) => v.id !== id),
         }));
@@ -104,10 +144,38 @@ export const useEnvStore = create<EnvStore>()(
         set({ revealedKeys: new Set() });
       },
 
+      initializeEnvVars: async () => {
+        const state = get();
+        if (state.initialized) return;
+
+        // Set all stored variables in the system environment
+        for (const variable of state.globalVariables) {
+          try {
+            await invoke("set_system_env_var", {
+              key: variable.key,
+              value: variable.value
+            });
+          } catch (err) {
+            console.error(`Failed to initialize env var ${variable.key}:`, err);
+          }
+        }
+
+        set({ initialized: true });
+      },
+
       reset: () => {
+        // Remove all from system
+        const state = get();
+        for (const variable of state.globalVariables) {
+          invoke("remove_system_env_var", { key: variable.key }).catch((err) => {
+            console.error("Failed to remove system env var:", err);
+          });
+        }
+
         set({
           globalVariables: [],
           revealedKeys: new Set(),
+          initialized: false,
         });
       },
     }),

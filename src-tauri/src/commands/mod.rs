@@ -1443,12 +1443,32 @@ pub async fn get_node_modules_size(project_path: String) -> Result<u64, String> 
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SystemCheckResults {
+    // JavaScript ecosystem
     pub node: Option<String>,
     pub npm: Option<String>,
+    pub pnpm: Option<String>,
+    pub yarn: Option<String>,
+    pub bun: Option<String>,
+    // Version control
     pub git: Option<String>,
+    // AI tools
     pub claude: Option<String>,
     pub codex: Option<String>,
     pub gemini: Option<String>,
+    // Ruby ecosystem
+    pub ruby: Option<String>,
+    pub rails: Option<String>,
+    pub bundler: Option<String>,
+    // Python ecosystem
+    pub python: Option<String>,
+    pub pip: Option<String>,
+    // Systems languages
+    pub go: Option<String>,
+    pub rust: Option<String>,
+    pub cargo: Option<String>,
+    // Containers & Package managers
+    pub docker: Option<String>,
+    pub homebrew: Option<String>,
 }
 
 fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
@@ -1497,12 +1517,32 @@ fn get_command_version(cmd: &str, args: &[&str]) -> Option<String> {
 #[tauri::command]
 pub fn check_system_requirements() -> SystemCheckResults {
     SystemCheckResults {
+        // JavaScript ecosystem
         node: get_command_version("node", &["--version"]),
         npm: get_command_version("npm", &["--version"]),
+        pnpm: get_command_version("pnpm", &["--version"]),
+        yarn: get_command_version("yarn", &["--version"]),
+        bun: get_command_version("bun", &["--version"]),
+        // Version control
         git: get_command_version("git", &["--version"]),
+        // AI tools
         claude: get_command_version("claude", &["--version"]),
         codex: get_command_version("codex", &["--version"]),
         gemini: get_command_version("gemini", &["--version"]),
+        // Ruby ecosystem
+        ruby: get_command_version("ruby", &["--version"]),
+        rails: get_command_version("rails", &["--version"]),
+        bundler: get_command_version("bundler", &["--version"]),
+        // Python ecosystem
+        python: get_command_version("python3", &["--version"]),
+        pip: get_command_version("pip3", &["--version"]),
+        // Systems languages
+        go: get_command_version("go", &["version"]),
+        rust: get_command_version("rustc", &["--version"]),
+        cargo: get_command_version("cargo", &["--version"]),
+        // Containers & Package managers
+        docker: get_command_version("docker", &["--version"]),
+        homebrew: get_command_version("brew", &["--version"]),
     }
 }
 
@@ -2640,6 +2680,24 @@ pub fn get_system_env_vars() -> Vec<SystemEnvVar> {
     std::env::vars()
         .map(|(key, value)| SystemEnvVar { key, value })
         .collect()
+}
+
+#[tauri::command]
+pub fn set_system_env_var(key: String, value: String) -> Result<(), String> {
+    if key.is_empty() {
+        return Err("Key cannot be empty".to_string());
+    }
+    std::env::set_var(&key, &value);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_system_env_var(key: String) -> Result<(), String> {
+    if key.is_empty() {
+        return Err("Key cannot be empty".to_string());
+    }
+    std::env::remove_var(&key);
+    Ok(())
 }
 
 // ============================================

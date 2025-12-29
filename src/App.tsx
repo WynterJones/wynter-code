@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppFont } from "@/hooks/useAppFont";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useEnvStore } from "@/stores/envStore";
 
 type WindowType = "main" | "floating-webcam" | "webcam-cost-popup" | "launcher";
 
@@ -68,8 +69,18 @@ function App() {
         }
       };
 
+      // Initialize stored environment variables
+      const initEnvVars = async () => {
+        try {
+          await useEnvStore.getState().initializeEnvVars();
+        } catch (error) {
+          console.error("Failed to initialize env vars:", error);
+        }
+      };
+
       initLightcast();
       initVibrancy();
+      initEnvVars();
     }
   }, []);
 

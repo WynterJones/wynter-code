@@ -1,8 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Play,
-  Star,
-  Clock,
   ChevronRight,
   ChevronDown,
   Terminal as TerminalIcon,
@@ -10,11 +8,14 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  Bot,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { Terminal } from "@/components/terminal/Terminal";
 import { useJustfileStore } from "@/stores/justfileStore";
+import { IconButton, Tooltip } from "@/components/ui";
+import { AIAssistantPopup } from "@/components/ai";
 import { cn } from "@/lib/utils";
 import type { JustfileData, JustRecipe } from "./types";
 
@@ -26,21 +27,27 @@ interface RecipesTabProps {
 export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
   const [selectedRecipe, setSelectedRecipe] = useState<JustRecipe | null>(null);
   const [expandedRecipes, setExpandedRecipes] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [ptyId, setPtyId] = useState<string | null>(null);
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [showPrivate, setShowPrivate] = useState(false);
+  const [showAIPopup, setShowAIPopup] = useState(false);
 
-  const {
-    executions,
-    favoriteRecipes,
-    recentRecipes,
-    toggleFavorite,
-    addToRecent,
-    addExecution,
-    updateExecution,
-  } = useJustfileStore();
+  const { executions, addExecution, updateExecution } = useJustfileStore();
+
+  // Build AI context with justfile info
+  const aiContext = useMemo(() => {
+    const recipeList = justfileData.recipes
+      .map((r) => `- ${r.name}${r.description ? `: ${r.description}` : ""}`)
+      .join("\n");
+    return `You are helping with a justfile at ${justfileData.path}.
+
+Available recipes:
+${recipeList}
+
+Help the user with questions about their justfile, creating new recipes, or understanding just command syntax.`;
+  }, [justfileData]);
 
   const toggleExpanded = (recipeName: string) => {
     setExpandedRecipes((prev) => {
@@ -65,10 +72,9 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
       if (!projectPath) return;
 
       setSelectedRecipe(recipe);
-      addToRecent(recipe.name);
       setPtyId(null);
     },
-    [projectPath, addToRecent]
+    [projectPath],
   );
 
   const handlePtyCreated = useCallback(
@@ -89,7 +95,7 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
 
       await invoke("write_pty", { ptyId: id, data: command + "\n" });
     },
-    [selectedRecipe, projectPath, paramValues, addExecution]
+    [selectedRecipe, projectPath, paramValues, addExecution],
   );
 
   const handleStopRecipe = async () => {
@@ -103,24 +109,12 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
 
   // Filter recipes
   const visibleRecipes = justfileData.recipes.filter(
-    (r) => showPrivate || !r.isPrivate
+    (r) => showPrivate || !r.isPrivate,
   );
-
-  // Group recipes
-  const favoriteList = visibleRecipes.filter((r) =>
-    favoriteRecipes.includes(r.name)
-  );
-  const recentList = visibleRecipes
-    .filter(
-      (r) =>
-        recentRecipes.includes(r.name) && !favoriteRecipes.includes(r.name)
-    )
-    .slice(0, 5);
 
   const renderRecipeItem = (recipe: JustRecipe) => {
     const status = getRecipeStatus(recipe.name);
     const isExpanded = expandedRecipes.has(recipe.name);
-    const isFavorite = favoriteRecipes.includes(recipe.name);
     const isSelected = selectedRecipe?.name === recipe.name;
 
     return (
@@ -128,14 +122,14 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
         key={recipe.name}
         className={cn(
           "border border-border rounded-lg overflow-hidden mb-2",
-          isSelected && "ring-1 ring-accent"
+          isSelected && "ring-1 ring-accent",
         )}
       >
         <div
           className={cn(
             "flex items-center gap-2 px-3 py-2 cursor-pointer transition-colors",
             "hover:bg-bg-hover",
-            isSelected && "bg-accent/5"
+            isSelected && "bg-accent/5",
           )}
           onClick={() => toggleExpanded(recipe.name)}
         >
@@ -150,7 +144,7 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
           <span
             className={cn(
               "font-mono text-sm font-medium",
-              recipe.isPrivate ? "text-text-secondary" : "text-text-primary"
+              recipe.isPrivate ? "text-text-secondary" : "text-text-primary",
             )}
           >
             {recipe.isQuiet && (
@@ -178,24 +172,6 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
             {status === "running" && (
               <Loader2 className="w-4 h-4 animate-spin text-accent" />
             )}
-
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(recipe.name);
-              }}
-              className="p-1 rounded hover:bg-bg-tertiary transition-colors"
-              title={isFavorite ? "Remove from favorites" : "Add to favorites"}
-            >
-              <Star
-                className={cn(
-                  "w-3.5 h-3.5",
-                  isFavorite
-                    ? "fill-yellow-400 text-yellow-400"
-                    : "text-text-secondary"
-                )}
-              />
-            </button>
 
             <button
               onClick={(e) => {
@@ -281,51 +257,32 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
               <span className="text-xs text-text-secondary">
                 {visibleRecipes.length} recipes
               </span>
-              <button
-                onClick={() => setShowPrivate(!showPrivate)}
-                className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors",
-                  showPrivate
-                    ? "bg-accent/10 text-accent"
-                    : "text-text-secondary hover:bg-bg-hover"
-                )}
-              >
-                {showPrivate ? (
-                  <Eye className="w-3 h-3" />
-                ) : (
-                  <EyeOff className="w-3 h-3" />
-                )}
-                Private
-              </button>
+              <div className="flex items-center gap-2">
+                <Tooltip content="AI Assistant">
+                  <IconButton size="sm" onClick={() => setShowAIPopup(true)}>
+                    <Bot className="w-4 h-4" />
+                  </IconButton>
+                </Tooltip>
+                <button
+                  onClick={() => setShowPrivate(!showPrivate)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 text-xs rounded transition-colors",
+                    showPrivate
+                      ? "bg-accent/10 text-accent"
+                      : "text-text-secondary hover:bg-bg-hover",
+                  )}
+                >
+                  {showPrivate ? (
+                    <Eye className="w-3 h-3" />
+                  ) : (
+                    <EyeOff className="w-3 h-3" />
+                  )}
+                  Private
+                </button>
+              </div>
             </div>
 
-            {favoriteList.length > 0 && (
-              <div className="mb-4">
-                <h3 className="flex items-center gap-2 text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                  <Star className="w-3 h-3" />
-                  Favorites
-                </h3>
-                {favoriteList.map(renderRecipeItem)}
-              </div>
-            )}
-
-            {recentList.length > 0 && (
-              <div className="mb-4">
-                <h3 className="flex items-center gap-2 text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                  <Clock className="w-3 h-3" />
-                  Recent
-                </h3>
-                {recentList.map(renderRecipeItem)}
-              </div>
-            )}
-
-            <div>
-              <h3 className="flex items-center gap-2 text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
-                <TerminalIcon className="w-3 h-3" />
-                All Recipes
-              </h3>
-              {visibleRecipes.map(renderRecipeItem)}
-            </div>
+            <div>{visibleRecipes.map(renderRecipeItem)}</div>
           </div>
         </OverlayScrollbarsComponent>
 
@@ -349,6 +306,7 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
               <div className="flex-1 min-h-0">
                 {projectPath && (
                   <Terminal
+                    key={selectedRecipe.name}
                     projectPath={projectPath}
                     ptyId={ptyId}
                     onPtyCreated={handlePtyCreated}
@@ -366,6 +324,15 @@ export function RecipesTab({ justfileData, projectPath }: RecipesTabProps) {
           )}
         </div>
       </div>
+
+      <AIAssistantPopup
+        isOpen={showAIPopup}
+        onClose={() => setShowAIPopup(false)}
+        sessionId={`just-ai-${projectPath || "default"}`}
+        systemContext={aiContext}
+        title="Just Assistant"
+        placeholder="Ask about justfiles..."
+      />
     </div>
   );
 }

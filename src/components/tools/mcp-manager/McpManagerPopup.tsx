@@ -195,8 +195,7 @@ export function McpManagerPopup() {
           {/* Footer */}
           <div className="px-4 py-3 border-t border-border">
             <p className="text-[11px] text-text-secondary/70">
-              MCP servers extend Claude with additional tools. Toggle servers
-              on/off to enable or disable them in your Claude sessions.
+              Toggle servers on/off to enable or disable them.
             </p>
           </div>
         </div>

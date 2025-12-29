@@ -244,6 +244,8 @@ fn main() {
             commands::create_env_file,
             commands::check_env_gitignore,
             commands::get_system_env_vars,
+            commands::set_system_env_var,
+            commands::remove_system_env_var,
             commands::create_zip_archive,
             commands::zip_folder_to_base64,
             commands::zip_folder_for_deploy,

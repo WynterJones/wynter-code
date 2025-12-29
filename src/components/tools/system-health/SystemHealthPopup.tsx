@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { RefreshCw, Activity, AlertCircle } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { RefreshCw, AlertCircle } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { Modal, IconButton, Tooltip, ScrollArea } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -12,14 +12,11 @@ interface SystemHealthPopupProps {
   onClose: () => void;
 }
 
-const REFRESH_INTERVAL = 3000;
-
 export function SystemHealthPopup({ isOpen, onClose }: SystemHealthPopupProps) {
   const [devTools, setDevTools] = useState<SystemCheckResults | null>(null);
   const [resources, setResources] = useState<SystemResourcesInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchData = useCallback(async (showLoading = false) => {
     if (showLoading) setLoading(true);
@@ -42,41 +39,30 @@ export function SystemHealthPopup({ isOpen, onClose }: SystemHealthPopupProps) {
   useEffect(() => {
     if (isOpen) {
       fetchData(true);
-
-      intervalRef.current = setInterval(() => {
-        fetchData(false);
-      }, REFRESH_INTERVAL);
     }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
   }, [isOpen, fetchData]);
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="System Health" size="lg">
-      <div className="flex flex-col h-[550px] p-4">
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-accent" />
-            <span className="text-sm text-text-secondary">
-              Auto-refreshing every {REFRESH_INTERVAL / 1000}s
-            </span>
-          </div>
-          <Tooltip content="Refresh Now">
-            <IconButton
-              size="sm"
-              onClick={() => fetchData(true)}
-              disabled={loading}
-            >
-              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-            </IconButton>
-          </Tooltip>
-        </div>
+  const refreshButton = (
+    <Tooltip content="Refresh">
+      <IconButton
+        size="sm"
+        onClick={() => fetchData(true)}
+        disabled={loading}
+      >
+        <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+      </IconButton>
+    </Tooltip>
+  );
 
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="System Health"
+      size="lg"
+      headerActions={refreshButton}
+    >
+      <div className="flex flex-col h-[550px] p-4">
         {error && (
           <div className="flex items-center gap-2 p-3 mb-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
             <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -99,12 +85,6 @@ export function SystemHealthPopup({ isOpen, onClose }: SystemHealthPopupProps) {
             )}
           </div>
         </ScrollArea>
-
-        <div className="pt-3 mt-3 border-t border-border">
-          <p className="text-[11px] text-text-secondary/70">
-            Status display only. Resource metrics update automatically.
-          </p>
-        </div>
       </div>
     </Modal>
   );

@@ -34,6 +34,7 @@ interface KanbanStore {
     newOrder?: number
   ) => void;
   reorderTasks: (workspaceId: string, status: KanbanStatus, taskIds: string[]) => void;
+  toggleLock: (workspaceId: string, taskId: string) => void;
 
   // Reset
   reset: () => void;
@@ -165,6 +166,21 @@ export const useKanbanStore = create<KanbanStore>()(
               }
               return t;
             }),
+          });
+          return { boards: newBoards };
+        });
+      },
+
+      toggleLock: (workspaceId, taskId) => {
+        set((state) => {
+          const newBoards = new Map(state.boards);
+          const board = newBoards.get(workspaceId);
+          if (!board) return state;
+
+          newBoards.set(workspaceId, {
+            tasks: board.tasks.map((t) =>
+              t.id === taskId ? { ...t, locked: !t.locked, updatedAt: Date.now() } : t
+            ),
           });
           return { boards: newBoards };
         });

@@ -17,6 +17,8 @@ import {
   HardDrive,
   ChevronDown,
   ChevronRight,
+  Search,
+  X,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { IconButton, Tooltip, Modal } from "@/components/ui";
@@ -47,6 +49,7 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
   const [error, setError] = useState<string | null>(null);
   const [killingPid, setKillingPid] = useState<number | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchPorts = useCallback(async () => {
     setLoading(true);
@@ -64,6 +67,7 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
 
   useEffect(() => {
     if (isOpen) {
+      setSearchQuery("");
       fetchPorts();
     }
   }, [isOpen, fetchPorts]);
@@ -145,10 +149,29 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
     6379: "Redis",
   };
 
+  const filteredPorts = useMemo(() => {
+    if (!searchQuery.trim()) return ports;
+
+    const query = searchQuery.toLowerCase().trim();
+    return ports.filter((port) => {
+      const portStr = port.port.toString();
+      const pidStr = port.pid.toString();
+      const processLower = port.processName.toLowerCase();
+      const protocolLower = port.protocol.toLowerCase();
+
+      return (
+        portStr.includes(query) ||
+        pidStr.includes(query) ||
+        processLower.includes(query) ||
+        protocolLower.includes(query)
+      );
+    });
+  }, [ports, searchQuery]);
+
   const groupedPorts = useMemo(() => {
     const byName: Record<string, PortInfo[]> = {};
 
-    for (const port of ports) {
+    for (const port of filteredPorts) {
       if (!byName[port.processName]) {
         byName[port.processName] = [];
       }
@@ -164,24 +187,46 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
       .sort((a, b) => b.ports.length - a.ports.length);
 
     return groups;
-  }, [ports]);
+  }, [filteredPorts]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Port Manager" size="lg">
       <div className="flex flex-col h-[500px] p-4">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 mb-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Network className="w-4 h-4 text-accent" />
-            <span className="text-sm text-text-secondary">
-              {ports.length} port{ports.length !== 1 ? "s" : ""} in {groupedPorts.length} group{groupedPorts.length !== 1 ? "s" : ""}
-            </span>
+        <div className="flex flex-col gap-3 pb-3 mb-3 border-b border-border">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Network className="w-4 h-4 text-accent" />
+              <span className="text-sm text-text-secondary">
+                {searchQuery ? `${filteredPorts.length} of ${ports.length}` : ports.length} port{ports.length !== 1 ? "s" : ""} in {groupedPorts.length} group{groupedPorts.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <Tooltip content="Refresh">
+              <IconButton size="sm" onClick={fetchPorts} disabled={loading}>
+                <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+              </IconButton>
+            </Tooltip>
           </div>
-          <Tooltip content="Refresh">
-            <IconButton size="sm" onClick={fetchPorts} disabled={loading}>
-              <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
-            </IconButton>
-          </Tooltip>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by port, process, or PID..."
+              className="w-full pl-9 pr-8 py-2 text-sm bg-bg-tertiary border border-border rounded-lg text-text-primary placeholder:text-text-secondary/50 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/25 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content */}
@@ -205,6 +250,17 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
             <div className="flex flex-col items-center justify-center h-32 text-text-secondary">
               <Network className="w-8 h-8 mb-2 opacity-50" />
               <p>No listening ports found</p>
+            </div>
+          ) : filteredPorts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-32 text-text-secondary">
+              <Search className="w-8 h-8 mb-2 opacity-50" />
+              <p>No ports match "{searchQuery}"</p>
+              <button
+                onClick={() => setSearchQuery("")}
+                className="mt-2 text-xs text-accent hover:underline"
+              >
+                Clear search
+              </button>
             </div>
           ) : (
             <div className="space-y-2">

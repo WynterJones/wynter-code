@@ -36,6 +36,7 @@ export interface KanbanTask {
   createdAt: number;
   updatedAt: number;
   order: number;
+  locked?: boolean;
 }
 
 export interface KanbanBoard {

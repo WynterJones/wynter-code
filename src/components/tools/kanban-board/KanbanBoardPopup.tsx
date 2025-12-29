@@ -10,12 +10,14 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { CheckSquare, X, Plus } from "lucide-react";
+import { arrayMove } from "@dnd-kit/sortable";
+import { CheckSquare, X, Plus, Bot } from "lucide-react";
 import { IconButton, Tooltip } from "@/components/ui";
 import { useKanbanStore } from "@/stores/kanbanStore";
 import { KanbanColumn } from "./KanbanColumn";
 import { KanbanCardPreview } from "./KanbanCard";
 import { KanbanNewTaskPopup } from "./KanbanNewTaskPopup";
+import { KanbanAIPopup } from "./KanbanAIPopup";
 import type { KanbanTask, KanbanStatus, KanbanPriority } from "@/types/kanban";
 import { KANBAN_COLUMNS, KANBAN_STATUSES } from "@/types/kanban";
 
@@ -31,6 +33,7 @@ export function KanbanBoardPopup({
   workspaceId,
 }: KanbanBoardPopupProps) {
   const [showNewTaskPopup, setShowNewTaskPopup] = useState(false);
+  const [showAIPopup, setShowAIPopup] = useState(false);
   const [editTask, setEditTask] = useState<KanbanTask | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -40,6 +43,8 @@ export function KanbanBoardPopup({
     updateTask,
     deleteTask,
     moveTask,
+    reorderTasks,
+    toggleLock,
   } = useKanbanStore();
 
   const board = getBoard(workspaceId);
@@ -130,24 +135,32 @@ export function KanbanBoardPopup({
     const task = board.tasks.find((t) => t.id === taskId);
     if (!task) return;
 
-    // Determine target status from drop location
-    let targetStatus: KanbanStatus | null = null;
-
     // Check if dropped on another task
     const targetTask = board.tasks.find((t) => t.id === over.id);
+
     if (targetTask) {
-      targetStatus = targetTask.status;
+      // Dropped on a task
+      if (targetTask.status === task.status) {
+        // Same column - reorder
+        const tasksInColumn = columnTasks[task.status];
+        const oldIndex = tasksInColumn.findIndex((t) => t.id === taskId);
+        const newIndex = tasksInColumn.findIndex((t) => t.id === targetTask.id);
+
+        if (oldIndex !== newIndex) {
+          const newOrder = arrayMove(tasksInColumn, oldIndex, newIndex);
+          reorderTasks(workspaceId, task.status, newOrder.map((t) => t.id));
+        }
+      } else {
+        // Different column - move task
+        moveTask(workspaceId, taskId, targetTask.status);
+      }
     } else {
-      // Check if dropped on a column
+      // Check if dropped on a column (empty area)
       const column = KANBAN_COLUMNS.find((c) => c.id === over.id);
-      if (column) {
-        targetStatus = column.id;
+      if (column && column.id !== task.status) {
+        moveTask(workspaceId, taskId, column.id);
       }
     }
-
-    if (!targetStatus || targetStatus === task.status) return;
-
-    moveTask(workspaceId, taskId, targetStatus);
   };
 
   const handleCreateTask = (
@@ -173,6 +186,10 @@ export function KanbanBoardPopup({
 
   const handleDeleteTask = (taskId: string) => {
     deleteTask(workspaceId, taskId);
+  };
+
+  const handleToggleLock = (taskId: string) => {
+    toggleLock(workspaceId, taskId);
   };
 
   if (!isOpen) return null;
@@ -217,6 +234,11 @@ export function KanbanBoardPopup({
             </div>
 
             <div className="flex items-center gap-2">
+              <Tooltip content="AI Assistant">
+                <IconButton size="sm" onClick={() => setShowAIPopup(true)}>
+                  <Bot className="w-4 h-4" />
+                </IconButton>
+              </Tooltip>
               <Tooltip content="New Task (Ctrl+N)">
                 <IconButton size="sm" onClick={() => setShowNewTaskPopup(true)}>
                   <Plus className="w-4 h-4" />
@@ -250,6 +272,7 @@ export function KanbanBoardPopup({
                   }
                   onEditTask={handleEditTask}
                   onDeleteTask={handleDeleteTask}
+                  onToggleLock={handleToggleLock}
                 />
               ))}
             </div>
@@ -271,6 +294,13 @@ export function KanbanBoardPopup({
         onSubmit={handleCreateTask}
         editTask={editTask}
         onUpdate={handleUpdateTask}
+      />
+
+      {/* AI Assistant Modal */}
+      <KanbanAIPopup
+        isOpen={showAIPopup}
+        onClose={() => setShowAIPopup(false)}
+        workspaceId={workspaceId}
       />
     </>,
     document.body

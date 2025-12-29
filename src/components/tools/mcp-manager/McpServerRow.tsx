@@ -90,13 +90,13 @@ export function McpServerRow({ server, onEdit, onDelete }: McpServerRowProps) {
           onClick={handleToggle}
           className={cn(
             "relative w-9 h-5 rounded-full transition-colors flex-shrink-0",
-            server.isEnabled ? "bg-accent" : "bg-bg-tertiary"
+            server.isEnabled ? "bg-accent" : "bg-gray-500"
           )}
         >
           <span
             className={cn(
-              "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform",
-              server.isEnabled ? "translate-x-4" : "translate-x-0.5"
+              "absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white shadow-sm transition-transform",
+              server.isEnabled ? "left-[18px]" : "left-0.5"
             )}
           />
         </button>

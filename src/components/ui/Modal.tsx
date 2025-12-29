@@ -13,6 +13,7 @@ export interface ModalProps {
   overlayClassName?: string;
   size?: "sm" | "md" | "lg" | "xl" | "full";
   showCloseButton?: boolean;
+  headerActions?: ReactNode;
 }
 
 export function Modal({
@@ -24,6 +25,7 @@ export function Modal({
   overlayClassName,
   size = "lg",
   showCloseButton = true,
+  headerActions,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
 
@@ -76,7 +78,7 @@ export function Modal({
           className
         )}
       >
-        {(title || showCloseButton) && (
+        {(title || showCloseButton || headerActions) && (
           <div
             data-tauri-drag-region
             className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0 cursor-grab active:cursor-grabbing"
@@ -84,11 +86,14 @@ export function Modal({
             {title && (
               <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
             )}
-            {showCloseButton && (
-              <IconButton size="sm" onClick={onClose} className="ml-auto">
-                <X className="w-4 h-4" />
-              </IconButton>
-            )}
+            <div className="flex items-center gap-2 ml-auto">
+              {headerActions}
+              {showCloseButton && (
+                <IconButton size="sm" onClick={onClose}>
+                  <X className="w-4 h-4" />
+                </IconButton>
+              )}
+            </div>
           </div>
         )}
         <div className="overflow-hidden flex-1 min-h-0 flex flex-col">{children}</div>

@@ -1,20 +1,28 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Trash2, CheckSquare, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton, Tooltip } from "@/components/ui";
 import type { KanbanTask } from "@/types/kanban";
 import { PRIORITY_COLORS, PRIORITY_DOT_COLORS } from "@/types/kanban";
 
+const HOLD_DURATION = 1000; // 1 second
+
 interface KanbanCardProps {
   task: KanbanTask;
   onEdit?: (task: KanbanTask) => void;
   onDelete?: (taskId: string) => void;
+  onToggleLock?: (taskId: string) => void;
+  showLockToggle?: boolean;
 }
 
-export function KanbanCard({ task, onEdit, onDelete }: KanbanCardProps) {
+export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggle }: KanbanCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState(0);
+  const deleteTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const deleteIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
   const {
     attributes,
     listeners,
@@ -23,6 +31,48 @@ export function KanbanCard({ task, onEdit, onDelete }: KanbanCardProps) {
     transition,
     isDragging,
   } = useSortable({ id: task.id });
+
+  const clearDeleteTimers = useCallback(() => {
+    if (deleteTimerRef.current) {
+      clearTimeout(deleteTimerRef.current);
+      deleteTimerRef.current = null;
+    }
+    if (deleteIntervalRef.current) {
+      clearInterval(deleteIntervalRef.current);
+      deleteIntervalRef.current = null;
+    }
+    setDeleteProgress(0);
+  }, []);
+
+  const handleDeleteMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      // Start progress animation
+      const startTime = Date.now();
+      deleteIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+        setDeleteProgress(progress);
+      }, 16);
+
+      // Delete after hold duration
+      deleteTimerRef.current = setTimeout(() => {
+        clearDeleteTimers();
+        onDelete?.(task.id);
+      }, HOLD_DURATION);
+    },
+    [task.id, onDelete, clearDeleteTimers]
+  );
+
+  const handleDeleteMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      clearDeleteTimers();
+    },
+    [clearDeleteTimers]
+  );
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -45,8 +95,25 @@ export function KanbanCard({ task, onEdit, onDelete }: KanbanCardProps) {
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Actions (visible on hover) */}
-      {isHovered && (onEdit || onDelete) && (
+      {isHovered && (onEdit || onDelete || showLockToggle) && (
         <div className="absolute top-2 right-2 flex items-center gap-1">
+          {showLockToggle && onToggleLock && (
+            <Tooltip content={task.locked ? "Mark incomplete" : "Mark complete"}>
+              <IconButton
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleLock(task.id);
+                }}
+                className={cn(
+                  "h-6 w-6",
+                  task.locked ? "bg-green-500/20 text-green-400" : "bg-bg-tertiary"
+                )}
+              >
+                {task.locked ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
+              </IconButton>
+            </Tooltip>
+          )}
           {onEdit && (
             <Tooltip content="Edit">
               <IconButton
@@ -62,18 +129,49 @@ export function KanbanCard({ task, onEdit, onDelete }: KanbanCardProps) {
             </Tooltip>
           )}
           {onDelete && (
-            <Tooltip content="Delete">
-              <IconButton
-                size="sm"
-                variant="danger"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(task.id);
-                }}
-                className="h-6 w-6"
-              >
-                <Trash2 className="w-3 h-3" />
-              </IconButton>
+            <Tooltip content="Hold to delete">
+              <div className="relative">
+                {/* Progress ring */}
+                {deleteProgress > 0 && (
+                  <svg
+                    className="absolute inset-0 w-6 h-6 -rotate-90"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="text-red-500/30"
+                    />
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeDasharray={`${deleteProgress * 0.628} 100`}
+                      className="text-red-500 transition-all"
+                    />
+                  </svg>
+                )}
+                <IconButton
+                  size="sm"
+                  variant="danger"
+                  onMouseDown={handleDeleteMouseDown}
+                  onMouseUp={handleDeleteMouseUp}
+                  onMouseLeave={handleDeleteMouseUp}
+                  className={cn(
+                    "h-6 w-6 select-none",
+                    deleteProgress > 0 && "bg-red-500/20"
+                  )}
+                >
+                  <Trash2 className="w-3 h-3" />
+                </IconButton>
+              </div>
             </Tooltip>
           )}
         </div>
@@ -143,6 +241,43 @@ export function KanbanCardPreview({ task }: KanbanCardPreviewProps) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface LockedKanbanCardProps {
+  task: KanbanTask;
+  onToggleLock?: (taskId: string) => void;
+}
+
+export function LockedKanbanCard({ task, onToggleLock }: LockedKanbanCardProps) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <div
+      className="relative px-2.5 py-1.5 rounded bg-bg-tertiary/30 border border-border/30 hover:border-border/50 transition-colors cursor-default"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <p className="text-xs text-text-tertiary line-clamp-1 pr-6">{task.title}</p>
+
+      {/* Uncheck button on hover */}
+      {isHovered && onToggleLock && (
+        <div className="absolute top-1/2 -translate-y-1/2 right-1">
+          <Tooltip content="Mark incomplete">
+            <IconButton
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleLock(task.id);
+              }}
+              className="h-5 w-5 bg-bg-tertiary"
+            >
+              <Square className="w-2.5 h-2.5" />
+            </IconButton>
+          </Tooltip>
+        </div>
+      )}
     </div>
   );
 }
