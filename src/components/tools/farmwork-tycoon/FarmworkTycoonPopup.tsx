@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { Modal } from "@/components/ui/Modal";
 import { useProjectStore } from "@/stores";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -33,9 +33,10 @@ import { cn } from "@/lib/utils";
 interface FarmworkTycoonPopupProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenMarkdownFile?: (filePath: string) => void;
 }
 
-export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProps) {
+export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: FarmworkTycoonPopupProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
   const getProject = useProjectStore((s) => s.getProject);
   const activeProject = useMemo(
@@ -60,11 +61,26 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
     clearAllVehicles,
     setBeadsEnabled,
     syncBeadVehicles,
+    pendingBuildingSelection,
+    setPendingBuildingSelection,
   } = useFarmworkTycoonStore();
 
   const [containerSize, setContainerSize] = useState({ width: 600, height: 600 });
   const [farmworkStatus, setFarmworkStatus] = useState<"checking" | "installed" | "not_installed_globally" | "not_initialized_in_project">("checking");
   const [copied, setCopied] = useState(false);
+
+  // Capture pending building selection and clear it (for mini player -> full popup flow)
+  const initialBuildingRef = useRef<string | null>(null);
+  if (isOpen && pendingBuildingSelection && !initialBuildingRef.current) {
+    initialBuildingRef.current = pendingBuildingSelection;
+    setPendingBuildingSelection(null);
+  }
+  // Reset ref when popup closes
+  useEffect(() => {
+    if (!isOpen) {
+      initialBuildingRef.current = null;
+    }
+  }, [isOpen]);
 
   // Get the appropriate command based on current status
   const getCommand = useCallback(() => {
@@ -91,6 +107,38 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
     // Close the popup
     onClose();
   };
+
+  // Audit file mapping
+  const AUDIT_FILE_MAP: Record<string, string> = {
+    security: "_AUDIT/SECURITY.md",
+    tests: "_AUDIT/TESTS.md",
+    performance: "_AUDIT/PERFORMANCE.md",
+    accessibility: "_AUDIT/ACCESSIBILITY.md",
+    codeQuality: "_AUDIT/CODE_QUALITY.md",
+    farmhouse: "_AUDIT/FARMHOUSE.md",
+    garden: "_AUDIT/GARDEN.md",
+    compost: "_AUDIT/COMPOST.md",
+  };
+
+  // Handle opening audit file - minimize to mini player and open in markdown viewer
+  const handleOpenAuditFile = useCallback(async (buildingType: string) => {
+    if (!activeProject?.path) return;
+
+    const auditFile = AUDIT_FILE_MAP[buildingType];
+    if (!auditFile) return;
+
+    // Construct full path
+    const fullPath = await join(activeProject.path, auditFile);
+
+    // Show mini player and close popup
+    showMiniPlayerFn();
+    onClose();
+
+    // Open in markdown viewer popup
+    if (onOpenMarkdownFile) {
+      onOpenMarkdownFile(fullPath);
+    }
+  }, [activeProject?.path, showMiniPlayerFn, onClose, onOpenMarkdownFile]);
 
   // Check if farmwork CLI is installed globally and if project is initialized
   const checkFarmworkStatus = useCallback(async (projectPath: string) => {
@@ -336,6 +384,8 @@ export function FarmworkTycoonPopup({ isOpen, onClose }: FarmworkTycoonPopupProp
                 <TycoonGame
                   containerWidth={containerSize.width}
                   containerHeight={containerSize.height}
+                  initialSelectedBuilding={initialBuildingRef.current}
+                  onOpenAuditFile={handleOpenAuditFile}
                 />
 
                 {/* Scanline overlay */}

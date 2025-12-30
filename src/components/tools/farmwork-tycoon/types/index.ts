@@ -213,6 +213,9 @@ export interface FarmworkTycoonState {
   // Map cycling state (synced between mini player and full view)
   mapCycle: MapCycleState;
 
+  // Pending building selection (when clicking building in mini player to expand)
+  pendingBuildingSelection: string | null;
+
   initialize: (projectPath: string) => Promise<void>;
   pause: () => void;
   resume: () => void;
@@ -240,6 +243,7 @@ export interface FarmworkTycoonState {
   clearCelebrationQueue: () => void;
   tickMapCycle: (dt: number) => void;
   signalVehicleExit: (vehicleId: string) => void;
+  setPendingBuildingSelection: (buildingId: string | null) => void;
 
   // Beads issue vehicle tracking
   beadsEnabled: boolean;

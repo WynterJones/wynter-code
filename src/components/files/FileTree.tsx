@@ -11,7 +11,6 @@ import { useFileOperations } from "@/hooks/useFileOperations";
 import { useGitStatus } from "@/hooks/useGitStatus";
 import { useCompression } from "@/hooks/useCompression";
 import { useDragStore } from "@/stores/dragStore";
-import { formatBytes } from "@/lib/storageUtils";
 import { OPTIMIZABLE_IMAGE_EXTENSIONS } from "@/types/compression";
 import type { FileNode } from "@/types";
 

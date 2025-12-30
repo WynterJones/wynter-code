@@ -19,10 +19,10 @@ export const PANEL_TYPES: Record<PanelType, PanelTypeConfig> = {
 
   "claude-output": {
     id: "claude-output",
-    name: "Claude Output",
+    name: "Session GUI",
     icon: "MessageSquare",
-    defaultTitle: "Claude",
-    canHaveMultiple: true,
+    defaultTitle: "Session GUI",
+    canHaveMultiple: false,
     requiresProtection: true, // Streaming responses need protection
   },
 

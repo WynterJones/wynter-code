@@ -235,6 +235,10 @@ class ClaudeService {
             this._currentToolNameMap.set(sessionId, toolName);
             this._toolInputAccumulator.set(sessionId, chunk.tool_input || "");
             cb.onToolStart(toolName, chunk.tool_id);
+            // If initial tool_input is provided, send it as delta so UI gets populated
+            if (chunk.tool_input) {
+              cb.onToolInputDelta(chunk.tool_id, chunk.tool_input);
+            }
           }
           break;
 

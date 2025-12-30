@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 import { usePanelStore } from "@/stores/panelStore";
@@ -6,7 +6,7 @@ import { useSessionStore } from "@/stores/sessionStore";
 import { PanelHeader } from "./PanelHeader";
 import { PanelContent } from "./PanelContent";
 import { PanelCloseConfirmDialog } from "./PanelCloseConfirmDialog";
-import { requiresCloseProtection } from "./panelRegistry";
+import { requiresCloseProtection, getPanelTypeList } from "./panelRegistry";
 import type { PanelState, PanelType, PanelCloseCheck } from "@/types/panel";
 
 interface PanelProps {
@@ -20,8 +20,28 @@ export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) 
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const [closeReason, setCloseReason] = useState("");
 
-  const { changePanelType, focusPanel, updatePanel, setProcessRunning } = usePanelStore();
+  const { changePanelType, focusPanel, updatePanel, setProcessRunning, getLayoutForProject } = usePanelStore();
   const getStreamingState = useSessionStore((s) => s.getStreamingState);
+
+  // Get all panels for this layout to compute disabled types
+  const layoutState = getLayoutForProject(projectId, sessionId);
+
+  // Compute which panel types should be disabled (already exist and can't have multiple)
+  const disabledTypes = useMemo((): PanelType[] => {
+    const disabled: PanelType[] = [];
+    for (const typeConfig of getPanelTypeList()) {
+      if (!typeConfig.canHaveMultiple) {
+        // Check if any OTHER panel has this type
+        const existsElsewhere = Object.values(layoutState.panels).some(
+          (p) => p.id !== panel.id && p.type === typeConfig.id
+        );
+        if (existsElsewhere) {
+          disabled.push(typeConfig.id);
+        }
+      }
+    }
+    return disabled;
+  }, [layoutState.panels, panel.id]);
 
   const handleFocus = useCallback(() => {
     focusPanel(projectId, panel.id, sessionId);
@@ -142,6 +162,7 @@ export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) 
         onTypeChange={handleTypeChange}
         onClose={handleClose}
         isFocused={panel.isFocused}
+        disabledTypes={disabledTypes}
       />
 
       <div className="flex-1 overflow-hidden relative">
@@ -149,8 +170,10 @@ export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) 
           panelId={panel.id}
           projectId={projectId}
           projectPath={projectPath}
+          sessionId={sessionId}
           panel={panel}
           isFocused={panel.isFocused}
+          disabledTypes={disabledTypes}
           onProcessStateChange={handleProcessStateChange}
           onPanelUpdate={handlePanelUpdate}
         />

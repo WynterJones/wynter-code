@@ -29,7 +29,15 @@ interface Position {
 }
 
 export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProps) {
-  const { refreshStats, isInitialized } = useFarmworkTycoonStore();
+  const { refreshStats, isInitialized, setPendingBuildingSelection } = useFarmworkTycoonStore();
+
+  // Generate a unique key each time the mini player opens to force fresh TycoonGame
+  const [gameKey, setGameKey] = useState(0);
+  useEffect(() => {
+    if (isOpen) {
+      setGameKey(prev => prev + 1);
+    }
+  }, [isOpen]);
 
   // Poll for stats updates every 5 seconds while mini player is open
   useEffect(() => {
@@ -167,6 +175,12 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
     return () => window.removeEventListener("resize", handleResize);
   }, [size, isMinimized]);
 
+  // Handle building click in mini player - expand and open building popup
+  const handleBuildingClick = useCallback((buildingId: string) => {
+    setPendingBuildingSelection(buildingId);
+    onExpand();
+  }, [setPendingBuildingSelection, onExpand]);
+
   if (!isOpen) return null;
 
   // Calculate dimensions for equal padding around game area
@@ -279,9 +293,11 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
           {/* Game canvas */}
           <div className="relative w-full h-full overflow-hidden rounded">
             <TycoonGame
+              key={`mini-game-${gameKey}`}
               containerWidth={gameSize}
               containerHeight={gameSize}
               isMiniPlayer
+              onBuildingClick={handleBuildingClick}
             />
 
             {/* Scanline overlay */}

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Brain, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 interface ThinkingBlockProps {
   content: string;
@@ -109,13 +111,46 @@ export function ThinkingBlock({
             }}
             className="max-h-64"
           >
-            <div className="px-3 py-2">
-              <p className="text-xs text-text-secondary font-mono whitespace-pre-wrap leading-relaxed">
+            <div className="px-3 py-2 thinking-markdown">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => (
+                    <p className="text-xs text-text-secondary leading-relaxed mb-1 last:mb-0">
+                      {children}
+                    </p>
+                  ),
+                  strong: ({ children }) => (
+                    <strong className="text-accent font-semibold">{children}</strong>
+                  ),
+                  em: ({ children }) => (
+                    <em className="text-text-primary italic">{children}</em>
+                  ),
+                  code: ({ children }) => (
+                    <code className="text-[10px] bg-bg-hover px-1 py-0.5 rounded font-mono text-accent-cyan">
+                      {children}
+                    </code>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="text-xs text-text-secondary list-disc list-inside mb-1 space-y-0.5">
+                      {children}
+                    </ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="text-xs text-text-secondary list-decimal list-inside mb-1 space-y-0.5">
+                      {children}
+                    </ol>
+                  ),
+                  li: ({ children }) => (
+                    <li className="text-xs text-text-secondary">{children}</li>
+                  ),
+                }}
+              >
                 {content}
-                {isStreaming && (
-                  <span className="inline-block w-1.5 h-3 bg-accent ml-0.5 animate-pulse" />
-                )}
-              </p>
+              </ReactMarkdown>
+              {isStreaming && (
+                <span className="inline-block w-1.5 h-3 bg-accent ml-0.5 animate-pulse" />
+              )}
             </div>
           </OverlayScrollbarsComponent>
         </div>

@@ -3,6 +3,7 @@ import { Tooltip } from "@/components/ui";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { getModelLimits } from "@/services/modelLimits";
+import { useShallow } from "zustand/react/shallow";
 
 function formatTokens(tokens: number): string {
   if (tokens >= 1_000_000) {
@@ -20,32 +21,69 @@ interface ContextProgressBarProps {
 
 export function ContextProgressBar({ className }: ContextProgressBarProps) {
   const activeProjectId = useProjectStore((s) => s.activeProjectId);
-  const getActiveSession = useSessionStore((s) => s.getActiveSession);
-  const getStreamingState = useSessionStore((s) => s.getStreamingState);
-  const getContextStats = useSessionStore((s) => s.getContextStats);
 
-  const session = activeProjectId ? getActiveSession(activeProjectId) : undefined;
+  // Get flattened session data - useShallow compares primitive values to prevent infinite loops
+  const {
+    sessionId,
+    provider,
+    model,
+    inputTokens,
+    isStreaming,
+    streamingInputTokens,
+  } = useSessionStore(
+    useShallow((s) => {
+      const activeId = activeProjectId ? s.activeSessionId.get(activeProjectId) : undefined;
+      if (!activeProjectId || !activeId) {
+        return {
+          sessionId: null,
+          provider: null,
+          model: null,
+          inputTokens: 0,
+          isStreaming: false,
+          streamingInputTokens: 0,
+        };
+      }
 
-  // Don't show if no session or if it's a terminal session
-  if (!session || session.type === "terminal") {
+      const projectSessions = s.sessions.get(activeProjectId);
+      const foundSession = projectSessions?.find((sess) => sess.id === activeId);
+
+      if (!foundSession || foundSession.type === "terminal") {
+        return {
+          sessionId: null,
+          provider: null,
+          model: null,
+          inputTokens: 0,
+          isStreaming: false,
+          streamingInputTokens: 0,
+        };
+      }
+
+      const contextStats = s.sessionContextStats.get(activeId);
+      const streamingState = s.streamingState.get(activeId);
+
+      return {
+        sessionId: foundSession.id,
+        provider: foundSession.provider,
+        model: foundSession.model,
+        inputTokens: contextStats?.inputTokens ?? 0,
+        isStreaming: streamingState?.isStreaming ?? false,
+        streamingInputTokens: streamingState?.stats.inputTokens ?? 0,
+      };
+    })
+  );
+
+  // Don't show if no session (terminal sessions already filtered in selector)
+  if (!sessionId || !provider || !model) {
     return null;
   }
 
-  const sessionId = session.id;
-  const provider = session.provider;
-  const model = session.model;
   const limits = getModelLimits(provider, model);
   const contextLimit = limits.input;
 
-  // Get context stats (persistent) and streaming stats (live)
-  const contextStats = getContextStats(sessionId);
-  const streamingState = getStreamingState(sessionId);
-
   // During streaming: show live stats if available, otherwise persisted
-  // After turn: show persisted final values
-  const streamingTokens = streamingState?.isStreaming ? streamingState.stats.inputTokens : 0;
-  const persistedTokens = contextStats?.inputTokens ?? 0;
-  const currentTokens = streamingTokens > 0 ? streamingTokens : persistedTokens;
+  const currentTokens = isStreaming && streamingInputTokens > 0
+    ? streamingInputTokens
+    : inputTokens;
 
   // Calculate percentage
   const percentage = contextLimit > 0
@@ -75,8 +113,8 @@ export function ContextProgressBar({ className }: ContextProgressBarProps) {
           <div className="text-text-secondary">
             {percentage.toFixed(1)}% context used
           </div>
-          <div className="text-text-secondary/70 text-[10px]">
-            {model} (max out: {formatTokens(limits.output)})
+          <div className="text-text-secondary/50 text-[9px] italic">
+            * estimation only
           </div>
         </div>
       }

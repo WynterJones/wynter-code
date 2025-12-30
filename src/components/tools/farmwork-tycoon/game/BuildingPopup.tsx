@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   Shield,
   TestTube2,
@@ -10,6 +10,7 @@ import {
   Trash2,
   Warehouse,
   X,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import type { BuildingType, AuditKey } from "../types";
 interface BuildingPopupProps {
   buildingId: string | null;
   onClose: () => void;
+  onOpenAuditFile?: (buildingType: string) => void;
 }
 
 interface BuildingInfo {
@@ -94,7 +96,18 @@ const AUDIT_KEY_MAP: Partial<Record<BuildingType, AuditKey>> = {
   codeQuality: "codeQuality",
 };
 
-export function BuildingPopup({ buildingId, onClose }: BuildingPopupProps) {
+const AUDIT_FILE_MAP: Partial<Record<BuildingType, string>> = {
+  security: "_AUDIT/SECURITY.md",
+  tests: "_AUDIT/TESTS.md",
+  performance: "_AUDIT/PERFORMANCE.md",
+  accessibility: "_AUDIT/ACCESSIBILITY.md",
+  codeQuality: "_AUDIT/CODE_QUALITY.md",
+  farmhouse: "_AUDIT/FARMHOUSE.md",
+  garden: "_AUDIT/GARDEN.md",
+  compost: "_AUDIT/COMPOST.md",
+};
+
+export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: BuildingPopupProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const { buildings, auditScores, gardenStats, compostStats } = useFarmworkTycoonStore();
@@ -127,11 +140,20 @@ export function BuildingPopup({ buildingId, onClose }: BuildingPopupProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [buildingId, onClose]);
 
+  // Must be before early return to satisfy hooks rules
+  const openAuditFile = useCallback(() => {
+    if (!building) return;
+    const auditFile = AUDIT_FILE_MAP[building.type];
+    if (!auditFile || !onOpenAuditFile) return;
+    onOpenAuditFile(building.type);
+  }, [building, onOpenAuditFile]);
+
   if (!isAnimating || !building || !info) return null;
 
   const Icon = info.icon;
   const auditKey = AUDIT_KEY_MAP[building.type];
   const metadata = auditKey ? auditScores[auditKey] : null;
+  const auditFile = AUDIT_FILE_MAP[building.type];
 
   // Get count value for count-type buildings
   const getCountValue = () => {
@@ -180,14 +202,25 @@ export function BuildingPopup({ buildingId, onClose }: BuildingPopupProps) {
       >
         {/* Header - fixed */}
         <div className="p-4 pb-3 border-b border-border/30 shrink-0 relative">
-          <button
-            onClick={onClose}
-            className="absolute top-3 right-3 p-1.5 rounded-md hover:bg-bg-tertiary transition-colors"
-          >
-            <X className="w-4 h-4 text-text-tertiary" />
-          </button>
+          <div className="absolute top-3 right-3 flex items-center gap-1">
+            {auditFile && (
+              <button
+                onClick={openAuditFile}
+                className="p-1.5 rounded-md hover:bg-bg-tertiary transition-colors"
+                title="Open audit file"
+              >
+                <FileText className="w-4 h-4 text-text-tertiary" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-md hover:bg-bg-tertiary transition-colors"
+            >
+              <X className="w-4 h-4 text-text-tertiary" />
+            </button>
+          </div>
 
-          <div className="flex items-center gap-3 pr-8">
+          <div className="flex items-center gap-3 pr-16">
             <div
               className="p-2.5 rounded-lg shrink-0"
               style={{ backgroundColor: `${info.color}20` }}
@@ -212,11 +245,6 @@ export function BuildingPopup({ buildingId, onClose }: BuildingPopupProps) {
 
         {/* Scrollable content */}
         <div className="p-4 pt-3 overflow-y-auto flex-1 min-h-0">
-          {/* Description */}
-          <p className="text-xs text-text-secondary leading-relaxed mb-4">
-            {info.description}
-          </p>
-
           {/* Progress Bar for audit buildings */}
           {info.type === "audit" && metadata && (
             <div className="space-y-2">
@@ -308,6 +336,11 @@ export function BuildingPopup({ buildingId, onClose }: BuildingPopupProps) {
                   </div>
                 </div>
               )}
+
+              {/* Description at bottom */}
+              <p className="mt-3 pt-2 border-t border-border/30 text-[10px] text-text-tertiary leading-relaxed">
+                {info.description}
+              </p>
             </div>
           )}
 
@@ -365,6 +398,11 @@ export function BuildingPopup({ buildingId, onClose }: BuildingPopupProps) {
                   </div>
                 </div>
               )}
+
+              {/* Description at bottom */}
+              <p className="mt-3 pt-2 border-t border-border/30 text-[10px] text-text-tertiary leading-relaxed">
+                {info.description}
+              </p>
             </div>
           )}
         </div>

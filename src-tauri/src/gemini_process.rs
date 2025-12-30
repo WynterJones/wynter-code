@@ -207,6 +207,7 @@ pub async fn send_gemini_input(
     session_id: String,
     input: String,
     model: Option<String>,
+    images: Option<Vec<String>>,
 ) -> Result<(), String> {
     // Get session config
     let (cwd, stored_model, yolo_mode) = {
@@ -248,6 +249,14 @@ pub async fn send_gemini_input(
     // Add yolo flag if enabled
     if yolo_mode {
         args.push("--yolo".to_string());
+    }
+
+    // Add images with -i flag (Gemini CLI supports image inputs)
+    if let Some(ref image_paths) = images {
+        for path in image_paths {
+            args.push("-i".to_string());
+            args.push(path.clone());
+        }
     }
 
     // Add the prompt as positional argument (must be last)
@@ -313,12 +322,36 @@ pub async fn send_gemini_input(
         let reader = BufReader::new(stdout);
         let mut line_count = 0;
 
+        // Dev mode only: Create JSONL log file for debugging stream output
+        let mut log_file = if cfg!(debug_assertions) {
+            let log_dir = std::env::temp_dir().join("wynter-code");
+            if let Err(e) = std::fs::create_dir_all(&log_dir) {
+                eprintln!("[Gemini] Failed to create log dir: {}", e);
+            }
+            let log_path = log_dir.join(format!("gemini-{}.jsonl", session_for_reader));
+            eprintln!("[Gemini] JSONL log enabled: {:?}", log_path);
+            std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&log_path)
+                .ok()
+        } else {
+            None
+        };
+
         for line in reader.lines() {
             match line {
                 Ok(line) if !line.is_empty() => {
                     line_count += 1;
                     let log_preview: String = line.chars().take(200).collect();
                     eprintln!("[Gemini STDOUT #{}] {}", line_count, log_preview);
+
+                    // Write raw line to JSONL log file
+                    if let Some(ref mut file) = log_file {
+                        use std::io::Write as IoWrite;
+                        let _ = writeln!(file, "{}", line);
+                    }
 
                     // Try to parse as JSON (stream-json format)
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {

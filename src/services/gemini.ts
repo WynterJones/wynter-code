@@ -111,6 +111,10 @@ class GeminiService {
           if (chunk.tool_name && chunk.tool_id) {
             this._currentToolIdMap.set(sessionId, chunk.tool_id);
             cb.onToolStart(chunk.tool_name, chunk.tool_id);
+            // If initial tool_input is provided, send it as delta so UI gets populated
+            if (chunk.tool_input) {
+              cb.onToolInputDelta(chunk.tool_id, chunk.tool_input);
+            }
           }
           break;
 
@@ -208,9 +212,34 @@ class GeminiService {
       throw new Error("Session not active. Start a session first.");
     }
 
-    // TODO: Handle images if Gemini CLI supports them
-    // For now, just send text
-    await this.sendPrompt(sessionId, text);
+    // Convert base64 images to temp file paths for Gemini -i flag
+    const imagePaths: string[] = [];
+    if (images && images.length > 0) {
+      for (const img of images) {
+        try {
+          // Extract base64 data (remove data URL prefix if present)
+          let base64Data = img.data;
+          if (base64Data.startsWith("data:")) {
+            base64Data = base64Data.split(",")[1] || base64Data;
+          }
+          const tempPath = await invoke<string>("save_temp_image", {
+            base64Data,
+            mediaType: img.mimeType,
+          });
+          imagePaths.push(tempPath);
+        } catch (error) {
+          console.error("[GeminiService] Failed to save image:", error);
+        }
+      }
+    }
+
+    // Send prompt with image paths
+    await invoke("send_gemini_input", {
+      sessionId,
+      input: text,
+      model: this._currentModel,
+      images: imagePaths.length > 0 ? imagePaths : null,
+    });
   }
 
   /** Clean up session resources */

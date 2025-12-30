@@ -11,7 +11,6 @@ import { useFileOperations } from "@/hooks/useFileOperations";
 import { useGitStatus } from "@/hooks/useGitStatus";
 import { useCompression } from "@/hooks/useCompression";
 import { canOptimize } from "@/types/compression";
-import { formatBytes } from "@/lib/storageUtils";
 import { Archive, FilePlus, FolderPlus, FolderOpen, Copy, Eye, ImageMinus, Pencil, Trash2, ImagePlus } from "lucide-react";
 import type { FileNode } from "@/types";
 

@@ -44,6 +44,7 @@ import {
   FileBrowserPopup,
   ImageAttachment,
 } from "@/components/files/FileBrowserPopup";
+import { MarkdownEditorPopup } from "@/components/files";
 import {
   ToolsDropdown,
   PortManagerPopup,
@@ -311,6 +312,8 @@ export function ProjectTabBar({
   const isAutoBuildOpen = useAutoBuildStore((s) => s.isPopupOpen);
   const openAutoBuildPopup = useAutoBuildStore((s) => s.openPopup);
 
+  const hideMiniPlayer = useFarmworkTycoonStore((s) => s.hideMiniPlayer);
+
   const {
     workspaces,
     activeWorkspaceId,
@@ -394,6 +397,7 @@ export function ProjectTabBar({
   const [showDevToolkit, setShowDevToolkit] = useState(false);
   const [devToolkitInitialTool, setDevToolkitInitialTool] = useState<string | undefined>();
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
+  const [farmworkMarkdownFile, setFarmworkMarkdownFile] = useState<string | null>(null);
   const [showClaudeCodeStats, setShowClaudeCodeStats] = useState(false);
   const [showLimitsMonitor, setShowLimitsMonitor] = useState(false);
   const [showDomainTools, setShowDomainTools] = useState(false);
@@ -531,6 +535,7 @@ export function ProjectTabBar({
           setShowDevToolkit(true);
           break;
         case "openFarmworkTycoon":
+          hideMiniPlayer();
           setShowFarmworkTycoon(true);
           break;
         case "openClaudeCodeStats":
@@ -576,6 +581,7 @@ export function ProjectTabBar({
           onOpenSubscriptions?.();
           break;
         case "openFarmwork":
+          hideMiniPlayer();
           setShowFarmworkTycoon(true);
           break;
         case "openUniversalViewer":
@@ -952,7 +958,10 @@ export function ProjectTabBar({
           onOpenProjectTemplates={() => setShowProjectTemplates(true)}
           onOpenFileFinder={handleBrowseFiles}
           onOpenSubscriptions={() => onOpenSubscriptions?.()}
-          onOpenFarmwork={() => setShowFarmworkTycoon(true)}
+          onOpenFarmwork={() => {
+            hideMiniPlayer();
+            setShowFarmworkTycoon(true);
+          }}
           onOpenJustCommandManager={() => setShowJustCommandManager(true)}
           onOpenUniversalViewer={() => setShowUniversalViewer(true)}
           hasStorybook={hasStorybook}
@@ -1170,7 +1179,16 @@ export function ProjectTabBar({
       <FarmworkTycoonPopup
         isOpen={showFarmworkTycoon}
         onClose={() => setShowFarmworkTycoon(false)}
+        onOpenMarkdownFile={(filePath) => setFarmworkMarkdownFile(filePath)}
       />
+
+      {/* Farmwork Markdown Viewer */}
+      {farmworkMarkdownFile && (
+        <MarkdownEditorPopup
+          filePath={farmworkMarkdownFile}
+          onClose={() => setFarmworkMarkdownFile(null)}
+        />
+      )}
 
       {/* Claude Code Stats */}
       <ClaudeCodeStatsPopup
@@ -1269,7 +1287,10 @@ export function ProjectTabBar({
       )}
 
       {/* Farmwork Mini Player - persists even when popup is closed */}
-      <FarmworkMiniPlayerWrapper onExpand={() => setShowFarmworkTycoon(true)} />
+      <FarmworkMiniPlayerWrapper onExpand={() => {
+        hideMiniPlayer();
+        setShowFarmworkTycoon(true);
+      }} />
     </div>
   );
 }

@@ -33,9 +33,10 @@ interface PanelHeaderProps {
   onTypeChange: (type: PanelType) => void;
   onClose: () => void;
   isFocused: boolean;
+  disabledTypes?: PanelType[];
 }
 
-export function PanelHeader({ panel, onTypeChange, onClose, isFocused }: PanelHeaderProps) {
+export function PanelHeader({ panel, onTypeChange, onClose, isFocused, disabledTypes = [] }: PanelHeaderProps) {
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const config = getPanelTypeConfig(panel.type);
   const Icon = PANEL_ICONS[panel.type] || Plus;
@@ -44,6 +45,11 @@ export function PanelHeader({ panel, onTypeChange, onClose, isFocused }: PanelHe
 
   // Filter out "empty" from the type list since users select via X button
   const selectableTypes = getPanelTypeList().filter((t) => t.id !== "empty");
+
+  // Check if a type is disabled (already exists elsewhere and can't have multiple)
+  const isTypeDisabled = (typeId: PanelType): boolean => {
+    return disabledTypes.includes(typeId);
+  };
 
   return (
     <div
@@ -86,20 +92,29 @@ export function PanelHeader({ panel, onTypeChange, onClose, isFocused }: PanelHe
               {selectableTypes.map((typeConfig) => {
                 const TypeIcon = PANEL_ICONS[typeConfig.id];
                 const isActive = typeConfig.id === panel.type;
+                const isDisabled = isTypeDisabled(typeConfig.id);
                 return (
                   <button
                     key={typeConfig.id}
                     onClick={() => {
+                      if (isDisabled) return;
                       onTypeChange(typeConfig.id);
                       setShowTypeSelector(false);
                     }}
+                    disabled={isDisabled}
                     className={cn(
                       "flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left",
-                      "hover:bg-bg-hover transition-colors",
+                      "transition-colors",
+                      isDisabled
+                        ? "opacity-40 cursor-not-allowed"
+                        : "hover:bg-bg-hover",
                       isActive
                         ? "text-accent bg-accent/10"
-                        : "text-text-secondary hover:text-text-primary"
+                        : isDisabled
+                          ? "text-text-secondary"
+                          : "text-text-secondary hover:text-text-primary"
                     )}
+                    title={isDisabled ? "Only one allowed per session" : undefined}
                   >
                     <TypeIcon className="w-3.5 h-3.5" />
                     <span>{typeConfig.name}</span>

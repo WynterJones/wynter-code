@@ -24,6 +24,14 @@ import {
 import { ScrollArea, Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { ToolCall } from "@/types";
+import {
+  EditToolInput,
+  GrepToolDisplay,
+  ReadToolDisplay,
+  BashToolDisplay,
+  GlobToolDisplay,
+  TodoWriteDisplay,
+} from "./tools";
 
 // Subagent type detection and metadata
 interface SubagentInfo {
@@ -167,6 +175,80 @@ function formatToolInput(input: Record<string, unknown>): string {
   return JSON.stringify(input, null, 2);
 }
 
+interface TaskToolDisplayProps {
+  input: {
+    description?: string;
+    prompt?: string;
+    subagent_type?: string;
+    model?: string;
+    run_in_background?: boolean;
+  };
+  output?: string;
+  subagentInfo: SubagentInfo;
+}
+
+function TaskToolDisplay({ input, output, subagentInfo }: TaskToolDisplayProps) {
+  const AgentIcon = subagentInfo.icon || Bot;
+  const modelLabel = input.model ? input.model.charAt(0).toUpperCase() + input.model.slice(1) : null;
+
+  return (
+    <div className="space-y-2">
+      {/* Agent info header */}
+      <div className="rounded-lg bg-accent-purple/5 border border-accent-purple/20 overflow-hidden">
+        <div className="px-2 py-1.5 bg-accent-purple/10 border-b border-accent-purple/20 flex items-center gap-2">
+          <AgentIcon className="w-3 h-3 text-accent-purple" />
+          <span className="text-[10px] text-accent-purple font-medium">
+            {subagentInfo.displayName}
+          </span>
+          {modelLabel && (
+            <span className="ml-auto px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-wide bg-bg-tertiary text-text-secondary rounded">
+              {modelLabel}
+            </span>
+          )}
+          {input.run_in_background && (
+            <span className="px-1.5 py-0.5 text-[8px] font-medium uppercase tracking-wide bg-accent-yellow/20 text-accent-yellow rounded">
+              Background
+            </span>
+          )}
+        </div>
+
+        {/* Description */}
+        {input.description && (
+          <div className="px-2 py-1.5 border-b border-accent-purple/10">
+            <span className="text-[10px] font-medium text-text-primary">
+              {input.description}
+            </span>
+          </div>
+        )}
+
+        {/* Prompt (truncated) */}
+        {input.prompt && (
+          <div className="px-2 py-1.5">
+            <p className="text-[9px] text-text-secondary font-mono line-clamp-4">
+              {input.prompt}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Agent output */}
+      {output && (
+        <div className="rounded-lg bg-[#1a1a1a] border border-border overflow-hidden">
+          <div className="px-2 py-1 bg-bg-hover border-b border-border">
+            <span className="text-[9px] text-text-secondary">Agent Output</span>
+          </div>
+          <div className="max-h-48 overflow-auto p-2">
+            <pre className="text-[10px] font-mono text-[#b0b0b0] whitespace-pre-wrap break-all">
+              {output.slice(0, 2000)}
+              {output.length > 2000 && "..."}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface CompactActivityItemProps {
   toolCall: ToolCall;
   onApprove: (toolId: string) => void;
@@ -274,17 +356,56 @@ function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityI
       {/* Expanded details */}
       {isExpanded && (
         <div className="px-2 pb-2 pt-1 border-t border-border/30">
-          {Object.keys(toolCall.input).length > 0 && (
-            <pre className="text-[10px] text-text-secondary font-mono bg-bg-secondary/50 rounded p-1.5 overflow-x-auto max-h-32 mb-1">
-              {formatToolInput(toolCall.input)}
-            </pre>
-          )}
-
-          {toolCall.output && (
-            <div className="text-[10px] text-text-secondary font-mono bg-bg-secondary/50 rounded p-1.5 overflow-x-auto max-h-32">
-              {toolCall.output.slice(0, 500)}
-              {toolCall.output.length > 500 && "..."}
-            </div>
+          {/* Tool-specific rendering */}
+          {toolCall.name === "Edit" && toolCall.input.old_string !== undefined ? (
+            <EditToolInput
+              input={toolCall.input as { file_path?: string; old_string?: string; new_string?: string }}
+            />
+          ) : toolCall.name === "Grep" ? (
+            <GrepToolDisplay
+              input={toolCall.input as { pattern?: string; path?: string; output_mode?: string; glob?: string }}
+              output={toolCall.output}
+            />
+          ) : toolCall.name === "Read" ? (
+            <ReadToolDisplay
+              input={toolCall.input as { file_path?: string; offset?: number; limit?: number }}
+              output={toolCall.output}
+            />
+          ) : toolCall.name === "Bash" ? (
+            <BashToolDisplay
+              input={toolCall.input as { command?: string; description?: string; timeout?: number }}
+              output={toolCall.output}
+            />
+          ) : toolCall.name === "Glob" ? (
+            <GlobToolDisplay
+              input={toolCall.input as { pattern?: string; path?: string }}
+              output={toolCall.output}
+            />
+          ) : toolCall.name === "TodoWrite" ? (
+            <TodoWriteDisplay
+              input={toolCall.input as { todos?: Array<{ content: string; status: "pending" | "in_progress" | "completed"; activeForm?: string }> }}
+              output={toolCall.output}
+            />
+          ) : subagentInfo.isSubagent ? (
+            <TaskToolDisplay
+              input={toolCall.input as { description?: string; prompt?: string; subagent_type?: string; model?: string; run_in_background?: boolean }}
+              output={toolCall.output}
+              subagentInfo={subagentInfo}
+            />
+          ) : (
+            <>
+              {Object.keys(toolCall.input).length > 0 && (
+                <pre className="text-[10px] text-text-secondary font-mono bg-bg-secondary/50 rounded p-1.5 overflow-x-auto max-h-32 mb-1">
+                  {formatToolInput(toolCall.input)}
+                </pre>
+              )}
+              {toolCall.output && (
+                <div className="mt-1.5 text-[10px] text-text-secondary font-mono bg-bg-secondary/50 rounded p-1.5 overflow-x-auto max-h-32">
+                  {toolCall.output.slice(0, 500)}
+                  {toolCall.output.length > 500 && "..."}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

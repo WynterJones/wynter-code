@@ -454,11 +454,13 @@ export const useSessionStore = create<SessionStore>()(
           // This ensures we store accurate final values, not intermediate streaming values
           if (isFinal && (newStats.inputTokens !== undefined || newStats.outputTokens !== undefined)) {
             const newContextStats = new Map(state.sessionContextStats);
+            const existing = state.sessionContextStats.get(sessionId);
+            // Accumulate tokens across turns (Claude CLI reports per-turn, not cumulative)
             newContextStats.set(sessionId, {
-              inputTokens: newStats.inputTokens ?? 0,
-              outputTokens: newStats.outputTokens ?? 0,
-              cacheReadTokens: newStats.cacheReadTokens ?? 0,
-              cacheWriteTokens: newStats.cacheWriteTokens ?? 0,
+              inputTokens: (existing?.inputTokens ?? 0) + (newStats.inputTokens ?? 0),
+              outputTokens: (existing?.outputTokens ?? 0) + (newStats.outputTokens ?? 0),
+              cacheReadTokens: (existing?.cacheReadTokens ?? 0) + (newStats.cacheReadTokens ?? 0),
+              cacheWriteTokens: (existing?.cacheWriteTokens ?? 0) + (newStats.cacheWriteTokens ?? 0),
               lastUpdated: Date.now(),
             });
             return { streamingState: newStreamingState, sessionContextStats: newContextStats };
@@ -703,14 +705,14 @@ export const useSessionStore = create<SessionStore>()(
         sessions: Array.from(state.sessions.entries()),
         activeSessionId: Array.from(state.activeSessionId.entries()),
         messages: Array.from(state.messages.entries()),
-        sessionContextStats: Array.from(state.sessionContextStats.entries()),
+        // Note: sessionContextStats is intentionally NOT persisted - it's an estimation
+        // that should start fresh each app load to avoid over-accumulation
       }),
       merge: (persisted: unknown, current) => {
         const data = persisted as {
           sessions?: [string, Session[]][];
           activeSessionId?: [string, string][];
           messages?: [string, Message[]][];
-          sessionContextStats?: [string, SessionContextStats][];
         } | null;
 
         // Migrate old sessions to include new required fields
@@ -739,7 +741,7 @@ export const useSessionStore = create<SessionStore>()(
           activeSessionId: new Map(data?.activeSessionId || []),
           messages: new Map(data?.messages || []),
           streamingState: new Map(),
-          sessionContextStats: new Map(data?.sessionContextStats || []),
+          sessionContextStats: new Map(), // Start fresh each app load
         };
       },
     }

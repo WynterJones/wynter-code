@@ -216,11 +216,17 @@ export interface PanelContentProps {
   /** Project path */
   projectPath: string;
 
+  /** Session ID (for multi-panel layouts) */
+  sessionId?: string;
+
   /** Panel state */
   panel: PanelState;
 
   /** Whether this panel is focused */
   isFocused: boolean;
+
+  /** Panel types that should be disabled (already exist in layout) */
+  disabledTypes?: PanelType[];
 
   /** Callback when process state changes */
   onProcessStateChange: (running: boolean) => void;

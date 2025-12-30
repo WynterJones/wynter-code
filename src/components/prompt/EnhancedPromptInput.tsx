@@ -130,7 +130,6 @@ export function EnhancedPromptInput({
     appendStreamingText,
     finishStreaming,
     getStreamingState,
-    getSession,
   } = useSessionStore();
 
   const streamingState = sessionId ? getStreamingState(sessionId) : null;
@@ -625,13 +624,7 @@ export function EnhancedPromptInput({
       fullPrompt = `${filePaths}\n\n${fullPrompt}`;
     }
 
-    // Add images as base64 data URLs (legacy - won't work properly)
-    if (currentImages.length > 0) {
-      const imageRefs = currentImages.map((img) => img.data).join("\n");
-      fullPrompt = `${imageRefs}\n\n${fullPrompt}`;
-    }
-
-    // If we have a custom send handler, use that (persistent session mode)
+    // If we have a legacy send handler (no structured prompt support)
     if (onSendPrompt) {
       let currentSessionId = sessionId;
       if (!currentSessionId) {
@@ -654,7 +647,11 @@ export function EnhancedPromptInput({
       setFiles([]);
       setIsFocused(false);
 
-      // Delegate to external handler
+      // Legacy: embed images in prompt text (images may not work for non-Claude providers)
+      if (currentImages.length > 0) {
+        const imageRefs = currentImages.map((img) => img.data).join("\n");
+        fullPrompt = `${imageRefs}\n\n${fullPrompt}`;
+      }
       onSendPrompt(fullPrompt);
       return;
     }
@@ -680,10 +677,6 @@ export function EnhancedPromptInput({
     });
 
     startStreaming(currentSessionId);
-
-    const session = getSession(currentSessionId);
-    const providerSessionId = session?.providerSessionId || undefined;
-    const permissionMode = session?.permissionMode || "default";
 
     try {
       // This uses the old per-prompt streaming approach

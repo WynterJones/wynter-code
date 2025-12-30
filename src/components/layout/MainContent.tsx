@@ -26,8 +26,8 @@ import { codexService } from "@/services/codex";
 import { geminiService } from "@/services/gemini";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { cn } from "@/lib/utils";
-import type { Project, PermissionMode, ToolCall, McpPermissionRequest, AIProvider } from "@/types";
-import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
+import type { Project, PermissionMode, ToolCall, McpPermissionRequest, AIProvider, StructuredPrompt, ImageAttachment } from "@/types";
+import type { ImageAttachment as FileBrowserImageAttachment } from "@/components/files/FileBrowserPopup";
 
 // In stream-json mode, there's no interactive tool approval.
 // The CLI auto-approves or auto-rejects based on --permission-mode:
@@ -41,7 +41,7 @@ function toolNeedsPermission(_toolName: string, _permissionMode: PermissionMode)
 
 interface MainContentProps {
   project: Project;
-  pendingImage?: ImageAttachment | null;
+  pendingImage?: FileBrowserImageAttachment | null;
   onImageConsumed?: () => void;
   onRequestImageBrowser?: () => void;
 }
@@ -140,8 +140,14 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
 
     const session = getSession(currentSessionId);
     const permissionMode = session?.permissionMode || "default";
-    const resumeSessionId = session?.providerSessionId || undefined;
     const provider = session?.provider || "claude";
+
+    // Only resume if there are existing messages (true continuation)
+    // Don't resume for fresh starts (no messages) - the old thread might be expired
+    const existingMessages = getMessages(currentSessionId);
+    const resumeSessionId = existingMessages.length > 0
+      ? (session?.providerSessionId || undefined)
+      : undefined;
 
     // Get the correct model based on provider
     const model = provider === "codex"
@@ -163,7 +169,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
           updateProviderSessionId(currentSessionId, info.providerSessionId);
         }
       },
-      onSessionEnded: (reason: string) => {
+      onSessionEnded: (_reason: string) => {
         setClaudeSessionEnded(currentSessionId);
         finishStreaming(currentSessionId);
       },
@@ -360,6 +366,46 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         }
       } catch (error) {
         console.error("[MainContent] Failed to send prompt:", error);
+        appendStreamingText(currentSessionId, `\nError: ${error}`);
+        finishStreaming(currentSessionId);
+      }
+    },
+    [currentSessionId, isSessionActive, getSession, startStreaming, appendStreamingText, finishStreaming]
+  );
+
+  // Send structured prompt with images/files to active session
+  const handleSendStructuredPrompt = useCallback(
+    async (prompt: StructuredPrompt) => {
+      if (!currentSessionId || !isSessionActive) return;
+
+      const session = getSession(currentSessionId);
+      const provider = session?.provider || "claude";
+
+      startStreaming(currentSessionId);
+
+      try {
+        if (provider === "codex") {
+          // Convert StructuredPrompt images to ImageAttachment format for Codex
+          const codexImages: ImageAttachment[] | undefined = prompt.images?.map((img, idx) => ({
+            id: `img-${idx}`,
+            data: img.base64.startsWith("data:") ? img.base64 : `data:${img.mediaType};base64,${img.base64}`,
+            mimeType: img.mediaType,
+          }));
+          await codexService.sendStructuredPrompt(currentSessionId, prompt.text, codexImages);
+        } else if (provider === "gemini") {
+          // Convert StructuredPrompt images to ImageAttachment format for Gemini
+          const geminiImages: ImageAttachment[] | undefined = prompt.images?.map((img, idx) => ({
+            id: `img-${idx}`,
+            data: img.base64.startsWith("data:") ? img.base64 : `data:${img.mediaType};base64,${img.base64}`,
+            mimeType: img.mediaType,
+          }));
+          await geminiService.sendStructuredPrompt(currentSessionId, prompt.text, geminiImages);
+        } else {
+          // Claude accepts StructuredPrompt directly
+          await claudeService.sendStructuredPrompt(currentSessionId, prompt);
+        }
+      } catch (error) {
+        console.error("[MainContent] Failed to send structured prompt:", error);
         appendStreamingText(currentSessionId, `\nError: ${error}`);
         finishStreaming(currentSessionId);
       }
@@ -657,6 +703,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
               onImageConsumed={onImageConsumed}
               onRequestImageBrowser={onRequestImageBrowser}
               onSendPrompt={handleSendPrompt}
+              onSendStructuredPrompt={handleSendStructuredPrompt}
               disabled={!isSessionActive}
               placeholder={
                 !isSessionActive

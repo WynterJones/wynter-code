@@ -15,6 +15,7 @@ struct CodexProcessInstance {
     session_id: String,
     thread_id: Option<String>,
     cwd: String,
+    permission_mode: PermissionMode,
 }
 
 /// Manages multiple Codex CLI processes across sessions
@@ -91,10 +92,13 @@ fn parse_codex_chunk(json: &serde_json::Value, session_id: &str) -> Option<Strea
                             .get("id")
                             .and_then(|i| i.as_str())
                             .map(|s| s.to_string());
+                        // Use serde_json to properly escape the command string
                         chunk.tool_input = item
                             .get("command")
                             .and_then(|c| c.as_str())
-                            .map(|s| format!(r#"{{"command": "{}"}}"#, s));
+                            .map(|s| {
+                                serde_json::json!({"command": s}).to_string()
+                            });
                         return Some(chunk);
                     }
                     "file_change" | "file_read" | "file_write" => {
@@ -108,10 +112,13 @@ fn parse_codex_chunk(json: &serde_json::Value, session_id: &str) -> Option<Strea
                             .get("id")
                             .and_then(|i| i.as_str())
                             .map(|s| s.to_string());
+                        // Use serde_json to properly escape the file path
                         chunk.tool_input = item
                             .get("path")
                             .and_then(|p| p.as_str())
-                            .map(|s| format!(r#"{{"file_path": "{}"}}"#, s));
+                            .map(|s| {
+                                serde_json::json!({"file_path": s}).to_string()
+                            });
                         return Some(chunk);
                     }
                     "agent_message" | "message" => {
@@ -324,6 +331,7 @@ pub async fn start_codex_session(
                 session_id: session_id.clone(),
                 thread_id: resume_thread_id.clone(),
                 cwd: cwd.clone(),
+                permission_mode: mode,
             },
         );
     }
@@ -366,6 +374,24 @@ pub async fn start_codex_session(
         let mut line_count = 0;
         let mut session_ready = false;
 
+        // Dev mode only: Create JSONL log file for debugging stream output
+        let mut log_file = if cfg!(debug_assertions) {
+            let log_dir = std::env::temp_dir().join("wynter-code");
+            if let Err(e) = std::fs::create_dir_all(&log_dir) {
+                eprintln!("[Codex] Failed to create log dir: {}", e);
+            }
+            let log_path = log_dir.join(format!("codex-{}.jsonl", session_for_reader));
+            eprintln!("[Codex] JSONL log enabled: {:?}", log_path);
+            std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&log_path)
+                .ok()
+        } else {
+            None
+        };
+
         for line in reader.lines() {
             match line {
                 Ok(line) if !line.is_empty() => {
@@ -373,6 +399,12 @@ pub async fn start_codex_session(
                     // Safely truncate at char boundary for logging
                     let log_preview: String = line.chars().take(200).collect();
                     eprintln!("[Codex STDOUT #{}] {}", line_count, log_preview);
+
+                    // Write raw line to JSONL log file
+                    if let Some(ref mut file) = log_file {
+                        use std::io::Write as IoWrite;
+                        let _ = writeln!(file, "{}", line);
+                    }
 
                     // Try to parse as JSON
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
@@ -445,11 +477,11 @@ pub async fn send_codex_input(
     model: Option<String>,
     images: Option<Vec<String>>,
 ) -> Result<(), String> {
-    // Get the thread_id and cwd from the existing session
-    let (thread_id, cwd) = {
+    // Get the thread_id, cwd, and permission_mode from the existing session
+    let (thread_id, cwd, permission_mode) = {
         let instances = state.instances.lock().unwrap();
         match instances.get(&session_id) {
-            Some(instance) => (instance.thread_id.clone(), instance.cwd.clone()),
+            Some(instance) => (instance.thread_id.clone(), instance.cwd.clone(), instance.permission_mode.clone()),
             None => return Err("Session not found".to_string()),
         }
     };
@@ -468,6 +500,20 @@ pub async fn send_codex_input(
         "--json".to_string(),
         "--skip-git-repo-check".to_string(),
     ];
+
+    // Add permission mode flags (same as start_codex_session)
+    match permission_mode {
+        PermissionMode::Default | PermissionMode::AcceptEdits => {
+            args.push("--full-auto".to_string());
+        }
+        PermissionMode::Plan | PermissionMode::Manual => {
+            args.push("--sandbox".to_string());
+            args.push("read-only".to_string());
+        }
+        PermissionMode::BypassPermissions => {
+            args.push("--dangerously-bypass-approvals-and-sandbox".to_string());
+        }
+    }
 
     // Add model if specified
     if let Some(ref model_name) = model {

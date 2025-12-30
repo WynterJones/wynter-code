@@ -68,10 +68,10 @@ export function useAIAssistant(
     const callbacks: ClaudeSessionCallbacks = {
       onSessionStarting: () => {
       },
-      onSessionReady: (info) => {
+      onSessionReady: (_info) => {
         setIsSessionActive(true);
       },
-      onSessionEnded: (reason) => {
+      onSessionEnded: (_reason) => {
         setIsSessionActive(false);
         setIsStreaming(false);
       },

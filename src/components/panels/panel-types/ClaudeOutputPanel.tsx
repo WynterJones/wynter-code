@@ -143,7 +143,13 @@ export function ClaudeOutputPanel({
 
     const session = getSession(sessionId);
     const permissionMode = session?.permissionMode || "default";
-    const resumeSessionId = session?.providerSessionId || undefined;
+
+    // Only resume if there are existing messages (true continuation)
+    // Don't resume for fresh starts - the old thread might be expired
+    const existingMessages = getMessages(sessionId);
+    const resumeSessionId = existingMessages.length > 0
+      ? (session?.providerSessionId || undefined)
+      : undefined;
 
     setClaudeSessionStarting(sessionId);
 
@@ -160,7 +166,7 @@ export function ClaudeOutputPanel({
               updateProviderSessionId(sessionId, info.providerSessionId);
             }
           },
-          onSessionEnded: (reason) => {
+          onSessionEnded: (_reason) => {
             setClaudeSessionEnded(sessionId);
             finishStreaming(sessionId);
           },
@@ -444,7 +450,7 @@ export function ClaudeOutputPanel({
               updateProviderSessionId(sessionId, info.providerSessionId);
             }
           },
-          onSessionEnded: (reason) => {
+          onSessionEnded: (_reason) => {
             setClaudeSessionEnded(sessionId);
             finishStreaming(sessionId);
           },

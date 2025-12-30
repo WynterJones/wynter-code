@@ -218,7 +218,7 @@ export function useKanbanAI(workspaceId: string): UseKanbanAIReturn {
       onSessionReady: () => {
         setIsSessionActive(true);
       },
-      onSessionEnded: (reason) => {
+      onSessionEnded: (_reason) => {
         setIsSessionActive(false);
         setIsStreaming(false);
       },

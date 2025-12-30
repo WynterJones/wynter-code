@@ -107,7 +107,8 @@ class CodexService {
         case "thinking":
           if (chunk.content) {
             cb.onThinkingStart();
-            cb.onThinking(chunk.content);
+            // Format Codex reasoning items as bullet points (each item.completed is a discrete thought)
+            cb.onThinking(`• ${chunk.content}\n`);
           }
           break;
 
@@ -115,6 +116,10 @@ class CodexService {
           if (chunk.tool_name && chunk.tool_id) {
             this._currentToolIdMap.set(sessionId, chunk.tool_id);
             cb.onToolStart(chunk.tool_name, chunk.tool_id);
+            // If initial tool_input is provided, send it as delta so UI gets populated
+            if (chunk.tool_input) {
+              cb.onToolInputDelta(chunk.tool_id, chunk.tool_input);
+            }
           }
           break;
 

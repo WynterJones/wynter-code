@@ -358,7 +358,7 @@ export function GraphChecker() {
     // Animation tracking
     const animatedBlocks: { container: Container; baseY: number; phase: number }[] = [];
 
-    positions.forEach((pos, idx) => {
+    positions.forEach((pos, _idx) => {
       const theme = getBlockTheme(pos.table.complexityScore, maxComplexity);
 
       // Create a container for the block (holds glow + main graphics)

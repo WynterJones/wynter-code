@@ -274,6 +274,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   simulatedFlowerCount: null,
   celebrationQueue: [],
   mapCycle: createInitialMapCycleState(),
+  pendingBuildingSelection: null,
 
   // Beads issue vehicle tracking
   beadsEnabled: false,
@@ -851,6 +852,10 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
         v.id === vehicleId ? { ...v, shouldExit: true } : v
       ),
     }));
+  },
+
+  setPendingBuildingSelection: (buildingId: string | null) => {
+    set({ pendingBuildingSelection: buildingId });
   },
 
   // Beads issue vehicle tracking methods

@@ -5,9 +5,9 @@ import type { PanelContentProps, PanelType } from "@/types/panel";
 const PANEL_OPTIONS: { type: PanelType; name: string; icon: React.ComponentType<{ className?: string }>; description: string }[] = [
   {
     type: "claude-output",
-    name: "Claude Output",
+    name: "Session GUI",
     icon: MessageSquare,
-    description: "AI responses",
+    description: "AI session view",
   },
   {
     type: "terminal",
@@ -57,13 +57,19 @@ export function EmptyPanel({
   panelId: _panelId,
   projectId: _projectId,
   projectPath: _projectPath,
+  sessionId: _sessionId,
   panel: _panel,
   isFocused: _isFocused,
+  disabledTypes = [],
   onProcessStateChange: _onProcessStateChange,
   onPanelUpdate,
 }: PanelContentProps) {
   const handleSelectType = (type: PanelType) => {
     onPanelUpdate({ type });
+  };
+
+  const isTypeDisabled = (type: PanelType): boolean => {
+    return disabledTypes.includes(type);
   };
 
   return (
@@ -75,25 +81,38 @@ export function EmptyPanel({
       </div>
 
       <div className="flex flex-col gap-1">
-        {PANEL_OPTIONS.map(({ type, name, icon: Icon, description }) => (
-          <button
-            key={type}
-            onClick={() => handleSelectType(type)}
-            className={cn(
-              "flex items-center gap-3 px-2.5 py-2 rounded-md",
-              "hover:bg-bg-hover transition-colors",
-              "text-left group"
-            )}
-          >
-            <Icon className="w-4 h-4 text-text-secondary/60 group-hover:text-accent flex-shrink-0 transition-colors" />
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-medium text-text-primary truncate">{name}</span>
-              <span className="text-[10px] text-text-secondary/40 truncate hidden sm:inline">
-                {description}
-              </span>
-            </div>
-          </button>
-        ))}
+        {PANEL_OPTIONS.map(({ type, name, icon: Icon, description }) => {
+          const isDisabled = isTypeDisabled(type);
+          return (
+            <button
+              key={type}
+              onClick={() => !isDisabled && handleSelectType(type)}
+              disabled={isDisabled}
+              className={cn(
+                "flex items-center gap-3 px-2.5 py-2 rounded-md",
+                "transition-colors",
+                "text-left group",
+                isDisabled
+                  ? "opacity-40 cursor-not-allowed"
+                  : "hover:bg-bg-hover"
+              )}
+              title={isDisabled ? "Only one allowed per session" : undefined}
+            >
+              <Icon className={cn(
+                "w-4 h-4 flex-shrink-0 transition-colors",
+                isDisabled
+                  ? "text-text-secondary/60"
+                  : "text-text-secondary/60 group-hover:text-accent"
+              )} />
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs font-medium text-text-primary truncate">{name}</span>
+                <span className="text-[10px] text-text-secondary/40 truncate hidden sm:inline">
+                  {description}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

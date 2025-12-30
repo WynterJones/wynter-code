@@ -25,13 +25,19 @@ interface TycoonGameProps {
   containerHeight?: number;
   autoScale?: boolean;
   isMiniPlayer?: boolean;
+  onBuildingClick?: (buildingId: string) => void;
+  initialSelectedBuilding?: string | null;
+  onOpenAuditFile?: (buildingType: string) => void;
 }
 
 export function TycoonGame({
   containerWidth,
   containerHeight,
   autoScale = true,
-  isMiniPlayer = false
+  isMiniPlayer = false,
+  onBuildingClick,
+  initialSelectedBuilding = null,
+  onOpenAuditFile,
 }: TycoonGameProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<Application | null>(null);
@@ -49,7 +55,7 @@ export function TycoonGame({
   const mapSpritesRef = useRef<Map<string, Sprite>>(new Map());
 
   const [scale, setScale] = useState(1);
-  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(null);
+  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(initialSelectedBuilding);
   const [flowerTooltip, setFlowerTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
 
   const {
@@ -139,7 +145,6 @@ export function TycoonGame({
     // This properly handles React Strict Mode's double-invoke pattern
     let cancelled = false;
     let localApp: Application | null = null;
-    let keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
     mountedRef.current = true;
 
@@ -158,17 +163,19 @@ export function TycoonGame({
         backgroundColor: 0x1a1a1a,
         antialias: true,
         resolution: 1,
+        sharedTicker: false, // Use own ticker to avoid interference between instances
+        preference: 'webgl', // Ensure WebGL renderer
       });
 
       // Check if this effect was cancelled during async init
       if (cancelled || !app.stage) {
-        try { app.destroy(true, { children: true, texture: true }); } catch {}
+        try { app.destroy(true, { children: true, texture: false }); } catch {}
         return;
       }
 
       // Check if container already has a canvas (race condition protection)
       if (containerRef.current?.querySelector('canvas')) {
-        try { app.destroy(true, { children: true, texture: true }); } catch {}
+        try { app.destroy(true, { children: true, texture: false }); } catch {}
         return;
       }
 
@@ -259,8 +266,14 @@ export function TycoonGame({
         buildingsContainer.addChild(buildingSprite);
         buildingSpritesRef.current.set(buildingData.id, buildingSprite);
 
-        // Add click handler for building popup (only in full game view, not mini player)
-        if (!isMiniPlayer) {
+        // Add click handler for building popup
+        if (isMiniPlayer && onBuildingClick) {
+          // In mini player, trigger callback to expand and open building popup
+          buildingSprite.on("pointerdown", () => {
+            onBuildingClick(buildingData.id);
+          });
+        } else if (!isMiniPlayer) {
+          // In full game view, open building popup directly
           buildingSprite.on("pointerdown", () => {
             setSelectedBuilding(buildingData.id);
           });
@@ -475,13 +488,6 @@ export function TycoonGame({
           }
         }
       });
-
-      keydownHandler = (e: KeyboardEvent) => {
-        if (e.key.toLowerCase() === "g") {
-          useFarmworkTycoonStore.getState().toggleDebug();
-        }
-      };
-      window.addEventListener("keydown", keydownHandler);
     };
 
     initApp();
@@ -490,17 +496,31 @@ export function TycoonGame({
       cancelled = true;
       mountedRef.current = false;
 
-      // Remove keydown listener
-      if (keydownHandler) {
-        window.removeEventListener("keydown", keydownHandler);
-      }
-
-      // Destroy the PixiJS app
+      // Clean up the PixiJS app
       if (localApp) {
         try {
-          localApp.destroy(true, { children: true, texture: true });
+          // Stop the ticker first to prevent any pending updates
+          localApp.ticker?.stop();
+
+          // Remove all children from the stage
+          if (localApp.stage) {
+            localApp.stage.removeChildren();
+          }
+
+          // Remove the canvas from DOM manually
+          if (localApp.canvas?.parentNode) {
+            localApp.canvas.parentNode.removeChild(localApp.canvas);
+          }
+
+          // Now destroy the app - don't destroy textures as they're shared via Assets cache
+          // Use a more defensive destroy that catches internal PixiJS errors
+          localApp.destroy(false, { children: false, texture: false });
         } catch (e) {
-          console.warn("Error destroying PixiJS app:", e);
+          // Suppress common PixiJS cleanup errors that don't affect functionality
+          const errorMsg = String(e);
+          if (!errorMsg.includes('_cancelResize') && !errorMsg.includes('textureBatch')) {
+            console.warn("Error destroying PixiJS app:", e);
+          }
         }
       }
 
@@ -745,6 +765,7 @@ export function TycoonGame({
         <BuildingPopup
           buildingId={selectedBuilding}
           onClose={() => setSelectedBuilding(null)}
+          onOpenAuditFile={onOpenAuditFile}
         />
       )}
 
