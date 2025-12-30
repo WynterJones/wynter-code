@@ -56,14 +56,6 @@ class GeminiService {
     permissionMode?: PermissionMode,
     safeMode?: boolean
   ): Promise<void> {
-    console.log("[GeminiService] startSession called:", {
-      cwd,
-      sessionId,
-      model: model || this._currentModel,
-      permissionMode,
-      safeMode,
-    });
-
     if (this._sessionActiveMap.get(sessionId)) {
       console.error("[GeminiService] Session already active:", sessionId);
       throw new Error("Session already active");
@@ -74,7 +66,6 @@ class GeminiService {
     this._currentToolIdMap.set(sessionId, null);
 
     // Set up event listener for gemini-stream
-    console.log("[GeminiService] Setting up event listener for session:", sessionId);
     const unlisten = await listen<StreamChunk>("gemini-stream", (event) => {
       const chunk = event.payload;
 
@@ -85,11 +76,6 @@ class GeminiService {
 
       const cb = this._callbacksMap.get(sessionId);
       if (!cb) return;
-
-      console.log("[GeminiService] Received event:", {
-        type: chunk.chunk_type,
-        hasContent: !!chunk.content,
-      });
 
       switch (chunk.chunk_type) {
         case "session_starting":
@@ -168,11 +154,9 @@ class GeminiService {
 
         case "stderr":
           // Log stderr but don't show to user unless it's an error
-          console.log("[GeminiService] stderr:", chunk.content);
           break;
 
         default:
-          console.log("[GeminiService] Unknown chunk type:", chunk.chunk_type);
           break;
       }
     });
@@ -180,7 +164,6 @@ class GeminiService {
     this._unlistenMap.set(sessionId, unlisten);
 
     try {
-      console.log("[GeminiService] Invoking start_gemini_session...");
       await invoke("start_gemini_session", {
         cwd,
         sessionId,
@@ -188,7 +171,6 @@ class GeminiService {
         permissionMode,
         safeMode,
       });
-      console.log("[GeminiService] start_gemini_session invoke succeeded");
     } catch (error) {
       console.error("[GeminiService] start_gemini_session FAILED:", error);
       this.cleanupSession(sessionId);
@@ -198,7 +180,6 @@ class GeminiService {
 
   /** Stop a running Gemini session */
   async stopSession(sessionId: string): Promise<void> {
-    console.log("[GeminiService] stopSession called:", sessionId);
     try {
       await invoke("stop_gemini_session", { sessionId });
     } catch (error) {
@@ -210,7 +191,6 @@ class GeminiService {
 
   /** Send a prompt to a running session */
   async sendPrompt(sessionId: string, prompt: string): Promise<void> {
-    console.log("[GeminiService] sendPrompt:", { sessionId, prompt: prompt.substring(0, 50), model: this._currentModel });
     if (!this._sessionActiveMap.get(sessionId)) {
       throw new Error("Session not active. Start a session first.");
     }
@@ -224,13 +204,6 @@ class GeminiService {
     text: string,
     images?: ImageAttachment[]
   ): Promise<void> {
-    console.log("[GeminiService] sendStructuredPrompt:", {
-      sessionId,
-      text: text.substring(0, 50),
-      imageCount: images?.length ?? 0,
-      model: this._currentModel,
-    });
-
     if (!this._sessionActiveMap.get(sessionId)) {
       throw new Error("Session not active. Start a session first.");
     }

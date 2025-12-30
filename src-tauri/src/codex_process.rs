@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State};
@@ -354,7 +354,6 @@ pub async fn start_codex_session(
 
     // Spawn stdout reader thread
     let window_clone = window.clone();
-    let state_clone = state.inner().clone();
     let session_for_reader = session_id.clone();
 
     std::thread::spawn(move || {

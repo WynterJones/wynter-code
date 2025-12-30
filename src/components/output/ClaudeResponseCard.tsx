@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
-import { Copy, Check, Brain } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import { IconButton } from "@/components/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ToolCallBlock } from "./ToolCallBlock";
+import { ThinkingBlock } from "./ThinkingBlock";
 import { InlineStreamingIndicator } from "./InlineStreamingIndicator";
 import { ContextBlock, CostBlock, UsageBlock, StatusBlock, TodosBlock } from "./commands";
 import { parseCommandResponse } from "@/lib/slashCommandHandler";
@@ -32,7 +33,6 @@ export function ClaudeResponseCard({
   onReject,
 }: ClaudeResponseCardProps) {
   const [copied, setCopied] = useState(false);
-  const [showThinking, setShowThinking] = useState(false);
 
   // Parse command response if this is a custom command
   const commandResponse = useMemo(() => {
@@ -72,30 +72,11 @@ export function ClaudeResponseCard({
         )}
 
         {thinkingText && (
-          <div className="mb-4 rounded-lg border border-accent/30 overflow-hidden">
-            <button
-              className={cn(
-                "w-full flex items-center gap-2 px-3 py-2",
-                "bg-accent/5 hover:bg-accent/10 transition-colors",
-                "text-left"
-              )}
-              onClick={() => setShowThinking(!showThinking)}
-            >
-              <Brain className="w-4 h-4 text-accent" />
-              <span className="text-xs text-accent font-medium">
-                {showThinking ? "Hide" : "Show"} thinking
-              </span>
-              <span className="text-xs text-text-secondary ml-auto">
-                {thinkingText.length} chars
-              </span>
-            </button>
-            {showThinking && (
-              <div className="px-3 py-2 bg-bg-secondary border-t border-accent/20 max-h-48 overflow-auto">
-                <p className="text-xs text-text-secondary font-mono whitespace-pre-wrap leading-relaxed">
-                  {thinkingText}
-                </p>
-              </div>
-            )}
+          <div className="mb-4">
+            <ThinkingBlock
+              content={thinkingText}
+              isStreaming={isStreaming}
+            />
           </div>
         )}
 

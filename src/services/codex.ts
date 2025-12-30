@@ -59,15 +59,6 @@ class CodexService {
     permissionMode?: PermissionMode,
     safeMode?: boolean
   ): Promise<void> {
-    console.log("[CodexService] startSession called:", {
-      cwd,
-      sessionId,
-      resumeThreadId,
-      model: model || this._currentModel,
-      permissionMode,
-      safeMode,
-    });
-
     if (this._sessionActiveMap.get(sessionId)) {
       console.error("[CodexService] Session already active:", sessionId);
       throw new Error("Session already active");
@@ -78,7 +69,6 @@ class CodexService {
     this._currentToolIdMap.set(sessionId, null);
 
     // Set up event listener for codex-stream
-    console.log("[CodexService] Setting up event listener for session:", sessionId);
     const unlisten = await listen<StreamChunk>("codex-stream", (event) => {
       const chunk = event.payload;
 
@@ -89,11 +79,6 @@ class CodexService {
 
       const cb = this._callbacksMap.get(sessionId);
       if (!cb) return;
-
-      console.log("[CodexService] Received event:", {
-        type: chunk.chunk_type,
-        hasContent: !!chunk.content,
-      });
 
       switch (chunk.chunk_type) {
         case "session_starting":
@@ -172,7 +157,6 @@ class CodexService {
 
         case "stderr":
           // Log stderr but don't show to user unless it's an error
-          console.log("[CodexService] stderr:", chunk.content);
           break;
 
         case "raw":
@@ -182,7 +166,6 @@ class CodexService {
           break;
 
         default:
-          console.log("[CodexService] Unknown chunk type:", chunk.chunk_type);
           break;
       }
     });
@@ -190,7 +173,6 @@ class CodexService {
     this._unlistenMap.set(sessionId, unlisten);
 
     try {
-      console.log("[CodexService] Invoking start_codex_session...");
       await invoke("start_codex_session", {
         cwd,
         sessionId,
@@ -200,7 +182,6 @@ class CodexService {
         permissionMode,
         safeMode,
       });
-      console.log("[CodexService] start_codex_session invoke succeeded");
     } catch (error) {
       console.error("[CodexService] start_codex_session FAILED:", error);
       this.cleanupSession(sessionId);
@@ -210,7 +191,6 @@ class CodexService {
 
   /** Stop a running Codex session */
   async stopSession(sessionId: string): Promise<void> {
-    console.log("[CodexService] stopSession called:", sessionId);
     try {
       await invoke("stop_codex_session", { sessionId });
     } catch (error) {
@@ -222,7 +202,6 @@ class CodexService {
 
   /** Send a prompt to a running session */
   async sendPrompt(sessionId: string, prompt: string): Promise<void> {
-    console.log("[CodexService] sendPrompt:", { sessionId, prompt: prompt.substring(0, 50), model: this._currentModel });
     if (!this._sessionActiveMap.get(sessionId)) {
       throw new Error("Session not active. Start a session first.");
     }
@@ -236,13 +215,6 @@ class CodexService {
     text: string,
     images?: ImageAttachment[]
   ): Promise<void> {
-    console.log("[CodexService] sendStructuredPrompt:", {
-      sessionId,
-      text: text.substring(0, 50),
-      imageCount: images?.length ?? 0,
-      model: this._currentModel,
-    });
-
     if (!this._sessionActiveMap.get(sessionId)) {
       throw new Error("Session not active. Start a session first.");
     }
@@ -257,7 +229,6 @@ class CodexService {
             mediaType: img.mimeType,
           });
           imagePaths.push(tempPath);
-          console.log("[CodexService] Saved image to:", tempPath);
         } catch (error) {
           console.error("[CodexService] Failed to save image:", error);
         }

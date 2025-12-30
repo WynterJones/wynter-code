@@ -90,8 +90,6 @@ export function StorybookViewerPopup({
     listen<StorybookEvent>("storybook-event", (event) => {
       const { serverId, eventType, url, status, message } = event.payload;
 
-      console.log("[Storybook Event]", eventType, message, status);
-
       if (eventType === "ready" || eventType === "status_change") {
         updateServer(serverId, {
           url: url ?? undefined,
@@ -132,11 +130,8 @@ export function StorybookViewerPopup({
 
   const handleStartStorybook = useCallback(async () => {
     if (!activeProject?.path || !startCommand) {
-      console.log("[Storybook] Cannot start - path:", activeProject?.path, "command:", startCommand);
       return;
     }
-
-    console.log("[Storybook] Starting with command:", startCommand, "in", activeProject.path);
 
     const port = parseInt(portInput, 10);
     if (isNaN(port) || port < 1 || port > 65535) {

@@ -244,7 +244,6 @@ export function GraphChecker() {
     // Guard against multiple initializations
     if (!containerRef.current) return;
     if (appRef.current) {
-      console.log("[GraphChecker] App already initialized, skipping");
       return;
     }
 
@@ -263,8 +262,6 @@ export function GraphChecker() {
         const width = container.clientWidth || 800;
         const height = container.clientHeight || 600;
 
-        console.log("[GraphChecker] Initializing pixi app:", { width, height });
-
         const app = new Application();
         await app.init({
           background: BLOCK_COLORS.background,
@@ -280,8 +277,6 @@ export function GraphChecker() {
 
         container.appendChild(app.canvas);
         appRef.current = app;
-
-        console.log("[GraphChecker] Pixi app initialized successfully");
 
         const linesContainer = new Container();
         app.stage.addChild(linesContainer);
@@ -353,22 +348,12 @@ export function GraphChecker() {
     const width = app.screen.width;
     const height = app.screen.height;
 
-    console.log("[GraphChecker] Drawing blocks:", {
-      tableCount: relationshipGraph.tables.length,
-      width,
-      height,
-      appReady
-    });
-
     if (width === 0 || height === 0) {
-      console.warn("[GraphChecker] Canvas has zero dimensions, skipping draw");
       return;
     }
 
     const positions = calculateBlockPositions(relationshipGraph.tables, width, height);
     const maxComplexity = Math.max(...relationshipGraph.tables.map((t) => t.complexityScore), 1);
-
-    console.log("[GraphChecker] Block positions calculated:", positions.length);
 
     // Animation tracking
     const animatedBlocks: { container: Container; baseY: number; phase: number }[] = [];
@@ -407,17 +392,6 @@ export function GraphChecker() {
       graphics.stroke({ width: 2, color: theme.border, alpha: 0.6 });
 
       blockContainer.addChild(graphics);
-
-      if (idx < 3) {
-        console.log(`[GraphChecker] Block ${idx}:`, {
-          x: pos.x,
-          y: pos.y,
-          width: pos.width,
-          height: pos.height,
-          theme: theme,
-          tableName: pos.table.tableName
-        });
-      }
 
       const shortName =
         pos.table.tableName.includes(".")
@@ -494,8 +468,6 @@ export function GraphChecker() {
     // Draw initial lines (without hover)
     drawRelationshipLines(linesContainer, positions, relationshipGraph.edges, null);
     runScanAnimation(scanLine, width, height);
-
-    console.log("[GraphChecker] Drawing complete. BlocksContainer children:", blocksContainer.children.length);
   }, [appReady, relationshipGraph, calculateBlockPositions, drawRelationshipLines, runScanAnimation]);
 
   // Update relationship lines on hover

@@ -266,6 +266,24 @@ pub async fn start_claude_session(
         let mut line_count = 0;
         let mut session_ready = false;
 
+        // Dev mode only: Create JSONL log file for debugging stream-json output
+        let mut log_file = if cfg!(debug_assertions) {
+            let log_dir = std::env::temp_dir().join("wynter-code");
+            if let Err(e) = std::fs::create_dir_all(&log_dir) {
+                eprintln!("[Claude] Failed to create log dir: {}", e);
+            }
+            let log_path = log_dir.join(format!("claude-{}.jsonl", session_for_reader));
+            eprintln!("[Claude] JSONL log enabled: {:?}", log_path);
+            std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(&log_path)
+                .ok()
+        } else {
+            None
+        };
+
         for line in reader.lines() {
             eprintln!("[Claude] Got a line from reader...");
             match line {
@@ -274,6 +292,12 @@ pub async fn start_claude_session(
                     // Safely truncate at char boundary for logging
                     let log_preview: String = line.chars().take(200).collect();
                     eprintln!("[Claude STDOUT #{}] {}", line_count, log_preview);
+
+                    // Dev mode: Write raw JSON line to log file
+                    if let Some(ref mut file) = log_file {
+                        use std::io::Write as IoWrite;
+                        let _ = writeln!(file, "{}", line);
+                    }
 
                     // Try to parse as JSON
                     if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {

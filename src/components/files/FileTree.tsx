@@ -172,7 +172,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         refetchGitStatus();
         setSelectedPaths(new Set());
       } catch (err) {
-        console.error("Failed to move items:", err);
       }
     };
 
@@ -212,7 +211,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
           }
         );
       } catch (err) {
-        console.error("Failed to setup file watcher:", err);
       }
     };
 
@@ -244,7 +242,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
           updateNodeInTree(prev, node.path, { ...node, isExpanded: true, children })
         );
       } catch (err) {
-        console.error("Failed to load directory:", err);
       }
     }
   };
@@ -332,7 +329,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       await loadFiles(true);
       refetchGitStatus();
     } catch (err) {
-      console.error("Failed to delete:", err);
     }
   };
 
@@ -343,7 +339,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       refetchGitStatus();
       setSelectedPaths(new Set());
     } catch (err) {
-      console.error("Failed to move item:", err);
     }
   };
 
@@ -357,7 +352,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       refetchGitStatus();
       setSelectedPaths(new Set());
     } catch (err) {
-      console.error("Failed to move items:", err);
     }
   };
 
@@ -365,15 +359,10 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     try {
       const result = await createArchive(paths);
       if (result.success) {
-        const savings = result.savingsPercent.toFixed(1);
-        console.log(
-          `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${savings}% saved)`
-        );
         setSelectedPaths(new Set());
         await loadFiles(true);
       }
     } catch (err) {
-      console.error("Failed to create archive:", err);
     }
   };
 
@@ -396,14 +385,9 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       }
 
       if (result.success) {
-        const savings = result.savingsPercent.toFixed(1);
-        console.log(
-          `Optimized ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${savings}% saved)`
-        );
         await loadFiles(true);
       }
     } catch (err) {
-      console.error("Failed to optimize file:", err);
     }
   };
 
@@ -421,7 +405,6 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       await loadFiles(true);
       refetchGitStatus();
     } catch (err) {
-      console.error("File operation failed:", err);
     }
 
     setDialog(null);

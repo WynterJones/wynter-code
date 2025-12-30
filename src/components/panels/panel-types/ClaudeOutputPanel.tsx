@@ -133,8 +133,6 @@ export function ClaudeOutputPanel({
 
   // Debug: Log when pendingApprovalTool changes
   useEffect(() => {
-    console.log("[ClaudeOutputPanel] pendingApprovalTool changed:", pendingApprovalTool);
-    console.log("[ClaudeOutputPanel] allToolCalls:", allToolCalls);
   }, [pendingApprovalTool, allToolCalls]);
 
   // Get pending question set
@@ -155,17 +153,14 @@ export function ClaudeOutputPanel({
         sessionId,
         {
           onSessionStarting: () => {
-            console.log("[ClaudeOutputPanel] Session starting...");
           },
           onSessionReady: (info) => {
-            console.log("[ClaudeOutputPanel] Session ready:", info);
             setClaudeSessionReady(sessionId, info);
             if (info.providerSessionId) {
               updateProviderSessionId(sessionId, info.providerSessionId);
             }
           },
           onSessionEnded: (reason) => {
-            console.log("[ClaudeOutputPanel] Session ended:", reason);
             setClaudeSessionEnded(sessionId);
             finishStreaming(sessionId);
           },
@@ -184,12 +179,6 @@ export function ClaudeOutputPanel({
           onToolStart: (toolName, toolId) => {
             // Determine if this tool needs permission approval
             const needsPermission = toolNeedsPermission(toolName, permissionMode);
-            console.log("[ClaudeOutputPanel] onToolStart:", {
-              toolName,
-              toolId,
-              permissionMode,
-              needsPermission,
-            });
             addPendingToolCall(sessionId, {
               id: toolId,
               name: toolName,
@@ -245,7 +234,6 @@ export function ClaudeOutputPanel({
             appendStreamingText(sessionId, `\nError: ${error}`);
           },
           onPermissionRequest: (request) => {
-            console.log("[ClaudeOutputPanel] MCP Permission request:", request);
             setPendingMcpRequest(request);
           },
         },
@@ -449,17 +437,14 @@ export function ClaudeOutputPanel({
         sessionId,
         {
           onSessionStarting: () => {
-            console.log("[ClaudeOutputPanel] Session starting (execute plan)...");
           },
           onSessionReady: (info) => {
-            console.log("[ClaudeOutputPanel] Session ready (execute plan):", info);
             setClaudeSessionReady(sessionId, info);
             if (info.providerSessionId) {
               updateProviderSessionId(sessionId, info.providerSessionId);
             }
           },
           onSessionEnded: (reason) => {
-            console.log("[ClaudeOutputPanel] Session ended (execute plan):", reason);
             setClaudeSessionEnded(sessionId);
             finishStreaming(sessionId);
           },

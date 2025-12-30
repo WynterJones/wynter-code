@@ -91,7 +91,7 @@ export function FileBrowserPopup({
     if (isOpen) {
       invoke<string>("get_home_dir")
         .then(setHomeDir)
-        .catch(console.error);
+        .catch(() => {});
     }
   }, [isOpen]);
 
@@ -117,7 +117,6 @@ export function FileBrowserPopup({
       setFiles(result);
       setCurrentPath(path);
     } catch (err) {
-      console.error("Failed to load directory:", err);
       setFiles([]);
     } finally {
       setLoading(false);
@@ -271,7 +270,6 @@ export function FileBrowserPopup({
       };
       reader.readAsDataURL(blob);
     } catch (err) {
-      console.error("Failed to read image:", err);
     }
   }, [getSelectedFile, onSendToPrompt, onClose]);
 
@@ -313,7 +311,6 @@ export function FileBrowserPopup({
       await loadDirectory(currentPath);
       refetchGitStatus();
     } catch (err) {
-      console.error("File operation failed:", err);
     }
     setDialog(null);
   }, [dialog, currentPath, createFile, createFolder, renameItem]);
@@ -406,14 +403,10 @@ export function FileBrowserPopup({
           try {
             const result = await createArchive(pathsToCompress);
             if (result.success) {
-              console.log(
-                `Created ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${result.savingsPercent.toFixed(1)}% saved)`
-              );
               setSelectedPaths(new Set());
               await loadDirectory(currentPath);
             }
           } catch (err) {
-            console.error("Failed to create archive:", err);
           }
         },
         separator: true,
@@ -429,13 +422,9 @@ export function FileBrowserPopup({
           try {
             const result = await optimizeFile(node.path);
             if (result.success) {
-              console.log(
-                `Optimized ${result.outputPath}: ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (${result.savingsPercent.toFixed(1)}% saved)`
-              );
               await loadDirectory(currentPath);
             }
           } catch (err) {
-            console.error("Failed to optimize file:", err);
           }
         },
       });

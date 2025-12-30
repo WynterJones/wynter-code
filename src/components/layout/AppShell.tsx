@@ -76,7 +76,6 @@ export function AppShell() {
   useBackupScheduler({
     onBackupNeeded: () => {
       // Show notification or indicator that backup is due
-      console.log("Backup is due - consider running a backup");
     },
   });
 

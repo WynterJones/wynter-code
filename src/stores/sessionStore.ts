@@ -501,7 +501,6 @@ export const useSessionStore = create<SessionStore>()(
             // This can happen when Claude CLI sends its own tool_result for permission handling
             // Only user approval (pending → running) or execution finish (running → completed) should work
             if (tc.status === "pending" && status === "completed") {
-              console.log("[SessionStore] Blocked pending→completed transition for tool:", tc.name, "- output:", output?.substring(0, 100));
               return tc; // Keep as pending
             }
 
@@ -561,13 +560,11 @@ export const useSessionStore = create<SessionStore>()(
 
         // If there are pending approvals, don't finish streaming yet
         if (pendingApprovals.length > 0) {
-          console.log("[SessionStore] finishStreaming blocked - waiting for tool approvals:", pendingApprovals.map(tc => tc.name));
           return;
         }
 
         // If there's a pending question set (AskUserQuestion), don't finish yet
         if (streamingState.pendingQuestionSet) {
-          console.log("[SessionStore] finishStreaming blocked - waiting for question response");
           return;
         }
 

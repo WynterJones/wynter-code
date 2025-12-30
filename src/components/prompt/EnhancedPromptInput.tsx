@@ -686,14 +686,6 @@ export function EnhancedPromptInput({
     const permissionMode = session?.permissionMode || "default";
 
     try {
-      console.log("[EnhancedPromptInput] Legacy mode - Starting streaming:", {
-        prompt: fullPrompt.substring(0, 100) + "...",
-        projectPath,
-        sessionId: currentSessionId,
-        providerSessionId,
-        permissionMode,
-      });
-
       // This uses the old per-prompt streaming approach
       // In persistent session mode, this branch is not used
       appendStreamingText(currentSessionId, "Note: Legacy per-prompt mode. Consider using persistent session.\n\n");

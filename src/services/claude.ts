@@ -79,7 +79,6 @@ class ClaudeService {
   async startMcpPermissionServer(sessionId: string): Promise<number> {
     const port = await invoke<number>("start_mcp_permission_server", { sessionId });
     this._mcpPortMap.set(sessionId, port);
-    console.log("[ClaudeService] MCP permission server started on port:", port);
     return port;
   }
 
@@ -94,14 +93,12 @@ class ClaudeService {
     approved: boolean,
     updatedInput?: Record<string, unknown>
   ): Promise<void> {
-    console.log("[ClaudeService] respondToPermission:", { requestId, approved });
     try {
       await invoke("respond_to_mcp_permission", {
         requestId,
         approved,
         updatedInput: updatedInput ? JSON.stringify(updatedInput) : null,
       });
-      console.log("[ClaudeService] respondToPermission succeeded");
     } catch (error) {
       console.error("[ClaudeService] respondToPermission FAILED:", error);
       throw error;
@@ -118,16 +115,9 @@ class ClaudeService {
         return;
       }
 
-      console.log("[ClaudeService] MCP permission request:", request);
-      console.log("[ClaudeService] Looking for callbacks with sessionId:", sessionId);
-      console.log("[ClaudeService] Available sessions in callbacksMap:", Array.from(this._callbacksMap.keys()));
-
       const cb = this._callbacksMap.get(sessionId);
-      console.log("[ClaudeService] Found callbacks?", !!cb);
-      console.log("[ClaudeService] Has onPermissionRequest?", !!cb?.onPermissionRequest);
 
       if (cb?.onPermissionRequest) {
-        console.log("[ClaudeService] Calling onPermissionRequest callback");
         cb.onPermissionRequest(request);
       } else {
         console.warn("[ClaudeService] No onPermissionRequest callback found!");
@@ -147,15 +137,6 @@ class ClaudeService {
     safeMode?: boolean,
     model?: string
   ): Promise<void> {
-    console.log("[ClaudeService] startSession called:", {
-      cwd,
-      sessionId,
-      permissionMode,
-      resumeSessionId,
-      safeMode,
-      model,
-    });
-
     if (this._sessionActiveMap.get(sessionId)) {
       console.error("[ClaudeService] Session already active:", sessionId);
       throw new Error("Session already active");
@@ -166,7 +147,6 @@ class ClaudeService {
     this._currentToolIdMap.set(sessionId, null);
 
     // Set up event listener
-    console.log("[ClaudeService] Setting up event listener for session:", sessionId);
     const unlisten = await listen<StreamChunk>("claude-stream", (event) => {
       const chunk = event.payload;
 
@@ -179,11 +159,6 @@ class ClaudeService {
       if (!cb) return;
 
       const currentToolId = this._currentToolIdMap.get(sessionId);
-
-      console.log("[ClaudeService] Received event:", {
-        type: chunk.chunk_type,
-        hasContent: !!chunk.content,
-      });
 
       switch (chunk.chunk_type) {
         case "session_starting":
@@ -253,11 +228,6 @@ class ClaudeService {
 
         case "tool_start":
         case "tool_use":
-          console.log("[ClaudeService] tool_use received:", {
-            tool_name: chunk.tool_name,
-            tool_id: chunk.tool_id,
-            has_input: !!chunk.tool_input,
-          });
           if (chunk.tool_id) {
             // Use tool name if available, otherwise extract from input or use placeholder
             const toolName = chunk.tool_name || "unknown_tool";
@@ -346,7 +316,6 @@ class ClaudeService {
           break;
 
         default:
-          console.log("[ClaudeService] Unknown chunk type:", chunk.chunk_type);
           break;
       }
     });
@@ -356,16 +325,11 @@ class ClaudeService {
     try {
       // For manual mode, start MCP permission server first
       let mcpPermissionPort: number | undefined;
-      console.log("[ClaudeService] Permission mode check:", { permissionMode, isManual: permissionMode === "manual" });
       if (permissionMode === "manual") {
-        console.log("[ClaudeService] Starting MCP permission server for manual mode...");
         mcpPermissionPort = await this.startMcpPermissionServer(sessionId);
-        console.log("[ClaudeService] MCP permission server started on port:", mcpPermissionPort);
         await this.setupMcpPermissionListener(sessionId);
-        console.log("[ClaudeService] MCP permission listener set up");
       }
 
-      console.log("[ClaudeService] Invoking start_claude_session...");
       await invoke("start_claude_session", {
         cwd,
         sessionId,
@@ -375,7 +339,6 @@ class ClaudeService {
         mcpPermissionPort,
         model,
       });
-      console.log("[ClaudeService] start_claude_session invoke succeeded");
     } catch (error) {
       console.error("[ClaudeService] start_claude_session FAILED:", error);
       this.cleanupSession(sessionId);
@@ -385,7 +348,6 @@ class ClaudeService {
 
   /** Stop a running Claude session */
   async stopSession(sessionId: string): Promise<void> {
-    console.log("[ClaudeService] stopSession called:", sessionId);
     try {
       await invoke("stop_claude_session", { sessionId });
     } catch (error) {
@@ -397,7 +359,6 @@ class ClaudeService {
 
   /** Send a prompt to a running session */
   async sendPrompt(sessionId: string, prompt: string): Promise<void> {
-    console.log("[ClaudeService] sendPrompt:", { sessionId, prompt: prompt.substring(0, 50) });
     if (!this._sessionActiveMap.get(sessionId)) {
       throw new Error("Session not active. Start a session first.");
     }
@@ -417,12 +378,6 @@ class ClaudeService {
 
   /** Send a structured prompt with images and files to a running session */
   async sendStructuredPrompt(sessionId: string, prompt: StructuredPrompt): Promise<void> {
-    console.log("[ClaudeService] sendStructuredPrompt:", {
-      sessionId,
-      text: prompt.text.substring(0, 50),
-      imageCount: prompt.images?.length ?? 0,
-      fileCount: prompt.files?.length ?? 0,
-    });
     if (!this._sessionActiveMap.get(sessionId)) {
       throw new Error("Session not active. Start a session first.");
     }

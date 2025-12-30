@@ -111,8 +111,6 @@ pub fn apply_window_vibrancy<R: Runtime>(
     material: String,
     #[allow(unused_variables)] opacity: f64,
 ) -> Result<(), String> {
-    println!("[Vibrancy] apply_window_vibrancy called with material: {}", material);
-
     #[cfg(target_os = "macos")]
     {
         // Clear existing vibrancy first to allow changing materials
@@ -193,14 +191,9 @@ pub fn apply_vibrancy_to_all_windows(
 ) -> Result<(), String> {
     let windows = app.webview_windows();
 
-    println!("[Vibrancy] Applying material '{}' with opacity {} to {} windows", material, opacity, windows.len());
-
     for (label, window) in windows {
-        println!("[Vibrancy] Applying to window: {}", label);
         if let Err(e) = apply_window_vibrancy(window, material.clone(), opacity) {
             eprintln!("[Vibrancy] Failed to apply vibrancy to window '{}': {}", label, e);
-        } else {
-            println!("[Vibrancy] Successfully applied to window: {}", label);
         }
     }
 

@@ -49,7 +49,6 @@ export function useAIAssistant(
     // Check if session is active on backend and stop it first
     const isBackendActive = await claudeService.checkSessionActive(sessionIdRef.current);
     if (isSessionActive || isBackendActive) {
-      console.log("[useAIAssistant] Session already active, stopping first...");
       try {
         await claudeService.stopSession(sessionIdRef.current);
         // Wait for backend to confirm session is stopped
@@ -68,14 +67,11 @@ export function useAIAssistant(
 
     const callbacks: ClaudeSessionCallbacks = {
       onSessionStarting: () => {
-        console.log("[useAIAssistant] Session starting...");
       },
       onSessionReady: (info) => {
-        console.log("[useAIAssistant] Session ready:", info);
         setIsSessionActive(true);
       },
       onSessionEnded: (reason) => {
-        console.log("[useAIAssistant] Session ended:", reason);
         setIsSessionActive(false);
         setIsStreaming(false);
       },
@@ -148,12 +144,6 @@ export function useAIAssistant(
 
   const sendPrompt = useCallback(
     async (prompt: string) => {
-      console.log("[useAIAssistant] sendPrompt called:", {
-        isSessionActive,
-        sessionId: sessionIdRef.current,
-        promptLength: prompt.length,
-      });
-
       if (!isSessionActive) {
         console.error("[useAIAssistant] Session not active!");
         throw new Error("Session not active");
@@ -178,11 +168,8 @@ export function useAIAssistant(
         ? `${systemContext}\n\nUser request: ${prompt}`
         : prompt;
 
-      console.log("[useAIAssistant] Sending to claude service...");
-
       try {
         await claudeService.sendPrompt(sessionIdRef.current, fullPrompt);
-        console.log("[useAIAssistant] sendPrompt succeeded");
       } catch (error) {
         console.error("[useAIAssistant] Failed to send prompt:", error);
         setIsStreaming(false);

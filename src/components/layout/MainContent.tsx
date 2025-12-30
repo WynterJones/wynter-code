@@ -132,8 +132,6 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
 
   // Debug: Log when pendingApprovalTool changes
   useEffect(() => {
-    console.log("[MainContent] pendingApprovalTool changed:", pendingApprovalTool);
-    console.log("[MainContent] allToolCalls:", allToolCalls);
   }, [pendingApprovalTool, allToolCalls]);
 
   // Start a persistent AI session (Claude or Codex based on provider)
@@ -152,31 +150,20 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         ? defaultGeminiModel
         : defaultModel;
 
-    console.log("[MainContent] Starting session with:", {
-      sessionId: currentSessionId,
-      provider,
-      model,
-      permissionMode,
-      resumeSessionId,
-      isManualMode: permissionMode === "manual",
-    });
 
     setClaudeSessionStarting(currentSessionId);
 
     // Common callbacks for both providers
     const commonCallbacks = {
       onSessionStarting: () => {
-        console.log("[MainContent] Session starting...");
       },
       onSessionReady: (info: { model?: string; providerSessionId?: string }) => {
-        console.log("[MainContent] Session ready:", info);
         setClaudeSessionReady(currentSessionId, info);
         if (info.providerSessionId) {
           updateProviderSessionId(currentSessionId, info.providerSessionId);
         }
       },
       onSessionEnded: (reason: string) => {
-        console.log("[MainContent] Session ended:", reason);
         setClaudeSessionEnded(currentSessionId);
         finishStreaming(currentSessionId);
       },
@@ -195,12 +182,6 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
       onToolStart: (toolName: string, toolId: string) => {
         // Determine if this tool needs permission approval
         const needsPermission = toolNeedsPermission(toolName, permissionMode);
-        console.log("[MainContent] onToolStart:", {
-          toolName,
-          toolId,
-          permissionMode,
-          needsPermission,
-        });
         addPendingToolCall(currentSessionId, {
           id: toolId,
           name: toolName,
@@ -285,19 +266,10 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
               });
             },
             onPermissionRequest: async (request) => {
-              console.log("[MainContent] MCP Permission request received:", {
-                id: request.id,
-                toolName: request.toolName,
-                sessionId: request.sessionId,
-                inputKeys: Object.keys(request.input || {}),
-              });
-
               // Check if this tool is auto-approved for this session
               if (autoApprovedToolsRef.current.has(request.toolName)) {
-                console.log("[MainContent] Auto-approving tool:", request.toolName);
                 try {
                   await claudeService.respondToPermission(request.id, true);
-                  console.log("[MainContent] Auto-approved successfully");
                 } catch (error) {
                   console.error("[MainContent] Failed to auto-approve:", error);
                 }
@@ -432,21 +404,14 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   // MCP Permission handlers (for manual mode)
   const handleMcpApprove = useCallback(async (alwaysAllow?: boolean) => {
     if (!pendingMcpRequest) return;
-    console.log("[MainContent] MCP Approve clicked, request:", {
-      id: pendingMcpRequest.id,
-      toolName: pendingMcpRequest.toolName,
-      alwaysAllow,
-    });
 
     // If "always allow" was checked, add this tool to auto-approved set
     if (alwaysAllow && pendingMcpRequest.toolName) {
       setAutoApprovedTools(prev => new Set([...prev, pendingMcpRequest.toolName]));
-      console.log("[MainContent] Added to auto-approved tools:", pendingMcpRequest.toolName);
     }
 
     try {
       await claudeService.respondToPermission(pendingMcpRequest.id, true);
-      console.log("[MainContent] MCP permission response sent successfully");
       setPendingMcpRequest(null);
     } catch (error) {
       console.error("[MainContent] Failed to approve MCP permission:", error);
@@ -564,7 +529,6 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
 
     // If session is active, we need to restart it for the new mode to take effect
     if (wasActive) {
-      console.log("[MainContent] Mode changed while session active, restarting session with mode:", mode);
       try {
         // Stop current session
         await claudeService.stopSession(currentSessionId);
@@ -575,7 +539,6 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
 
         // Restart will happen automatically when user clicks Start again,
         // or we can auto-restart here. For now, just notify user.
-        console.log("[MainContent] Session stopped. Start again to use new mode:", mode);
       } catch (error) {
         console.error("[MainContent] Failed to restart session for mode change:", error);
       }

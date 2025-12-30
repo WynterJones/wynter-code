@@ -214,14 +214,11 @@ export function useKanbanAI(workspaceId: string): UseKanbanAIReturn {
 
     const callbacks: ClaudeSessionCallbacks = {
       onSessionStarting: () => {
-        console.log("[useKanbanAI] Session starting...");
       },
       onSessionReady: () => {
-        console.log("[useKanbanAI] Session ready");
         setIsSessionActive(true);
       },
       onSessionEnded: (reason) => {
-        console.log("[useKanbanAI] Session ended:", reason);
         setIsSessionActive(false);
         setIsStreaming(false);
       },
