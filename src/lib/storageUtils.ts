@@ -125,15 +125,23 @@ export const DATA_CATEGORIES: DataCategory[] = [
   {
     id: "tools",
     name: "Tools Data",
-    description: "API tester requests, database connections, Kanban boards, Storybook configs",
+    description: "API tester requests, database connections, Kanban boards, Storybook configs, codespace tabs",
     keys: [
       "wynter-code-api-tester",
       "database-viewer-storage",
       "wynter-code-kanban",
       "wynter-code-storybook",
-      "wynter-code-justfile",
       "wynter-code-search",
+      "codespace-storage",
     ],
+    canExport: true,
+    canClear: true,
+  },
+  {
+    id: "integrations",
+    name: "Integrations",
+    description: "Netlify deployment tool, site groups, and API tokens",
+    keys: ["netlify-ftp-store"],
     canExport: true,
     canClear: true,
   },
@@ -148,9 +156,9 @@ export const DATA_CATEGORIES: DataCategory[] = [
   {
     id: "ui",
     name: "UI State",
-    description: "Terminal state, saved colors, live preview settings",
-    keys: ["terminal-storage", "wynter-code-colors", "wynter-code-live-preview"],
-    canExport: false,
+    description: "Terminal state, saved colors, live preview settings, launcher preferences",
+    keys: ["terminal-storage", "wynter-code-colors", "wynter-code-live-preview", "launcher-store"],
+    canExport: true,
     canClear: true,
   },
   {
@@ -173,9 +181,9 @@ export const DATA_CATEGORIES: DataCategory[] = [
   {
     id: "backup",
     name: "Backup Config",
-    description: "Encrypted web backup configuration (Netlify token, site info)",
+    description: "Encrypted web backup configuration (Netlify token, site info, auto-backup settings)",
     keys: ["wynter-code-web-backup"],
-    canExport: false,
+    canExport: true,
     canClear: true,
   },
 ];

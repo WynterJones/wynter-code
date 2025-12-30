@@ -1,8 +1,9 @@
 import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe, Sparkles, Bot, Check, Download } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getVersion } from "@tauri-apps/api/app";
 import { cn } from "@/lib/utils";
-import { IconButton, Tooltip, ScrollArea } from "@/components/ui";
+import { IconButton, Tooltip, ScrollArea, Slider } from "@/components/ui";
 import {
   useSettingsStore,
   EDITOR_THEMES,
@@ -32,8 +33,6 @@ interface SettingsPopupProps {
   onClose: () => void;
   initialTab?: SettingsTab;
 }
-
-const APP_VERSION = "1.0.3";
 
 export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopupProps) {
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
@@ -282,27 +281,15 @@ function EditorSettings({
       </div>
 
       {/* Font Size */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-text-primary">
-          Font Size
-        </label>
-        <p className="text-xs text-text-secondary mb-2">
-          Adjust the editor font size (10-24px)
-        </p>
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min={10}
-            max={24}
-            value={fontSize}
-            onChange={(e) => onFontSizeChange(Number(e.target.value))}
-            className="flex-1 accent-accent"
-          />
-          <span className="text-sm text-text-primary w-12 text-right font-mono">
-            {fontSize}px
-          </span>
-        </div>
-      </div>
+      <Slider
+        label="Font Size"
+        description="Adjust the editor font size (10-24px)"
+        value={fontSize}
+        min={10}
+        max={24}
+        unit="px"
+        onChange={onFontSizeChange}
+      />
 
       {/* Word Wrap */}
       <div className="flex items-center justify-between">
@@ -593,8 +580,7 @@ function GeneralSettings({
               Safe Mode
             </label>
             <p className="text-xs text-text-secondary">
-              Prevent Claude from using &quot;bypass permissions&quot; mode. Protects against
-              destructive operations outside the project directory.
+              Prevent Claude from using &quot;bypass permissions&quot; mode.
             </p>
           </div>
           <button
@@ -954,26 +940,15 @@ function TerminalSettings({
       </div>
 
       {/* Font Size */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-text-primary">
-            Font Size
-          </label>
-          <span className="text-sm text-text-secondary">{terminalFontSize}px</span>
-        </div>
-        <input
-          type="range"
-          min="10"
-          max="24"
-          value={terminalFontSize}
-          onChange={(e) => onTerminalFontSizeChange(Number(e.target.value))}
-          className="w-full accent-accent"
-        />
-        <div className="flex justify-between text-xs text-text-secondary">
-          <span>10px</span>
-          <span>24px</span>
-        </div>
-      </div>
+      <Slider
+        label="Font Size"
+        value={terminalFontSize}
+        min={10}
+        max={24}
+        unit="px"
+        showMinMax
+        onChange={onTerminalFontSizeChange}
+      />
 
       {/* Cursor Blink */}
       <div className="flex items-center justify-between">
@@ -1021,6 +996,11 @@ function TerminalSettings({
 function AboutSection() {
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string>("...");
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => setAppVersion("unknown"));
+  }, []);
 
   const handleCheckUpdate = async () => {
     setIsCheckingUpdate(true);
@@ -1063,7 +1043,7 @@ function AboutSection() {
         <h1 className="text-2xl font-bold text-text-primary mb-1">
           Wynter Code
         </h1>
-        <p className="text-text-secondary">Version {APP_VERSION}</p>
+        <p className="text-text-secondary">Version {appVersion}</p>
 
         {/* Check for Updates Button */}
         <button
@@ -1112,67 +1092,113 @@ function AboutSection() {
         <div className="p-4 rounded-lg bg-bg-secondary border border-border">
           <h3 className="font-medium text-text-primary mb-2">About</h3>
           <p className="text-text-secondary leading-relaxed">
-            The ultimate toolkit for Wynter&apos;s workflow with a plethora of tools,
-            connected directly with Claude Code CLI (soon more).
+            An opinionated workflow GUI for Claude Code with 70+ integrated tools for development, testing, and productivity.
           </p>
         </div>
 
         <div className="p-4 rounded-lg bg-bg-secondary border border-border">
           <h3 className="font-medium text-text-primary mb-3">Tools & Features</h3>
 
-          <h4 className="text-sm font-medium text-accent mb-1">Development</h4>
+          <h4 className="text-sm font-medium text-accent mb-1">Development (12 Tools)</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
-            <li>Live Preview, Test Runner, Storybook Viewer</li>
-            <li>API Tester, Beads Tracker, Claude Code Stats</li>
-            <li>Farmwork Tycoon</li>
+            <li>Live Preview, Test Runner, Storybook Viewer, API Tester</li>
+            <li>Database Viewer (SQLite, Postgres, MySQL)</li>
+            <li>Claude Code Stats, Claude Limits Monitor</li>
+            <li>Beads Tracker, Auto Build, Farmwork, Farmwork Tycoon</li>
+            <li>Workspace Kanban Board</li>
           </ul>
 
-          <h4 className="text-sm font-medium text-accent mb-1">Dev Toolkit (28 Tools)</h4>
+          <h4 className="text-sm font-medium text-accent mb-1">Developer Tools (31 Tools)</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
-            <li>JSON, Base64, URL, Hash, JWT, UUID, QR Code</li>
-            <li>Regex Tester, Bcrypt, HMAC, Password Generator</li>
-            <li>Text Diff, Lorem Ipsum, Cron Parser, and more</li>
+            <li>JSON Formatter, Base64, URL Encoder, HTML Entity, String Escape</li>
+            <li>Text Diff, Case Converter, Lorem Ipsum, Slug Generator</li>
+            <li>Word Counter, List Sorter, JSON/YAML, CSV/JSON, Timestamp</li>
+            <li>Cron Parser, Regex Tester, UUID Generator, Password Generator</li>
+            <li>QR Code, Hash Generator, JWT Debugger, Bcrypt, HMAC</li>
+            <li>URL Parser, HTTP Status, User Agent Parser, IP Address Tool</li>
+            <li>Number Base, Byte Size, HTML/CSS Validator, EXIF Remover</li>
           </ul>
 
-          <h4 className="text-sm font-medium text-accent mb-1">Domain & SEO Tools (11 Tools)</h4>
+          <h4 className="text-sm font-medium text-accent mb-1">Domain Tools (11 Tools)</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
-            <li>WHOIS, DNS Lookup, SSL Certificate Checker</li>
-            <li>HTTP Headers, IP Geolocation, Redirect Tracker</li>
+            <li>WHOIS Lookup, Domain Availability, DNS Lookup, DNS Propagation</li>
+            <li>SSL Certificate, HTTP Headers, IP Geolocation, Redirect Tracker</li>
             <li>Dead Link Checker, Lighthouse Auditor, Favicon Grabber</li>
           </ul>
 
-          <h4 className="text-sm font-medium text-accent mb-1">Infrastructure</h4>
+          <h4 className="text-sm font-medium text-accent mb-1">SEO Tools (9 Tools)</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
-            <li>Port Manager, Localhost Tunnel</li>
-            <li>Background Services, System Health, Overwatch</li>
+            <li>Meta Tags Generator, Open Graph, Twitter Cards, JSON-LD</li>
+            <li>Canonical URL Helper, Robots.txt, LLMs.txt Generator</li>
+            <li>Sitemap Generator, Hreflang Generator</li>
           </ul>
 
-          <h4 className="text-sm font-medium text-accent mb-1">Utilities</h4>
+          <h4 className="text-sm font-medium text-accent mb-1">Infrastructure (6 Tools)</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
-            <li>Node Modules Cleaner, Env Manager, MCP Servers</li>
-            <li>Favicon Generator, Database Viewer</li>
+            <li>Port Manager, Localhost Tunnel, Background Services</li>
+            <li>System Health, Homebrew Manager, System Cleaner</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Design & Media (2 Tools)</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>Favicon Generator, Designer Tool (AI Image Generation)</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Utilities (6 Tools)</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>MCP Servers Manager, Environment Variables Manager</li>
+            <li>Node Modules Cleaner, Just Command Manager</li>
+            <li>File Viewer, Web Backup</li>
+          </ul>
+
+          <h4 className="text-sm font-medium text-accent mb-1">Productivity (4 Tools)</h4>
+          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
+            <li>Music / Meditation Player (Nightride FM, Radio Browser)</li>
+            <li>Bookmarks Manager, Subscription Tracker, Overwatch</li>
           </ul>
 
           <h4 className="text-sm font-medium text-accent mb-1">Core Features</h4>
           <ul className="text-text-secondary text-sm space-y-0.5">
-            <li>Multi-Panel Layouts, Multi-Session Support</li>
-            <li>Git-aware File Browser, Integrated Terminal</li>
-            <li>Command Palette, Git Integration</li>
+            <li>Multi-Panel Layouts, Multi-Session Support, Project Tabs</li>
+            <li>Git-aware File Browser, Project Search, File Finder</li>
+            <li>Integrated Terminal (GPU-accelerated), Command Palette</li>
+            <li>Monaco Code Editor, Git Integration, Compression Tools</li>
+            <li>Project Templates, Vibrancy Effects, Custom Themes</li>
           </ul>
         </div>
 
         <div className="p-4 rounded-lg bg-bg-secondary border border-border">
-          <h3 className="font-medium text-text-primary mb-2">Built With</h3>
-          <ul className="text-text-secondary space-y-1">
-            <li>Tauri 2.0 (Rust + Web)</li>
-            <li>React 18 + TypeScript</li>
-            <li>Tailwind CSS</li>
-            <li>Monaco Editor</li>
-            <li>Xterm.js (Terminal)</li>
-            <li>Zustand (State)</li>
-            <li>SQLx (Multi-database)</li>
-            <li>Recharts + Pixi.js</li>
-            <li>Claude Code CLI</li>
+          <h3 className="font-medium text-text-primary mb-3">Built With</h3>
+
+          <h4 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Frontend</h4>
+          <ul className="text-text-secondary space-y-0.5 mb-3">
+            <li>React 18 + TypeScript + Vite</li>
+            <li>Tailwind CSS + Lucide Icons</li>
+            <li>Monaco Editor (Code Editing)</li>
+            <li>Xterm.js + WebGL (Terminal)</li>
+            <li>Zustand (State Management)</li>
+            <li>Recharts + Pixi.js (Visualizations)</li>
+            <li>@dnd-kit (Drag &amp; Drop)</li>
+            <li>OverlayScrollbars, react-markdown</li>
+          </ul>
+
+          <h4 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">Backend (Rust)</h4>
+          <ul className="text-text-secondary space-y-0.5 mb-3">
+            <li>Tauri 2.0 (Desktop Framework)</li>
+            <li>Tokio (Async Runtime)</li>
+            <li>SQLx (SQLite, Postgres, MySQL)</li>
+            <li>Reqwest + tiny_http + tungstenite (HTTP/WS)</li>
+            <li>oxipng + image + webp (Image Processing)</li>
+            <li>lopdf (PDF Processing)</li>
+            <li>sysinfo + notify (System Monitoring)</li>
+            <li>window-vibrancy (macOS Effects)</li>
+          </ul>
+
+          <h4 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2">AI Integration</h4>
+          <ul className="text-text-secondary space-y-0.5">
+            <li>Claude Code CLI (Anthropic)</li>
+            <li>Codex CLI (OpenAI)</li>
+            <li>Gemini CLI (Google)</li>
           </ul>
         </div>
 
@@ -1418,9 +1444,10 @@ const CATEGORY_LABELS: Record<KeyboardShortcut["category"], string> = {
   sessions: "Sessions",
   ui: "Interface",
   editing: "Editing",
+  tools: "Tools",
 };
 
-const CATEGORY_ORDER: KeyboardShortcut["category"][] = ["navigation", "sessions", "ui", "editing"];
+const CATEGORY_ORDER: KeyboardShortcut["category"][] = ["navigation", "sessions", "ui", "tools", "editing"];
 
 function KeyboardShortcutsSection() {
   // Group shortcuts by category

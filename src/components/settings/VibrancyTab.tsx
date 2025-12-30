@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Sparkles, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { Slider } from "@/components/ui";
 
 interface VibrancySupportInfo {
   supported: boolean;
@@ -118,39 +119,19 @@ export function VibrancyTab() {
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <label className="text-sm font-medium text-text-primary">
-              Darkness
-            </label>
-            <p className="text-xs text-text-secondary">
-              Adjust the darkness of the window background
-            </p>
-          </div>
-          <span className="text-sm text-text-secondary font-mono">
-            {Math.round(vibrancyDarkness * 100)}%
-          </span>
-        </div>
-
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={vibrancyDarkness * 100}
-          onChange={(e) => setVibrancyDarkness(Number(e.target.value) / 100)}
-          disabled={!vibrancyEnabled || !supportInfo?.supported}
-          className={cn(
-            "w-full accent-accent",
-            (!vibrancyEnabled || !supportInfo?.supported) && "opacity-50 cursor-not-allowed"
-          )}
-        />
-
-        <div className="flex justify-between text-xs text-text-secondary">
-          <span>Light</span>
-          <span>Dark</span>
-        </div>
-      </div>
+      <Slider
+        label="Darkness"
+        description="Adjust the darkness of the window background"
+        value={Math.round(vibrancyDarkness * 100)}
+        min={0}
+        max={100}
+        unit="%"
+        showMinMax
+        minLabel="Light"
+        maxLabel="Dark"
+        disabled={!vibrancyEnabled || !supportInfo?.supported}
+        onChange={(val) => setVibrancyDarkness(val / 100)}
+      />
     </div>
   );
 }

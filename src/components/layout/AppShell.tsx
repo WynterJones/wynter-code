@@ -119,6 +119,47 @@ export function AppShell() {
     window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openProjectSearch" } }));
   }, []);
 
+  // Tool shortcut handlers
+  const handleOpenDatabaseViewer = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openDatabaseViewer" } }));
+  }, []);
+
+  const handleOpenTestRunner = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openTestRunner" } }));
+  }, []);
+
+  const handleOpenEnvManager = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openEnvManager" } }));
+  }, []);
+
+  const handleOpenMeditation = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openMeditation" } }));
+  }, []);
+
+  const handleOpenPortManager = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openPortManager" } }));
+  }, []);
+
+  const handleOpenBookmarks = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openBookmarks" } }));
+  }, []);
+
+  const handleOpenApiTester = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openApiTester" } }));
+  }, []);
+
+  const handleOpenSystemHealth = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openSystemHealth" } }));
+  }, []);
+
+  const handleOpenDevToolkit = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openDevToolkit" } }));
+  }, []);
+
+  const handleOpenOverwatch = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openOverwatch" } }));
+  }, []);
+
   const handleOpenProjectFromWelcome = useCallback(async () => {
     try {
       const homeDir = await invoke<string>("get_home_dir");
@@ -207,9 +248,23 @@ export function AppShell() {
     onOpenSettings: () => setShowSettings(true),
     onToggleSidebar: toggleSidebar,
     onToggleFileBrowser: handleToggleFileBrowser,
+    onOpenProjectSearch: handleOpenProjectSearch,
     onShowShortcuts: () => setShowShortcuts(true),
     onFocusPrompt: handleFocusPrompt,
     onOpenCommandPalette: openCommandPalette,
+    // Tool shortcuts
+    onOpenDatabaseViewer: handleOpenDatabaseViewer,
+    onOpenBeadsTracker: handleOpenBeads,
+    onOpenTestRunner: handleOpenTestRunner,
+    onOpenLivePreview: handleOpenLivePreview,
+    onOpenEnvManager: handleOpenEnvManager,
+    onOpenMeditation: handleOpenMeditation,
+    onOpenPortManager: handleOpenPortManager,
+    onOpenBookmarks: handleOpenBookmarks,
+    onOpenApiTester: handleOpenApiTester,
+    onOpenSystemHealth: handleOpenSystemHealth,
+    onOpenDevToolkit: handleOpenDevToolkit,
+    onOpenOverwatch: handleOpenOverwatch,
   });
 
   // Show onboarding if not completed

@@ -215,7 +215,7 @@ export function WebBackupTab() {
                 <button
                   onClick={handleSaveToken}
                   disabled={connectionStatus === "connecting"}
-                  className="px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 disabled:opacity-50 transition-colors"
+                  className="btn btn-primary"
                 >
                   {connectionStatus === "connecting" ? (
                     <Loader2 className="w-4 h-4 animate-spin" />

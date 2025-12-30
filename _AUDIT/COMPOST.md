@@ -3,7 +3,7 @@
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
 **Last Updated:** 2025-12-29
-**Composted Ideas:** 39
+**Composted Ideas:** 40
 
 ---
 
@@ -18,6 +18,10 @@
 ---
 
 ## Composted Ideas
+
+### Add Ralph Plugin
+Integration with Ralph Wiggum automation tool for auto-build workflows.
+> **Why rejected (2025-12-29):** Not adding much value - our existing auto build system is already more sophisticated than Ralph Wiggum's functionality. Our system has concurrent workers, phase-based state machine, built-in verification gates, SILO context files, file locking, and human review queue. Ralph Wiggum is just a simple while loop.
 
 ### Floating Webcam
 Floating webcam overlay with desktop pinning, customizable borders/effects/shadows, crop selection, Decart AI integration for real-time effects.

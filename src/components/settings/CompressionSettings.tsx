@@ -1,5 +1,6 @@
 import { Archive, ImageMinus, Info } from "lucide-react";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { Toggle } from "@/components/ui/Toggle";
 
 export function CompressionSettings() {
   const {
@@ -31,18 +32,11 @@ export function CompressionSettings() {
               Replace existing archive if one exists with the same name
             </p>
           </div>
-          <button
-            onClick={() => setCompressionArchiveOverwrite(!compressionArchiveOverwrite)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              compressionArchiveOverwrite ? "bg-accent-blue" : "bg-bg-tertiary"
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                compressionArchiveOverwrite ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </button>
+          <Toggle
+            checked={compressionArchiveOverwrite}
+            onChange={setCompressionArchiveOverwrite}
+            size="sm"
+          />
         </div>
       </div>
 
@@ -62,18 +56,11 @@ export function CompressionSettings() {
               Replace original files when optimizing (otherwise creates _optimized suffix)
             </p>
           </div>
-          <button
-            onClick={() => setCompressionMediaOverwrite(!compressionMediaOverwrite)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-              compressionMediaOverwrite ? "bg-accent-blue" : "bg-bg-tertiary"
-            }`}
-          >
-            <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                compressionMediaOverwrite ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </button>
+          <Toggle
+            checked={compressionMediaOverwrite}
+            onChange={setCompressionMediaOverwrite}
+            size="sm"
+          />
         </div>
       </div>
 

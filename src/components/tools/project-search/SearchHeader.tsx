@@ -65,9 +65,14 @@ export function SearchHeader({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [isSearchHovered, setIsSearchHovered] = useState(false);
 
-  // Auto-focus search input on mount
+  // Auto-focus search input on mount and select all if there's text
   useEffect(() => {
-    searchInputRef.current?.focus();
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
+      if (query) {
+        searchInputRef.current.select();
+      }
+    }
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

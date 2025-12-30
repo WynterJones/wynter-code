@@ -12,9 +12,10 @@ const CATEGORY_LABELS: Record<KeyboardShortcut["category"], string> = {
   sessions: "Sessions",
   ui: "Interface",
   editing: "Editing",
+  tools: "Tools",
 };
 
-const CATEGORY_ORDER: KeyboardShortcut["category"][] = ["navigation", "sessions", "ui", "editing"];
+const CATEGORY_ORDER: KeyboardShortcut["category"][] = ["navigation", "sessions", "ui", "tools", "editing"];
 
 export function KeyboardShortcutsPopup({ onClose }: KeyboardShortcutsPopupProps) {
   const handleKeyDown = useCallback(

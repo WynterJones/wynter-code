@@ -10,7 +10,7 @@ export interface KeyboardShortcut {
   key: string;
   modifiers: ("ctrl" | "meta" | "shift" | "alt")[];
   description: string;
-  category: "navigation" | "sessions" | "ui" | "editing";
+  category: "navigation" | "sessions" | "ui" | "editing" | "tools";
   action: string;
 }
 
@@ -30,6 +30,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
   { key: "b", modifiers: ["ctrl", "meta"], description: "Toggle sidebar", category: "ui", action: "toggleSidebar" },
   { key: ",", modifiers: ["ctrl", "meta"], description: "Open settings", category: "ui", action: "openSettings" },
   { key: "e", modifiers: ["ctrl", "meta"], description: "Toggle file browser", category: "ui", action: "toggleFileBrowser" },
+  { key: "f", modifiers: ["ctrl", "meta"], description: "Open project search", category: "ui", action: "openProjectSearch" },
   { key: "/", modifiers: ["ctrl", "meta"], description: "Show keyboard shortcuts", category: "ui", action: "showShortcuts" },
 
   // Editing
@@ -39,24 +40,65 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
 
   // Sessions
   { key: "Tab", modifiers: ["shift"], description: "Cycle permission mode", category: "sessions", action: "cycleMode" },
+
+  // Tools
+  { key: "d", modifiers: ["ctrl", "meta"], description: "Open database viewer", category: "tools", action: "openDatabaseViewer" },
+  { key: "g", modifiers: ["ctrl", "meta"], description: "Open issues (Beads)", category: "tools", action: "openBeadsTracker" },
+  { key: "j", modifiers: ["ctrl", "meta"], description: "Open test runner", category: "tools", action: "openTestRunner" },
+  { key: "r", modifiers: ["ctrl", "meta"], description: "Open live preview", category: "tools", action: "openLivePreview" },
+  { key: "e", modifiers: ["ctrl", "meta", "shift"], description: "Open env manager", category: "tools", action: "openEnvManager" },
+  { key: "m", modifiers: ["ctrl", "meta", "shift"], description: "Open music/meditation", category: "tools", action: "openMeditation" },
+  { key: "p", modifiers: ["ctrl", "meta", "shift"], description: "Open port manager", category: "tools", action: "openPortManager" },
+  { key: "b", modifiers: ["ctrl", "meta", "shift"], description: "Open bookmarks", category: "tools", action: "openBookmarks" },
+  { key: "a", modifiers: ["alt"], description: "Open API tester", category: "tools", action: "openApiTester" },
+  { key: "s", modifiers: ["alt"], description: "Open system health", category: "tools", action: "openSystemHealth" },
+  { key: "d", modifiers: ["alt"], description: "Open dev toolkit", category: "tools", action: "openDevToolkit" },
+  { key: "o", modifiers: ["ctrl", "meta", "shift"], description: "Open overwatch", category: "tools", action: "openOverwatch" },
 ];
 
 interface UseKeyboardShortcutsOptions {
   onOpenSettings: () => void;
   onToggleSidebar: () => void;
   onToggleFileBrowser: () => void;
+  onOpenProjectSearch: () => void;
   onShowShortcuts: () => void;
   onFocusPrompt: () => void;
   onOpenCommandPalette: () => void;
+  // Tool shortcuts
+  onOpenDatabaseViewer: () => void;
+  onOpenBeadsTracker: () => void;
+  onOpenTestRunner: () => void;
+  onOpenLivePreview: () => void;
+  onOpenEnvManager: () => void;
+  onOpenMeditation: () => void;
+  onOpenPortManager: () => void;
+  onOpenBookmarks: () => void;
+  onOpenApiTester: () => void;
+  onOpenSystemHealth: () => void;
+  onOpenDevToolkit: () => void;
+  onOpenOverwatch: () => void;
 }
 
 export function useKeyboardShortcuts({
   onOpenSettings,
   onToggleSidebar,
   onToggleFileBrowser,
+  onOpenProjectSearch,
   onShowShortcuts,
   onFocusPrompt,
   onOpenCommandPalette,
+  onOpenDatabaseViewer,
+  onOpenBeadsTracker,
+  onOpenTestRunner,
+  onOpenLivePreview,
+  onOpenEnvManager,
+  onOpenMeditation,
+  onOpenPortManager,
+  onOpenBookmarks,
+  onOpenApiTester,
+  onOpenSystemHealth,
+  onOpenDevToolkit,
+  onOpenOverwatch,
 }: UseKeyboardShortcutsOptions) {
   const { projects, activeProjectId, setActiveProject } = useProjectStore();
   const { createSession, removeSession, getSessionsForProject, getActiveSession, setActiveSession, updateSessionPermissionMode } = useSessionStore();
@@ -131,6 +173,13 @@ export function useKeyboardShortcuts({
       return;
     }
 
+    // Ctrl/Cmd + F: Open project search
+    if (isMod && !isShift && e.key.toLowerCase() === "f") {
+      e.preventDefault();
+      onOpenProjectSearch();
+      return;
+    }
+
     // Ctrl/Cmd + /: Show keyboard shortcuts
     if (isMod && !isShift && e.key === "/") {
       e.preventDefault();
@@ -183,6 +232,92 @@ export function useKeyboardShortcuts({
       }
       return;
     }
+
+    // === TOOL SHORTCUTS ===
+
+    // Ctrl/Cmd + D: Open database viewer
+    if (isMod && !isShift && e.key.toLowerCase() === "d") {
+      e.preventDefault();
+      onOpenDatabaseViewer();
+      return;
+    }
+
+    // Ctrl/Cmd + G: Open beads tracker (issues)
+    if (isMod && !isShift && e.key.toLowerCase() === "g") {
+      e.preventDefault();
+      onOpenBeadsTracker();
+      return;
+    }
+
+    // Ctrl/Cmd + J: Open test runner
+    if (isMod && !isShift && e.key.toLowerCase() === "j") {
+      e.preventDefault();
+      onOpenTestRunner();
+      return;
+    }
+
+    // Ctrl/Cmd + R: Open live preview
+    if (isMod && !isShift && e.key.toLowerCase() === "r") {
+      e.preventDefault();
+      onOpenLivePreview();
+      return;
+    }
+
+    // Ctrl/Cmd + Shift + E: Open env manager
+    if (isMod && isShift && e.key.toLowerCase() === "e") {
+      e.preventDefault();
+      onOpenEnvManager();
+      return;
+    }
+
+    // Ctrl/Cmd + Shift + M: Open music/meditation
+    if (isMod && isShift && e.key.toLowerCase() === "m") {
+      e.preventDefault();
+      onOpenMeditation();
+      return;
+    }
+
+    // Ctrl/Cmd + Shift + P: Open port manager
+    if (isMod && isShift && e.key.toLowerCase() === "p") {
+      e.preventDefault();
+      onOpenPortManager();
+      return;
+    }
+
+    // Ctrl/Cmd + Shift + B: Open bookmarks
+    if (isMod && isShift && e.key.toLowerCase() === "b") {
+      e.preventDefault();
+      onOpenBookmarks();
+      return;
+    }
+
+    // Alt + A: Open API tester
+    if (e.altKey && !isMod && !isShift && e.key.toLowerCase() === "a") {
+      e.preventDefault();
+      onOpenApiTester();
+      return;
+    }
+
+    // Alt + S: Open system health
+    if (e.altKey && !isMod && !isShift && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      onOpenSystemHealth();
+      return;
+    }
+
+    // Alt + D: Open dev toolkit
+    if (e.altKey && !isMod && !isShift && e.key.toLowerCase() === "d") {
+      e.preventDefault();
+      onOpenDevToolkit();
+      return;
+    }
+
+    // Ctrl/Cmd + Shift + O: Open overwatch
+    if (isMod && isShift && e.key.toLowerCase() === "o") {
+      e.preventDefault();
+      onOpenOverwatch();
+      return;
+    }
   }, [
     projects,
     activeProjectId,
@@ -196,9 +331,22 @@ export function useKeyboardShortcuts({
     onOpenSettings,
     onToggleSidebar,
     onToggleFileBrowser,
+    onOpenProjectSearch,
     onShowShortcuts,
     onFocusPrompt,
     onOpenCommandPalette,
+    onOpenDatabaseViewer,
+    onOpenBeadsTracker,
+    onOpenTestRunner,
+    onOpenLivePreview,
+    onOpenEnvManager,
+    onOpenMeditation,
+    onOpenPortManager,
+    onOpenBookmarks,
+    onOpenApiTester,
+    onOpenSystemHealth,
+    onOpenDevToolkit,
+    onOpenOverwatch,
   ]);
 
   useEffect(() => {

@@ -53,3 +53,6 @@ export type {
 
 export { TabContextMenu } from "./TabContextMenu";
 export type { TabContextMenuProps } from "./TabContextMenu";
+
+export { Slider } from "./Slider";
+export type { SliderProps } from "./Slider";
