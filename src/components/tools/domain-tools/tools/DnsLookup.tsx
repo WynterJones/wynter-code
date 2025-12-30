@@ -14,8 +14,12 @@ interface DnsRecord {
 
 const RECORD_TYPES = ["A", "AAAA", "MX", "TXT", "NS", "CNAME", "SOA", "PTR", "SRV"];
 
-export function DnsLookup() {
-  const [domain, setDomain] = useState("");
+interface DnsLookupProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function DnsLookup({ url, onUrlChange }: DnsLookupProps) {
   const [recordType, setRecordType] = useState("A");
   const [records, setRecords] = useState<DnsRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,14 +27,14 @@ export function DnsLookup() {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const handleLookup = async () => {
-    if (!domain.trim()) return;
+    if (!url.trim()) return;
 
     setLoading(true);
     setError(null);
     setRecords([]);
 
     try {
-      const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
+      const cleanDomain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
       const result = await invoke<string>("dns_lookup", {
         domain: cleanDomain,
         recordType
@@ -109,8 +113,8 @@ export function DnsLookup() {
         <div className="relative flex-1">
           <input
             type="text"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLookup()}
             placeholder="Enter domain (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -128,7 +132,7 @@ export function DnsLookup() {
             </option>
           ))}
         </select>
-        <Button onClick={handleLookup} disabled={loading || !domain.trim()}>
+        <Button variant="primary" onClick={handleLookup} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Lookup"}
         </Button>
       </div>
@@ -140,7 +144,7 @@ export function DnsLookup() {
             key={type}
             onClick={() => {
               setRecordType(type);
-              if (domain.trim()) handleLookup();
+              if (url.trim()) handleLookup();
             }}
             className={cn(
               "px-3 py-1 rounded-full text-xs font-medium transition-colors",
@@ -200,7 +204,7 @@ export function DnsLookup() {
       )}
 
       {/* Empty State */}
-      {!loading && !error && records.length === 0 && domain && (
+      {!loading && !error && records.length === 0 && url && (
         <div className="flex-1 flex items-center justify-center text-text-secondary">
           No {recordType} records found
         </div>

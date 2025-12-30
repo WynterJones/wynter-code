@@ -143,6 +143,7 @@ const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
 export function DomainToolsPopup({ isOpen, onClose, initialTool }: DomainToolsPopupProps) {
   const [activeTool, setActiveTool] = useState("whois");
+  const [sharedUrl, setSharedUrl] = useState("");
 
   // Set initial tool when provided
   useEffect(() => {
@@ -198,22 +199,22 @@ export function DomainToolsPopup({ isOpen, onClose, initialTool }: DomainToolsPo
             categories={TOOL_CATEGORIES}
             activeToolId={activeTool}
             onToolSelect={setActiveTool}
-            searchPlaceholder="Search domain tools..."
+            searchPlaceholder="Search..."
           />
 
           <ScrollArea className="flex-1" scrollbarVisibility="visible">
             <div className="h-full">
-              {activeTool === "whois" && <WhoisLookup />}
-              {activeTool === "availability" && <DomainAvailability />}
-              {activeTool === "dns" && <DnsLookup />}
-              {activeTool === "propagation" && <DnsPropagation />}
-              {activeTool === "ssl" && <SslChecker />}
-              {activeTool === "headers" && <HttpHeadersInspector />}
-              {activeTool === "ip" && <IpAddressLookup />}
-              {activeTool === "redirect" && <RedirectTracker />}
-              {activeTool === "dead-links" && <DeadLinkChecker />}
-              {activeTool === "lighthouse" && <LighthouseAuditor />}
-              {activeTool === "favicon-grabber" && <FaviconGrabber />}
+              {activeTool === "whois" && <WhoisLookup url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "availability" && <DomainAvailability url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "dns" && <DnsLookup url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "propagation" && <DnsPropagation url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "ssl" && <SslChecker url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "headers" && <HttpHeadersInspector url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "ip" && <IpAddressLookup url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "redirect" && <RedirectTracker url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "dead-links" && <DeadLinkChecker url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "lighthouse" && <LighthouseAuditor url={sharedUrl} onUrlChange={setSharedUrl} />}
+              {activeTool === "favicon-grabber" && <FaviconGrabber url={sharedUrl} onUrlChange={setSharedUrl} />}
             </div>
           </ScrollArea>
         </div>

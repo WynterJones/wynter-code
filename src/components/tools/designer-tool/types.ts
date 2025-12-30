@@ -13,7 +13,7 @@ export interface ImagePreset {
 export const IMAGE_PRESETS: ImagePreset[] = [
   {
     id: "favicon",
-    name: "Favicon",
+    name: "Small Square",
     width: 512,
     height: 512,
     aspectRatio: "1:1",

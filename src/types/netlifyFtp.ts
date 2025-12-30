@@ -67,11 +67,18 @@ export interface DeployConfig {
   draft?: boolean;
 }
 
-export type ConnectionStatus = 
+export type ConnectionStatus =
   | 'disconnected'
-  | 'connecting' 
-  | 'connected' 
+  | 'connecting'
+  | 'connected'
   | 'error';
+
+export interface SiteGroup {
+  id: string;
+  name: string;
+  isCollapsed: boolean;
+  siteIds: string[];
+}
 
 export interface NetlifyFtpState {
   // Auth

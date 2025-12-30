@@ -120,12 +120,53 @@ pub async fn http_get_json(url: String) -> Result<String, String> {
         .arg("-s")
         .arg("-L")
         .arg("--max-time")
-        .arg("10")
+        .arg("60") // Increased for slow APIs like PageSpeed Insights
         .arg("-H")
         .arg("Accept: application/json")
+        .arg("-w")
+        .arg("\n---HTTP_CODE---%{http_code}")
         .arg(&url)
         .output()
         .map_err(|e| format!("Failed to execute curl command: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+
+    if output.status.success() {
+        // Check if we got an HTTP error code
+        if let Some(pos) = stdout.rfind("---HTTP_CODE---") {
+            let http_code = stdout[pos + 15..].trim();
+            let body = stdout[..pos].to_string();
+
+            if http_code.starts_with('4') || http_code.starts_with('5') {
+                // Return the body anyway as it may contain error details
+                return Ok(body);
+            }
+            return Ok(body);
+        }
+        Ok(stdout)
+    } else {
+        if stderr.is_empty() {
+            Err("HTTP request failed: Connection timed out or refused".to_string())
+        } else {
+            Err(format!("HTTP request failed: {}", stderr))
+        }
+    }
+}
+
+/// Fetch HTML content from a URL
+#[tauri::command]
+pub async fn http_get_html(url: String) -> Result<String, String> {
+    let output = Command::new("curl")
+        .arg("-s")
+        .arg("-L")
+        .arg("--max-time")
+        .arg("15")
+        .arg("-H")
+        .arg("User-Agent: Mozilla/5.0 (compatible; SEOTools/1.0)")
+        .arg(&url)
+        .output()
+        .map_err(|e| format!("Failed to execute curl: {}", e))?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())

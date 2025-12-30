@@ -47,7 +47,15 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(
             )}
           </div>
         )}
-        <div className="relative">
+        <div className="relative h-2">
+          {/* Track background */}
+          <div className="absolute inset-0 rounded-full bg-neutral-500" />
+          {/* Filled track */}
+          <div
+            className="absolute top-0 left-0 h-full rounded-full bg-accent"
+            style={{ width: `${percentage}%` }}
+          />
+          {/* Input */}
           <input
             ref={ref}
             type="range"
@@ -58,33 +66,31 @@ export const Slider = forwardRef<HTMLInputElement, SliderProps>(
             onChange={(e) => onChange(Number(e.target.value))}
             disabled={disabled}
             className={cn(
-              "w-full h-1.5 rounded-full appearance-none cursor-pointer",
-              "bg-bg-tertiary",
+              "absolute inset-0 w-full h-full appearance-none cursor-pointer bg-transparent",
               "[&::-webkit-slider-thumb]:appearance-none",
-              "[&::-webkit-slider-thumb]:w-3.5",
-              "[&::-webkit-slider-thumb]:h-3.5",
+              "[&::-webkit-slider-thumb]:w-4",
+              "[&::-webkit-slider-thumb]:h-4",
               "[&::-webkit-slider-thumb]:rounded-full",
               "[&::-webkit-slider-thumb]:bg-accent",
-              "[&::-webkit-slider-thumb]:shadow-sm",
+              "[&::-webkit-slider-thumb]:shadow-md",
               "[&::-webkit-slider-thumb]:cursor-pointer",
               "[&::-webkit-slider-thumb]:transition-transform",
               "[&::-webkit-slider-thumb]:hover:scale-110",
               "[&::-webkit-slider-thumb]:active:scale-95",
-              "[&::-moz-range-thumb]:w-3.5",
-              "[&::-moz-range-thumb]:h-3.5",
+              "[&::-moz-range-thumb]:w-4",
+              "[&::-moz-range-thumb]:h-4",
               "[&::-moz-range-thumb]:rounded-full",
               "[&::-moz-range-thumb]:bg-accent",
               "[&::-moz-range-thumb]:border-0",
               "[&::-moz-range-thumb]:cursor-pointer",
+              "[&::-webkit-slider-runnable-track]:bg-transparent",
+              "[&::-moz-range-track]:bg-transparent",
               "focus:outline-none",
               "focus-visible:ring-2 focus-visible:ring-accent/50",
               disabled && "opacity-50 cursor-not-allowed",
               disabled && "[&::-webkit-slider-thumb]:cursor-not-allowed",
               disabled && "[&::-moz-range-thumb]:cursor-not-allowed"
             )}
-            style={{
-              background: `linear-gradient(to right, var(--color-accent) 0%, var(--color-accent) ${percentage}%, var(--color-bg-tertiary) ${percentage}%, var(--color-bg-tertiary) 100%)`,
-            }}
             {...props}
           />
         </div>

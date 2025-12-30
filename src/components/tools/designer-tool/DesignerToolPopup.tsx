@@ -82,20 +82,24 @@ export function DesignerToolPopup({ isOpen, onClose }: DesignerToolPopupProps) {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Designer Tool" showCloseButton className="max-w-5xl w-[95vw]">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Designer Tool"
+      showCloseButton
+      className="max-w-5xl w-[95vw]"
+      headerActions={
+        <Tooltip content="API Settings">
+          <IconButton
+            onClick={() => setShowApiKeySetup(true)}
+            className="text-text-secondary hover:text-text-primary"
+          >
+            <Settings className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      }
+    >
       <div className="flex flex-col h-[80vh] max-h-[700px]">
-        {/* Toolbar */}
-        <div className="flex items-center justify-end px-4 py-2 border-b border-border">
-          <Tooltip content="API Settings">
-            <IconButton
-              onClick={() => setShowApiKeySetup(true)}
-              className="text-text-secondary hover:text-text-primary"
-            >
-              <Settings className="w-4 h-4" />
-            </IconButton>
-          </Tooltip>
-        </div>
-
         {/* Content */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left Panel - Controls */}
@@ -139,16 +143,13 @@ export function DesignerToolPopup({ isOpen, onClose }: DesignerToolPopupProps) {
                         key={preset.id}
                         onClick={() => setSelectedPresetId(preset.id)}
                         className={cn(
-                          "px-3 py-2 rounded-md text-left text-sm transition-colors",
+                          "!text-xs",
                           selectedPresetId === preset.id
-                            ? "bg-accent text-white"
-                            : "bg-secondary text-secondary hover:bg-secondary/80 hover:text-primary"
+                            ? "btn-primary"
+                            : "btn-secondary"
                         )}
                       >
-                        <div className="font-medium">{preset.name}</div>
-                        <div className="text-xs opacity-70">
-                          {preset.width}x{preset.height}
-                        </div>
+                        {preset.name}
                       </button>
                     ))}
                   </div>

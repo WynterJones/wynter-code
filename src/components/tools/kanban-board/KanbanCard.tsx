@@ -44,10 +44,13 @@ export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggl
     setDeleteProgress(0);
   }, []);
 
-  const handleDeleteMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+  const handleDeletePointerDown = useCallback(
+    (e: React.PointerEvent) => {
       e.stopPropagation();
       e.preventDefault();
+
+      // Capture the pointer to prevent mouse leave during hold
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
       // Start progress animation
       const startTime = Date.now();
@@ -66,8 +69,18 @@ export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggl
     [task.id, onDelete, clearDeleteTimers]
   );
 
-  const handleDeleteMouseUp = useCallback(
-    (e: React.MouseEvent) => {
+  const handleDeletePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      e.stopPropagation();
+      // Release pointer capture
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      clearDeleteTimers();
+    },
+    [clearDeleteTimers]
+  );
+
+  const handleDeletePointerCancel = useCallback(
+    (e: React.PointerEvent) => {
       e.stopPropagation();
       clearDeleteTimers();
     },
@@ -96,7 +109,11 @@ export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggl
     >
       {/* Actions (visible on hover) */}
       {isHovered && (onEdit || onDelete || showLockToggle) && (
-        <div className="absolute top-2 right-2 flex items-center gap-1">
+        <div
+          className="absolute top-2 right-2 flex items-center gap-1"
+          onPointerDown={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {showLockToggle && onToggleLock && (
             <Tooltip content={task.locked ? "Mark incomplete" : "Mark complete"}>
               <IconButton
@@ -161,11 +178,11 @@ export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggl
                 <IconButton
                   size="sm"
                   variant="danger"
-                  onMouseDown={handleDeleteMouseDown}
-                  onMouseUp={handleDeleteMouseUp}
-                  onMouseLeave={handleDeleteMouseUp}
+                  onPointerDown={handleDeletePointerDown}
+                  onPointerUp={handleDeletePointerUp}
+                  onPointerCancel={handleDeletePointerCancel}
                   className={cn(
-                    "h-6 w-6 select-none",
+                    "h-6 w-6 select-none touch-none",
                     deleteProgress > 0 && "bg-red-500/20"
                   )}
                 >

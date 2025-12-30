@@ -7,6 +7,7 @@ import {
   Loader2,
   Upload,
   ExternalLink,
+  FolderPlus,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
@@ -41,6 +42,9 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
   const [isResizing, setIsResizing] = useState(false);
   const [isDeployingProject, setIsDeployingProject] = useState(false);
   const [deployProjectMessage, setDeployProjectMessage] = useState("");
+  const [showNewGroupDialog, setShowNewGroupDialog] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [showDeployConfirm, setShowDeployConfirm] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   // Get active project
@@ -62,6 +66,8 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     isDeploying,
     deployProgress,
     deployMessage,
+    groups,
+    ungroupedCollapsed,
     setApiToken,
     testConnection,
     disconnect,
@@ -72,6 +78,14 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     deployZip,
     rollbackDeploy,
     clearError,
+    createGroup,
+    renameGroup,
+    deleteGroup,
+    toggleGroupCollapse,
+    toggleUngroupedCollapse,
+    reorderGroups,
+    addSiteToGroup,
+    removeSiteFromGroup,
   } = useNetlifyFtpStore();
 
   const currentSite = useMemo(
@@ -152,6 +166,14 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     }
   }, [newSiteName, createSite, selectSite]);
 
+  const handleCreateGroup = useCallback(() => {
+    if (newGroupName.trim()) {
+      createGroup(newGroupName.trim());
+      setNewGroupName("");
+      setShowNewGroupDialog(false);
+    }
+  }, [newGroupName, createGroup]);
+
   const handleDeleteSite = useCallback(
     async (siteId: string) => {
       await deleteSite(siteId);
@@ -180,7 +202,13 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     [currentSiteId, rollbackDeploy],
   );
 
-  const handleDeployProject = useCallback(async () => {
+  const handleDeployProjectClick = useCallback(() => {
+    if (!currentSiteId || !activeProject?.path) return;
+    setShowDeployConfirm(true);
+  }, [currentSiteId, activeProject?.path]);
+
+  const handleDeployProjectConfirm = useCallback(async () => {
+    setShowDeployConfirm(false);
     if (!currentSiteId || !activeProject?.path) return;
 
     setIsDeployingProject(true);
@@ -340,12 +368,34 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                 className="relative border-r border-border flex flex-col shrink-0 bg-bg-primary"
                 style={{ width: sidebarWidth }}
               >
+                {/* Group header with add button */}
+                <div className="flex items-center justify-between px-2 py-1.5 border-b border-border">
+                  <span className="text-xs text-text-secondary font-medium">Sites</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowNewGroupDialog(true)}
+                    title="New Group"
+                    className="!p-1 !h-6"
+                  >
+                    <FolderPlus className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
                 <SiteList
                   sites={sites}
                   selectedSiteId={currentSiteId}
                   onSelectSite={selectSite}
                   onDeleteSite={handleDeleteSite}
                   isLoading={isLoadingSites}
+                  groups={groups}
+                  ungroupedCollapsed={ungroupedCollapsed}
+                  onToggleGroupCollapse={toggleGroupCollapse}
+                  onToggleUngroupedCollapse={toggleUngroupedCollapse}
+                  onRenameGroup={renameGroup}
+                  onDeleteGroup={deleteGroup}
+                  onReorderGroups={reorderGroups}
+                  onAddSiteToGroup={addSiteToGroup}
+                  onRemoveSiteFromGroup={removeSiteFromGroup}
                 />
 
                 {/* Resize handle */}
@@ -404,7 +454,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                         disabled={!currentSite}
                         projectPath={activeProject?.path}
                         projectName={activeProject?.name}
-                        onDeployProject={handleDeployProject}
+                        onDeployProject={handleDeployProjectClick}
                         isDeployingProject={isDeployingProject}
                         deployProjectMessage={deployProjectMessage}
                       />
@@ -462,6 +512,77 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                 <Button
                   variant="ghost"
                   onClick={() => setShowNewSiteDialog(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* New Group Dialog */}
+        {showNewGroupDialog && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-bg-secondary border border-border rounded-lg p-4 w-80">
+              <h3 className="text-sm font-semibold mb-3">Create New Group</h3>
+              <label className="block text-xs text-text-secondary mb-2">
+                Group name
+              </label>
+              <Input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="My Group"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateGroup();
+                  if (e.key === "Escape") setShowNewGroupDialog(false);
+                }}
+              />
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  onClick={handleCreateGroup}
+                  disabled={!newGroupName.trim()}
+                >
+                  Create
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowNewGroupDialog(false)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Deploy Confirmation Dialog */}
+        {showDeployConfirm && currentSite && activeProject && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-bg-secondary border border-border rounded-lg p-4 w-96">
+              <h3 className="text-sm font-semibold mb-3">Deploy to Netlify</h3>
+              <p className="text-xs text-text-secondary mb-4">
+                Deploy <span className="text-text-primary font-medium">{activeProject.name}</span> to{" "}
+                <span className="text-accent font-medium">
+                  {currentSite.custom_domain || currentSite.url.replace(/https?:\/\//, "")}
+                </span>?
+              </p>
+              <p className="text-xs text-text-secondary mb-4">
+                The build folder (if detected) or full project will be uploaded.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  onClick={handleDeployProjectConfirm}
+                >
+                  Deploy
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowDeployConfirm(false)}
                 >
                   Cancel
                 </Button>

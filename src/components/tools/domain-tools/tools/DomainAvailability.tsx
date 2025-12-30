@@ -14,8 +14,12 @@ interface DomainCheck {
 
 const POPULAR_TLDS = [".com", ".net", ".org", ".io", ".co", ".dev", ".app", ".ai", ".xyz", ".tech"];
 
-export function DomainAvailability() {
-  const [baseName, setBaseName] = useState("");
+interface DomainAvailabilityProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function DomainAvailability({ url, onUrlChange }: DomainAvailabilityProps) {
   const [checks, setChecks] = useState<DomainCheck[]>([]);
   const [loading, setLoading] = useState(false);
   const [customTld, setCustomTld] = useState("");
@@ -37,9 +41,9 @@ export function DomainAvailability() {
   };
 
   const handleCheck = async () => {
-    if (!baseName.trim()) return;
+    if (!url.trim()) return;
 
-    const cleanName = baseName.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const cleanName = url.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
     // Initialize checks for all TLDs
     const initialChecks: DomainCheck[] = POPULAR_TLDS.map(tld => ({
@@ -94,8 +98,8 @@ export function DomainAvailability() {
         <div className="relative flex-1">
           <input
             type="text"
-            value={baseName}
-            onChange={(e) => setBaseName(e.target.value)}
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCheck()}
             placeholder="Enter domain name (without TLD)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -109,7 +113,7 @@ export function DomainAvailability() {
           placeholder=".custom"
           className="w-24 px-3 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
         />
-        <Button onClick={handleCheck} disabled={loading || !baseName.trim()}>
+        <Button variant="primary" onClick={handleCheck} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Check"}
         </Button>
       </div>

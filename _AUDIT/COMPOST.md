@@ -2,8 +2,8 @@
 
 > Archive of rejected ideas. Reference to avoid re-proposing and remember why we didn't pursue something.
 
-**Last Updated:** 2025-12-28
-**Composted Ideas:** 38
+**Last Updated:** 2025-12-29
+**Composted Ideas:** 39
 
 ---
 
@@ -18,6 +18,10 @@
 ---
 
 ## Composted Ideas
+
+### Floating Webcam
+Floating webcam overlay with desktop pinning, customizable borders/effects/shadows, crop selection, Decart AI integration for real-time effects.
+> **Why rejected (2025-12-29):** Not helpful and camera having issues.
 
 ### Color Picker Tool
 System-wide color picker with magnifier overlay, HSL controls, format conversion (HEX/RGB/HSL), and color history.

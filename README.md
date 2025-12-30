@@ -68,17 +68,6 @@ Everything for search engine optimization.
 
 ---
 
-### Recording & Media
-
-Create content without leaving your IDE.
-
-- **Floating Webcam** — Desktop-pinned overlay with customizable borders, effects, and shadows
-- **Decart AI Integration** — Real-time AI effects for your webcam
-- **Screen Studio** — Cinematic screen recorder with zoom effects
-- **GIF Recorder** — Record screen regions directly to GIF
-
----
-
 ### Infrastructure Tools
 
 Keep your local dev environment under control.

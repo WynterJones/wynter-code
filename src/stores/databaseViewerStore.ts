@@ -11,6 +11,7 @@ import type {
   SortConfig,
   QueryHistoryEntry,
   DetectedService,
+  RelationshipGraph,
 } from "@/types";
 
 interface DatabaseViewerStore {
@@ -31,8 +32,10 @@ interface DatabaseViewerStore {
   queryResults: QueryResult | null;
   queryHistory: QueryHistoryEntry[];
   queryLoading: boolean;
-  activeTab: "browser" | "sql";
+  activeTab: "browser" | "graph" | "sql";
   sidePanel: "connections" | "history" | null;
+  relationshipGraph: RelationshipGraph | null;
+  relationshipsLoading: boolean;
   connectionsSidebarCollapsed: boolean;
   isLoading: boolean;
   error: string | null;
@@ -63,7 +66,8 @@ interface DatabaseViewerStore {
   executeQuery: () => Promise<void>;
   clearQueryResults: () => void;
 
-  setActiveTab: (tab: "browser" | "sql") => void;
+  loadRelationships: () => Promise<void>;
+  setActiveTab: (tab: "browser" | "graph" | "sql") => void;
   setSidePanel: (panel: "connections" | "history" | null) => void;
   toggleConnectionsSidebar: () => void;
   clearError: () => void;
@@ -96,6 +100,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
       queryLoading: false,
       activeTab: "browser",
       sidePanel: "connections",
+      relationshipGraph: null,
+      relationshipsLoading: false,
       connectionsSidebarCollapsed: false,
       isLoading: false,
       error: null,
@@ -402,6 +408,22 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
         set({ queryResults: null });
       },
 
+      loadRelationships: async () => {
+        const state = get();
+        if (!state.activeConnectionId || !state.isConnected.get(state.activeConnectionId)) {
+          return;
+        }
+        set({ relationshipsLoading: true, error: null });
+        try {
+          const graph = await invoke<RelationshipGraph>("db_get_relationships", {
+            connectionId: state.activeConnectionId,
+          });
+          set({ relationshipGraph: graph, relationshipsLoading: false });
+        } catch (e) {
+          set({ relationshipsLoading: false, error: String(e) });
+        }
+      },
+
       setActiveTab: (tab) => {
         set({ activeTab: tab });
       },
@@ -439,6 +461,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
           queryLoading: false,
           activeTab: "browser",
           sidePanel: "connections",
+          relationshipGraph: null,
+          relationshipsLoading: false,
           connectionsSidebarCollapsed: false,
           isLoading: false,
           error: null,

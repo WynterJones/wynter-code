@@ -249,6 +249,7 @@ fn main() {
             commands::create_zip_archive,
             commands::zip_folder_to_base64,
             commands::zip_folder_for_deploy,
+            commands::estimate_image_optimization,
             commands::optimize_image,
             commands::optimize_pdf,
             commands::optimize_video,
@@ -288,6 +289,7 @@ fn main() {
             database_viewer::db_update_row,
             database_viewer::db_delete_row,
             database_viewer::db_detect_services,
+            database_viewer::db_get_relationships,
             overwatch::overwatch_railway_status,
             overwatch::overwatch_plausible_stats,
             overwatch::overwatch_netlify_status,
@@ -388,6 +390,7 @@ fn main() {
             domain_tools::ssl_check,
             domain_tools::http_head_request,
             domain_tools::http_get_json,
+            domain_tools::http_get_html,
             domain_tools::http_follow_redirects,
             // Homebrew Manager
             homebrew::brew_check_installed,

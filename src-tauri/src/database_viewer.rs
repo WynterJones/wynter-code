@@ -105,6 +105,49 @@ pub struct DetectedService {
     pub databases: Vec<String>,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForeignKeyInfo {
+    pub constraint_name: String,
+    pub source_table: String,
+    pub source_column: String,
+    pub target_table: String,
+    pub target_column: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TableRelationships {
+    pub table_name: String,
+    pub schema: Option<String>,
+    pub column_count: i64,
+    pub foreign_keys_out: Vec<ForeignKeyInfo>,
+    pub foreign_keys_in: Vec<ForeignKeyInfo>,
+    pub complexity_score: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelationshipEdge {
+    pub from: String,
+    pub to: String,
+    pub columns: Vec<ColumnPair>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnPair {
+    pub source: String,
+    pub target: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RelationshipGraph {
+    pub tables: Vec<TableRelationships>,
+    pub edges: Vec<RelationshipEdge>,
+}
+
 // Enum to hold different database pool types
 pub enum DbPool {
     Sqlite(SqlitePool),
@@ -1426,5 +1469,348 @@ async fn detect_mysql() -> Option<DetectedService> {
         running,
         pid,
         databases: vec![],
+    })
+}
+
+#[tauri::command]
+pub async fn db_get_relationships(
+    connection_id: String,
+    manager: tauri::State<'_, std::sync::Arc<DatabaseManager>>,
+) -> Result<RelationshipGraph, String> {
+    let connections = manager.connections.read().await;
+    let entry = connections.get(&connection_id).ok_or("Connection not found")?;
+
+    match &entry.pool {
+        DbPool::Sqlite(pool) => get_sqlite_relationships(pool).await,
+        DbPool::Postgres(pool) => get_postgres_relationships(pool).await,
+        DbPool::MySql(pool) => get_mysql_relationships(pool).await,
+    }
+}
+
+async fn get_sqlite_relationships(pool: &SqlitePool) -> Result<RelationshipGraph, String> {
+    // Get all tables first
+    let tables_query = "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'";
+    let table_rows = sqlx::query(tables_query)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    let mut all_fk_info: Vec<ForeignKeyInfo> = Vec::new();
+    let mut table_relationships: Vec<TableRelationships> = Vec::new();
+
+    for table_row in &table_rows {
+        let table_name: String = table_row.try_get("name").unwrap_or_default();
+
+        // Get column count
+        let col_query = format!("PRAGMA table_info('{}')", table_name);
+        let col_rows = sqlx::query(&col_query)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| format!("Column query failed: {}", e))?;
+        let column_count = col_rows.len() as i64;
+
+        // Get foreign keys for this table
+        let fk_query = format!("PRAGMA foreign_key_list('{}')", table_name);
+        let fk_rows = sqlx::query(&fk_query)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| format!("FK query failed: {}", e))?;
+
+        let mut foreign_keys_out: Vec<ForeignKeyInfo> = Vec::new();
+        for fk_row in &fk_rows {
+            let target_table: String = fk_row.try_get("table").unwrap_or_default();
+            let source_column: String = fk_row.try_get("from").unwrap_or_default();
+            let target_column: String = fk_row.try_get("to").unwrap_or_default();
+            let id: i64 = fk_row.try_get("id").unwrap_or(0);
+
+            let fk_info = ForeignKeyInfo {
+                constraint_name: format!("fk_{}_{}", table_name, id),
+                source_table: table_name.clone(),
+                source_column,
+                target_table,
+                target_column,
+            };
+            foreign_keys_out.push(fk_info.clone());
+            all_fk_info.push(fk_info);
+        }
+
+        table_relationships.push(TableRelationships {
+            table_name,
+            schema: Some("main".to_string()),
+            column_count,
+            foreign_keys_out,
+            foreign_keys_in: Vec::new(),
+            complexity_score: 0.0,
+        });
+    }
+
+    // Calculate inbound foreign keys and complexity scores
+    for table_rel in &mut table_relationships {
+        table_rel.foreign_keys_in = all_fk_info
+            .iter()
+            .filter(|fk| fk.target_table == table_rel.table_name)
+            .cloned()
+            .collect();
+
+        let in_count = table_rel.foreign_keys_in.len() as f64;
+        let out_count = table_rel.foreign_keys_out.len() as f64;
+        let col_factor = (table_rel.column_count as f64).ln_1p();
+        table_rel.complexity_score = (in_count + out_count) * (1.0 + col_factor * 0.1);
+    }
+
+    // Build edges
+    let mut edges: Vec<RelationshipEdge> = Vec::new();
+    let mut edge_map: HashMap<(String, String), Vec<ColumnPair>> = HashMap::new();
+
+    for fk in &all_fk_info {
+        let key = (fk.source_table.clone(), fk.target_table.clone());
+        edge_map.entry(key).or_default().push(ColumnPair {
+            source: fk.source_column.clone(),
+            target: fk.target_column.clone(),
+        });
+    }
+
+    for ((from, to), columns) in edge_map {
+        edges.push(RelationshipEdge { from, to, columns });
+    }
+
+    Ok(RelationshipGraph {
+        tables: table_relationships,
+        edges,
+    })
+}
+
+async fn get_postgres_relationships(pool: &PgPool) -> Result<RelationshipGraph, String> {
+    // Get all tables with column counts
+    let tables_query = r#"
+        SELECT
+            t.table_name,
+            t.table_schema,
+            (SELECT COUNT(*) FROM information_schema.columns c
+             WHERE c.table_name = t.table_name AND c.table_schema = t.table_schema) as column_count
+        FROM information_schema.tables t
+        WHERE t.table_schema NOT IN ('pg_catalog', 'information_schema')
+        AND t.table_type = 'BASE TABLE'
+        ORDER BY t.table_schema, t.table_name
+    "#;
+
+    let table_rows: Vec<PgRow> = sqlx::query(tables_query)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    // Get all foreign keys
+    let fk_query = r#"
+        SELECT
+            tc.constraint_name,
+            tc.table_schema as source_schema,
+            tc.table_name as source_table,
+            kcu.column_name as source_column,
+            ccu.table_schema as target_schema,
+            ccu.table_name as target_table,
+            ccu.column_name as target_column
+        FROM information_schema.table_constraints tc
+        JOIN information_schema.key_column_usage kcu
+            ON tc.constraint_name = kcu.constraint_name
+            AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.constraint_column_usage ccu
+            ON tc.constraint_name = ccu.constraint_name
+            AND tc.table_schema = ccu.constraint_schema
+        WHERE tc.constraint_type = 'FOREIGN KEY'
+        AND tc.table_schema NOT IN ('pg_catalog', 'information_schema')
+    "#;
+
+    let fk_rows: Vec<PgRow> = sqlx::query(fk_query)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("FK query failed: {}", e))?;
+
+    let all_fk_info: Vec<ForeignKeyInfo> = fk_rows
+        .iter()
+        .map(|row| {
+            let source_schema: String = row.try_get("source_schema").unwrap_or_default();
+            let source_table: String = row.try_get("source_table").unwrap_or_default();
+            let target_schema: String = row.try_get("target_schema").unwrap_or_default();
+            let target_table: String = row.try_get("target_table").unwrap_or_default();
+
+            ForeignKeyInfo {
+                constraint_name: row.try_get("constraint_name").unwrap_or_default(),
+                source_table: format!("{}.{}", source_schema, source_table),
+                source_column: row.try_get("source_column").unwrap_or_default(),
+                target_table: format!("{}.{}", target_schema, target_table),
+                target_column: row.try_get("target_column").unwrap_or_default(),
+            }
+        })
+        .collect();
+
+    let table_relationships: Vec<TableRelationships> = table_rows
+        .iter()
+        .map(|row| {
+            let table_name: String = row.try_get("table_name").unwrap_or_default();
+            let schema: String = row.try_get("table_schema").unwrap_or_else(|_| "public".to_string());
+            let column_count: i64 = row.try_get("column_count").unwrap_or(0);
+            let full_name = format!("{}.{}", schema, table_name);
+
+            let foreign_keys_out: Vec<ForeignKeyInfo> = all_fk_info
+                .iter()
+                .filter(|fk| fk.source_table == full_name)
+                .cloned()
+                .collect();
+
+            let foreign_keys_in: Vec<ForeignKeyInfo> = all_fk_info
+                .iter()
+                .filter(|fk| fk.target_table == full_name)
+                .cloned()
+                .collect();
+
+            let in_count = foreign_keys_in.len() as f64;
+            let out_count = foreign_keys_out.len() as f64;
+            let col_factor = (column_count as f64).ln_1p();
+            let complexity_score = (in_count + out_count) * (1.0 + col_factor * 0.1);
+
+            TableRelationships {
+                table_name: full_name,
+                schema: Some(schema),
+                column_count,
+                foreign_keys_out,
+                foreign_keys_in,
+                complexity_score,
+            }
+        })
+        .collect();
+
+    // Build edges
+    let mut edge_map: HashMap<(String, String), Vec<ColumnPair>> = HashMap::new();
+    for fk in &all_fk_info {
+        let key = (fk.source_table.clone(), fk.target_table.clone());
+        edge_map.entry(key).or_default().push(ColumnPair {
+            source: fk.source_column.clone(),
+            target: fk.target_column.clone(),
+        });
+    }
+
+    let edges: Vec<RelationshipEdge> = edge_map
+        .into_iter()
+        .map(|((from, to), columns)| RelationshipEdge { from, to, columns })
+        .collect();
+
+    Ok(RelationshipGraph {
+        tables: table_relationships,
+        edges,
+    })
+}
+
+async fn get_mysql_relationships(pool: &MySqlPool) -> Result<RelationshipGraph, String> {
+    // Get current database
+    let db_row: MySqlRow = sqlx::query("SELECT DATABASE() as db")
+        .fetch_one(pool)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+    let current_db: String = db_row.try_get("db").unwrap_or_else(|_| "mysql".to_string());
+
+    // Get all tables with column counts
+    let tables_query = r#"
+        SELECT
+            TABLE_NAME as table_name,
+            TABLE_SCHEMA as table_schema,
+            (SELECT COUNT(*) FROM information_schema.COLUMNS c
+             WHERE c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA) as column_count
+        FROM information_schema.TABLES t
+        WHERE t.TABLE_SCHEMA = ?
+        AND t.TABLE_TYPE = 'BASE TABLE'
+        ORDER BY t.TABLE_NAME
+    "#;
+
+    let table_rows: Vec<MySqlRow> = sqlx::query(tables_query)
+        .bind(&current_db)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("Query failed: {}", e))?;
+
+    // Get all foreign keys
+    let fk_query = r#"
+        SELECT
+            CONSTRAINT_NAME as constraint_name,
+            TABLE_SCHEMA as source_schema,
+            TABLE_NAME as source_table,
+            COLUMN_NAME as source_column,
+            REFERENCED_TABLE_SCHEMA as target_schema,
+            REFERENCED_TABLE_NAME as target_table,
+            REFERENCED_COLUMN_NAME as target_column
+        FROM information_schema.KEY_COLUMN_USAGE
+        WHERE REFERENCED_TABLE_NAME IS NOT NULL
+        AND TABLE_SCHEMA = ?
+    "#;
+
+    let fk_rows: Vec<MySqlRow> = sqlx::query(fk_query)
+        .bind(&current_db)
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("FK query failed: {}", e))?;
+
+    let all_fk_info: Vec<ForeignKeyInfo> = fk_rows
+        .iter()
+        .map(|row| ForeignKeyInfo {
+            constraint_name: row.try_get("constraint_name").unwrap_or_default(),
+            source_table: row.try_get("source_table").unwrap_or_default(),
+            source_column: row.try_get("source_column").unwrap_or_default(),
+            target_table: row.try_get("target_table").unwrap_or_default(),
+            target_column: row.try_get("target_column").unwrap_or_default(),
+        })
+        .collect();
+
+    let table_relationships: Vec<TableRelationships> = table_rows
+        .iter()
+        .map(|row| {
+            let table_name: String = row.try_get("table_name").unwrap_or_default();
+            let schema: String = row.try_get("table_schema").unwrap_or_default();
+            let column_count: i64 = row.try_get("column_count").unwrap_or(0);
+
+            let foreign_keys_out: Vec<ForeignKeyInfo> = all_fk_info
+                .iter()
+                .filter(|fk| fk.source_table == table_name)
+                .cloned()
+                .collect();
+
+            let foreign_keys_in: Vec<ForeignKeyInfo> = all_fk_info
+                .iter()
+                .filter(|fk| fk.target_table == table_name)
+                .cloned()
+                .collect();
+
+            let in_count = foreign_keys_in.len() as f64;
+            let out_count = foreign_keys_out.len() as f64;
+            let col_factor = (column_count as f64).ln_1p();
+            let complexity_score = (in_count + out_count) * (1.0 + col_factor * 0.1);
+
+            TableRelationships {
+                table_name,
+                schema: Some(schema),
+                column_count,
+                foreign_keys_out,
+                foreign_keys_in,
+                complexity_score,
+            }
+        })
+        .collect();
+
+    // Build edges
+    let mut edge_map: HashMap<(String, String), Vec<ColumnPair>> = HashMap::new();
+    for fk in &all_fk_info {
+        let key = (fk.source_table.clone(), fk.target_table.clone());
+        edge_map.entry(key).or_default().push(ColumnPair {
+            source: fk.source_column.clone(),
+            target: fk.target_column.clone(),
+        });
+    }
+
+    let edges: Vec<RelationshipEdge> = edge_map
+        .into_iter()
+        .map(|((from, to), columns)| RelationshipEdge { from, to, columns })
+        .collect();
+
+    Ok(RelationshipGraph {
+        tables: table_relationships,
+        edges,
     })
 }

@@ -6,6 +6,7 @@ import type {
   NetlifyDeploy,
   ConnectionStatus,
   DeployConfig,
+  SiteGroup,
 } from "@/types/netlifyFtp";
 
 interface NetlifyFtpStore {
@@ -29,6 +30,10 @@ interface NetlifyFtpStore {
   deployProgress: number;
   deployMessage: string;
 
+  // Groups
+  groups: SiteGroup[];
+  ungroupedCollapsed: boolean;
+
   // Actions - Auth
   setApiToken: (token: string | null) => void;
   testConnection: () => Promise<boolean>;
@@ -50,6 +55,16 @@ interface NetlifyFtpStore {
   // Actions - UI
   setDeployProgress: (progress: number, message: string) => void;
   clearError: () => void;
+
+  // Actions - Groups
+  createGroup: (name: string) => void;
+  renameGroup: (groupId: string, name: string) => void;
+  deleteGroup: (groupId: string) => void;
+  toggleGroupCollapse: (groupId: string) => void;
+  toggleUngroupedCollapse: () => void;
+  reorderGroups: (groupIds: string[]) => void;
+  addSiteToGroup: (siteId: string, groupId: string) => void;
+  removeSiteFromGroup: (siteId: string) => void;
 }
 
 export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
@@ -68,6 +83,8 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
       isDeploying: false,
       deployProgress: 0,
       deployMessage: "",
+      groups: [],
+      ungroupedCollapsed: false,
 
       // Auth actions
       setApiToken: (token) => {
@@ -348,12 +365,84 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
       clearError: () => {
         set({ connectionError: null });
       },
+
+      // Group actions
+      createGroup: (name) => {
+        const newGroup: SiteGroup = {
+          id: crypto.randomUUID(),
+          name,
+          isCollapsed: false,
+          siteIds: [],
+        };
+        set((state) => ({ groups: [...state.groups, newGroup] }));
+      },
+
+      renameGroup: (groupId, name) => {
+        set((state) => ({
+          groups: state.groups.map((g) =>
+            g.id === groupId ? { ...g, name } : g
+          ),
+        }));
+      },
+
+      deleteGroup: (groupId) => {
+        set((state) => ({
+          groups: state.groups.filter((g) => g.id !== groupId),
+        }));
+      },
+
+      toggleGroupCollapse: (groupId) => {
+        set((state) => ({
+          groups: state.groups.map((g) =>
+            g.id === groupId ? { ...g, isCollapsed: !g.isCollapsed } : g
+          ),
+        }));
+      },
+
+      toggleUngroupedCollapse: () => {
+        set((state) => ({ ungroupedCollapsed: !state.ungroupedCollapsed }));
+      },
+
+      reorderGroups: (groupIds) => {
+        set((state) => {
+          const groupMap = new Map(state.groups.map((g) => [g.id, g]));
+          const reordered = groupIds
+            .map((id) => groupMap.get(id))
+            .filter((g): g is SiteGroup => g !== undefined);
+          return { groups: reordered };
+        });
+      },
+
+      addSiteToGroup: (siteId, groupId) => {
+        set((state) => ({
+          groups: state.groups.map((g) => {
+            // Remove site from this group first (in case it's already there)
+            const filtered = g.siteIds.filter((id) => id !== siteId);
+            // Add to target group
+            if (g.id === groupId) {
+              return { ...g, siteIds: [...filtered, siteId] };
+            }
+            return { ...g, siteIds: filtered };
+          }),
+        }));
+      },
+
+      removeSiteFromGroup: (siteId) => {
+        set((state) => ({
+          groups: state.groups.map((g) => ({
+            ...g,
+            siteIds: g.siteIds.filter((id) => id !== siteId),
+          })),
+        }));
+      },
     }),
     {
       name: "netlify-ftp-store",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         apiToken: state.apiToken,
+        groups: state.groups,
+        ungroupedCollapsed: state.ungroupedCollapsed,
       }),
     }
   )

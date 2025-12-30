@@ -168,6 +168,9 @@ interface SettingsStore {
   // Designer Tool settings
   geminiImageApiKey: string;
 
+  // SEO Tools settings
+  lighthouseApiKey: string;
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
@@ -227,6 +230,9 @@ interface SettingsStore {
 
   // Designer Tool setters
   setGeminiImageApiKey: (key: string) => void;
+
+  // SEO Tools setters
+  setLighthouseApiKey: (key: string) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -289,6 +295,9 @@ export const useSettingsStore = create<SettingsStore>()(
 
       // Designer Tool defaults
       geminiImageApiKey: "",
+
+      // SEO Tools defaults
+      lighthouseApiKey: "",
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -495,6 +504,11 @@ export const useSettingsStore = create<SettingsStore>()(
       // Designer Tool setters
       setGeminiImageApiKey: (geminiImageApiKey: string) => {
         set({ geminiImageApiKey });
+      },
+
+      // SEO Tools setters
+      setLighthouseApiKey: (lighthouseApiKey: string) => {
+        set({ lighthouseApiKey });
       },
     }),
     {

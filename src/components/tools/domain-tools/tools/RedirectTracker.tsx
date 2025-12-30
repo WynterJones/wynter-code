@@ -11,8 +11,12 @@ interface RedirectHop {
   location?: string;
 }
 
-export function RedirectTracker() {
-  const [url, setUrl] = useState("");
+interface RedirectTrackerProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function RedirectTracker({ url, onUrlChange }: RedirectTrackerProps) {
   const [hops, setHops] = useState<RedirectHop[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,14 +109,14 @@ export function RedirectTracker() {
           <input
             type="text"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleTrack()}
             placeholder="Enter URL to track redirects"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
         </div>
-        <Button onClick={handleTrack} disabled={loading || !url.trim()}>
+        <Button variant="primary" onClick={handleTrack} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Track"}
         </Button>
       </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Search, Loader2, Download, Image as ImageIcon, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { invoke } from "@tauri-apps/api/core";
 import JSZip from "jszip";
 
 interface FaviconInfo {
@@ -11,8 +12,12 @@ interface FaviconInfo {
   source: string;
 }
 
-export function FaviconGrabber() {
-  const [url, setUrl] = useState("");
+interface FaviconGrabberProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function FaviconGrabber({ url, onUrlChange }: FaviconGrabberProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [favicons, setFavicons] = useState<FaviconInfo[]>([]);
@@ -30,17 +35,8 @@ export function FaviconGrabber() {
     const found: FaviconInfo[] = [];
 
     try {
-      const response = await fetch(targetUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; FaviconGrabber/1.0)",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const html = await response.text();
+      // Use Tauri invoke to bypass CORS
+      const html = await invoke<string>("http_get_html", { url: targetUrl });
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
 
@@ -65,32 +61,33 @@ export function FaviconGrabber() {
         });
       });
 
+      // Check for manifest.json
       const manifestLink = doc.querySelector('link[rel="manifest"]');
       if (manifestLink) {
         const manifestHref = manifestLink.getAttribute("href");
         if (manifestHref) {
           try {
             const manifestUrl = new URL(manifestHref, baseUrl.origin).href;
-            const manifestResponse = await fetch(manifestUrl);
-            if (manifestResponse.ok) {
-              const manifest = await manifestResponse.json();
-              if (manifest.icons && Array.isArray(manifest.icons)) {
-                manifest.icons.forEach((icon: any) => {
-                  const iconUrl = new URL(icon.src, baseUrl.origin).href;
-                  found.push({
-                    url: iconUrl,
-                    size: icon.sizes || "Unknown",
-                    type: icon.type || "image/png",
-                    source: "manifest.json",
-                  });
+            const manifestJson = await invoke<string>("http_get_json", { url: manifestUrl });
+            const manifest = JSON.parse(manifestJson);
+            if (manifest.icons && Array.isArray(manifest.icons)) {
+              manifest.icons.forEach((icon: { src: string; sizes?: string; type?: string }) => {
+                const iconUrl = new URL(icon.src, baseUrl.origin).href;
+                found.push({
+                  url: iconUrl,
+                  size: icon.sizes || "Unknown",
+                  type: icon.type || "image/png",
+                  source: "manifest.json",
                 });
-              }
+              });
             }
           } catch {
+            // Manifest not found or invalid
           }
         }
       }
 
+      // Check common favicon paths using HEAD requests
       const commonPaths = [
         "/favicon.ico",
         "/apple-touch-icon.png",
@@ -107,9 +104,12 @@ export function FaviconGrabber() {
       for (const path of commonPaths) {
         try {
           const testUrl = new URL(path, baseUrl.origin).href;
-          const testResponse = await fetch(testUrl, { method: "HEAD" });
-          if (testResponse.ok) {
-            const contentType = testResponse.headers.get("content-type") || "image/png";
+          const headers = await invoke<string>("http_head_request", { url: testUrl });
+          // Check if response contains 200 status
+          if (headers.includes("200") && !headers.includes("404")) {
+            // Try to extract content-type from headers
+            const contentTypeMatch = headers.match(/content-type:\s*([^\r\n]+)/i);
+            const contentType = contentTypeMatch ? contentTypeMatch[1].trim() : "image/png";
             found.push({
               url: testUrl,
               size: extractSizeFromUrl(path),
@@ -118,6 +118,7 @@ export function FaviconGrabber() {
             });
           }
         } catch {
+          // Path doesn't exist
         }
       }
 
@@ -214,14 +215,14 @@ export function FaviconGrabber() {
           <input
             type="text"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleGrab()}
             placeholder="Enter URL (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
         </div>
-        <Button onClick={handleGrab} disabled={loading || !url.trim()}>
+        <Button variant="primary" onClick={handleGrab} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Grab"}
         </Button>
       </div>

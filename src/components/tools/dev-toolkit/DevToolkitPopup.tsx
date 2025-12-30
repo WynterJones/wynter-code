@@ -216,7 +216,7 @@ export function DevToolkitPopup({ isOpen, onClose, initialTool }: DevToolkitPopu
             categories={TOOL_CATEGORIES}
             activeToolId={activeTool}
             onToolSelect={setActiveTool}
-            searchPlaceholder="Search dev tools..."
+            searchPlaceholder="Search..."
           />
 
           <ScrollArea className="flex-1" scrollbarVisibility="visible">

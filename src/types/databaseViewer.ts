@@ -84,3 +84,31 @@ export interface DetectedService {
   pid?: number;
   databases: string[];
 }
+
+export interface ForeignKeyInfo {
+  constraintName: string;
+  sourceTable: string;
+  sourceColumn: string;
+  targetTable: string;
+  targetColumn: string;
+}
+
+export interface TableRelationships {
+  tableName: string;
+  schema?: string;
+  columnCount: number;
+  foreignKeysOut: ForeignKeyInfo[];
+  foreignKeysIn: ForeignKeyInfo[];
+  complexityScore: number;
+}
+
+export interface RelationshipEdge {
+  from: string;
+  to: string;
+  columns: Array<{ source: string; target: string }>;
+}
+
+export interface RelationshipGraph {
+  tables: TableRelationships[];
+  edges: RelationshipEdge[];
+}

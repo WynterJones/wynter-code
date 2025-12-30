@@ -17,8 +17,12 @@ interface IpInfo {
   asn?: string;
 }
 
-export function IpAddressLookup() {
-  const [ipAddress, setIpAddress] = useState("");
+interface IpAddressLookupProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function IpAddressLookup({ url, onUrlChange }: IpAddressLookupProps) {
   const [ipInfo, setIpInfo] = useState<IpInfo | null>(null);
   const [myIp, setMyIp] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -44,7 +48,7 @@ export function IpAddressLookup() {
   };
 
   const handleLookup = async (ip?: string) => {
-    const targetIp = ip || ipAddress.trim();
+    const targetIp = ip || url.trim();
     if (!targetIp) return;
 
     setLoading(true);
@@ -76,7 +80,7 @@ export function IpAddressLookup() {
 
   const handleLookupMyIp = () => {
     if (myIp) {
-      setIpAddress(myIp);
+      onUrlChange(myIp);
       handleLookup(myIp);
     }
   };
@@ -124,15 +128,15 @@ export function IpAddressLookup() {
         <div className="relative flex-1">
           <input
             type="text"
-            value={ipAddress}
-            onChange={(e) => setIpAddress(e.target.value)}
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLookup()}
             placeholder="Enter IP address (e.g., 8.8.8.8)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent font-mono"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
         </div>
-        <Button onClick={() => handleLookup()} disabled={loading || !ipAddress.trim()}>
+        <Button variant="primary" onClick={() => handleLookup()} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Lookup"}
         </Button>
       </div>

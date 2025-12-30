@@ -128,7 +128,7 @@ export function SeoToolsPopup({ isOpen, onClose, initialTool }: SeoToolsPopupPro
             categories={TOOL_CATEGORIES}
             activeToolId={activeTool}
             onToolSelect={setActiveTool}
-            searchPlaceholder="Search SEO tools..."
+            searchPlaceholder="Search..."
           />
 
           <ScrollArea className="flex-1" scrollbarVisibility="visible">

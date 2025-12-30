@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Search, Loader2, TrendingUp, Smartphone, Monitor, FileText, FileCode } from "lucide-react";
+import { Search, Loader2, TrendingUp, Smartphone, Monitor, FileText, FileCode, Key, ExternalLink, Check, Eye, EyeOff, AlertCircle, Settings } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { invoke } from "@tauri-apps/api/core";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
 
 interface LighthouseScore {
@@ -27,22 +29,136 @@ interface LighthouseResult {
   timestamp: number;
 }
 
-export function LighthouseAuditor() {
-  const [url, setUrl] = useState("");
+interface LighthouseAuditorProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+// API Key Setup Component
+function ApiKeySetup({ onComplete }: { onComplete: () => void }) {
+  const { lighthouseApiKey, setLighthouseApiKey } = useSettingsStore();
+  const [apiKey, setApiKey] = useState(lighthouseApiKey);
+  const [showKey, setShowKey] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = () => {
+    if (!apiKey.trim()) {
+      setError("API key is required");
+      return;
+    }
+    setLighthouseApiKey(apiKey.trim());
+    onComplete();
+  };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8">
+      <div className="max-w-md w-full space-y-6">
+        <div className="flex flex-col items-center text-center space-y-4">
+          <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
+            <Key className="w-8 h-8 text-accent" />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold text-text-primary">Set Up PageSpeed API</h2>
+            <p className="text-text-secondary mt-2">
+              To run Lighthouse audits, you need a Google PageSpeed Insights API key.
+            </p>
+            <p className="text-text-tertiary text-sm mt-1">
+              Free tier: 25,000 requests/day
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-text-primary">API Key</label>
+            <div className="relative">
+              <input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                placeholder="Enter your PageSpeed API key"
+                className="w-full px-3 py-2 pr-10 bg-bg-tertiary border border-border rounded-md text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent font-mono text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-text-secondary hover:text-text-primary"
+              >
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 px-3 py-2 rounded-md">
+              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <Button
+            onClick={handleSave}
+            disabled={!apiKey.trim()}
+            className="w-full"
+          >
+            <Check className="w-4 h-4 mr-2" />
+            Save API Key
+          </Button>
+        </div>
+
+        <div className="pt-4 border-t border-border">
+          <a
+            href="https://developers.google.com/speed/docs/insights/v5/get-started#key"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 text-sm text-accent hover:underline"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Get a free API key from Google Cloud
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function LighthouseAuditor({ url, onUrlChange }: LighthouseAuditorProps) {
+  const { lighthouseApiKey, setLighthouseApiKey } = useSettingsStore();
   const [device, setDevice] = useState<"mobile" | "desktop">("mobile");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<LighthouseResult | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+
+  const hasApiKey = !!lighthouseApiKey;
 
   const runLighthouse = async (targetUrl: string, deviceType: "mobile" | "desktop"): Promise<LighthouseResult> => {
-    const lighthouseUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(targetUrl)}&strategy=${deviceType}&category=performance&category=accessibility&category=best-practices&category=seo`;
+    let lighthouseUrl = `https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=${encodeURIComponent(targetUrl)}&strategy=${deviceType}&category=performance&category=accessibility&category=best-practices&category=seo`;
 
-    const response = await fetch(lighthouseUrl);
-    if (!response.ok) {
-      throw new Error("Failed to run Lighthouse audit");
+    // Add API key
+    if (lighthouseApiKey) {
+      lighthouseUrl += `&key=${encodeURIComponent(lighthouseApiKey)}`;
     }
 
-    const data = await response.json();
+    // Use Tauri invoke to bypass CORS
+    const jsonResponse = await invoke<string>("http_get_json", { url: lighthouseUrl });
+
+    let data;
+    try {
+      data = JSON.parse(jsonResponse);
+    } catch {
+      throw new Error(`Invalid response from API: ${jsonResponse.substring(0, 200)}`);
+    }
+
+    if (data.error) {
+      const errorMsg = data.error.message || data.error.status || JSON.stringify(data.error);
+      throw new Error(errorMsg);
+    }
+
+    if (!data.lighthouseResult) {
+      throw new Error("No Lighthouse results returned. Please check your API key.");
+    }
 
     const scores: LighthouseScore = {
       performance: Math.round((data.lighthouseResult?.categories?.performance?.score || 0) * 100),
@@ -61,9 +177,10 @@ export function LighthouseAuditor() {
     };
 
     const recommendations: string[] = [];
-    Object.values(audits).forEach((audit: any) => {
-      if (audit.score !== null && audit.score < 0.9 && audit.title) {
-        recommendations.push(audit.title);
+    Object.values(audits).forEach((audit: unknown) => {
+      const a = audit as { score?: number | null; title?: string };
+      if (a.score !== null && a.score !== undefined && a.score < 0.9 && a.title) {
+        recommendations.push(a.title);
       }
     });
 
@@ -100,14 +217,14 @@ export function LighthouseAuditor() {
 
     const json = JSON.stringify(result, null, 2);
     const blob = new Blob([json], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    a.href = blobUrl;
     a.download = `lighthouse-${Date.now()}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
   };
 
   const handleExportHtml = () => {
@@ -134,7 +251,7 @@ export function LighthouseAuditor() {
   <p><strong>URL:</strong> ${result.url}</p>
   <p><strong>Device:</strong> ${result.device}</p>
   <p><strong>Date:</strong> ${new Date(result.timestamp).toLocaleString()}</p>
-  
+
   <div class="scores">
     <div class="score-card" style="background: ${getScoreColor(result.scores.performance)}">
       <h3>Performance</h3>
@@ -172,14 +289,14 @@ export function LighthouseAuditor() {
     `;
 
     const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
+    const blobUrl = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    a.href = blobUrl;
     a.download = `lighthouse-${Date.now()}.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
   };
 
   const getScoreColor = (score: number): string => {
@@ -199,6 +316,61 @@ export function LighthouseAuditor() {
     return `${(value / 1000).toFixed(2)}s`;
   };
 
+  // Show API key setup if no key is configured
+  if (!hasApiKey && !showSettings) {
+    return <ApiKeySetup onComplete={() => {}} />;
+  }
+
+  // Show settings panel if user clicks settings button
+  if (showSettings) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8">
+        <div className="max-w-md w-full space-y-6">
+          <div className="flex flex-col items-center text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center">
+              <Settings className="w-8 h-8 text-accent" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-text-primary">PageSpeed API Settings</h2>
+              <p className="text-text-secondary mt-2">
+                Update or remove your API key
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-text-primary">Current API Key</label>
+              <div className="px-3 py-2 bg-bg-tertiary border border-border rounded-md text-text-secondary font-mono text-sm">
+                {lighthouseApiKey.slice(0, 8)}...{lighthouseApiKey.slice(-4)}
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setShowSettings(false)}
+                variant="outline"
+                className="flex-1"
+              >
+                Back
+              </Button>
+              <Button
+                onClick={() => {
+                  setLighthouseApiKey("");
+                  setShowSettings(false);
+                }}
+                variant="outline"
+                className="flex-1 text-red-400 hover:text-red-300"
+              >
+                Remove Key
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 h-full p-4">
       <div className="flex gap-2">
@@ -206,7 +378,7 @@ export function LighthouseAuditor() {
           <input
             type="text"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAudit()}
             placeholder="Enter URL (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -239,7 +411,14 @@ export function LighthouseAuditor() {
             Desktop
           </button>
         </div>
-        <Button onClick={handleAudit} disabled={loading || !url.trim()}>
+        <button
+          onClick={() => setShowSettings(true)}
+          className="px-3 py-2 rounded-lg border bg-bg-secondary border-border text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+          title="API Key Settings"
+        >
+          <Key className="w-4 h-4" />
+        </button>
+        <Button variant="primary" onClick={handleAudit} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Run Audit"}
         </Button>
       </div>
@@ -365,4 +544,3 @@ export function LighthouseAuditor() {
     </div>
   );
 }
-

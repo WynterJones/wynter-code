@@ -9,6 +9,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Key,
+  Network,
 } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { useDatabaseViewerStore } from "@/stores/databaseViewerStore";
@@ -19,6 +20,7 @@ import { TableBrowser } from "./TableBrowser";
 import { SchemaViewer } from "./SchemaViewer";
 import { DataGrid } from "./DataGrid";
 import { SqlRunner } from "./SqlRunner";
+import { GraphChecker } from "./graph-checker";
 
 interface DatabaseViewerPopupProps {
   isOpen: boolean;
@@ -71,6 +73,18 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
               >
                 <Table2 className="w-4 h-4" />
                 Browser
+              </button>
+              <button
+                onClick={() => setActiveTab("graph")}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-colors",
+                  activeTab === "graph"
+                    ? "bg-accent text-[#3d2066]"
+                    : "hover:bg-bg-hover text-text-secondary"
+                )}
+              >
+                <Network className="w-4 h-4" />
+                Graph
               </button>
               <button
                 onClick={() => setActiveTab("sql")}
@@ -162,6 +176,8 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
             <div className="flex-1 h-full overflow-hidden">
               {activeTab === "browser" ? (
                 <BrowserTab />
+              ) : activeTab === "graph" ? (
+                <GraphChecker />
               ) : (
                 <SqlRunner />
               )}

@@ -6,11 +6,13 @@ import { FileTreeNode } from "./FileTreeNode";
 import { FileTreeToolbar } from "./FileTreeToolbar";
 import { ContextMenu, buildFileContextMenuItems, buildCompressionMenuItems } from "./ContextMenu";
 import { FileDialog } from "./FileDialog";
+import { ImageOptimizePopup } from "./ImageOptimizePopup";
 import { useFileOperations } from "@/hooks/useFileOperations";
 import { useGitStatus } from "@/hooks/useGitStatus";
 import { useCompression } from "@/hooks/useCompression";
 import { useDragStore } from "@/stores/dragStore";
 import { formatBytes } from "@/lib/storageUtils";
+import { OPTIMIZABLE_IMAGE_EXTENSIONS } from "@/types/compression";
 import type { FileNode } from "@/types";
 
 interface FileTreeProps {
@@ -40,10 +42,11 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const [dialog, setDialog] = useState<DialogState | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [lastSelectedPath, setLastSelectedPath] = useState<string | null>(null);
+  const [optimizePopupPath, setOptimizePopupPath] = useState<string | null>(null);
 
   const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
-  const { createArchive, optimizeFile } = useCompression();
+  const { createArchive, optimizePdf, optimizeVideo } = useCompression();
   const cancelDrag = useDragStore((s) => s.cancelDrag);
   const isRefreshing = useRef(false);
 
@@ -375,8 +378,23 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   };
 
   const handleOptimizeFile = async (node: FileNode) => {
+    const ext = node.path.split(".").pop()?.toLowerCase() || "";
+
+    // For images, open the optimization popup
+    if (OPTIMIZABLE_IMAGE_EXTENSIONS.includes(ext)) {
+      setOptimizePopupPath(node.path);
+      return;
+    }
+
+    // For PDFs and videos, use direct optimization
     try {
-      const result = await optimizeFile(node.path);
+      let result;
+      if (ext === "pdf") {
+        result = await optimizePdf(node.path);
+      } else {
+        result = await optimizeVideo(node.path);
+      }
+
       if (result.success) {
         const savings = result.savingsPercent.toFixed(1);
         console.log(
@@ -539,6 +557,15 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
           initialValue={dialog.currentName}
           onConfirm={handleDialogConfirm}
           onCancel={handleDialogCancel}
+        />
+      )}
+
+      {optimizePopupPath && (
+        <ImageOptimizePopup
+          isOpen={!!optimizePopupPath}
+          onClose={() => setOptimizePopupPath(null)}
+          filePath={optimizePopupPath}
+          onOptimized={() => loadFiles(true)}
         />
       )}
     </div>

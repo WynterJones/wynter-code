@@ -28,20 +28,24 @@ const DNS_SERVERS: DnsServer[] = [
   { name: "DNS.Watch", location: "Germany", ip: "84.200.69.80" },
 ];
 
-export function DnsPropagation() {
-  const [domain, setDomain] = useState("");
+interface DnsPropagationProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function DnsPropagation({ url, onUrlChange }: DnsPropagationProps) {
   const [recordType, setRecordType] = useState("A");
   const [results, setResults] = useState<PropagationResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleCheck = async () => {
-    if (!domain.trim()) return;
+    if (!url.trim()) return;
 
     setLoading(true);
     setError(null);
 
-    const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
+    const cleanDomain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
 
     // Initialize results
     const initialResults: PropagationResult[] = DNS_SERVERS.map(server => ({
@@ -117,8 +121,8 @@ export function DnsPropagation() {
         <div className="relative flex-1">
           <input
             type="text"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCheck()}
             placeholder="Enter domain (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -137,7 +141,7 @@ export function DnsPropagation() {
           <option value="NS">NS</option>
           <option value="CNAME">CNAME</option>
         </select>
-        <Button onClick={handleCheck} disabled={loading || !domain.trim()}>
+        <Button variant="primary" onClick={handleCheck} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Check"}
         </Button>
       </div>

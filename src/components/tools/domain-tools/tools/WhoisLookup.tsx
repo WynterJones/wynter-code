@@ -18,22 +18,26 @@ interface WhoisData {
   };
 }
 
-export function WhoisLookup() {
-  const [domain, setDomain] = useState("");
+interface WhoisLookupProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function WhoisLookup({ url, onUrlChange }: WhoisLookupProps) {
   const [result, setResult] = useState<WhoisData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const handleLookup = async () => {
-    if (!domain.trim()) return;
+    if (!url.trim()) return;
 
     setLoading(true);
     setError(null);
     setResult(null);
 
     try {
-      const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
+      const cleanDomain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "").trim();
       const raw = await invoke<string>("whois_lookup", { domain: cleanDomain });
 
       // Parse common WHOIS fields
@@ -103,15 +107,15 @@ export function WhoisLookup() {
         <div className="relative flex-1">
           <input
             type="text"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleLookup()}
             placeholder="Enter domain (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
         </div>
-        <Button onClick={handleLookup} disabled={loading || !domain.trim()}>
+        <Button variant="primary" onClick={handleLookup} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Lookup"}
         </Button>
       </div>

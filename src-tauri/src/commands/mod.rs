@@ -3093,9 +3093,42 @@ pub fn zip_folder_for_deploy(project_path: String) -> Result<DeployZipResult, St
     })
 }
 
+/// Result of image optimization estimation
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageEstimateResult {
+    pub original_size: u64,
+    pub estimated_size: u64,
+    pub estimated_savings_percent: f32,
+    pub format: String,
+    pub target_format: String,
+    pub supports_quality: bool,
+    pub can_convert_to_webp: bool,
+}
+
+/// Encode image to WebP with quality setting
+fn encode_to_webp_lossy(img: &image::DynamicImage, quality: f32) -> Result<Vec<u8>, String> {
+    let rgba = img.to_rgba8();
+    let (width, height) = rgba.dimensions();
+
+    let encoder = webp::Encoder::from_rgba(&rgba, width, height);
+    let webp_data = encoder.encode(quality);
+
+    Ok(webp_data.to_vec())
+}
+
+/// Estimate optimization savings without actually saving
 #[tauri::command]
-pub async fn optimize_image(path: String, overwrite: bool) -> Result<CompressionResult, String> {
+pub async fn estimate_image_optimization(
+    path: String,
+    quality: u8,
+    convert_to_webp: Option<bool>,
+) -> Result<ImageEstimateResult, String> {
+    use image::codecs::jpeg::JpegEncoder;
+    use std::io::Cursor;
+
     let input_path = Path::new(&path);
+    let to_webp = convert_to_webp.unwrap_or(false);
 
     if !input_path.exists() {
         return Err(format!("File does not exist: {}", path));
@@ -3111,18 +3144,215 @@ pub async fn optimize_image(path: String, overwrite: bool) -> Result<Compression
         .map(|e| e.to_lowercase())
         .unwrap_or_default();
 
+    // If converting to WebP, handle all formats uniformly
+    if to_webp && ext != "webp" {
+        let img = image::open(&input_path)
+            .map_err(|e| format!("Failed to open image: {}", e))?;
+
+        let webp_data = encode_to_webp_lossy(&img, quality as f32)
+            .map_err(|e| format!("Failed to encode WebP: {}", e))?;
+
+        let estimated_size = webp_data.len() as u64;
+        let estimated_savings_percent = if original_size > 0 {
+            ((original_size as f32 - estimated_size as f32) / original_size as f32) * 100.0
+        } else {
+            0.0
+        };
+
+        return Ok(ImageEstimateResult {
+            original_size,
+            estimated_size,
+            estimated_savings_percent,
+            format: ext.to_uppercase(),
+            target_format: "WebP".to_string(),
+            supports_quality: true,
+            can_convert_to_webp: true,
+        });
+    }
+
+    match ext.as_str() {
+        "png" => {
+            // For PNG, estimate using oxipng in memory
+            let input_data = fs::read(&input_path)
+                .map_err(|e| format!("Failed to read PNG: {}", e))?;
+
+            let options = oxipng::Options::from_preset(3);
+            let optimized = oxipng::optimize_from_memory(&input_data, &options)
+                .map_err(|e| format!("PNG optimization failed: {}", e))?;
+
+            let estimated_size = optimized.len() as u64;
+            let estimated_savings_percent = if original_size > 0 {
+                ((original_size as f32 - estimated_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(ImageEstimateResult {
+                original_size,
+                estimated_size,
+                estimated_savings_percent,
+                format: "PNG".to_string(),
+                target_format: "PNG".to_string(),
+                supports_quality: false,
+                can_convert_to_webp: true,
+            })
+        }
+        "jpg" | "jpeg" => {
+            // For JPEG, encode to memory buffer with specified quality
+            let img = image::open(&input_path)
+                .map_err(|e| format!("Failed to open JPEG: {}", e))?;
+
+            let mut buffer = Cursor::new(Vec::new());
+            let encoder = JpegEncoder::new_with_quality(&mut buffer, quality);
+            img.write_with_encoder(encoder)
+                .map_err(|e| format!("Failed to estimate JPEG: {}", e))?;
+
+            let estimated_size = buffer.into_inner().len() as u64;
+            let estimated_savings_percent = if original_size > 0 {
+                ((original_size as f32 - estimated_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(ImageEstimateResult {
+                original_size,
+                estimated_size,
+                estimated_savings_percent,
+                format: "JPEG".to_string(),
+                target_format: "JPEG".to_string(),
+                supports_quality: true,
+                can_convert_to_webp: true,
+            })
+        }
+        "webp" => {
+            // WebP - re-encode with quality
+            let img = image::open(&input_path)
+                .map_err(|e| format!("Failed to open WebP: {}", e))?;
+
+            let webp_data = encode_to_webp_lossy(&img, quality as f32)
+                .map_err(|e| format!("Failed to encode WebP: {}", e))?;
+
+            let estimated_size = webp_data.len() as u64;
+            let estimated_savings_percent = if original_size > 0 {
+                ((original_size as f32 - estimated_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(ImageEstimateResult {
+                original_size,
+                estimated_size,
+                estimated_savings_percent,
+                format: "WebP".to_string(),
+                target_format: "WebP".to_string(),
+                supports_quality: true,
+                can_convert_to_webp: false,
+            })
+        }
+        "gif" => {
+            // GIF - estimate by encoding to memory
+            let img = image::open(&input_path)
+                .map_err(|e| format!("Failed to open GIF: {}", e))?;
+
+            let mut buffer = Cursor::new(Vec::new());
+            img.write_to(&mut buffer, image::ImageFormat::Gif)
+                .map_err(|e| format!("Failed to estimate GIF: {}", e))?;
+
+            let estimated_size = buffer.into_inner().len() as u64;
+            let estimated_savings_percent = if original_size > 0 {
+                ((original_size as f32 - estimated_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(ImageEstimateResult {
+                original_size,
+                estimated_size,
+                estimated_savings_percent,
+                format: "GIF".to_string(),
+                target_format: "GIF".to_string(),
+                supports_quality: false,
+                can_convert_to_webp: true,
+            })
+        }
+        _ => Err(format!("Unsupported image format: {}", ext)),
+    }
+}
+
+#[tauri::command]
+pub async fn optimize_image(
+    path: String,
+    overwrite: bool,
+    quality: Option<u8>,
+    convert_to_webp: Option<bool>,
+) -> Result<CompressionResult, String> {
+    use image::codecs::jpeg::JpegEncoder;
+
+    let input_path = Path::new(&path);
+    let to_webp = convert_to_webp.unwrap_or(false);
+
+    if !input_path.exists() {
+        return Err(format!("File does not exist: {}", path));
+    }
+
+    let original_size = fs::metadata(&input_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    let ext = input_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_lowercase())
+        .unwrap_or_default();
+
+    // Determine output extension based on conversion
+    let output_ext = if to_webp && ext != "webp" { "webp" } else { &ext };
+
     // Determine output path
-    let output_path = if overwrite {
+    let output_path = if overwrite && !to_webp {
         input_path.to_path_buf()
     } else {
         let stem = input_path.file_stem().and_then(|s| s.to_str()).unwrap_or("image");
         let parent = input_path.parent().unwrap_or(Path::new("."));
-        parent.join(format!("{}_optimized.{}", stem, ext))
+        if to_webp && ext != "webp" {
+            parent.join(format!("{}.webp", stem))
+        } else {
+            parent.join(format!("{}_optimized.{}", stem, output_ext))
+        }
     };
+
+    // Handle WebP conversion for any format
+    if to_webp && ext != "webp" {
+        let img = image::open(&input_path)
+            .map_err(|e| format!("Failed to open image: {}", e))?;
+
+        let quality_value = quality.unwrap_or(85) as f32;
+        let webp_data = encode_to_webp_lossy(&img, quality_value)
+            .map_err(|e| format!("Failed to encode WebP: {}", e))?;
+
+        fs::write(&output_path, &webp_data)
+            .map_err(|e| format!("Failed to write WebP: {}", e))?;
+
+        let compressed_size = webp_data.len() as u64;
+        let savings_percent = if original_size > 0 {
+            ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+        } else {
+            0.0
+        };
+
+        return Ok(CompressionResult {
+            success: true,
+            output_path: output_path.to_string_lossy().to_string(),
+            original_size,
+            compressed_size,
+            savings_percent,
+            error: None,
+        });
+    }
 
     match ext.as_str() {
         "png" => {
-            // Use oxipng for PNG optimization
+            // Use oxipng for PNG optimization (lossless)
             let input_data = fs::read(&input_path)
                 .map_err(|e| format!("Failed to read PNG: {}", e))?;
 
@@ -3150,13 +3380,18 @@ pub async fn optimize_image(path: String, overwrite: bool) -> Result<Compression
             })
         }
         "jpg" | "jpeg" => {
-            // Use image crate for JPEG - re-encode with quality preservation
+            // Use image crate for JPEG with quality setting
             let img = image::open(&input_path)
                 .map_err(|e| format!("Failed to open JPEG: {}", e))?;
 
-            // Save with optimized settings (quality 90 is visually lossless)
-            img.save(&output_path)
+            let quality_value = quality.unwrap_or(85);
+            let file = fs::File::create(&output_path)
+                .map_err(|e| format!("Failed to create output file: {}", e))?;
+            let mut writer = std::io::BufWriter::new(file);
+            let encoder = JpegEncoder::new_with_quality(&mut writer, quality_value);
+            img.write_with_encoder(encoder)
                 .map_err(|e| format!("Failed to save JPEG: {}", e))?;
+            drop(writer);
 
             let compressed_size = fs::metadata(&output_path)
                 .map(|m| m.len())
@@ -3177,8 +3412,36 @@ pub async fn optimize_image(path: String, overwrite: bool) -> Result<Compression
                 error: None,
             })
         }
-        "gif" | "webp" => {
-            // Use image crate for GIF/WebP
+        "webp" => {
+            // Re-encode WebP with quality
+            let img = image::open(&input_path)
+                .map_err(|e| format!("Failed to open WebP: {}", e))?;
+
+            let quality_value = quality.unwrap_or(85) as f32;
+            let webp_data = encode_to_webp_lossy(&img, quality_value)
+                .map_err(|e| format!("Failed to encode WebP: {}", e))?;
+
+            fs::write(&output_path, &webp_data)
+                .map_err(|e| format!("Failed to write WebP: {}", e))?;
+
+            let compressed_size = webp_data.len() as u64;
+            let savings_percent = if original_size > 0 {
+                ((original_size as f32 - compressed_size as f32) / original_size as f32) * 100.0
+            } else {
+                0.0
+            };
+
+            Ok(CompressionResult {
+                success: true,
+                output_path: output_path.to_string_lossy().to_string(),
+                original_size,
+                compressed_size,
+                savings_percent,
+                error: None,
+            })
+        }
+        "gif" => {
+            // Use image crate for GIF
             let img = image::open(&input_path)
                 .map_err(|e| format!("Failed to open image: {}", e))?;
 

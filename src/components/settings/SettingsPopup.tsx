@@ -1141,12 +1141,6 @@ function AboutSection() {
             <li>Dead Link Checker, Lighthouse Auditor, Favicon Grabber</li>
           </ul>
 
-          <h4 className="text-sm font-medium text-accent mb-1">Webcam & Streaming</h4>
-          <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
-            <li>Floating webcam with desktop pinning</li>
-            <li>Custom borders, effects, Decart AI integration</li>
-          </ul>
-
           <h4 className="text-sm font-medium text-accent mb-1">Infrastructure</h4>
           <ul className="text-text-secondary text-sm space-y-0.5 mb-3">
             <li>Port Manager, Localhost Tunnel</li>

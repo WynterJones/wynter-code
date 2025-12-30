@@ -16,8 +16,12 @@ interface SecurityCheck {
   message: string;
 }
 
-export function HttpHeadersInspector() {
-  const [url, setUrl] = useState("");
+interface HttpHeadersInspectorProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function HttpHeadersInspector({ url, onUrlChange }: HttpHeadersInspectorProps) {
   const [headers, setHeaders] = useState<HeaderInfo[]>([]);
   const [securityChecks, setSecurityChecks] = useState<SecurityCheck[]>([]);
   const [loading, setLoading] = useState(false);
@@ -177,14 +181,14 @@ export function HttpHeadersInspector() {
           <input
             type="text"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleInspect()}
             placeholder="Enter URL (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
         </div>
-        <Button onClick={handleInspect} disabled={loading || !url.trim()}>
+        <Button variant="primary" onClick={handleInspect} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Inspect"}
         </Button>
       </div>

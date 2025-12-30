@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Search, Loader2, Download, AlertCircle, CheckCircle, ExternalLink, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 
 interface LinkResult {
@@ -13,13 +14,17 @@ interface LinkResult {
   isInternal: boolean;
 }
 
-export function DeadLinkChecker() {
-  const [url, setUrl] = useState("");
+interface DeadLinkCheckerProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function DeadLinkChecker({ url, onUrlChange }: DeadLinkCheckerProps) {
   const [depth, setDepth] = useState(2);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<LinkResult[]>([]);
-  const [checkedUrls, setCheckedUrls] = useState<Set<string>>(new Set());
+  const checkedUrlsRef = useRef<Set<string>>(new Set());
 
   const normalizeUrl = (baseUrl: string, link: string): string | null => {
     try {
@@ -70,8 +75,19 @@ export function DeadLinkChecker() {
     return links;
   };
 
+  const parseStatusCode = (headers: string): number | undefined => {
+    // Parse HTTP status code from curl response headers
+    const match = headers.match(/HTTP\/[\d.]+ (\d{3})/);
+    return match ? parseInt(match[1], 10) : undefined;
+  };
+
+  const parseRedirectUrl = (headers: string): string | undefined => {
+    const match = headers.match(/location:\s*([^\r\n]+)/i);
+    return match ? match[1].trim() : undefined;
+  };
+
   const checkLink = async (linkUrl: string, anchorText: string, baseUrl: string): Promise<LinkResult> => {
-    if (checkedUrls.has(linkUrl)) {
+    if (checkedUrlsRef.current.has(linkUrl)) {
       return {
         url: linkUrl,
         anchorText,
@@ -80,38 +96,31 @@ export function DeadLinkChecker() {
       };
     }
 
-    setCheckedUrls((prev) => new Set(prev).add(linkUrl));
+    checkedUrlsRef.current.add(linkUrl);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      // Use Tauri invoke for HEAD request to bypass CORS
+      const headers = await invoke<string>("http_head_request", { url: linkUrl });
+      const statusCode = parseStatusCode(headers);
 
-      const response = await fetch(linkUrl, {
-        method: "HEAD",
-        signal: controller.signal,
-        redirect: "manual",
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.status >= 300 && response.status < 400) {
-        const redirectUrl = response.headers.get("location") || "";
+      if (statusCode && statusCode >= 300 && statusCode < 400) {
+        const redirectUrl = parseRedirectUrl(headers);
         return {
           url: linkUrl,
           anchorText,
           status: "redirect",
-          statusCode: response.status,
+          statusCode,
           redirectUrl,
           isInternal: isInternalLink(baseUrl, linkUrl),
         };
       }
 
-      if (response.status >= 200 && response.status < 300) {
+      if (statusCode && statusCode >= 200 && statusCode < 300) {
         return {
           url: linkUrl,
           anchorText,
           status: "success",
-          statusCode: response.status,
+          statusCode,
           isInternal: isInternalLink(baseUrl, linkUrl),
         };
       }
@@ -120,21 +129,11 @@ export function DeadLinkChecker() {
         url: linkUrl,
         anchorText,
         status: "error",
-        statusCode: response.status,
-        error: `HTTP ${response.status}`,
+        statusCode,
+        error: statusCode ? `HTTP ${statusCode}` : "Unknown status",
         isInternal: isInternalLink(baseUrl, linkUrl),
       };
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
-        return {
-          url: linkUrl,
-          anchorText,
-          status: "timeout",
-          error: "Request timeout",
-          isInternal: isInternalLink(baseUrl, linkUrl),
-        };
-      }
-
       return {
         url: linkUrl,
         anchorText,
@@ -146,24 +145,15 @@ export function DeadLinkChecker() {
   };
 
   const crawlPage = async (pageUrl: string, currentDepth: number, baseUrl: string): Promise<LinkResult[]> => {
-    if (currentDepth > depth || checkedUrls.has(pageUrl)) {
+    if (currentDepth > depth || checkedUrlsRef.current.has(pageUrl)) {
       return [];
     }
 
-    setCheckedUrls((prev) => new Set(prev).add(pageUrl));
+    checkedUrlsRef.current.add(pageUrl);
 
     try {
-      const response = await fetch(pageUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; LinkChecker/1.0)",
-        },
-      });
-
-      if (!response.ok) {
-        return [];
-      }
-
-      const html = await response.text();
+      // Use Tauri invoke to fetch HTML and bypass CORS
+      const html = await invoke<string>("http_get_html", { url: pageUrl });
       const links = extractLinks(html, pageUrl);
       const results: LinkResult[] = [];
 
@@ -189,7 +179,7 @@ export function DeadLinkChecker() {
     setLoading(true);
     setError(null);
     setResults([]);
-    setCheckedUrls(new Set());
+    checkedUrlsRef.current = new Set();
 
     try {
       const cleanUrl = url.startsWith("http") ? url : `https://${url}`;
@@ -271,7 +261,7 @@ export function DeadLinkChecker() {
           <input
             type="text"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCheck()}
             placeholder="Enter URL to crawl (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
@@ -289,7 +279,7 @@ export function DeadLinkChecker() {
           <option value={4}>Depth: 4</option>
           <option value={5}>Depth: 5</option>
         </select>
-        <Button onClick={handleCheck} disabled={loading || !url.trim()}>
+        <Button variant="primary" onClick={handleCheck} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Check"}
         </Button>
       </div>

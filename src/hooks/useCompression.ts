@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useSettingsStore } from "@/stores/settingsStore";
-import type { CompressionResult } from "@/types/compression";
+import type { CompressionResult, ImageEstimateResult } from "@/types/compression";
 import { getCompressionType } from "@/types/compression";
 
 export function useCompression() {
@@ -15,10 +15,27 @@ export function useCompression() {
     });
   };
 
-  const optimizeImage = async (path: string): Promise<CompressionResult> => {
+  const estimateImageOptimization = async (
+    path: string,
+    quality: number = 85,
+    convertToWebp: boolean = false
+  ): Promise<ImageEstimateResult> => {
+    return invoke<ImageEstimateResult>("estimate_image_optimization", {
+      path,
+      quality,
+      convertToWebp,
+    });
+  };
+
+  const optimizeImage = async (
+    path: string,
+    options?: { overwrite?: boolean; quality?: number; convertToWebp?: boolean }
+  ): Promise<CompressionResult> => {
     return invoke<CompressionResult>("optimize_image", {
       path,
-      overwrite: compressionMediaOverwrite,
+      overwrite: options?.overwrite ?? compressionMediaOverwrite,
+      quality: options?.quality ?? null,
+      convertToWebp: options?.convertToWebp ?? false,
     });
   };
 
@@ -56,6 +73,7 @@ export function useCompression() {
 
   return {
     createArchive,
+    estimateImageOptimization,
     optimizeImage,
     optimizePdf,
     optimizeVideo,

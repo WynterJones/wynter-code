@@ -58,7 +58,6 @@
 | Claude Code Stats | `ClaudeCodeStatsPopup` - 16 stat cards (messages, sessions, tool calls, streak, peak hour, cache hits, etc.), daily activity charts, model usage breakdown, hourly heatmap | 2025-12-23 |
 | Dev Toolkit Expansion | `DevToolkitPopup` - expanded to 28 tools: Bcrypt, HMAC, HTTP Status Reference, IP Address, Byte Size, Cron Parser, Number Base, User Agent Parser, Lorem Ipsum, Case Converter, String Escape, Slug Generator, Word Counter, Timestamp Converter, JSON/YAML, CSV/JSON, Regex Tester, Password Generator | 2025-12-24 |
 | Domain & SEO Tools | `DomainToolsPopup` - 8 tools: WHOIS Lookup, Domain Availability, DNS Lookup, DNS Propagation, SSL Certificate, HTTP Headers, IP Geolocation, Redirect Tracker | 2025-12-24 |
-| Floating Webcam | `WebcamToolPopup` - floating webcam overlay with desktop pinning, customizable borders/effects/shadows, crop selection, Decart AI integration for real-time effects | 2025-12-24 |
 | List Sorter & Deduplicator | `DevToolkitPopup` > Text category - Sort arrays alphabetically/numerically/by length, remove duplicates, case-sensitive options, natural sort, copy results | 2025-12-24 |
 | HTML/CSS Validator | `DevToolkitPopup` > Code category - Validate HTML/CSS with error detection, deprecated tag/property warnings, accessibility hints, format/beautify | 2025-12-24 |
 | EXIF Data Remover | `DevToolkitPopup` > Image category - Strip EXIF metadata from images, batch processing, preview before/after, download individually or as ZIP | 2025-12-24 |

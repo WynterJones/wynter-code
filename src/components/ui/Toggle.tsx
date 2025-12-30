@@ -49,7 +49,7 @@ export const Toggle = forwardRef<HTMLInputElement, ToggleProps>(
         className={cn(
           "relative rounded-full transition-colors duration-200",
           sizes.track,
-          checked ? "bg-accent" : "bg-bg-tertiary",
+          checked ? "bg-accent" : "bg-neutral-600",
           disabled && "opacity-50 cursor-not-allowed",
           !disabled && "cursor-pointer",
           "focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"

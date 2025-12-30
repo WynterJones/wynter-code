@@ -20,22 +20,26 @@ interface SslInfo {
   }>;
 }
 
-export function SslChecker() {
-  const [domain, setDomain] = useState("");
+interface SslCheckerProps {
+  url: string;
+  onUrlChange: (url: string) => void;
+}
+
+export function SslChecker({ url, onUrlChange }: SslCheckerProps) {
   const [sslInfo, setSslInfo] = useState<SslInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
 
   const handleCheck = async () => {
-    if (!domain.trim()) return;
+    if (!url.trim()) return;
 
     setLoading(true);
     setError(null);
     setSslInfo(null);
 
     try {
-      const cleanDomain = domain.replace(/^https?:\/\//, "").replace(/\/.*$/, "").split(":")[0].trim();
+      const cleanDomain = url.replace(/^https?:\/\//, "").replace(/\/.*$/, "").split(":")[0].trim();
       const result = await invoke<string>("ssl_check", { domain: cleanDomain });
 
       // Parse OpenSSL output
@@ -108,15 +112,15 @@ export function SslChecker() {
         <div className="relative flex-1">
           <input
             type="text"
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCheck()}
             placeholder="Enter domain (e.g., example.com)"
             className="w-full pl-10 pr-4 py-2 bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
           />
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
         </div>
-        <Button onClick={handleCheck} disabled={loading || !domain.trim()}>
+        <Button variant="primary" onClick={handleCheck} disabled={loading || !url.trim()}>
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Check SSL"}
         </Button>
       </div>

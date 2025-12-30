@@ -1,5 +1,4 @@
 import { AppShell } from "@/components/layout/AppShell";
-import { FloatingWebcamWindow, CostTrackingPopup } from "@/components/tools/webcam";
 import { LauncherWindow } from "@/components/launcher";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
@@ -7,7 +6,7 @@ import { useAppFont } from "@/hooks/useAppFont";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useEnvStore } from "@/stores/envStore";
 
-type WindowType = "main" | "floating-webcam" | "webcam-cost-popup" | "launcher";
+type WindowType = "main" | "launcher";
 
 function App() {
   useAppFont();
@@ -17,11 +16,7 @@ function App() {
     document.documentElement.classList.add("dark");
     // Check window type based on path
     const path = window.location.pathname;
-    if (path === "/floating-webcam") {
-      setWindowType("floating-webcam");
-    } else if (path === "/webcam-cost-popup") {
-      setWindowType("webcam-cost-popup");
-    } else if (path === "/launcher") {
+    if (path === "/launcher") {
       setWindowType("launcher");
     } else {
       setWindowType("main");
@@ -85,14 +80,6 @@ function App() {
   }, []);
 
   // Render appropriate window based on type
-  if (windowType === "floating-webcam") {
-    return <FloatingWebcamWindow />;
-  }
-
-  if (windowType === "webcam-cost-popup") {
-    return <CostTrackingPopup />;
-  }
-
   if (windowType === "launcher") {
     return <LauncherWindow />;
   }

@@ -20,7 +20,6 @@ import {
   Tractor,
   BarChart3,
   Gauge,
-  Video,
   AtSign,
   FileCode,
   Upload,
@@ -88,11 +87,11 @@ export interface ToolDefinition {
   category:
     | "code"
     | "testing"
+    | "ai-providers"
     | "project"
     | "local-system"
     | "production"
     | "design"
-    | "recording"
     | "web-tools"
     | "productivity"
     | "utilities";
@@ -208,7 +207,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Browse Storybook components",
     icon: BookOpen,
     actionKey: "openStorybookViewer",
-    category: "code",
+    category: "testing",
   },
   {
     id: "claude-code-stats",
@@ -216,7 +215,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "CLI usage analytics",
     icon: BarChart3,
     actionKey: "openClaudeCodeStats",
-    category: "code",
+    category: "ai-providers",
   },
   {
     id: "limits-monitor",
@@ -224,7 +223,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     description: "Track API usage limits",
     icon: Gauge,
     actionKey: "openLimitsMonitor",
-    category: "code",
+    category: "ai-providers",
   },
 
   // === TESTING ===
@@ -352,15 +351,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     category: "design",
   },
 
-  // === RECORDING ===
-  {
-    id: "floating-webcam",
-    name: "Floating Webcam",
-    description: "Webcam with AI effects",
-    icon: Video,
-    actionKey: "openFloatingWebcam",
-    category: "recording",
-  },
   // === TOOLKITS ===
   {
     id: "dev-toolkit",
@@ -518,11 +508,11 @@ interface Tool {
   category:
     | "code"
     | "testing"
+    | "ai-providers"
     | "project"
     | "local-system"
     | "production"
     | "design"
-    | "recording"
     | "web-tools"
     | "productivity"
     | "utilities";
@@ -558,7 +548,6 @@ interface ToolsDropdownProps {
   onOpenLimitsMonitor: () => void;
   onOpenDomainTools: () => void;
   onOpenSeoTools: () => void;
-  onOpenFloatingWebcam: () => void;
   onOpenNetlifyFtp: () => void;
   onOpenBookmarks: () => void;
   onOpenMeditation: () => void;
@@ -596,7 +585,6 @@ export function ToolsDropdown({
   onOpenLimitsMonitor,
   onOpenDomainTools,
   onOpenSeoTools,
-  onOpenFloatingWebcam,
   onOpenNetlifyFtp,
   onOpenBookmarks,
   onOpenMeditation,
@@ -764,7 +752,7 @@ export function ToolsDropdown({
         ? "Browse Storybook components"
         : "Storybook not detected",
       icon: <BookOpen className="w-4 h-4" />,
-      category: "code",
+      category: "testing",
       onClick: () => {
         if (!hasStorybook) return;
         onOpenStorybookViewer();
@@ -777,7 +765,7 @@ export function ToolsDropdown({
       name: "Claude Code Stats",
       description: "CLI usage analytics",
       icon: <BarChart3 className="w-4 h-4" />,
-      category: "code",
+      category: "ai-providers",
       onClick: () => {
         onOpenClaudeCodeStats();
         setIsOpen(false);
@@ -788,7 +776,7 @@ export function ToolsDropdown({
       name: "Claude Limits Monitor",
       description: "Track API usage limits",
       icon: <Gauge className="w-4 h-4" />,
-      category: "code",
+      category: "ai-providers",
       onClick: () => {
         onOpenLimitsMonitor();
         setIsOpen(false);
@@ -955,19 +943,6 @@ export function ToolsDropdown({
       },
     },
 
-    // === RECORDING ===
-    {
-      id: "floating-webcam",
-      name: "Floating Webcam",
-      description: "Webcam with AI effects",
-      icon: <Video className="w-4 h-4" />,
-      category: "recording",
-      onClick: () => {
-        onOpenFloatingWebcam();
-        setIsOpen(false);
-      },
-    },
-
     // === TOOLKITS ===
     {
       id: "dev-toolkit",
@@ -1114,11 +1089,11 @@ export function ToolsDropdown({
     const categoryOrder: Array<{ id: ToolCategory["id"]; label: string }> = [
       { id: "code", label: "Code" },
       { id: "testing", label: "Testing" },
+      { id: "ai-providers", label: "AI Providers" },
       { id: "project", label: "Project" },
       { id: "local-system", label: "Local System" },
       { id: "production", label: "Production" },
       { id: "design", label: "Design" },
-      { id: "recording", label: "Recording" },
       { id: "web-tools", label: "Toolkits" },
       { id: "productivity", label: "Productivity" },
       { id: "utilities", label: "Utilities" },

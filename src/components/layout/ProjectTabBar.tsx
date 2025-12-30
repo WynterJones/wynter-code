@@ -71,7 +71,6 @@ import { McpManagerPopup } from "@/components/tools/mcp-manager";
 import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
 import { ClaudeCodeStatsPopup } from "@/components/tools/claude-code-stats";
 import { LimitsMonitorPopup } from "@/components/tools/limits-monitor";
-import { WebcamToolPopup } from "@/components/tools/webcam";
 import { DomainToolsPopup } from "@/components/tools/domain-tools";
 import { SeoToolsPopup } from "@/components/tools/seo-tools";
 import { NetlifyFtpPopup } from "@/components/tools/netlify-ftp";
@@ -397,7 +396,6 @@ export function ProjectTabBar({
   const [showFarmworkTycoon, setShowFarmworkTycoon] = useState(false);
   const [showClaudeCodeStats, setShowClaudeCodeStats] = useState(false);
   const [showLimitsMonitor, setShowLimitsMonitor] = useState(false);
-  const [showWebcamTool, setShowWebcamTool] = useState(false);
   const [showDomainTools, setShowDomainTools] = useState(false);
   const [domainToolsInitialTool, setDomainToolsInitialTool] = useState<string | undefined>();
   const [showSeoTools, setShowSeoTools] = useState(false);
@@ -540,9 +538,6 @@ export function ProjectTabBar({
           break;
         case "openLimitsMonitor":
           setShowLimitsMonitor(true);
-          break;
-        case "openFloatingWebcam":
-          setShowWebcamTool(true);
           break;
         case "openDomainTools":
           setDomainToolsInitialTool(subToolId || undefined);
@@ -949,7 +944,6 @@ export function ProjectTabBar({
           onOpenLimitsMonitor={() => setShowLimitsMonitor(true)}
           onOpenDomainTools={() => setShowDomainTools(true)}
           onOpenSeoTools={() => setShowSeoTools(true)}
-          onOpenFloatingWebcam={() => setShowWebcamTool(true)}
           onOpenNetlifyFtp={() => setShowNetlifyFtp(true)}
           onOpenBookmarks={() => setShowBookmarks(true)}
           onOpenProjectSearch={() => setShowProjectSearch(true)}
@@ -1188,12 +1182,6 @@ export function ProjectTabBar({
       <LimitsMonitorPopup
         isOpen={showLimitsMonitor}
         onClose={() => setShowLimitsMonitor(false)}
-      />
-
-      {/* Floating Webcam Tool */}
-      <WebcamToolPopup
-        isOpen={showWebcamTool}
-        onClose={() => setShowWebcamTool(false)}
       />
 
       {/* Domain Tools */}

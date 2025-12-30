@@ -7,6 +7,16 @@ export interface CompressionResult {
   error?: string;
 }
 
+export interface ImageEstimateResult {
+  originalSize: number;
+  estimatedSize: number;
+  estimatedSavingsPercent: number;
+  format: string;
+  targetFormat: string;
+  supportsQuality: boolean;
+  canConvertToWebp: boolean;
+}
+
 export type CompressionType = "archive" | "image" | "pdf" | "video";
 
 export const OPTIMIZABLE_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"];
