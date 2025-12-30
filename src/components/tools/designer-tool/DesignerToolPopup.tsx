@@ -233,21 +233,12 @@ export function DesignerToolPopup({ isOpen, onClose }: DesignerToolPopupProps) {
                 )}
 
                 {generatedImage && !isGenerating && !error && (
-                  <div className="flex flex-col items-center space-y-4">
-                    <div
-                      className="relative bg-secondary/50 rounded-lg overflow-hidden border border-border"
-                      style={{
-                        maxWidth: "100%",
-                        maxHeight: "calc(80vh - 200px)",
-                      }}
-                    >
+                  <div className="flex flex-col items-center space-y-4 w-full">
+                    <div className="relative bg-secondary/50 rounded-lg overflow-hidden border border-border w-full max-w-lg">
                       <img
                         src={base64ToDataUrl(generatedImage.imageData, generatedImage.mimeType)}
                         alt="Generated image"
-                        className="max-w-full max-h-full object-contain"
-                        style={{
-                          aspectRatio: `${generatedImage.width} / ${generatedImage.height}`,
-                        }}
+                        className="w-full h-auto"
                       />
                     </div>
                     <div className="text-center text-sm text-secondary">

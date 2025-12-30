@@ -10,7 +10,10 @@ export type GeminiAspectRatio =
   | "4:3"
   | "3:4"
   | "3:2"
-  | "2:3";
+  | "2:3"
+  | "5:4"
+  | "4:5"
+  | "21:9";
 
 export interface GeminiImageRequest {
   prompt: string;
@@ -28,7 +31,7 @@ export interface GeminiImageError {
   code?: string;
 }
 
-const GEMINI_MODEL = "gemini-2.0-flash-exp-image-generation";
+const GEMINI_MODEL = "gemini-2.5-flash-image";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 /**
@@ -99,10 +102,10 @@ export async function generateImage(
     throw new Error("No image data in response");
   }
 
-  // Find the inline_data part (the image)
-  const imagePart = parts.find((part: { inline_data?: { data: string; mime_type: string } }) => part.inline_data);
+  // Find the inlineData part (the image)
+  const imagePart = parts.find((part: { inlineData?: { data: string; mimeType: string } }) => part.inlineData);
 
-  if (!imagePart || !imagePart.inline_data) {
+  if (!imagePart || !imagePart.inlineData) {
     // Check if there's a text response explaining why no image was generated
     const textPart = parts.find((part: { text?: string }) => part.text);
     if (textPart?.text) {
@@ -112,8 +115,8 @@ export async function generateImage(
   }
 
   return {
-    imageData: imagePart.inline_data.data,
-    mimeType: imagePart.inline_data.mime_type || "image/png",
+    imageData: imagePart.inlineData.data,
+    mimeType: imagePart.inlineData.mimeType || "image/png",
   };
 }
 
