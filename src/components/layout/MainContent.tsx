@@ -73,6 +73,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     startStreaming,
     updateProviderSessionId,
     updateSessionProvider,
+    updateSessionModel,
     getSession,
     setPendingQuestionSet,
   } = useSessionStore();
@@ -344,7 +345,15 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const handleProviderChange = useCallback((provider: AIProvider) => {
     if (!currentSessionId) return;
     updateSessionProvider(currentSessionId, provider);
-  }, [currentSessionId, updateSessionProvider]);
+
+    // Also update the model to the default for the new provider
+    const newModel = provider === "codex"
+      ? defaultCodexModel
+      : provider === "gemini"
+        ? defaultGeminiModel
+        : defaultModel;
+    updateSessionModel(currentSessionId, newModel);
+  }, [currentSessionId, updateSessionProvider, updateSessionModel, defaultModel, defaultCodexModel, defaultGeminiModel]);
 
   // Send prompt to active session (Claude or Codex based on provider)
   const handleSendPrompt = useCallback(

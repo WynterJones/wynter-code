@@ -33,6 +33,8 @@ class GeminiService {
   private _sessionActiveMap = new Map<string, boolean>();
   private _currentToolIdMap = new Map<string, string | null>();
   private _callbacksMap = new Map<string, GeminiSessionCallbacks>();
+  private _isThinkingMap = new Map<string, boolean>();
+  private _modelMap = new Map<string, GeminiModel>();
 
   setModel(model: GeminiModel) {
     this._currentModel = model;
@@ -61,9 +63,10 @@ class GeminiService {
       throw new Error("Session already active");
     }
 
-    // Store callbacks
+    // Store callbacks and model
     this._callbacksMap.set(sessionId, callbacks);
     this._currentToolIdMap.set(sessionId, null);
+    this._modelMap.set(sessionId, (model as GeminiModel) || this._currentModel);
 
     // Set up event listener for gemini-stream
     const unlisten = await listen<StreamChunk>("gemini-stream", (event) => {
@@ -95,6 +98,11 @@ class GeminiService {
           break;
 
         case "text":
+          // End thinking if we were thinking
+          if (this._isThinkingMap.get(sessionId)) {
+            cb.onThinkingEnd();
+            this._isThinkingMap.set(sessionId, false);
+          }
           if (chunk.content) {
             cb.onText(chunk.content);
           }
@@ -102,12 +110,20 @@ class GeminiService {
 
         case "thinking":
           if (chunk.content) {
-            cb.onThinkingStart();
+            if (!this._isThinkingMap.get(sessionId)) {
+              cb.onThinkingStart();
+              this._isThinkingMap.set(sessionId, true);
+            }
             cb.onThinking(chunk.content);
           }
           break;
 
         case "tool_start":
+          // End thinking if we were thinking
+          if (this._isThinkingMap.get(sessionId)) {
+            cb.onThinkingEnd();
+            this._isThinkingMap.set(sessionId, false);
+          }
           if (chunk.tool_name && chunk.tool_id) {
             this._currentToolIdMap.set(sessionId, chunk.tool_id);
             cb.onToolStart(chunk.tool_name, chunk.tool_id);
@@ -139,6 +155,11 @@ class GeminiService {
           break;
 
         case "result":
+          // End thinking if we were thinking
+          if (this._isThinkingMap.get(sessionId)) {
+            cb.onThinkingEnd();
+            this._isThinkingMap.set(sessionId, false);
+          }
           // Turn/prompt completed
           cb.onResult(chunk.content || "");
           // Extract usage from result if present - these are final values
@@ -199,7 +220,7 @@ class GeminiService {
       throw new Error("Session not active. Start a session first.");
     }
     // Gemini spawns a new process for each prompt
-    await invoke("send_gemini_input", { sessionId, input: prompt, model: this._currentModel });
+    await invoke("send_gemini_input", { sessionId, input: prompt, model: this._modelMap.get(sessionId) || this._currentModel });
   }
 
   /** Send a structured prompt with images to a running session */
@@ -237,7 +258,7 @@ class GeminiService {
     await invoke("send_gemini_input", {
       sessionId,
       input: text,
-      model: this._currentModel,
+      model: this._modelMap.get(sessionId) || this._currentModel,
       images: imagePaths.length > 0 ? imagePaths : null,
     });
   }
@@ -252,6 +273,8 @@ class GeminiService {
     this._callbacksMap.delete(sessionId);
     this._currentToolIdMap.delete(sessionId);
     this._sessionActiveMap.delete(sessionId);
+    this._isThinkingMap.delete(sessionId);
+    this._modelMap.delete(sessionId);
   }
 }
 

@@ -26,6 +26,35 @@ function formatTokens(count: number): string {
   return count.toString();
 }
 
+function formatModelName(model: string): string {
+  // Claude models: claude-opus-4-20250514 -> opus-4, claude-sonnet-4-20250514 -> sonnet-4
+  if (model.startsWith("claude-")) {
+    return model.replace("claude-", "").replace(/-\d{8}$/, "");
+  }
+  // Gemini models: gemini-2.5-flash -> Flash 2.5, gemini-3-pro -> Pro 3
+  if (model.startsWith("gemini-")) {
+    const match = model.match(/gemini-(\d+(?:\.\d+)?)-(\w+)/);
+    if (match) {
+      const [, version, variant] = match;
+      return `${variant.charAt(0).toUpperCase() + variant.slice(1)} ${version}`;
+    }
+    return model.replace("gemini-", "");
+  }
+  // Codex models: gpt-5.2-codex -> Codex 5.2, gpt-5.1-codex-max -> Codex Max
+  if (model.includes("codex")) {
+    const match = model.match(/gpt-(\d+\.\d+)-codex(-(\w+))?/);
+    if (match) {
+      const [, version, , variant] = match;
+      if (variant) {
+        return `Codex ${variant.charAt(0).toUpperCase() + variant.slice(1)}`;
+      }
+      return `Codex ${version}`;
+    }
+    return model;
+  }
+  return model;
+}
+
 export function StreamingToolbar({ isStreaming, stats }: StreamingToolbarProps) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -100,7 +129,7 @@ export function StreamingToolbar({ isStreaming, stats }: StreamingToolbarProps) 
           <>
             <span className="text-text-secondary/50">|</span>
             <span className="text-text-secondary font-mono">
-              {stats.model.replace("claude-", "").replace(/-\d+$/, "")}
+              {formatModelName(stats.model)}
             </span>
           </>
         )}

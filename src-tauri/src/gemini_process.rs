@@ -66,15 +66,100 @@ fn parse_gemini_chunk(json: &serde_json::Value, session_id: &str) -> Option<Stre
 
         "tool_use" => {
             let mut chunk = create_chunk("tool_start", session_id);
-            chunk.tool_name = json
-                .get("tool_name")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
+            let raw_tool_name = json.get("tool_name").and_then(|v| v.as_str()).unwrap_or("");
+            let params = json.get("parameters"); // Gemini uses "parameters" not "arguments"
+
+            // Map Gemini CLI tool names to UI tool names and format input
+            let (tool_name, tool_input) = match raw_tool_name {
+                "run_shell_command" => {
+                    let cmd = params
+                        .and_then(|p| p.get("command"))
+                        .and_then(|c| c.as_str())
+                        .unwrap_or("");
+                    ("Bash", serde_json::json!({"command": cmd}).to_string())
+                }
+                "read_file" => {
+                    let path = params
+                        .and_then(|p| p.get("file_path"))
+                        .and_then(|f| f.as_str())
+                        .unwrap_or("");
+                    ("Read", serde_json::json!({"file_path": path}).to_string())
+                }
+                "write_file" => {
+                    let path = params
+                        .and_then(|p| p.get("file_path"))
+                        .and_then(|f| f.as_str())
+                        .unwrap_or("");
+                    ("Write", serde_json::json!({"file_path": path}).to_string())
+                }
+                "replace" => {
+                    // Pass all edit fields for diff display
+                    let file_path = params
+                        .and_then(|p| p.get("file_path"))
+                        .and_then(|f| f.as_str())
+                        .unwrap_or("");
+                    let old_string = params
+                        .and_then(|p| p.get("old_string"))
+                        .and_then(|s| s.as_str())
+                        .unwrap_or("");
+                    let new_string = params
+                        .and_then(|p| p.get("new_string"))
+                        .and_then(|s| s.as_str())
+                        .unwrap_or("");
+                    (
+                        "Edit",
+                        serde_json::json!({
+                            "file_path": file_path,
+                            "old_string": old_string,
+                            "new_string": new_string
+                        })
+                        .to_string(),
+                    )
+                }
+                "write_todos" => {
+                    // Pass todos array for TodoWriteDisplay
+                    let todos = params.and_then(|p| p.get("todos")).cloned();
+                    (
+                        "TodoWrite",
+                        serde_json::json!({ "todos": todos }).to_string(),
+                    )
+                }
+                "delegate_to_agent" => {
+                    let agent = params
+                        .and_then(|p| p.get("agent_name"))
+                        .and_then(|a| a.as_str())
+                        .unwrap_or("");
+                    let objective = params
+                        .and_then(|p| p.get("objective"))
+                        .and_then(|o| o.as_str())
+                        .unwrap_or("");
+                    (
+                        "Task",
+                        serde_json::json!({"prompt": objective, "subagent_type": agent}).to_string(),
+                    )
+                }
+                _ => {
+                    // Fallback: use raw name and pass parameters as-is
+                    let tool_input = params.map(|v| v.to_string()).unwrap_or_default();
+                    chunk.tool_name = json
+                        .get("tool_name")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    chunk.tool_id = json
+                        .get("tool_id")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string());
+                    chunk.tool_input = Some(tool_input);
+                    return Some(chunk);
+                }
+            };
+
+            chunk.tool_name = Some(tool_name.to_string());
             chunk.tool_id = json
                 .get("tool_id")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
-            chunk.tool_input = json.get("arguments").map(|v| v.to_string());
+            chunk.tool_input = Some(tool_input);
             Some(chunk)
         }
 

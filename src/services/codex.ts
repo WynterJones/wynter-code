@@ -35,6 +35,7 @@ class CodexService {
   private _sessionActiveMap = new Map<string, boolean>();
   private _currentToolIdMap = new Map<string, string | null>();
   private _callbacksMap = new Map<string, CodexSessionCallbacks>();
+  private _isThinkingMap = new Map<string, boolean>();
 
   setModel(model: CodexModel) {
     this._currentModel = model;
@@ -99,6 +100,11 @@ class CodexService {
           break;
 
         case "text":
+          // End thinking if we were thinking
+          if (this._isThinkingMap.get(sessionId)) {
+            cb.onThinkingEnd();
+            this._isThinkingMap.set(sessionId, false);
+          }
           if (chunk.content) {
             cb.onText(chunk.content);
           }
@@ -106,13 +112,21 @@ class CodexService {
 
         case "thinking":
           if (chunk.content) {
-            cb.onThinkingStart();
+            if (!this._isThinkingMap.get(sessionId)) {
+              cb.onThinkingStart();
+              this._isThinkingMap.set(sessionId, true);
+            }
             // Format Codex reasoning items as bullet points (each item.completed is a discrete thought)
             cb.onThinking(`• ${chunk.content}\n`);
           }
           break;
 
         case "tool_start":
+          // End thinking if we were thinking
+          if (this._isThinkingMap.get(sessionId)) {
+            cb.onThinkingEnd();
+            this._isThinkingMap.set(sessionId, false);
+          }
           if (chunk.tool_name && chunk.tool_id) {
             this._currentToolIdMap.set(sessionId, chunk.tool_id);
             cb.onToolStart(chunk.tool_name, chunk.tool_id);
@@ -150,6 +164,11 @@ class CodexService {
           break;
 
         case "result":
+          // End thinking if we were thinking
+          if (this._isThinkingMap.get(sessionId)) {
+            cb.onThinkingEnd();
+            this._isThinkingMap.set(sessionId, false);
+          }
           // Turn/prompt completed - call onResult
           cb.onResult(chunk.content || "");
           break;
@@ -259,6 +278,7 @@ class CodexService {
     this._callbacksMap.delete(sessionId);
     this._currentToolIdMap.delete(sessionId);
     this._sessionActiveMap.delete(sessionId);
+    this._isThinkingMap.delete(sessionId);
   }
 }
 

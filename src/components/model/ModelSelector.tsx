@@ -63,6 +63,20 @@ const codexModels: ModelOption[] = [
 
 const geminiModels: ModelOption[] = [
   {
+    value: "gemini-3-pro-preview",
+    label: "Pro 3",
+    description: "Most capable, preview model",
+    icon: Brain,
+    color: "text-[#4285f4]",
+  },
+  {
+    value: "gemini-3-flash-preview",
+    label: "Flash 3",
+    description: "Fast preview model",
+    icon: Zap,
+    color: "text-[#4285f4]",
+  },
+  {
     value: "gemini-2.5-flash",
     label: "Flash 2.5",
     description: "Fast and efficient, great for most tasks",
@@ -111,13 +125,17 @@ export function ModelSelector({ projectId }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Get session ID and provider for this project
+  const currentSessionId = useSessionStore((state) => state.activeSessionId.get(projectId));
+  const updateSessionModel = useSessionStore((state) => state.updateSessionModel);
+
   // Use selector to get current provider for this specific project
   const currentProvider = useSessionStore((state) => {
-    const currentSessionId = state.activeSessionId.get(projectId);
-    if (!currentSessionId) return "claude" as AIProvider;
+    const sessionId = state.activeSessionId.get(projectId);
+    if (!sessionId) return "claude" as AIProvider;
 
     const projectSessions = state.sessions.get(projectId);
-    const session = projectSessions?.find(s => s.id === currentSessionId);
+    const session = projectSessions?.find(s => s.id === sessionId);
     return (session?.provider || "claude") as AIProvider;
   });
 
@@ -146,6 +164,12 @@ export function ModelSelector({ projectId }: ModelSelectorProps) {
     } else {
       setDefaultModel(model as ClaudeModel);
     }
+
+    // Update the current session's model so context limits reflect the change
+    if (currentSessionId) {
+      updateSessionModel(currentSessionId, model);
+    }
+
     setIsOpen(false);
   };
 

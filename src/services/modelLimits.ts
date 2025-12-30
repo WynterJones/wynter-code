@@ -36,6 +36,8 @@ const MODEL_LIMITS: Record<string, ModelLimits> = {
   // Max output: 65,536 tokens
   "gemini-2.5-flash": { input: 1_048_576, output: 65_536 },
   "gemini-2.5-pro": { input: 1_048_576, output: 65_536 },
+  "gemini-3-flash-preview": { input: 1_048_576, output: 65_536 },
+  "gemini-3-pro-preview": { input: 1_048_576, output: 65_536 },
 };
 
 /**
