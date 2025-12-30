@@ -1,5 +1,6 @@
 import { Copy, Trash2, Check, AlertCircle, ExternalLink } from "lucide-react";
 import { useState, useMemo } from "react";
+import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -94,7 +95,7 @@ export function UrlParser() {
 
   const handleOpenUrl = () => {
     if (parsed) {
-      window.open(input, "_blank", "noopener,noreferrer");
+      open(input);
     }
   };
 

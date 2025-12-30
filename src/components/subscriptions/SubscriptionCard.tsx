@@ -1,4 +1,5 @@
 import { ExternalLink, Pencil, Trash2, Power } from "lucide-react";
+import { open } from "@tauri-apps/plugin-shell";
 import { cn } from "@/lib/utils";
 import { FaviconImage } from "./FaviconImage";
 import type { Subscription } from "@/types";
@@ -28,7 +29,7 @@ export function SubscriptionCard({
 
   const handleOpenLink = () => {
     if (subscription.url) {
-      window.open(subscription.url, "_blank");
+      open(subscription.url);
     }
   };
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-shell";
 import { Button } from "@/components/ui/Button";
 import { ChevronLeft, Check, X, RefreshCw, Copy, ExternalLink, Loader2 } from "lucide-react";
 import { useOnboardingStore, type SystemCheckResults } from "@/stores";
@@ -168,7 +169,7 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
 
                 {!isInstalled && !isLoading && item.installUrl && (
                   <button
-                    onClick={() => window.open(item.installUrl, "_blank")}
+                    onClick={() => open(item.installUrl!)}
                     className="text-xs text-accent hover:text-accent-light flex items-center gap-1"
                   >
                     Install

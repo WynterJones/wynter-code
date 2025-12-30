@@ -14,6 +14,7 @@ import {
   FolderOpen,
   FileCode,
 } from "lucide-react";
+import { open } from "@tauri-apps/plugin-shell";
 import { IconButton, Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { McpServer, McpScope } from "@/types";
@@ -158,7 +159,7 @@ export function McpServerRow({ server, onEdit, onDelete }: McpServerRowProps) {
                   (a) => !a.startsWith("-") && a !== "-y"
                 );
                 if (pkgArg) {
-                  window.open(`https://www.npmjs.com/package/${pkgArg}`, "_blank");
+                  open(`https://www.npmjs.com/package/${pkgArg}`);
                 }
               }}
             >

@@ -5,7 +5,8 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  closestCorners,
+  DragOverEvent,
+  pointerWithin,
   PointerSensor,
   useSensor,
   useSensors,
@@ -36,6 +37,7 @@ export function KanbanBoardPopup({
   const [showAIPopup, setShowAIPopup] = useState(false);
   const [editTask, setEditTask] = useState<KanbanTask | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [overColumnId, setOverColumnId] = useState<string | null>(null);
 
   const {
     getBoard,
@@ -125,9 +127,34 @@ export function KanbanBoardPopup({
     setActiveId(event.active.id as string);
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    if (!over) {
+      setOverColumnId(null);
+      return;
+    }
+
+    // Check if over a column directly
+    const column = KANBAN_COLUMNS.find((c) => c.id === over.id);
+    if (column) {
+      setOverColumnId(column.id);
+      return;
+    }
+
+    // Check if over a task - find which column the task belongs to
+    const targetTask = board.tasks.find((t) => t.id === over.id);
+    if (targetTask) {
+      setOverColumnId(targetTask.status);
+      return;
+    }
+
+    setOverColumnId(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setOverColumnId(null);
 
     if (!over) return;
 
@@ -255,8 +282,9 @@ export function KanbanBoardPopup({
           {/* Board Content */}
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={pointerWithin}
             onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
             onDragEnd={handleDragEnd}
           >
             <div className="flex-1 flex gap-4 p-4 overflow-x-auto">
@@ -265,6 +293,7 @@ export function KanbanBoardPopup({
                   key={column.id}
                   column={column}
                   tasks={columnTasks[column.id]}
+                  isDraggingOver={overColumnId === column.id}
                   onAddTask={
                     column.id === "backlog"
                       ? () => setShowNewTaskPopup(true)

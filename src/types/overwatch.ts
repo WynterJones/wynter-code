@@ -1,8 +1,5 @@
-// Service provider types
-export type ServiceProvider = "railway" | "plausible" | "netlify" | "sentry";
-
-// Connection mode: link-only (just external link) or api (full integration)
-export type ConnectionMode = "link" | "api";
+// Service provider types - API providers + link for custom links
+export type ServiceProvider = "railway" | "plausible" | "netlify" | "sentry" | "link";
 
 // Service status
 export type ServiceStatus = "healthy" | "degraded" | "down" | "unknown" | "loading";
@@ -13,13 +10,15 @@ export interface ServiceConfig {
   workspaceId: string;
   provider: ServiceProvider;
   name: string;
-  connectionMode: ConnectionMode;
   externalUrl?: string;
-  apiKeyId?: string;
+  apiKey?: string;
   // Provider-specific identifiers
   projectId?: string;
   siteId?: string;
   organizationSlug?: string;
+  // Link-specific customization
+  linkIcon?: string;
+  linkColor?: string;
   enabled: boolean;
   sortOrder: number;
   createdAt: number;
@@ -30,12 +29,13 @@ export interface ServiceConfigInput {
   workspaceId: string;
   provider: ServiceProvider;
   name: string;
-  connectionMode: ConnectionMode;
   externalUrl?: string;
-  apiKeyId?: string;
+  apiKey?: string;
   projectId?: string;
   siteId?: string;
   organizationSlug?: string;
+  linkIcon?: string;
+  linkColor?: string;
   enabled?: boolean;
   sortOrder?: number;
 }
@@ -132,5 +132,13 @@ export const PROVIDER_INFO: Record<ServiceProvider, ProviderInfo> = {
     color: "#362D59",
     apiDocsUrl: "https://docs.sentry.io/api/",
     requiredFields: ["organizationSlug", "projectId"],
+  },
+  link: {
+    id: "link",
+    name: "Link",
+    icon: "Link",
+    color: "#6c7086",
+    apiDocsUrl: "",
+    requiredFields: [],
   },
 };

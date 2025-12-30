@@ -13,11 +13,13 @@ import type {
   NetlifyMetrics,
   SentryMetrics,
 } from "@/types/overwatch";
-import { useEnvStore } from "./envStore";
 
 interface OverwatchStore {
   // Persisted service configurations
   services: ServiceConfig[];
+
+  // Persisted provider API keys (remembered for convenience)
+  providerApiKeys: Record<string, string>;
 
   // Runtime state (not persisted)
   serviceData: Map<string, ServiceData>;
@@ -46,8 +48,9 @@ interface OverwatchStore {
   setAutoRefresh: (enabled: boolean) => void;
   setRefreshInterval: (seconds: number) => void;
 
-  // Helpers
-  getApiKeyValue: (apiKeyId: string) => string | undefined;
+  // Provider API keys
+  getProviderApiKey: (provider: string) => string | undefined;
+  setProviderApiKey: (provider: string, apiKey: string) => void;
 
   // Reset
   reset: () => void;
@@ -57,6 +60,7 @@ export const useOverwatchStore = create<OverwatchStore>()(
   persist(
     (set, get) => ({
       services: [],
+      providerApiKeys: {},
       serviceData: new Map(),
       refreshing: new Set(),
       autoRefreshEnabled: true,
@@ -73,12 +77,13 @@ export const useOverwatchStore = create<OverwatchStore>()(
           workspaceId: input.workspaceId,
           provider: input.provider,
           name: input.name,
-          connectionMode: input.connectionMode,
           externalUrl: input.externalUrl,
-          apiKeyId: input.apiKeyId,
+          apiKey: input.apiKey,
           projectId: input.projectId,
           siteId: input.siteId,
           organizationSlug: input.organizationSlug,
+          linkIcon: input.linkIcon,
+          linkColor: input.linkColor,
           enabled: input.enabled ?? true,
           sortOrder: input.sortOrder ?? workspaceServices.length,
           createdAt: now,
@@ -167,7 +172,7 @@ export const useOverwatchStore = create<OverwatchStore>()(
 
       refreshService: async (serviceId) => {
         const service = get().getService(serviceId);
-        if (!service || service.connectionMode === "link") return;
+        if (!service || service.provider === "link") return;
 
         // Set loading state
         set((state) => {
@@ -179,12 +184,9 @@ export const useOverwatchStore = create<OverwatchStore>()(
         get().setServiceData(serviceId, { status: "loading" });
 
         try {
-          // Get API key value
-          const apiKey = service.apiKeyId
-            ? get().getApiKeyValue(service.apiKeyId)
-            : undefined;
+          const apiKey = service.apiKey;
 
-          if (!apiKey && service.connectionMode === "api") {
+          if (!apiKey) {
             get().setServiceData(serviceId, {
               status: "unknown",
               error: "API key not configured",
@@ -306,7 +308,7 @@ export const useOverwatchStore = create<OverwatchStore>()(
 
       refreshAllServices: async (workspaceId) => {
         const services = get().getServicesForWorkspace(workspaceId);
-        const apiServices = services.filter((s) => s.connectionMode === "api" && s.enabled);
+        const apiServices = services.filter((s) => s.provider !== "link" && s.enabled);
         await Promise.all(apiServices.map((s) => get().refreshService(s.id)));
       },
 
@@ -318,15 +320,23 @@ export const useOverwatchStore = create<OverwatchStore>()(
         set({ refreshInterval: Math.max(30, Math.min(300, seconds)) });
       },
 
-      getApiKeyValue: (apiKeyId) => {
-        const envStore = useEnvStore.getState();
-        const variable = envStore.globalVariables.find((v) => v.id === apiKeyId);
-        return variable?.value;
+      getProviderApiKey: (provider) => {
+        return get().providerApiKeys[provider];
+      },
+
+      setProviderApiKey: (provider, apiKey) => {
+        set((state) => ({
+          providerApiKeys: {
+            ...state.providerApiKeys,
+            [provider]: apiKey,
+          },
+        }));
       },
 
       reset: () => {
         set({
           services: [],
+          providerApiKeys: {},
           serviceData: new Map(),
           refreshing: new Set(),
           autoRefreshEnabled: true,
@@ -338,6 +348,7 @@ export const useOverwatchStore = create<OverwatchStore>()(
       name: "wynter-code-overwatch",
       partialize: (state) => ({
         services: state.services,
+        providerApiKeys: state.providerApiKeys,
         autoRefreshEnabled: state.autoRefreshEnabled,
         refreshInterval: state.refreshInterval,
       }),

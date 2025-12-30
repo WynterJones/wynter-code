@@ -140,8 +140,8 @@ export const DATA_CATEGORIES: DataCategory[] = [
   {
     id: "integrations",
     name: "Integrations",
-    description: "Netlify deployment tool, site groups, and API tokens",
-    keys: ["netlify-ftp-store"],
+    description: "Netlify deployment tool, site groups, service monitors, and API tokens",
+    keys: ["netlify-ftp-store", "wynter-code-overwatch"],
     canExport: true,
     canClear: true,
   },
@@ -173,8 +173,8 @@ export const DATA_CATEGORIES: DataCategory[] = [
   {
     id: "system",
     name: "System Data",
-    description: "Environment variables, onboarding progress, service monitors",
-    keys: ["wynter-code-env", "wynter-code-onboarding", "wynter-code-overwatch"],
+    description: "Environment variables and onboarding progress",
+    keys: ["wynter-code-env", "wynter-code-onboarding"],
     canExport: false,
     canClear: true,
   },

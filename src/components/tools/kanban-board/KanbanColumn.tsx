@@ -11,6 +11,7 @@ import type { KanbanTask, KanbanColumn as KanbanColumnType } from "@/types/kanba
 interface KanbanColumnProps {
   column: KanbanColumnType;
   tasks: KanbanTask[];
+  isDraggingOver?: boolean;
   onAddTask?: () => void;
   onEditTask?: (task: KanbanTask) => void;
   onDeleteTask?: (taskId: string) => void;
@@ -20,12 +21,16 @@ interface KanbanColumnProps {
 export function KanbanColumn({
   column,
   tasks,
+  isDraggingOver = false,
   onAddTask,
   onEditTask,
   onDeleteTask,
   onToggleLock,
 }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
+
+  // Use either isOver (direct column hover) or isDraggingOver (hovering over cards in this column)
+  const showDropIndicator = isOver || isDraggingOver;
 
   const isPolishedColumn = column.id === "polished";
 
@@ -47,8 +52,8 @@ export function KanbanColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex flex-col min-h-0 flex-1 min-w-[280px]",
-        isOver && "ring-2 ring-accent/50 rounded-lg"
+        "flex flex-col min-h-0 flex-1 min-w-[280px] rounded-lg transition-all duration-150",
+        showDropIndicator && "ring-2 ring-accent bg-accent/10 shadow-[inset_0_4px_16px_0_rgba(203,166,247,0.2)]"
       )}
     >
       {/* Column Header */}
@@ -83,32 +88,60 @@ export function KanbanColumn({
       </div>
 
       {/* Column Content */}
-      <div className="flex-1 flex flex-col bg-bg-tertiary/10 rounded-b-lg border border-t-0 border-border overflow-hidden">
+      <div
+        className={cn(
+          "flex-1 flex flex-col rounded-b-lg border border-t-0 overflow-hidden transition-all duration-150",
+          showDropIndicator
+            ? "bg-accent/5 border-accent/30"
+            : "bg-bg-tertiary/10 border-border"
+        )}
+      >
         <OverlayScrollbarsComponent
           className={cn("flex-1", lockedTasks.length > 0 && "min-h-0")}
           options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}
         >
           <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-            <div className="p-2 space-y-2 min-h-[200px]">
+            <div className={cn(
+              "p-2 space-y-2 min-h-[280px] transition-all duration-150",
+              showDropIndicator && "bg-gradient-to-b from-accent/5 to-transparent"
+            )}>
               {unlockedTasks.length === 0 && lockedTasks.length === 0 ? (
-                <div className="flex items-center justify-center h-32 text-xs text-text-secondary">
-                  {column.emptyMessage}
+                <div className={cn(
+                  "flex items-center justify-center h-full min-h-[240px] text-xs rounded-lg border-2 border-dashed transition-all duration-150",
+                  showDropIndicator
+                    ? "border-accent/50 bg-accent/5 text-accent"
+                    : "border-transparent text-text-secondary"
+                )}>
+                  {showDropIndicator ? "Drop here" : column.emptyMessage}
                 </div>
               ) : unlockedTasks.length === 0 ? (
-                <div className="flex items-center justify-center h-20 text-xs text-text-secondary">
-                  All tasks locked
+                <div className={cn(
+                  "flex items-center justify-center h-20 text-xs rounded-lg border-2 border-dashed transition-all duration-150",
+                  showDropIndicator
+                    ? "border-accent/50 bg-accent/5 text-accent"
+                    : "border-transparent text-text-secondary"
+                )}>
+                  {showDropIndicator ? "Drop here" : "All tasks locked"}
                 </div>
               ) : (
-                unlockedTasks.map((task) => (
-                  <KanbanCard
-                    key={task.id}
-                    task={task}
-                    onEdit={onEditTask}
-                    onDelete={onDeleteTask}
-                    onToggleLock={onToggleLock}
-                    showLockToggle={isPolishedColumn}
-                  />
-                ))
+                <>
+                  {unlockedTasks.map((task) => (
+                    <KanbanCard
+                      key={task.id}
+                      task={task}
+                      onEdit={onEditTask}
+                      onDelete={onDeleteTask}
+                      onToggleLock={onToggleLock}
+                      showLockToggle={isPolishedColumn}
+                    />
+                  ))}
+                  {/* Drop zone indicator at bottom of cards */}
+                  {showDropIndicator && (
+                    <div className="flex items-center justify-center h-16 text-xs text-accent rounded-lg border-2 border-dashed border-accent/50 bg-accent/5 mt-2">
+                      Drop here
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </SortableContext>

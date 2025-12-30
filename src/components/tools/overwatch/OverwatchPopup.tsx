@@ -165,7 +165,7 @@ export function OverwatchPopup({ isOpen, onClose }: OverwatchPopupProps) {
                     value={refreshInterval}
                     onChange={(e) => setRefreshInterval(Number(e.target.value))}
                     disabled={!autoRefreshEnabled}
-                    className="text-sm bg-surface border border-border rounded px-2 py-1"
+                    className="text-sm bg-surface text-text-primary border border-border rounded px-2 py-1 [&>option]:bg-surface-raised [&>option]:text-text-primary"
                   >
                     <option value={30}>30 seconds</option>
                     <option value={60}>1 minute</option>

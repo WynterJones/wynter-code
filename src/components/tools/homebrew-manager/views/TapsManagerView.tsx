@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { GitFork, Plus, Trash2, ExternalLink, Loader2 } from "lucide-react";
+import { open } from "@tauri-apps/plugin-shell";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
@@ -150,7 +151,7 @@ function TapCard({ tap, onRemove, isOperating }: TapCardProps) {
           <Tooltip content="Open on GitHub" side="top">
             <IconButton
               size="sm"
-              onClick={() => window.open(tap.remote.replace(".git", ""), "_blank")}
+              onClick={() => open(tap.remote.replace(".git", ""))}
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </IconButton>

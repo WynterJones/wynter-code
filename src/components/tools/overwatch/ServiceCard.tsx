@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { open } from "@tauri-apps/plugin-shell";
 import {
   Train,
   BarChart3,
@@ -10,6 +11,24 @@ import {
   Pencil,
   Trash2,
   Link as LinkIcon,
+  Server,
+  Database,
+  Cloud,
+  Shield,
+  Zap,
+  Box,
+  Layers,
+  Monitor,
+  Cpu,
+  HardDrive,
+  Wifi,
+  Lock,
+  Key,
+  FileCode,
+  GitBranch,
+  Terminal,
+  Settings,
+  Activity,
 } from "lucide-react";
 import { IconButton, Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -38,6 +57,7 @@ const PROVIDER_ICONS: Record<ServiceProvider, typeof Train> = {
   plausible: BarChart3,
   netlify: Globe,
   sentry: Bug,
+  link: LinkIcon,
 };
 
 const PROVIDER_COLORS: Record<ServiceProvider, string> = {
@@ -45,6 +65,31 @@ const PROVIDER_COLORS: Record<ServiceProvider, string> = {
   plausible: "#5850EC",
   netlify: "#00C7B7",
   sentry: "#362D59",
+  link: "#6c7086",
+};
+
+// Map of icon IDs to components for Link services
+const LINK_ICON_MAP: Record<string, typeof Train> = {
+  link: LinkIcon,
+  globe: Globe,
+  server: Server,
+  database: Database,
+  cloud: Cloud,
+  shield: Shield,
+  zap: Zap,
+  box: Box,
+  layers: Layers,
+  monitor: Monitor,
+  cpu: Cpu,
+  "hard-drive": HardDrive,
+  wifi: Wifi,
+  lock: Lock,
+  key: Key,
+  "file-code": FileCode,
+  "git-branch": GitBranch,
+  terminal: Terminal,
+  settings: Settings,
+  activity: Activity,
 };
 
 function formatTimeAgo(timestamp: number): string {
@@ -157,10 +202,16 @@ export function ServiceCard({
   onDelete,
 }: ServiceCardProps) {
   const [showMenu, setShowMenu] = useState(false);
-  const Icon = PROVIDER_ICONS[config.provider];
-  const color = PROVIDER_COLORS[config.provider];
+  const isLink = config.provider === "link";
+
+  // For link services, use custom icon/color if set, otherwise use defaults
+  const Icon = isLink && config.linkIcon
+    ? LINK_ICON_MAP[config.linkIcon] || LinkIcon
+    : PROVIDER_ICONS[config.provider];
+  const color = isLink && config.linkColor
+    ? config.linkColor
+    : PROVIDER_COLORS[config.provider];
   const status = data?.status ?? "unknown";
-  const isLinkOnly = config.connectionMode === "link";
 
   return (
     <div className="relative group bg-surface border border-border rounded-lg overflow-hidden hover:border-accent/50 transition-colors">
@@ -176,10 +227,10 @@ export function ServiceCard({
           <div className="min-w-0">
             <div className="text-sm font-medium truncate">{config.name}</div>
             <div className="flex items-center gap-1.5">
-              {isLinkOnly ? (
+              {isLink ? (
                 <div className="flex items-center gap-1 text-xs text-text-secondary">
                   <LinkIcon className="w-3 h-3" />
-                  <span>Link only</span>
+                  <span>Quick link</span>
                 </div>
               ) : (
                 <StatusIndicator status={status} size="sm" showLabel />
@@ -232,9 +283,9 @@ export function ServiceCard({
 
       {/* Content */}
       <div className="p-3">
-        {isLinkOnly ? (
+        {isLink ? (
           <div className="text-sm text-text-secondary">
-            Click to open external dashboard
+            Click to open external link
           </div>
         ) : data?.error ? (
           <div className="text-sm text-red-400">{data.error}</div>
@@ -261,10 +312,14 @@ export function ServiceCard({
       {/* Footer */}
       <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-surface-raised/50">
         <div className="text-xs text-text-secondary">
-          {data?.lastUpdated ? formatTimeAgo(data.lastUpdated) : "Never updated"}
+          {isLink ? (
+            config.externalUrl ? new URL(config.externalUrl).hostname : "No URL"
+          ) : (
+            data?.lastUpdated ? formatTimeAgo(data.lastUpdated) : "Never updated"
+          )}
         </div>
         <div className="flex items-center gap-1">
-          {!isLinkOnly && (
+          {!isLink && (
             <Tooltip content="Refresh">
               <IconButton
                 size="sm"
@@ -278,10 +333,10 @@ export function ServiceCard({
             </Tooltip>
           )}
           {config.externalUrl && (
-            <Tooltip content="Open Dashboard">
+            <Tooltip content={isLink ? "Open Link" : "Open Dashboard"}>
               <IconButton
                 size="sm"
-                onClick={() => window.open(config.externalUrl, "_blank")}
+                onClick={() => open(config.externalUrl!)}
               >
                 <ExternalLink className="w-3.5 h-3.5" />
               </IconButton>

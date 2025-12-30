@@ -11,6 +11,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-shell";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { IconButton, Tooltip, Modal } from "@/components/ui";
 import { QRCodeDisplay } from "./QRCodeDisplay";
@@ -334,7 +335,7 @@ export function LocalhostTunnelPopup({ isOpen, onClose }: LocalhostTunnelPopupPr
                         <Tooltip content="Open in Browser">
                           <IconButton
                             size="sm"
-                            onClick={() => window.open(tunnel.url!, "_blank")}
+                            onClick={() => open(tunnel.url!)}
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                           </IconButton>

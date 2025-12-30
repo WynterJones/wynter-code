@@ -21,6 +21,7 @@ import {
   X,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-shell";
 import { IconButton, Tooltip, Modal } from "@/components/ui";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
@@ -97,7 +98,7 @@ export function PortManagerPopup({ isOpen, onClose }: PortManagerPopupProps) {
   };
 
   const handleOpenInBrowser = (port: number) => {
-    window.open(`http://localhost:${port}`, "_blank");
+    open(`http://localhost:${port}`);
   };
 
   const toggleGroup = (groupKey: string) => {
