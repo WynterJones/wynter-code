@@ -1,1 +1,1 @@
-export { ProviderDropdown, getProviderManagerLabel } from "./ProviderDropdown";
+export { ProviderDropdown } from "./ProviderDropdown";

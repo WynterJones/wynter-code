@@ -1,9 +1,15 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import type { SimpleIcon } from "simple-icons";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LobeIconImport = () => Promise<any>;
+// Type for LobeHub icon module structure
+interface LobeIconModule {
+  default?: {
+    Avatar?: ComponentType<{ size: number }>;
+  };
+}
+
+type LobeIconImport = () => Promise<LobeIconModule>;
 
 // Lazy import lobehub icons to avoid loading all at once
 const lobeHubIconMap: Record<string, LobeIconImport> = {
@@ -319,9 +325,6 @@ const iconSizes = {
   xl: 40,
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type LobeIconModule = any;
-
 export function BookmarkIcon({
   url,
   faviconUrl,
@@ -371,7 +374,7 @@ export function BookmarkIcon({
     if (lobeImport) {
       lobeImport()
         .then((module) => {
-          setLobeIcon(module as LobeIconModule);
+          setLobeIcon(module);
           setLobeIconLoaded(true);
         })
         .catch(() => {
@@ -394,8 +397,9 @@ export function BookmarkIcon({
       const iconKey = `si${iconSlug.charAt(0).toUpperCase()}${iconSlug.slice(1)}`;
       import("simple-icons")
         .then((module) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const icon = (module as any)[iconKey] as SimpleIcon | undefined;
+          // simple-icons exports icons as named exports with 'si' prefix (e.g., siGithub)
+          // Access the icon using bracket notation - the module type includes a 'default' export
+          const icon = (module as unknown as Record<string, SimpleIcon>)[iconKey];
           if (icon && typeof icon === "object" && "svg" in icon) {
             setSimpleIcon(icon);
           }

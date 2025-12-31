@@ -46,12 +46,3 @@ export async function getGeminiVersion(): Promise<string> {
   return results.gemini || "unknown";
 }
 
-export async function getClaudeVersion(): Promise<string> {
-  const results = await getSystemVersions();
-  return results.claude || "unknown";
-}
-
-export function clearVersionCache(): void {
-  cachedResults = null;
-  cacheTimestamp = 0;
-}

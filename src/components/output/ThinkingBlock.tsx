@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Brain, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { SCROLLBAR_AUTO_HIDE_DELAY } from "@/lib/constants";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -106,7 +107,7 @@ export function ThinkingBlock({
             options={{
               scrollbars: {
                 autoHide: "scroll",
-                autoHideDelay: 400,
+                autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
               },
             }}
             className="max-h-64"

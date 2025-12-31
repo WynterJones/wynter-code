@@ -21,6 +21,7 @@ import {
   StorybookServer,
 } from "@/stores/storybookStore";
 import { useProjectStore } from "@/stores/projectStore";
+import { STORYBOOK_DEFAULT_PORT } from "@/lib/constants";
 
 interface StorybookViewerPopupProps {
   isOpen: boolean;
@@ -43,7 +44,7 @@ export function StorybookViewerPopup({
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedUrl, setCopiedUrl] = useState(false);
-  const [portInput, setPortInput] = useState("6006");
+  const [portInput, setPortInput] = useState(String(STORYBOOK_DEFAULT_PORT));
 
   const {
     hasStorybook,
@@ -234,8 +235,9 @@ export function StorybookViewerPopup({
       )}
 
       <div className="flex items-center gap-2 mb-4">
-        <label className="text-sm text-text-secondary">Port:</label>
+        <label htmlFor="storybook-port" className="text-sm text-text-secondary">Port:</label>
         <input
+          id="storybook-port"
           type="number"
           value={portInput}
           onChange={(e) => setPortInput(e.target.value)}

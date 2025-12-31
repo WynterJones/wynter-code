@@ -34,7 +34,7 @@ export const SPAWN_POINTS: SpawnPoint[] = [
   },
 ];
 
-export function getSpawnPointsForDirection(
+function getSpawnPointsForDirection(
   direction: "enter" | "exit"
 ): SpawnPoint[] {
   return SPAWN_POINTS.filter((sp) => sp.direction === direction);

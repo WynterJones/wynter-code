@@ -484,10 +484,11 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-bg-secondary border border-border rounded-lg p-4 w-80">
               <h3 className="text-sm font-semibold mb-3">Create New Site</h3>
-              <label className="block text-xs text-text-secondary mb-2">
+              <label htmlFor="netlify-new-site-name" className="block text-xs text-text-secondary mb-2">
                 Site name (subdomain)
               </label>
               <Input
+                id="netlify-new-site-name"
                 value={newSiteName}
                 onChange={(e) => setNewSiteName(e.target.value)}
                 placeholder="my-awesome-site"
@@ -525,10 +526,11 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="bg-bg-secondary border border-border rounded-lg p-4 w-80">
               <h3 className="text-sm font-semibold mb-3">Create New Group</h3>
-              <label className="block text-xs text-text-secondary mb-2">
+              <label htmlFor="netlify-new-group-name" className="block text-xs text-text-secondary mb-2">
                 Group name
               </label>
               <Input
+                id="netlify-new-group-name"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder="My Group"

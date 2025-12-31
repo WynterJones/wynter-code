@@ -9,7 +9,7 @@ import type {
   ClaudeVersionInfo,
 } from "@/types";
 
-export type ClaudeManagerTab = "commands" | "skills" | "subagents" | "settings";
+type ClaudeManagerTab = "commands" | "skills" | "subagents" | "settings";
 
 interface ClaudeStore {
   // State

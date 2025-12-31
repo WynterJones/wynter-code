@@ -70,24 +70,6 @@ export interface SiloProgress {
   lastUpdated: string;
 }
 
-export interface AutoBuildSession {
-  sessionId: string;
-  status: AutoBuildStatus;
-  queue: string[];
-  completed: string[];
-  humanReview: string[];  // IDs awaiting human review
-  currentIssueId: string | null;
-  currentPhase: AutoBuildPhase;
-  retryCount: number;
-  startedAt: string;
-  lastActivityAt: string;
-  settings: AutoBuildSettings;
-  // Branch state (for session resume)
-  currentBranch?: string | null;
-  originalBranch?: string | null;
-  epicBranches?: Record<string, string>; // serialized Map
-}
-
 export interface AutoBuildResult {
   success: boolean;
   output: string;
@@ -156,40 +138,3 @@ export interface AutoBuildState {
   epicBranches: Map<string, string>; // epicId → branch name
 }
 
-export const DEFAULT_SETTINGS: AutoBuildSettings = {
-  autoCommit: true,
-  runLint: true,
-  runTests: true,
-  runBuild: true,
-  maxRetries: 1,
-  priorityThreshold: 4,
-  requireHumanReview: true,
-  maxConcurrentIssues: 3,
-  ignoreUnrelatedFailures: true,
-  // AI Audits - disabled by default for faster iteration
-  runSecurityAudit: false,
-  runPerformanceAudit: false,
-  runCodeQualityAudit: false,
-  runAccessibilityAudit: false,
-  // Branch Management - disabled by default
-  useFeatureBranches: false,
-  autoCreatePR: false,
-};
-
-export const PHASE_LABELS: Record<NonNullable<AutoBuildPhase>, string> = {
-  selecting: "Selecting next issue",
-  working: "Working on code",
-  selfReviewing: "Self-reviewing code",
-  auditing: "Running AI audits",
-  testing: "Running verification",
-  fixing: "Fixing issues",
-  reviewing: "Awaiting review",
-  committing: "Committing changes",
-};
-
-export const STATUS_LABELS: Record<AutoBuildStatus, string> = {
-  idle: "Idle",
-  running: "Running",
-  paused: "Paused",
-  error: "Error",
-};

@@ -115,33 +115,3 @@ export function useBackupScheduler(options: BackupSchedulerOptions = {}) {
     checkNow: checkBackupSchedule,
   };
 }
-
-/**
- * Get formatted time until next backup
- */
-export function getTimeUntilBackup(): string | null {
-  const { enabled, autoBackupInterval, lastBackupAt } =
-    useWebBackupStore.getState();
-
-  if (!enabled || autoBackupInterval === 0 || !lastBackupAt) {
-    return null;
-  }
-
-  const intervalMs = autoBackupInterval * 60 * 60 * 1000;
-  const nextBackupAt = lastBackupAt + intervalMs;
-  const now = Date.now();
-  const remaining = nextBackupAt - now;
-
-  if (remaining <= 0) {
-    return "Due now";
-  }
-
-  const hours = Math.floor(remaining / (60 * 60 * 1000));
-  const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-
-  return `${minutes}m`;
-}

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -15,7 +15,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Zap } from "lucide-react";
+import { Zap, Radio } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
 import { useBeadsStore } from "@/stores/beadsStore";
@@ -24,7 +24,7 @@ import { TYPE_COLORS, PRIORITY_COLORS } from "@/types/beads";
 
 const BOARD_COLUMNS: { id: BeadsStatus; label: string; color: string }[] = [
   { id: "blocked", label: "Blocked", color: "border-red-500/50" },
-  { id: "open", label: "Ready", color: "border-green-500/50" },
+  { id: "open", label: "Open", color: "border-green-500/50" },
   { id: "in_progress", label: "In Progress", color: "border-amber-500/50" },
   { id: "closed", label: "Closed", color: "border-neutral-500/50" },
 ];
@@ -156,11 +156,29 @@ function BoardColumn({ column, issues }: BoardColumnProps) {
   );
 }
 
+const POLL_INTERVAL = 5000; // 5 seconds
+
 export function BoardTab() {
-  const { issues, updateIssue, closeIssue } = useBeadsStore();
+  const { issues, updateIssue, closeIssue, fetchIssues, fetchStats } = useBeadsStore();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [closeReason, setCloseReason] = useState("");
   const [pendingClose, setPendingClose] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(true);
+  const lastPollRef = useRef<Date>(new Date());
+
+  // Live polling
+  useEffect(() => {
+    if (!isPolling) return;
+
+    const poll = async () => {
+      await fetchIssues();
+      await fetchStats();
+      lastPollRef.current = new Date();
+    };
+
+    const intervalId = setInterval(poll, POLL_INTERVAL);
+    return () => clearInterval(intervalId);
+  }, [isPolling, fetchIssues, fetchStats]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -252,6 +270,22 @@ export function BoardTab() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Polling Indicator */}
+      <div className="flex items-center justify-end px-4 py-2 border-b border-border">
+        <button
+          onClick={() => setIsPolling(!isPolling)}
+          className={cn(
+            "flex items-center gap-2 px-2 py-1 text-xs rounded-md transition-colors",
+            isPolling
+              ? "text-green-400 bg-green-500/10 hover:bg-green-500/20"
+              : "text-text-secondary bg-bg-tertiary hover:bg-bg-tertiary/80"
+          )}
+        >
+          <Radio className={cn("w-3 h-3", isPolling && "animate-pulse")} />
+          <span>{isPolling ? "Live" : "Paused"}</span>
+        </button>
+      </div>
+
       {/* Close Reason Modal */}
       {pendingClose && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">

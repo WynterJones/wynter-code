@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   CircleDot,
   ListTodo,
@@ -7,11 +7,22 @@ import {
   HelpCircle,
   X,
   ChevronDown,
+  RefreshCw,
+  Terminal,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-shell";
 import { IconButton, Tooltip } from "@/components/ui";
+import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import { useBeadsStore } from "@/stores/beadsStore";
+import { useProjectStore } from "@/stores/projectStore";
+import { useSessionStore } from "@/stores/sessionStore";
+import { useTerminalStore } from "@/stores/terminalStore";
 import { IssuesTab, EpicsTab, BoardTab, HelpTab } from "./beads";
 import type { BeadsIssueType } from "@/types/beads";
 
@@ -33,29 +44,133 @@ const TABS: Tab[] = [
 interface BeadsTrackerPopupProps {
   isOpen: boolean;
   onClose: () => void;
-  projectPath: string;
 }
+
+type BeadsStatus = "checking" | "installed" | "not_installed_globally" | "not_initialized_in_project";
 
 export function BeadsTrackerPopup({
   isOpen,
   onClose,
-  projectPath,
 }: BeadsTrackerPopupProps) {
   const [activeTab, setActiveTab] = useState<TabId>("issues");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const { setProjectPath, fetchIssues, fetchStats, stats } = useBeadsStore();
+  const [beadsStatus, setBeadsStatus] = useState<BeadsStatus>("checking");
+  const [copied, setCopied] = useState(false);
+
+  const { setProjectPath, fetchIssues, fetchStats, stats, loading, projectPath: storeProjectPath, issues } = useBeadsStore();
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const getProject = useProjectStore((s) => s.getProject);
+  const activeProject = activeProjectId ? getProject(activeProjectId) : undefined;
+  const projectPath = activeProject?.path;
+
+  const { createSession } = useSessionStore();
+  const { queueCommand } = useTerminalStore();
+  const hasFetchedRef = useRef(false);
+  const hasRetriedRef = useRef(false);
+
+  // Get the appropriate command based on current status
+  const getCommand = useCallback(() => {
+    return beadsStatus === "not_installed_globally"
+      ? "npm install -g beads-cli"
+      : "bd init";
+  }, [beadsStatus]);
+
+  const handleCopyCommand = async () => {
+    await navigator.clipboard.writeText(getCommand());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleRunCommand = () => {
+    if (!activeProjectId) return;
+    const sessionId = createSession(activeProjectId, "terminal");
+    queueCommand(sessionId, getCommand());
+    onClose();
+  };
+
+  const handleOpenBeadsSite = async () => {
+    await open("https://github.com/anthropics/beads-cli");
+  };
+
+  // Check if beads CLI is installed globally and if project is initialized
+  const checkBeadsStatus = useCallback(async (path: string) => {
+    try {
+      // First check if beads CLI is installed globally
+      const isGloballyInstalled = await invoke<boolean>("validate_mcp_command", { command: "bd" });
+
+      if (!isGloballyInstalled) {
+        setBeadsStatus("not_installed_globally");
+        return false;
+      }
+
+      // CLI is installed, now check if project has .beads directory
+      const hasInit = await invoke<boolean>("beads_has_init", { projectPath: path });
+
+      if (!hasInit) {
+        setBeadsStatus("not_initialized_in_project");
+        return false;
+      }
+
+      setBeadsStatus("installed");
+      return true;
+    } catch {
+      setBeadsStatus("not_installed_globally");
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     if (isOpen && projectPath) {
-      setProjectPath(projectPath);
-      fetchIssues();
-      fetchStats();
+      setBeadsStatus("checking");
+      checkBeadsStatus(projectPath).then((isReady) => {
+        if (isReady) {
+          // Only fetch if we haven't already or if the project path changed
+          const pathChanged = storeProjectPath !== projectPath;
+          if (!hasFetchedRef.current || pathChanged) {
+            setProjectPath(projectPath);
+            fetchIssues();
+            fetchStats();
+            hasFetchedRef.current = true;
+          }
+        }
+      });
+    } else if (isOpen && !projectPath) {
+      setBeadsStatus("not_installed_globally");
     }
-  }, [isOpen, projectPath, setProjectPath, fetchIssues, fetchStats]);
+    // Reset the refs when popup closes
+    if (!isOpen) {
+      hasFetchedRef.current = false;
+      hasRetriedRef.current = false;
+    }
+  }, [isOpen, projectPath, storeProjectPath, setProjectPath, fetchIssues, fetchStats, checkBeadsStatus]);
+
+  // Retry logic: if we fetched but got no issues, retry once after a short delay
+  useEffect(() => {
+    if (
+      isOpen &&
+      beadsStatus === "installed" &&
+      !loading &&
+      hasFetchedRef.current &&
+      !hasRetriedRef.current &&
+      issues.length === 0
+    ) {
+      hasRetriedRef.current = true;
+      const retryTimer = setTimeout(() => {
+        fetchIssues();
+        fetchStats();
+      }, 500);
+      return () => clearTimeout(retryTimer);
+    }
+  }, [isOpen, beadsStatus, loading, issues.length, fetchIssues, fetchStats]);
 
   const handleCreateIssue = useCallback(() => {
     setShowCreateModal(true);
   }, []);
+
+  const handleRefresh = useCallback(() => {
+    fetchIssues();
+    fetchStats();
+  }, [fetchIssues, fetchStats]);
 
   // Keyboard shortcuts
   const handleKeyDown = useCallback(
@@ -77,6 +192,101 @@ export function BeadsTrackerPopup({
   }, [handleKeyDown]);
 
   if (!isOpen) return null;
+
+  // Show setup screen if beads is not installed globally or not initialized in project
+  if (beadsStatus === "not_installed_globally" || beadsStatus === "not_initialized_in_project") {
+    const isGlobalInstall = beadsStatus === "not_installed_globally";
+    const command = getCommand();
+
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Beads Tracker"
+        size="md"
+      >
+        <div className="flex flex-col items-center justify-center py-12 px-8 text-center">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500/20 to-violet-500/20 flex items-center justify-center mb-6">
+            <CircleDot className="w-10 h-10 text-purple-500" />
+          </div>
+          <h2 className="text-xl font-semibold text-text-primary mb-3">
+            {isGlobalInstall ? "Set Up Beads" : "Initialize Beads"}
+          </h2>
+          {isGlobalInstall ? (
+            <>
+              <p className="text-sm text-text-secondary max-w-md mb-2">
+                Beads is a lightweight issue tracker that lives in your project directory.
+              </p>
+              <p className="text-sm text-text-secondary max-w-md mb-6">
+                Install globally via npm, then run <code className="px-1.5 py-0.5 bg-bg-tertiary rounded text-xs font-mono">bd init</code> in your project to get started.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-text-secondary max-w-md mb-6">
+              Beads CLI is installed! Initialize it in this project to start tracking issues and tasks locally.
+            </p>
+          )}
+
+          {/* Terminal-style code block */}
+          <div className="w-full max-w-sm mb-6">
+            <div className="flex items-center justify-between bg-neutral-900 rounded-lg border border-neutral-700 px-4 py-3">
+              <code className="text-sm font-mono text-neutral-100">
+                <span className="text-neutral-500">$ </span>
+                {command}
+              </code>
+              <button
+                onClick={handleCopyCommand}
+                className="ml-3 p-1.5 rounded hover:bg-neutral-700 transition-colors"
+                title="Copy command"
+              >
+                {copied ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4 text-neutral-400" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {activeProjectId && (
+              <button
+                onClick={handleRunCommand}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Terminal className="w-4 h-4" />
+                <span>{isGlobalInstall ? "Install in Terminal" : "Initialize in Terminal"}</span>
+              </button>
+            )}
+            <button
+              onClick={handleOpenBeadsSite}
+              className="btn-secondary flex items-center gap-2"
+            >
+              <span>Learn More</span>
+              <ExternalLink className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Show loading state while checking
+  if (beadsStatus === "checking") {
+    return (
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Beads Tracker"
+        size="md"
+      >
+        <div className="flex flex-col items-center justify-center py-16 px-8">
+          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-text-secondary mt-4">Checking project configuration...</p>
+        </div>
+      </Modal>
+    );
+  }
 
   return createPortal(
     <>
@@ -115,6 +325,11 @@ export function BeadsTrackerPopup({
             </div>
 
             <div className="flex items-center gap-2">
+              <Tooltip content="Refresh">
+                <IconButton size="sm" onClick={handleRefresh} disabled={loading}>
+                  <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
+                </IconButton>
+              </Tooltip>
               <Tooltip content="Close">
                 <IconButton size="sm" onClick={onClose}>
                   <X className="w-4 h-4" />
@@ -212,10 +427,11 @@ function CreateIssueModal({ isOpen, onClose }: CreateIssueModalProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1">
+            <label htmlFor="beads-issue-title" className="block text-xs text-text-secondary mb-1">
               Title
             </label>
             <input
+              id="beads-issue-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -227,9 +443,10 @@ function CreateIssueModal({ isOpen, onClose }: CreateIssueModalProps) {
 
           {/* Type */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1">Type</label>
+            <label htmlFor="beads-issue-type" className="block text-xs text-text-secondary mb-1">Type</label>
             <div className="relative">
               <select
+                id="beads-issue-type"
                 value={issueType}
                 onChange={(e) => setIssueType(e.target.value as BeadsIssueType)}
                 className="w-full appearance-none bg-bg-tertiary border border-border rounded-md px-3 py-2 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
@@ -245,11 +462,12 @@ function CreateIssueModal({ isOpen, onClose }: CreateIssueModalProps) {
 
           {/* Priority */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1">
+            <label htmlFor="beads-issue-priority" className="block text-xs text-text-secondary mb-1">
               Priority
             </label>
             <div className="relative">
               <select
+                id="beads-issue-priority"
                 value={priority}
                 onChange={(e) => setPriority(Number(e.target.value))}
                 className="w-full appearance-none bg-bg-tertiary border border-border rounded-md px-3 py-2 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"

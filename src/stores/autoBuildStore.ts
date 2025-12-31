@@ -167,7 +167,7 @@ const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
 };
 
 // Create empty worker (used in concurrent mode)
-export function createWorker(id: number): AutoBuildWorker {
+function createWorker(id: number): AutoBuildWorker {
   return {
     id,
     issueId: null,
@@ -180,7 +180,7 @@ export function createWorker(id: number): AutoBuildWorker {
 }
 
 // Sort queue by phase (lower first), then priority (lower first), then created_at
-export function sortQueueByPhase(queue: string[], issueCache: Map<string, BeadsIssue>): string[] {
+function sortQueueByPhase(queue: string[], issueCache: Map<string, BeadsIssue>): string[] {
   return [...queue].sort((a, b) => {
     const issueA = issueCache.get(a);
     const issueB = issueCache.get(b);

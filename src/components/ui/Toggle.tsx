@@ -1,7 +1,7 @@
 import { forwardRef, InputHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-export interface ToggleProps
+interface ToggleProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange" | "size"> {
   label?: string;
   labelPosition?: "left" | "right";

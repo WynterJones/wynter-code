@@ -111,8 +111,9 @@ export function DesignerToolPopup({ isOpen, onClose }: DesignerToolPopupProps) {
               <div className="p-4 space-y-4">
                 {/* Prompt */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-primary">Prompt</label>
+                  <label htmlFor="designer-prompt" className="text-sm font-medium text-text-primary">Prompt</label>
                   <textarea
+                    id="designer-prompt"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -123,10 +124,11 @@ export function DesignerToolPopup({ isOpen, onClose }: DesignerToolPopupProps) {
 
                 {/* Negative Prompt */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-secondary">
+                  <label htmlFor="designer-negative-prompt" className="text-sm font-medium text-text-secondary">
                     Negative Prompt (optional)
                   </label>
                   <textarea
+                    id="designer-negative-prompt"
                     value={negativePrompt}
                     onChange={(e) => setNegativePrompt(e.target.value)}
                     placeholder="What to avoid in the image..."
@@ -136,7 +138,7 @@ export function DesignerToolPopup({ isOpen, onClose }: DesignerToolPopupProps) {
 
                 {/* Preset Selection */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-primary">Size Preset</label>
+                  <span className="text-sm font-medium text-text-primary">Size Preset</span>
                   <div className="grid grid-cols-2 gap-2">
                     {IMAGE_PRESETS.map((preset) => (
                       <button

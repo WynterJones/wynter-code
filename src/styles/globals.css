@@ -408,6 +408,19 @@ pre,
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Screen reader only - visually hidden but accessible */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
 }
 
 /* Markdown Preview Styles */
@@ -753,4 +766,34 @@ pre,
   animation:
     streaming-gradient 3s ease infinite,
     streaming-dots 1.5s ease-in-out infinite;
+}
+
+/* ============================================
+   Reduced Motion Support
+   Respects user's system preference for reduced motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Keep essential feedback animations but make them instant */
+  .streaming-gradient-text,
+  .streaming-gradient-icon svg,
+  .streaming-gradient-dots {
+    animation: none !important;
+  }
+
+  /* Blueprint grid effects - disable decorative animations */
+  .blueprint-grid::before,
+  .blueprint-grid::after {
+    animation: none !important;
+    opacity: 0 !important;
+  }
 }

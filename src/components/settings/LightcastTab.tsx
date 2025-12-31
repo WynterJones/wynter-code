@@ -69,7 +69,7 @@ export function LightcastTab() {
       <div className="p-4 rounded-lg bg-bg-secondary border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="enable-lightcast" className="text-sm font-medium text-text-primary">
               Enable Lightcast
             </label>
             <p className="text-xs text-text-secondary">
@@ -77,6 +77,9 @@ export function LightcastTab() {
             </p>
           </div>
           <button
+            id="enable-lightcast"
+            role="switch"
+            aria-checked={lightcastEnabled}
             onClick={() => handleEnabledChange(!lightcastEnabled)}
             className={cn(
               "w-11 h-6 rounded-full transition-colors relative",

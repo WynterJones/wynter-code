@@ -8,6 +8,7 @@ import {
   X,
   Check,
   RotateCcw,
+  Copy,
 } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { IconButton, Tooltip } from "@/components/ui";
@@ -68,6 +69,13 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
   const [typeFilter, setTypeFilter] = useState<BeadsIssueType | "all">("all");
   const [closingId, setClosingId] = useState<string | null>(null);
   const [closeReason, setCloseReason] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyId = async (id: string) => {
+    await navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const filteredIssues = useMemo(() => {
     return issues.filter((issue) => {
@@ -291,17 +299,37 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    {issue.status === "closed" && (
-                      <Tooltip content="Reopen">
+                    <div className="flex items-center gap-1">
+                      <Tooltip content={copiedId === issue.id ? "Copied!" : "Copy ID"}>
                         <IconButton
                           size="sm"
-                          onClick={() => handleReopen(issue.id)}
-                          className="text-amber-400 hover:bg-amber-500/10"
+                          onClick={() => handleCopyId(issue.id)}
+                          className={cn(
+                            "transition-colors",
+                            copiedId === issue.id
+                              ? "text-green-400"
+                              : "text-text-secondary hover:text-text-primary"
+                          )}
                         >
-                          <RotateCcw className="w-3 h-3" />
+                          {copiedId === issue.id ? (
+                            <Check className="w-3 h-3" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
                         </IconButton>
                       </Tooltip>
-                    )}
+                      {issue.status === "closed" && (
+                        <Tooltip content="Reopen">
+                          <IconButton
+                            size="sm"
+                            onClick={() => handleReopen(issue.id)}
+                            className="text-amber-400 hover:bg-amber-500/10"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))

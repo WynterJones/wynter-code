@@ -49,17 +49,6 @@ export interface NetlifyDeploy {
   context: string;
 }
 
-export interface NetlifyDomain {
-  hostname: string;
-  configured: boolean;
-  verified: boolean;
-  certificate?: {
-    state: string;
-    domains: string[];
-    expires_at: string;
-  } | null;
-}
-
 export interface DeployConfig {
   siteId: string;
   file: File;
@@ -79,83 +68,3 @@ export interface SiteGroup {
   isCollapsed: boolean;
   siteIds: string[];
 }
-
-export interface NetlifyFtpState {
-  // Auth
-  apiToken: string | null;
-  connectionStatus: ConnectionStatus;
-  connectionError: string | null;
-  
-  // Sites
-  sites: NetlifySite[];
-  currentSiteId: string | null;
-  isLoadingSites: boolean;
-  
-  // Deploys
-  deploys: Map<string, NetlifyDeploy[]>;
-  isLoadingDeploys: boolean;
-  
-  // Upload
-  isDeploying: boolean;
-  deployProgress: number;
-  deployMessage: string;
-}
-
-export interface DeployHistoryEntry {
-  deploy: NetlifyDeploy;
-  isLive: boolean;
-  timeAgo: string;
-}
-
-// Retro UI specific types
-export interface RetroTheme {
-  primary: string;
-  secondary: string;
-  accent: string;
-  text: string;
-  textDim: string;
-  border: string;
-  borderLight: string;
-  borderDark: string;
-  scanlines: boolean;
-  crtGlow: boolean;
-}
-
-export const RETRO_THEMES: Record<string, RetroTheme> = {
-  classic: {
-    primary: '#c0c0c0',
-    secondary: '#808080',
-    accent: '#000080',
-    text: '#000000',
-    textDim: '#555555',
-    border: '#dfdfdf',
-    borderLight: '#ffffff',
-    borderDark: '#404040',
-    scanlines: false,
-    crtGlow: false,
-  },
-  terminal: {
-    primary: '#0a0a0a',
-    secondary: '#1a1a1a',
-    accent: '#00ff00',
-    text: '#00ff00',
-    textDim: '#00aa00',
-    border: '#00ff00',
-    borderLight: '#00ff00',
-    borderDark: '#005500',
-    scanlines: true,
-    crtGlow: true,
-  },
-  amber: {
-    primary: '#0a0a0a',
-    secondary: '#1a1a1a', 
-    accent: '#ffb000',
-    text: '#ffb000',
-    textDim: '#aa7500',
-    border: '#ffb000',
-    borderLight: '#ffcc00',
-    borderDark: '#775500',
-    scanlines: true,
-    crtGlow: true,
-  },
-};

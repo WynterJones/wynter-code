@@ -13,6 +13,7 @@ import {
   Bot,
   Search,
   Code,
+  Github,
 } from "lucide-react";
 import {
   DndContext,
@@ -60,6 +61,7 @@ interface SessionTabBarProps {
   onBrowseFiles?: () => void;
   onOpenLivePreview?: () => void;
   onOpenProjectSearch?: () => void;
+  onOpenGitHubManager?: () => void;
 }
 
 interface SortableSessionTabProps {
@@ -210,6 +212,7 @@ export function SessionTabBar({
   onBrowseFiles,
   onOpenLivePreview,
   onOpenProjectSearch,
+  onOpenGitHubManager,
 }: SessionTabBarProps) {
   const {
     getSessionsForProject,
@@ -583,6 +586,26 @@ export function SessionTabBar({
           </button>
         </Tooltip>
 
+        {/* Beads Tracker */}
+        <Tooltip content="Beads Tracker">
+          <button
+            onClick={onOpenBeads}
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <Waypoints className={cn("w-4 h-4", hasBeads && "text-purple-500")} />
+          </button>
+        </Tooltip>
+
+        {/* GitHub Manager */}
+        <Tooltip content="GitHub Manager">
+          <button
+            onClick={onOpenGitHubManager}
+            className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <Github className="w-4 h-4" />
+          </button>
+        </Tooltip>
+
         {/* Live Preview */}
         <Tooltip content="Live Preview">
           <button
@@ -592,18 +615,6 @@ export function SessionTabBar({
             <Play className="w-4 h-4" />
           </button>
         </Tooltip>
-
-        {/* Beads Tracker */}
-        {hasBeads && (
-          <Tooltip content="Beads Tracker">
-            <button
-              onClick={onOpenBeads}
-              className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-            >
-              <Waypoints className="w-4 h-4" />
-            </button>
-          </Tooltip>
-        )}
 
         {/* Project Search */}
         <Tooltip content="Project Search">

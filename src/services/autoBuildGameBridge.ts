@@ -179,7 +179,7 @@ class AutoBuildGameBridge {
         ? destinations
         : [...destinations, "farmhouse"];
 
-    store.spawnVehicleWithTintAndRoute(route, tint);
+    store.spawnVehicle({ route, tint });
 
     // Add activity event
     const workerLabel = `W${worker.id + 1}`;
@@ -201,7 +201,7 @@ class AutoBuildGameBridge {
     const issue = autoBuildStore.getCachedIssue(issueId);
 
     // Spawn gold vehicle to farmhouse for celebration
-    store.spawnVehicleWithTintAndRoute(["farmhouse"], 0xffd700);
+    store.spawnVehicle({ route: ["farmhouse"], tint: 0xffd700 });
 
     store.addActivity({
       type: "autobuild_issue_completed",

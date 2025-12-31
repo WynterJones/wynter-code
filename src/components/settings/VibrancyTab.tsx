@@ -93,7 +93,7 @@ export function VibrancyTab() {
       <div className="p-4 rounded-lg bg-bg-secondary border border-border">
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="enable-vibrancy" className="text-sm font-medium text-text-primary">
               Enable Vibrancy
             </label>
             <p className="text-xs text-text-secondary">
@@ -101,6 +101,9 @@ export function VibrancyTab() {
             </p>
           </div>
           <button
+            id="enable-vibrancy"
+            role="switch"
+            aria-checked={vibrancyEnabled}
             onClick={() => setVibrancyEnabled(!vibrancyEnabled)}
             disabled={!supportInfo?.supported}
             className={cn(

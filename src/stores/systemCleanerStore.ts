@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { handleError } from "@/lib/errorHandler";
 import type {
   CleanableItem,
   ScanResult,
@@ -174,7 +175,7 @@ export const useSystemCleanerStore = create<SystemCleanerStore>((set, get) => ({
         lastScanTime: { ...get().lastScanTime, "large-files": Date.now() },
       });
     } catch (error) {
-      set({ error: String(error), isScanning: false });
+      set({ error: handleError(error, "SystemCleanerStore.scanLargeFiles"), isScanning: false });
     }
   },
 
@@ -190,7 +191,7 @@ export const useSystemCleanerStore = create<SystemCleanerStore>((set, get) => ({
         lastScanTime: { ...get().lastScanTime, "app-caches": Date.now() },
       });
     } catch (error) {
-      set({ error: String(error), isScanning: false });
+      set({ error: handleError(error, "SystemCleanerStore.scanAppCaches"), isScanning: false });
     }
   },
 
@@ -207,7 +208,7 @@ export const useSystemCleanerStore = create<SystemCleanerStore>((set, get) => ({
         lastScanTime: { ...get().lastScanTime, "installed-apps": Date.now() },
       });
     } catch (error) {
-      set({ error: String(error), isScanning: false });
+      set({ error: handleError(error, "SystemCleanerStore.scanInstalledApps"), isScanning: false });
     }
   },
 
@@ -267,7 +268,7 @@ export const useSystemCleanerStore = create<SystemCleanerStore>((set, get) => ({
 
       return result;
     } catch (error) {
-      set({ error: String(error), isDeleting: false });
+      set({ error: handleError(error, "SystemCleanerStore.deleteSelectedItems"), isDeleting: false });
       return null;
     }
   },
@@ -284,7 +285,7 @@ export const useSystemCleanerStore = create<SystemCleanerStore>((set, get) => ({
 
       return result;
     } catch (error) {
-      set({ error: String(error), isDeleting: false });
+      set({ error: handleError(error, "SystemCleanerStore.uninstallApp"), isDeleting: false });
       return null;
     }
   },

@@ -131,9 +131,6 @@ export function ClaudeOutputPanel({
     return allToolCalls.find(tc => tc.status === "pending") || null;
   }, [allToolCalls]);
 
-  // Debug: Log when pendingApprovalTool changes
-  useEffect(() => {
-  }, [pendingApprovalTool, allToolCalls]);
 
   // Get pending question set
   const pendingQuestionSet = streamingState?.pendingQuestionSet || null;

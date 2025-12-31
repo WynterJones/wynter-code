@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { ScrollArea } from "@/components/ui";
@@ -42,6 +42,8 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [lastSelectedPath, setLastSelectedPath] = useState<string | null>(null);
   const [optimizePopupPath, setOptimizePopupPath] = useState<string | null>(null);
+  const [focusedPath, setFocusedPath] = useState<string | null>(null);
+  const treeContainerRef = useRef<HTMLDivElement>(null);
 
   const { createFile, createFolder, renameItem, deleteToTrash, moveItem } = useFileOperations();
   const { gitStatus: gitStatusMap, refetch: refetchGitStatus } = useGitStatus(projectPath);
@@ -273,6 +275,122 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     return paths;
   }, []);
 
+  // Memoized visible paths for keyboard navigation
+  const visiblePaths = useMemo(() => collectVisiblePaths(files), [files, collectVisiblePaths]);
+
+  // Find a node by path in the tree
+  const findNodeByPathLocal = useCallback((path: string): FileNode | null => {
+    return findNodeByPath(files, path);
+  }, [files]);
+
+  // Get parent path
+  const getParentPath = useCallback((path: string): string | null => {
+    const lastSlash = path.lastIndexOf("/");
+    if (lastSlash <= 0) return null;
+    const parent = path.substring(0, lastSlash);
+    // Only return if parent is within project
+    return parent.startsWith(projectPath) ? parent : null;
+  }, [projectPath]);
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Only handle if tree is focused
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Enter", " "].includes(e.key)) {
+      return;
+    }
+
+    e.preventDefault();
+
+    // Initialize focus to first item if nothing focused
+    if (!focusedPath && visiblePaths.length > 0) {
+      setFocusedPath(visiblePaths[0]);
+      return;
+    }
+
+    if (!focusedPath) return;
+
+    const currentIndex = visiblePaths.indexOf(focusedPath);
+    const currentNode = findNodeByPathLocal(focusedPath);
+
+    switch (e.key) {
+      case "ArrowDown": {
+        // Move to next visible item
+        if (currentIndex < visiblePaths.length - 1) {
+          const nextPath = visiblePaths[currentIndex + 1];
+          setFocusedPath(nextPath);
+          setSelectedPaths(new Set([nextPath]));
+          setLastSelectedPath(nextPath);
+        }
+        break;
+      }
+      case "ArrowUp": {
+        // Move to previous visible item
+        if (currentIndex > 0) {
+          const prevPath = visiblePaths[currentIndex - 1];
+          setFocusedPath(prevPath);
+          setSelectedPaths(new Set([prevPath]));
+          setLastSelectedPath(prevPath);
+        }
+        break;
+      }
+      case "ArrowRight": {
+        // Expand folder or move to first child
+        if (currentNode?.isDirectory) {
+          if (!currentNode.isExpanded) {
+            handleToggle(currentNode);
+          } else if (currentNode.children && currentNode.children.length > 0) {
+            // Move to first child
+            const firstChild = currentNode.children.find(c => c.name !== ".DS_Store");
+            if (firstChild) {
+              setFocusedPath(firstChild.path);
+              setSelectedPaths(new Set([firstChild.path]));
+              setLastSelectedPath(firstChild.path);
+            }
+          }
+        }
+        break;
+      }
+      case "ArrowLeft": {
+        // Collapse folder or move to parent
+        if (currentNode?.isDirectory && currentNode.isExpanded) {
+          handleToggle(currentNode);
+        } else {
+          const parentPath = getParentPath(focusedPath);
+          if (parentPath && parentPath !== projectPath) {
+            setFocusedPath(parentPath);
+            setSelectedPaths(new Set([parentPath]));
+            setLastSelectedPath(parentPath);
+          }
+        }
+        break;
+      }
+      case "Enter":
+      case " ": {
+        // Open file or toggle folder
+        if (currentNode?.isDirectory) {
+          if (currentNode.name === "node_modules" && onNodeModulesClick) {
+            onNodeModulesClick();
+          } else {
+            handleToggle(currentNode);
+          }
+        } else if (currentNode) {
+          onFileOpen?.(currentNode.path);
+        }
+        break;
+      }
+    }
+  }, [focusedPath, visiblePaths, findNodeByPathLocal, getParentPath, projectPath, onFileOpen, onNodeModulesClick]);
+
+  // Scroll focused item into view
+  useEffect(() => {
+    if (focusedPath && treeContainerRef.current) {
+      const focusedElement = treeContainerRef.current.querySelector(`[data-path="${CSS.escape(focusedPath)}"]`);
+      if (focusedElement) {
+        focusedElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [focusedPath]);
+
   const handleSelect = useCallback((node: FileNode, shiftKey: boolean) => {
     if (shiftKey && lastSelectedPath) {
       // Range select
@@ -494,8 +612,13 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     <div className="relative flex flex-col h-full">
       <ScrollArea className="flex-1">
         <div
-          className="py-2 min-h-full"
+          ref={treeContainerRef}
+          className="py-2 min-h-full outline-none"
           onClick={handleContainerClick}
+          onKeyDown={handleKeyDown}
+          tabIndex={0}
+          role="tree"
+          aria-label="File tree"
           data-folder="true"
           data-path={projectPath}
         >
@@ -514,6 +637,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
               selectedPaths={selectedPaths}
               onSelect={handleSelect}
               allNodes={files}
+              focusedPath={focusedPath}
             />
           ))}
         </div>

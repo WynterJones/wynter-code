@@ -15,7 +15,7 @@ const APP_VERSION = "1.0.0";
 /**
  * Collect all exportable data from localStorage
  */
-export function collectExportableData(): BackupData {
+function collectExportableData(): BackupData {
   const exportableCategories = DATA_CATEGORIES.filter((c) => c.canExport);
   const data: Record<string, unknown> = {};
   const categoryIds: string[] = [];

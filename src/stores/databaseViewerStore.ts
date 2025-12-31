@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { invoke } from "@tauri-apps/api/core";
+import { handleError } from "@/lib/errorHandler";
 import type {
   ConnectionConfig,
   TableInfo,
@@ -154,9 +155,9 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             isLoading: false,
           });
           await get().loadTables();
-        } catch (e) {
-          set({ isLoading: false, error: String(e) });
-          throw e;
+        } catch (error) {
+          set({ isLoading: false, error: handleError(error, "DatabaseViewerStore.connect") });
+          throw error;
         }
       },
 
@@ -185,8 +186,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
           const result = await invoke<boolean>("db_test_connection", { config });
           set({ isLoading: false });
           return result;
-        } catch (e) {
-          set({ isLoading: false, error: String(e) });
+        } catch (error) {
+          set({ isLoading: false, error: handleError(error, "DatabaseViewerStore.testConnection") });
           return false;
         }
       },
@@ -196,8 +197,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
         try {
           const services = await invoke<DetectedService[]>("db_detect_services");
           set({ detectedServices: services, detectingServices: false });
-        } catch (e) {
-          set({ detectingServices: false, error: String(e) });
+        } catch (error) {
+          set({ detectingServices: false, error: handleError(error, "DatabaseViewerStore.detectServices") });
         }
       },
 
@@ -237,8 +238,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             connectionId: state.activeConnectionId,
           });
           set({ tables, isLoading: false });
-        } catch (e) {
-          set({ isLoading: false, error: String(e) });
+        } catch (error) {
+          set({ isLoading: false, error: handleError(error, "DatabaseViewerStore.loadTables") });
         }
       },
 
@@ -263,8 +264,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             sort: null,
           });
           await get().loadTableData();
-        } catch (e) {
-          set({ isLoading: false, error: String(e) });
+        } catch (error) {
+          set({ isLoading: false, error: handleError(error, "DatabaseViewerStore.selectTable") });
         }
       },
 
@@ -288,8 +289,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             tableDataLoading: false,
             isLoading: false,
           });
-        } catch (e) {
-          set({ tableDataLoading: false, isLoading: false, error: String(e) });
+        } catch (error) {
+          set({ tableDataLoading: false, isLoading: false, error: handleError(error, "DatabaseViewerStore.loadTableData") });
         }
       },
 
@@ -322,9 +323,9 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             data,
           });
           await get().loadTableData();
-        } catch (e) {
-          set({ isLoading: false, error: String(e) });
-          throw e;
+        } catch (error) {
+          set({ isLoading: false, error: handleError(error, "DatabaseViewerStore.insertRow") });
+          throw error;
         }
       },
 
@@ -341,9 +342,9 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             data,
           });
           await get().loadTableData();
-        } catch (e) {
-          set({ isLoading: false, error: String(e) });
-          throw e;
+        } catch (error) {
+          set({ isLoading: false, error: handleError(error, "DatabaseViewerStore.updateRow") });
+          throw error;
         }
       },
 
@@ -359,9 +360,9 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             primaryKey,
           });
           await get().loadTableData();
-        } catch (e) {
-          set({ isLoading: false, error: String(e) });
-          throw e;
+        } catch (error) {
+          set({ isLoading: false, error: handleError(error, "DatabaseViewerStore.deleteRow") });
+          throw error;
         }
       },
 
@@ -394,11 +395,12 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             queryLoading: false,
             queryHistory: [historyEntry, ...state.queryHistory].slice(0, MAX_HISTORY),
           }));
-        } catch (e) {
-          historyEntry.error = String(e);
+        } catch (error) {
+          const message = handleError(error, "DatabaseViewerStore.executeQuery");
+          historyEntry.error = message;
           set((state) => ({
             queryLoading: false,
-            error: String(e),
+            error: message,
             queryHistory: [historyEntry, ...state.queryHistory].slice(0, MAX_HISTORY),
           }));
         }
@@ -419,8 +421,8 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
             connectionId: state.activeConnectionId,
           });
           set({ relationshipGraph: graph, relationshipsLoading: false });
-        } catch (e) {
-          set({ relationshipsLoading: false, error: String(e) });
+        } catch (error) {
+          set({ relationshipsLoading: false, error: handleError(error, "DatabaseViewerStore.loadRelationships") });
         }
       },
 

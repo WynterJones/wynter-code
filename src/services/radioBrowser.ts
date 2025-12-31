@@ -71,26 +71,9 @@ export async function searchRadioStations(
   return response.json();
 }
 
-export async function getStationsByTag(
-  tag: string,
-  limit = 25
-): Promise<RadioBrowserStation[]> {
-  return searchRadioStations({ tag, limit });
-}
-
 export async function getTopStations(
   limit = 25
 ): Promise<RadioBrowserStation[]> {
   const response = await fetchWithFallback(`/stations/topvote/${limit}`);
   return response.json();
-}
-
-export async function reportStationClick(
-  stationuuid: string
-): Promise<void> {
-  try {
-    await fetchWithFallback(`/url/${stationuuid}`);
-  } catch {
-    // Silently fail - this is just for statistics
-  }
 }

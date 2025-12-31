@@ -1,6 +1,4 @@
-import { useEffect, useRef } from "react";
 import type { Monaco } from "@monaco-editor/react";
-import type { EditorTheme } from "@/stores/settingsStore";
 
 // One Dark theme (Atom One Dark inspired)
 const oneDarkTheme = {
@@ -209,29 +207,6 @@ const themes = {
   monokai: monokaiTheme,
   "catppuccin-ultrathin": catppuccinUltrathinTheme,
 };
-
-export function useMonacoTheme(
-  monaco: Monaco | null,
-  theme: EditorTheme
-): string {
-  const themesRegistered = useRef(false);
-
-  useEffect(() => {
-    if (monaco && !themesRegistered.current) {
-      // Register all custom themes
-      Object.entries(themes).forEach(([name, themeData]) => {
-        monaco.editor.defineTheme(name, themeData);
-      });
-      themesRegistered.current = true;
-    }
-  }, [monaco]);
-
-  // Map theme names to Monaco theme names
-  if (theme === "vs-dark") {
-    return "vs-dark";
-  }
-  return theme;
-}
 
 export function defineMonacoThemes(monaco: Monaco) {
   Object.entries(themes).forEach(([name, themeData]) => {

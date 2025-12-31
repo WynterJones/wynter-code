@@ -6,6 +6,9 @@ import { useDragStore } from "@/stores/dragStore";
 import { cn } from "@/lib/utils";
 import type { CodespaceTab } from "@/types/codespace";
 
+// Track if we've done the initial focus fix (only needed once per app load)
+let hasInitialFocus = false;
+
 type MonacoEditor = Parameters<OnMount>[0];
 
 interface CodespaceEditorPaneProps {
@@ -39,6 +42,22 @@ export function CodespaceEditorPane({
 
   const handleEditorMount: OnMount = useCallback((editor) => {
     editorRef.current = editor;
+    // Fix for monaco-react focus issue on first app load
+    // The internal textarea needs explicit focus for keyboard input to work
+    // See: https://github.com/suren-atoyan/monaco-react/issues/141
+    if (!hasInitialFocus) {
+      hasInitialFocus = true;
+      const focusEditor = () => {
+        editor.focus();
+        const textarea = editor.getDomNode()?.querySelector('textarea');
+        if (textarea) {
+          textarea.focus();
+        }
+      };
+      setTimeout(focusEditor, 0);
+      setTimeout(focusEditor, 100);
+      setTimeout(focusEditor, 300);
+    }
   }, []);
 
   // Go to line when pendingGoToLine changes
@@ -86,8 +105,8 @@ export function CodespaceEditorPane({
           padding: { top: 12, bottom: 12 },
           bracketPairColorization: { enabled: true },
           guides: {
-            bracketPairs: true,
-            indentation: true,
+            bracketPairs: false,
+            indentation: false,
           },
           suggest: {
             showKeywords: true,

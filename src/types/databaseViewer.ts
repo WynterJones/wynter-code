@@ -61,11 +61,6 @@ export interface SortConfig {
   direction: "asc" | "desc";
 }
 
-export interface InsertResult {
-  success: boolean;
-  lastInsertId?: number;
-}
-
 export interface QueryHistoryEntry {
   id: string;
   connectionId: string;

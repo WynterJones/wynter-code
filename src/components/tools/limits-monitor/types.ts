@@ -1,6 +1,6 @@
 export type SubscriptionPlan = "pro" | "max-100" | "max-200";
 
-export interface PlanLimits {
+interface PlanLimits {
   name: string;
   monthlyPrice: number;
   sonnet: { minHours: number; maxHours: number };

@@ -12,7 +12,8 @@ pub struct BeadsDependency {
     pub dep_type: String,
     pub created_at: String,
     pub created_by: String,
-    pub metadata: String,
+    #[serde(default)]
+    pub metadata: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

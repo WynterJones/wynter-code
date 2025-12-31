@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AlertTriangle, Check, X, Terminal, FileEdit, Globe } from "lucide-react";
 import { Button, Checkbox } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -68,7 +68,10 @@ export function PermissionApprovalModal({
   const [alwaysAllow, setAlwaysAllow] = useState(false);
   const Icon = getToolIcon(toolCall.name);
   const riskLevel = getToolRiskLevel(toolCall.name);
-  const inputPreview = formatToolInput(toolCall.input);
+  const inputPreview = useMemo(
+    () => formatToolInput(toolCall.input),
+    [toolCall.input]
+  );
 
   const handleApprove = () => {
     onApprove(alwaysAllow);

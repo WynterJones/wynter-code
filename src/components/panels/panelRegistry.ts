@@ -7,7 +7,7 @@ import type { PanelType, PanelTypeConfig } from "@/types/panel";
  * - Display metadata (name, icon, title)
  * - Behavior (can have multiple, requires protection)
  */
-export const PANEL_TYPES: Record<PanelType, PanelTypeConfig> = {
+const PANEL_TYPES: Record<PanelType, PanelTypeConfig> = {
   empty: {
     id: "empty",
     name: "Empty",
@@ -98,16 +98,6 @@ export function getPanelTypeList(): PanelTypeConfig[] {
 /** Get panel type config by ID */
 export function getPanelTypeConfig(type: PanelType): PanelTypeConfig {
   return PANEL_TYPES[type];
-}
-
-/** Get icon name for a panel type */
-export function getPanelIcon(type: PanelType): string {
-  return PANEL_TYPES[type]?.icon ?? "Square";
-}
-
-/** Get default title for a panel type */
-export function getPanelDefaultTitle(type: PanelType): string {
-  return PANEL_TYPES[type]?.defaultTitle ?? "Panel";
 }
 
 /** Check if panel type requires close protection */

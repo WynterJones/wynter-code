@@ -32,9 +32,3 @@ export function generateManifest(options: ManifestOptions = {}): string {
 
   return JSON.stringify(manifest, null, 2);
 }
-
-export function generateManifestBlob(options: ManifestOptions = {}): Blob {
-  return new Blob([generateManifest(options)], {
-    type: "application/manifest+json",
-  });
-}

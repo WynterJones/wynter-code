@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useProjectStore } from "@/stores/projectStore";
+import { STORYBOOK_DEFAULT_PORT } from "@/lib/constants";
 
 interface StorybookDetection {
   hasStorybook: boolean;
@@ -36,7 +37,7 @@ export function useStorybookDetection() {
     version: null,
     framework: null,
     startCommand: null,
-    port: 6006,
+    port: STORYBOOK_DEFAULT_PORT,
     isDetecting: true,
   });
 
@@ -120,7 +121,7 @@ export function useStorybookDetection() {
         version,
         framework,
         startCommand: hasStorybook ? startCommand : null,
-        port: 6006,
+        port: STORYBOOK_DEFAULT_PORT,
         isDetecting: false,
       });
     } catch {
@@ -129,7 +130,7 @@ export function useStorybookDetection() {
         version: null,
         framework: null,
         startCommand: null,
-        port: 6006,
+        port: STORYBOOK_DEFAULT_PORT,
         isDetecting: false,
       });
     }

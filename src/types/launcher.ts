@@ -36,15 +36,3 @@ export interface MacOSApp {
   path: string;
   bundle_id: string | null;
 }
-
-export interface RecentFile {
-  name: string;
-  path: string;
-  last_used: string | null;
-}
-
-export interface FileResult {
-  name: string;
-  path: string;
-  is_directory: boolean;
-}

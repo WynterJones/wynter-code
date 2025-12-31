@@ -118,6 +118,10 @@ export function AppShell() {
     window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openProjectSearch" } }));
   }, []);
 
+  const handleOpenGitHubManager = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openGitHubManager" } }));
+  }, []);
+
   // Tool shortcut handlers
   const handleOpenDatabaseViewer = useCallback(() => {
     window.dispatchEvent(new CustomEvent("command-palette-tool", { detail: { action: "openDatabaseViewer" } }));
@@ -308,6 +312,7 @@ export function AppShell() {
             onBrowseFiles={handleBrowseFiles}
             onOpenLivePreview={handleOpenLivePreview}
             onOpenProjectSearch={handleOpenProjectSearch}
+            onOpenGitHubManager={handleOpenGitHubManager}
           />
 
           <div className={`flex-1 flex overflow-hidden relative ${isResizingSidebar ? "select-none" : ""}`}>

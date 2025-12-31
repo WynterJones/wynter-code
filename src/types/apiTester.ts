@@ -77,11 +77,11 @@ export interface WebhookRequest {
   timestamp: number;
 }
 
-export const DEFAULT_AUTH: ApiAuth = {
+const DEFAULT_AUTH: ApiAuth = {
   type: 'none',
 };
 
-export const DEFAULT_BODY = {
+const DEFAULT_BODY = {
   type: 'none' as BodyType,
   content: '',
 };

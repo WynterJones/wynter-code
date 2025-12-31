@@ -104,18 +104,6 @@ function getModelsForProvider(provider: AIProvider): ModelOption[] {
   }
 }
 
-function getDefaultModelForProvider(provider: AIProvider): AIModel {
-  switch (provider) {
-    case "codex":
-      return "gpt-5.2-codex";
-    case "gemini":
-      return "gemini-2.5-flash";
-    case "claude":
-    default:
-      return "claude-sonnet-4-20250514";
-  }
-}
-
 interface ModelSelectorProps {
   projectId: string;
 }
@@ -228,4 +216,4 @@ export function ModelSelector({ projectId }: ModelSelectorProps) {
   );
 }
 
-export { getModelsForProvider, getDefaultModelForProvider };
+;

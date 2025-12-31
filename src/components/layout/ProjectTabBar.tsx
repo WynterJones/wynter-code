@@ -66,6 +66,8 @@ import {
   FarmworkTycoonPopup,
   MiniGamePlayer,
   HomebrewManagerPopup,
+  GitHubManagerPopup,
+  ScratchpadPopup,
 } from "@/components/tools";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { McpManagerPopup } from "@/components/tools/mcp-manager";
@@ -381,6 +383,8 @@ export function ProjectTabBar({
   const [showTunnelManager, setShowTunnelManager] = useState(false);
   const [showSystemHealth, setShowSystemHealth] = useState(false);
   const [showHomebrewManager, setShowHomebrewManager] = useState(false);
+  const [showGitHubManager, setShowGitHubManager] = useState(false);
+  const [showScratchpad, setShowScratchpad] = useState(false);
   const [showSystemCleaner, setShowSystemCleaner] = useState(false);
   const [showOverwatch, setShowOverwatch] = useState(false);
   const [showLivePreview, setShowLivePreview] = useState(false);
@@ -493,6 +497,12 @@ export function ProjectTabBar({
           break;
         case "openHomebrewManager":
           setShowHomebrewManager(true);
+          break;
+        case "openGitHubManager":
+          setShowGitHubManager(true);
+          break;
+        case "openScratchpad":
+          setShowScratchpad(true);
           break;
         case "openSystemCleaner":
           setShowSystemCleaner(true);
@@ -964,6 +974,8 @@ export function ProjectTabBar({
           }}
           onOpenJustCommandManager={() => setShowJustCommandManager(true)}
           onOpenUniversalViewer={() => setShowUniversalViewer(true)}
+          onOpenGitHubManager={() => setShowGitHubManager(true)}
+          onOpenScratchpad={() => setShowScratchpad(true)}
           hasStorybook={hasStorybook}
           hasJustfile={hasJustfile}
         />
@@ -1072,6 +1084,19 @@ export function ProjectTabBar({
         onClose={() => setShowHomebrewManager(false)}
       />
 
+      {/* GitHub Manager Popup */}
+      <GitHubManagerPopup
+        isOpen={showGitHubManager}
+        onClose={() => setShowGitHubManager(false)}
+        projectPath={activeProject?.path}
+      />
+
+      {/* Scratchpad Popup */}
+      <ScratchpadPopup
+        isOpen={showScratchpad}
+        onClose={() => setShowScratchpad(false)}
+      />
+
       {/* System Cleaner Popup */}
       <SystemCleanerPopup
         isOpen={showSystemCleaner}
@@ -1137,13 +1162,10 @@ export function ProjectTabBar({
       />
 
       {/* Beads Tracker */}
-      {activeProject?.path && (
-        <BeadsTrackerPopup
-          isOpen={showBeadsTracker}
-          onClose={() => setShowBeadsTracker(false)}
-          projectPath={activeProject.path}
-        />
-      )}
+      <BeadsTrackerPopup
+        isOpen={showBeadsTracker}
+        onClose={() => setShowBeadsTracker(false)}
+      />
 
       {/* Auto Build */}
       {activeProject?.path && isAutoBuildOpen && (

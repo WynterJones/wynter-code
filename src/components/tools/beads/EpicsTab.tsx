@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, Zap } from "lucide-react";
+import { ChevronDown, ChevronRight, Zap, Search, Copy, Check } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
 import { useBeadsStore } from "@/stores/beadsStore";
@@ -10,6 +10,7 @@ import {
   PRIORITY_COLORS,
   PRIORITY_LABELS,
 } from "@/types/beads";
+import { IconButton, Tooltip } from "@/components/ui";
 
 interface Epic {
   epic: BeadsIssue;
@@ -24,19 +25,37 @@ interface Epic {
 export function EpicsTab() {
   const { issues } = useBeadsStore();
   const [expandedEpics, setExpandedEpics] = useState<Set<string>>(new Set());
+  const [hideClosed, setHideClosed] = useState(true);
+  const [search, setSearch] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyId = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const epics = useMemo(() => {
     const epicIssues = issues.filter((i) => i.issue_type === "epic");
     const epicMap: Epic[] = [];
 
     for (const epic of epicIssues) {
-      // Find children by matching ID prefix (e.g., epic-id.1, epic-id.2)
-      const children = issues.filter(
-        (i) =>
-          i.id !== epic.id &&
+      // Find children by checking dependencies for parent-child relationship
+      const children = issues.filter((i) => {
+        if (i.id === epic.id) return false;
+        // Check dependencies array for parent-child link to this epic
+        if (i.dependencies?.some(
+          (d) => d.type === "parent-child" && d.depends_on_id === epic.id
+        )) {
+          return true;
+        }
+        // Fallback: match by ID prefix (e.g., epic-id.1, epic-id.2)
+        return (
           i.id.startsWith(epic.id + ".") &&
           !i.id.substring(epic.id.length + 1).includes(".")
-      );
+        );
+      });
 
       const closedCount = children.filter((c) => c.status === "closed").length;
       epicMap.push({
@@ -53,6 +72,18 @@ export function EpicsTab() {
     return epicMap;
   }, [issues]);
 
+  const filteredEpics = useMemo(() => {
+    return epics.filter((e) => {
+      if (hideClosed && e.epic.status === "closed") return false;
+      if (
+        search &&
+        !e.epic.title.toLowerCase().includes(search.toLowerCase()) &&
+        !e.epic.id.toLowerCase().includes(search.toLowerCase())
+      ) return false;
+      return true;
+    });
+  }, [epics, hideClosed, search]);
+
   const toggleExpanded = (epicId: string) => {
     setExpandedEpics((prev) => {
       const next = new Set(prev);
@@ -67,17 +98,31 @@ export function EpicsTab() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Search Bar */}
+      <div className="flex items-center gap-3 p-4 border-b border-border">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by title or ID..."
+            className="w-full bg-bg-tertiary border border-border rounded-md pl-9 pr-3 py-1.5 text-sm text-text-primary placeholder:text-text-secondary focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+        </div>
+      </div>
+
       <OverlayScrollbarsComponent
         className="flex-1 os-theme-custom"
         options={{ scrollbars: { theme: "os-theme-custom", autoHide: "scroll" } }}
       >
-        {epics.length === 0 ? (
+        {filteredEpics.length === 0 ? (
           <div className="flex items-center justify-center h-full text-text-secondary">
-            No epics found
+            {epics.length === 0 ? "No epics found" : "No open epics"}
           </div>
         ) : (
           <div className="p-4 space-y-3">
-            {epics.map(({ epic, children, progress }) => {
+            {filteredEpics.map(({ epic, children, progress }) => {
               const isExpanded = expandedEpics.has(epic.id);
 
               return (
@@ -86,57 +131,80 @@ export function EpicsTab() {
                   className="rounded-lg border border-border bg-bg-tertiary/30 overflow-hidden"
                 >
                   {/* Epic Header */}
-                  <button
-                    onClick={() => toggleExpanded(epic.id)}
-                    className="w-full flex items-center gap-3 p-4 hover:bg-bg-tertiary/50 transition-colors"
-                  >
-                    {/* Expand Icon */}
-                    <div className="flex-shrink-0">
-                      {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-text-secondary" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4 text-text-secondary" />
-                      )}
-                    </div>
-
-                    {/* Epic Badge */}
-                    <span
-                      className={cn(
-                        "flex-shrink-0 px-2 py-0.5 text-xs rounded border",
-                        TYPE_COLORS.epic
-                      )}
+                  <div className="flex items-center gap-3 p-4 hover:bg-bg-tertiary/50 transition-colors">
+                    {/* Expandable area */}
+                    <button
+                      onClick={() => toggleExpanded(epic.id)}
+                      className="flex-1 flex items-center gap-3"
                     >
-                      Epic
-                    </span>
-
-                    {/* Title */}
-                    <span className="flex-1 text-left text-sm font-medium text-text-primary truncate">
-                      {epic.title}
-                    </span>
-
-                    {/* Status Badge */}
-                    <span
-                      className={cn(
-                        "flex-shrink-0 px-2 py-0.5 text-xs rounded border capitalize",
-                        STATUS_COLORS[epic.status]
-                      )}
-                    >
-                      {epic.status.replace("_", " ")}
-                    </span>
-
-                    {/* Progress Bar */}
-                    <div className="flex-shrink-0 w-32 flex items-center gap-2">
-                      <div className="flex-1 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-green-500 transition-all"
-                          style={{ width: `${progress.percentage}%` }}
-                        />
+                      {/* Expand Icon */}
+                      <div className="flex-shrink-0">
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4 text-text-secondary" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-text-secondary" />
+                        )}
                       </div>
-                      <span className="text-xs text-text-secondary w-12 text-right">
-                        {progress.closed}/{progress.total}
+
+                      {/* Epic Badge */}
+                      <span
+                        className={cn(
+                          "flex-shrink-0 px-2 py-0.5 text-xs rounded border",
+                          TYPE_COLORS.epic
+                        )}
+                      >
+                        Epic
                       </span>
-                    </div>
-                  </button>
+
+                      {/* Title */}
+                      <span className="flex-1 text-left text-sm font-medium text-text-primary truncate">
+                        {epic.title}
+                      </span>
+
+                      {/* Status Badge */}
+                      <span
+                        className={cn(
+                          "flex-shrink-0 px-2 py-0.5 text-xs rounded border capitalize",
+                          STATUS_COLORS[epic.status]
+                        )}
+                      >
+                        {epic.status.replace("_", " ")}
+                      </span>
+
+                      {/* Progress Bar */}
+                      <div className="flex-shrink-0 w-32 flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-bg-tertiary rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-green-500 transition-all"
+                            style={{ width: `${progress.percentage}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-text-secondary w-12 text-right">
+                          {progress.closed}/{progress.total}
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Copy ID Button */}
+                    <Tooltip content={copiedId === epic.id ? "Copied!" : "Copy ID"}>
+                      <IconButton
+                        size="sm"
+                        onClick={(e) => handleCopyId(epic.id, e)}
+                        className={cn(
+                          "flex-shrink-0 transition-colors",
+                          copiedId === epic.id
+                            ? "text-green-400"
+                            : "text-text-secondary hover:text-text-primary"
+                        )}
+                      >
+                        {copiedId === epic.id ? (
+                          <Check className="w-3 h-3" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+                  </div>
 
                   {/* Children */}
                   {isExpanded && children.length > 0 && (
@@ -204,8 +272,22 @@ export function EpicsTab() {
       </OverlayScrollbarsComponent>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-border text-xs text-text-secondary">
-        {epics.length} epic{epics.length !== 1 ? "s" : ""}
+      <div className="px-4 py-2 border-t border-border text-xs text-text-secondary flex items-center justify-between">
+        <span>
+          {filteredEpics.length} epic{filteredEpics.length !== 1 ? "s" : ""}
+          {filteredEpics.length !== epics.length
+            ? ` (filtered from ${epics.length})`
+            : ""}
+        </span>
+        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={hideClosed}
+            onChange={(e) => setHideClosed(e.target.checked)}
+            className="w-3 h-3 rounded border-border bg-bg-tertiary accent-accent cursor-pointer"
+          />
+          <span>Hide closed</span>
+        </label>
       </div>
     </div>
   );

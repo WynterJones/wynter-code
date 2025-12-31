@@ -5,7 +5,7 @@
 /**
  * Calculate the size of a localStorage item in bytes
  */
-export function getStorageSize(key: string): number {
+function getStorageSize(key: string): number {
   const item = localStorage.getItem(key);
   if (!item) return 0;
   // Calculate size in bytes (2 bytes per character for UTF-16)

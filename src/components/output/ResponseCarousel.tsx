@@ -4,6 +4,7 @@ import { OverlayScrollbarsComponent, type OverlayScrollbarsComponentRef } from "
 import { IconButton } from "@/components/ui";
 import { ClaudeResponseCard } from "./ClaudeResponseCard";
 import { cn } from "@/lib/utils";
+import { SCROLLBAR_AUTO_HIDE_DELAY } from "@/lib/constants";
 import type { Message, ToolCall, StreamingStats } from "@/types";
 import type { CustomHandledCommand } from "@/types/slashCommandResponse";
 
@@ -294,7 +295,7 @@ export function ResponseCarousel({
                     theme: "os-theme-custom",
                     visibility: "auto",
                     autoHide: "leave",
-                    autoHideDelay: 400,
+                    autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
                   },
                   overflow: { x: "scroll", y: "scroll" },
                 }}
@@ -319,7 +320,7 @@ export function ResponseCarousel({
                     theme: "os-theme-custom",
                     visibility: "auto",
                     autoHide: "leave",
-                    autoHideDelay: 400,
+                    autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
                   },
                   overflow: { x: "scroll", y: "scroll" },
                 }}

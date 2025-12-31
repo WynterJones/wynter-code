@@ -236,7 +236,7 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
                 style={{ color: info.color }}
               >
                 {info.type === "audit" && metadata
-                  ? `${metadata.score.toFixed(1)}/10`
+                  ? `${metadata.score % 1 === 0 ? metadata.score : metadata.score.toFixed(1)}/10`
                   : `${getCountValue()} ${getCountLabel().toLowerCase()}`}
               </span>
             </div>
@@ -251,7 +251,7 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-text-tertiary uppercase tracking-wider">Score</span>
                 <span className="font-mono font-bold" style={{ color: info.color }}>
-                  {metadata.score.toFixed(1)}/10
+                  {metadata.score % 1 === 0 ? metadata.score : metadata.score.toFixed(1)}/10
                 </span>
               </div>
               <div className="flex gap-[3px] h-3">

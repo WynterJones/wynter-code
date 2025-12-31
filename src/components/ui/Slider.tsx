@@ -1,7 +1,7 @@
 import { InputHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-export interface SliderProps
+interface SliderProps
   extends Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "onChange"> {
   label?: string;
   description?: string;

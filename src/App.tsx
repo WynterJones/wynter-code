@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAppFont } from "@/hooks/useAppFont";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useEnvStore } from "@/stores/envStore";
+import { ScreenReaderAnnouncerProvider } from "@/components/ui";
 
 type WindowType = "main" | "launcher";
 
@@ -81,10 +82,18 @@ function App() {
 
   // Render appropriate window based on type
   if (windowType === "launcher") {
-    return <LauncherWindow />;
+    return (
+      <ScreenReaderAnnouncerProvider>
+        <LauncherWindow />
+      </ScreenReaderAnnouncerProvider>
+    );
   }
 
-  return <AppShell />;
+  return (
+    <ScreenReaderAnnouncerProvider>
+      <AppShell />
+    </ScreenReaderAnnouncerProvider>
+  );
 }
 
 export default App;

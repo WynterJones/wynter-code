@@ -90,6 +90,8 @@ export function Tooltip({
       className={cn("relative inline-flex", wrapperClassName)}
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
+      onFocus={() => setIsVisible(true)}
+      onBlur={() => setIsVisible(false)}
     >
       {children}
       {isVisible &&

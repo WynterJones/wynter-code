@@ -370,8 +370,9 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
               <div className="space-y-2 mt-3">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs text-text-secondary">Port:</label>
+                    <label htmlFor="live-preview-port" className="text-xs text-text-secondary">Port:</label>
                     <input
+                      id="live-preview-port"
                       type="number"
                       value={portInput}
                       onChange={(e) => setPortInput(e.target.value)}

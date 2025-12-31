@@ -41,19 +41,6 @@ export type BackupConnectionStatus =
   | "error";
 
 /**
- * Backup operation status
- */
-export type BackupStatus =
-  | "idle"
-  | "collecting"
-  | "compressing"
-  | "encrypting"
-  | "generating"
-  | "uploading"
-  | "complete"
-  | "error";
-
-/**
  * Auto-backup interval options (in hours)
  */
 export type BackupInterval = 0 | 12 | 24 | 48 | 72;
@@ -65,15 +52,6 @@ export const BACKUP_INTERVAL_OPTIONS: { value: BackupInterval; label: string }[]
   { value: 48, label: "Every 48 hours" },
   { value: 72, label: "Every 72 hours" },
 ];
-
-/**
- * Backup progress step info
- */
-export interface BackupProgress {
-  status: BackupStatus;
-  progress: number;
-  message: string;
-}
 
 /**
  * Netlify site info (minimal subset we need)
@@ -88,7 +66,7 @@ export interface BackupSite {
 /**
  * Web backup store state
  */
-export interface WebBackupState {
+interface WebBackupState {
   // Configuration (persisted)
   enabled: boolean;
   netlifyToken: string | null;
@@ -114,7 +92,7 @@ export interface WebBackupState {
 /**
  * Web backup store actions
  */
-export interface WebBackupActions {
+interface WebBackupActions {
   // Configuration
   setEnabled: (enabled: boolean) => void;
   setNetlifyToken: (token: string | null) => void;

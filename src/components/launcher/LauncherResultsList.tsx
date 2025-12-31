@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { LauncherItem } from "@/types/launcher";
 import { LauncherResultItem } from "./LauncherResultItem";
 import { useLauncherStore } from "@/stores/launcherStore";
+import { SCROLLBAR_AUTO_HIDE_DELAY } from "@/lib/constants";
 
 interface LauncherResultsListProps {
   results: LauncherItem[];
@@ -58,7 +59,7 @@ export function LauncherResultsList({
       options={{
         scrollbars: {
           autoHide: "leave",
-          autoHideDelay: 400,
+          autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
           theme: "os-theme-custom",
           visibility: "visible",
         },

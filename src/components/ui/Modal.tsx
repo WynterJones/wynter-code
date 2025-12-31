@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect, useRef, useId } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ export function Modal({
   headerActions,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -71,6 +72,9 @@ export function Modal({
       onClick={handleOverlayClick}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={cn(
           "bg-bg-secondary rounded-lg border border-border shadow-2xl w-full animate-in zoom-in-95 duration-150 flex flex-col",
           sizeClasses[size],
@@ -84,12 +88,12 @@ export function Modal({
             className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0 cursor-grab active:cursor-grabbing"
           >
             {title && (
-              <h2 className="text-sm font-semibold text-text-primary">{title}</h2>
+              <h2 id={titleId} className="text-sm font-semibold text-text-primary">{title}</h2>
             )}
             <div className="flex items-center gap-2 ml-auto">
               {headerActions}
               {showCloseButton && (
-                <IconButton size="sm" onClick={onClose}>
+                <IconButton size="sm" onClick={onClose} aria-label="Close dialog">
                   <X className="w-4 h-4" />
                 </IconButton>
               )}

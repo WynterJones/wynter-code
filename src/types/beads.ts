@@ -7,7 +7,7 @@ export interface BeadsDependency {
   type: "parent-child" | "blocks" | "relates_to";
   created_at: string;
   created_by: string;
-  metadata: string;
+  metadata?: string;
 }
 
 export interface BeadsIssue {

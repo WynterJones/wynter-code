@@ -34,11 +34,6 @@ function splitNode(
   };
 }
 
-/** Create default single panel layout */
-export function createDefaultLayout(panelIds: string[]): LayoutNode {
-  return panelNode(panelIds[0]);
-}
-
 /**
  * Layout Templates
  *
@@ -151,7 +146,3 @@ export function getLayoutTemplateList(): LayoutTemplate[] {
   return Object.values(LAYOUT_TEMPLATES);
 }
 
-/** Get template by ID */
-export function getLayoutTemplate(id: LayoutTemplateId): LayoutTemplate | undefined {
-  return LAYOUT_TEMPLATES[id];
-}

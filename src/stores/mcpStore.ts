@@ -1,20 +1,10 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { McpServer, McpServerInput, McpScope } from "@/types";
+import { isSensitiveKey } from "@/lib/sensitiveKeyDetection";
+import { handleError } from "@/lib/errorHandler";
 
-const SENSITIVE_KEY_PATTERNS = [
-  /api[_-]?key/i,
-  /secret/i,
-  /password/i,
-  /token/i,
-  /private[_-]?key/i,
-  /auth/i,
-  /credential/i,
-];
-
-export function isSensitiveEnvKey(key: string): boolean {
-  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
-}
+export { isSensitiveKey as isSensitiveEnvKey };
 
 interface McpStore {
   // Popup state
@@ -116,7 +106,7 @@ export const useMcpStore = create<McpStore>((set, get) => ({
       set({ servers, isLoading: false });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : String(error),
+        error: handleError(error, "McpStore.loadServers"),
         isLoading: false,
       });
     }
@@ -132,7 +122,7 @@ export const useMcpStore = create<McpStore>((set, get) => ({
       set({ isFormOpen: false, editingServer: null });
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : String(error),
+        error: handleError(error, "McpStore.saveServer"),
         isLoading: false,
       });
       throw error;
@@ -147,7 +137,7 @@ export const useMcpStore = create<McpStore>((set, get) => ({
       await get().loadServers(projectPath);
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : String(error),
+        error: handleError(error, "McpStore.deleteServer"),
         isLoading: false,
       });
       throw error;
@@ -167,7 +157,7 @@ export const useMcpStore = create<McpStore>((set, get) => ({
       }));
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : String(error),
+        error: handleError(error, "McpStore.toggleServer"),
         isLoading: false,
       });
       throw error;

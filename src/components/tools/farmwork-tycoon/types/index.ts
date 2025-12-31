@@ -5,6 +5,12 @@ export interface Point {
   y: number;
 }
 
+export interface SpawnVehicleOptions {
+  destination?: string;
+  route?: string[];
+  tint?: number;
+}
+
 export interface BuildingPosition {
   x: number;
   y: number;
@@ -49,6 +55,7 @@ export type VehicleTaskStatus =
   | "waiting_for_completion"
   | "waiting_at_office" // Beads: open issues wait at office
   | "traveling_to_farmhouse" // Beads: in_progress issues go to farmhouse
+  | "bead_completing" // Beads: 1-second completion animation before auto-exit
   | "exiting"
   | "finished";
 
@@ -230,10 +237,7 @@ export interface FarmworkTycoonState {
   refreshStats: () => Promise<void>;
   setNavGraph: (graph: NavGraph) => void;
   updateVehiclePosition: (vehicleId: string, position: Point) => void;
-  spawnVehicle: (destination: string, returnDestination?: string) => string;
-  spawnVehicleWithTint: (destination: string, tint: number) => string;
-  spawnVehicleWithRoute: (route: string[]) => string;
-  spawnVehicleWithTintAndRoute: (route: string[], tint: number) => string;
+  spawnVehicle: (options: SpawnVehicleOptions) => string;
   incrementToolCount: () => void;
   removeVehicle: (vehicleId: string) => void;
   setVehicleCarrying: (vehicleId: string, carrying: boolean) => void;
@@ -248,11 +252,14 @@ export interface FarmworkTycoonState {
   // Beads issue vehicle tracking
   beadsEnabled: boolean;
   beadVehicleMap: Map<string, BeadVehicleMapping>;
+  completedBeadIssueIds: Set<string>;
   setBeadsEnabled: (enabled: boolean) => void;
   syncBeadVehicles: (issues: import("@/types/beads").BeadsIssue[]) => void;
   spawnBeadVehicle: (issue: import("@/types/beads").BeadsIssue) => string;
   updateBeadVehicleStatus: (issueId: string, newStatus: BeadsStatus) => void;
   removeBeadVehicle: (issueId: string) => void;
+  markBeadIssueCompleted: (issueId: string) => void;
+  clearCompletedBeadIssues: () => void;
 }
 
 export const BUILDING_COLORS: Record<BuildingType, string> = {
@@ -365,18 +372,6 @@ export const VEHICLE_SPRITE_PATHS: Record<
   },
 };
 
-export const BUILDING_BADGE_ICONS: Record<BuildingType, string> = {
-  security: "Shield",
-  tests: "TestTube2",
-  performance: "Gauge",
-  farmhouse: "Home",
-  office: "Building2",
-  accessibility: "Accessibility",
-  garden: "Sprout",
-  compost: "Trash2",
-  codeQuality: "Code2",
-};
-
 export const VEHICLE_SPEED = {
   BASE: 180,
   VARIANCE: 90,
@@ -407,6 +402,8 @@ export function getTaskMessage(
       return "Ready to start";
     case "traveling_to_farmhouse":
       return "In progress...";
+    case "bead_completing":
+      return "Completed!";
     case "exiting":
       return "Task Complete!";
     case "finished":

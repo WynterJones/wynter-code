@@ -2,12 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import type { StreamChunk, GeminiModel, StreamingStats, PermissionMode, ImageAttachment } from "@/types";
 
-export interface GeminiSessionInfo {
+interface GeminiSessionInfo {
   model?: string;
   cwd?: string;
 }
 
-export interface GeminiSessionCallbacks {
+interface GeminiSessionCallbacks {
   onSessionStarting: () => void;
   onSessionReady: (info: GeminiSessionInfo) => void;
   onSessionEnded: (reason: string) => void;

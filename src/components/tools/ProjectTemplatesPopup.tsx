@@ -829,10 +829,11 @@ export function ProjectTemplatesPopup({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label htmlFor="template-project-name" className="block text-sm font-medium text-text-secondary mb-1.5">
               Project Name
             </label>
             <input
+              id="template-project-name"
               type="text"
               value={projectName}
               onChange={(e) => setProjectName(e.target.value)}
@@ -846,9 +847,9 @@ export function ProjectTemplatesPopup({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <span className="block text-sm font-medium text-text-secondary mb-1.5">
               Destination
-            </label>
+            </span>
             <div className="flex gap-2 mb-2">
               <button
                 onClick={() => setUseCurrentProject(false)}
@@ -898,9 +899,9 @@ export function ProjectTemplatesPopup({
           </div>
 
           <div className="pt-2 border-t border-border">
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+            <span className="block text-sm font-medium text-text-secondary mb-1.5">
               Command Preview
-            </label>
+            </span>
             <code className="block px-3 py-2 rounded-md bg-bg-tertiary text-text-secondary text-sm font-mono">
               cd {workingDir} && {getFullCommand()}
             </code>

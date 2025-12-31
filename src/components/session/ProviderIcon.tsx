@@ -41,7 +41,3 @@ export function ProviderIcon({ provider, size = 16, className }: ProviderIconPro
 export function getProviderLabel(provider: AIProvider): string {
   return providerConfig[provider].label;
 }
-
-export function getProviderIconSrc(provider: AIProvider): string {
-  return providerConfig[provider].src;
-}

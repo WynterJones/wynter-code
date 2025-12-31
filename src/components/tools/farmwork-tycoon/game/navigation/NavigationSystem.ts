@@ -6,7 +6,7 @@ import { pathToWaypoints, smoothPath } from "./pathToWaypoints";
 import { getRandomRoadNode } from "./snap";
 import { SPAWN_POINTS, getSpawnPointById, type SpawnPoint } from "./SpawnPoints";
 
-export class NavigationSystem {
+class NavigationSystem {
   private grid: Grid | null = null;
   private graph: NavGraph | null = null;
   private initialized = false;

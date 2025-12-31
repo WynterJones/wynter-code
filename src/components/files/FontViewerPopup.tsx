@@ -109,8 +109,9 @@ export function FontViewerPopup({ filePath, onClose }: FontViewerPopupProps) {
 
             {/* Custom text input */}
             <div className="space-y-2">
-              <label className="text-sm text-text-secondary">Custom text:</label>
+              <label htmlFor="font-custom-text" className="text-sm text-text-secondary">Custom text:</label>
               <Input
+                id="font-custom-text"
                 value={customText}
                 onChange={(e) => setCustomText(e.target.value)}
                 placeholder="Type your own text to preview..."

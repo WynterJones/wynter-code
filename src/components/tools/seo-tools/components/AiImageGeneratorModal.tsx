@@ -13,7 +13,7 @@ import {
   type GeminiAspectRatio,
 } from "@/services/geminiImageService";
 
-export type ImagePresetType = "og-image" | "twitter-card" | "favicon";
+type ImagePresetType = "og-image" | "twitter-card" | "favicon";
 
 interface AiImageGeneratorModalProps {
   isOpen: boolean;

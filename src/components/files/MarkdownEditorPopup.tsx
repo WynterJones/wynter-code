@@ -389,8 +389,9 @@ export function MarkdownEditorPopup({
 
                     {/* Max Width */}
                     <div className="space-y-1.5">
-                      <label className="text-xs text-text-secondary">Content Width</label>
+                      <label htmlFor="md-content-width" className="text-xs text-text-secondary">Content Width</label>
                       <select
+                        id="md-content-width"
                         value={markdownMaxWidth}
                         onChange={(e) => setMarkdownMaxWidth(e.target.value as typeof markdownMaxWidth)}
                         className="w-full px-2 py-1.5 text-sm bg-bg-tertiary border border-border rounded text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"
@@ -403,8 +404,9 @@ export function MarkdownEditorPopup({
 
                     {/* Font Size */}
                     <div className="space-y-1.5">
-                      <label className="text-xs text-text-secondary">Font Size: {markdownFontSize}px</label>
+                      <label htmlFor="md-font-size" className="text-xs text-text-secondary">Font Size: {markdownFontSize}px</label>
                       <input
+                        id="md-font-size"
                         type="range"
                         min="12"
                         max="24"

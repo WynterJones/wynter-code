@@ -37,7 +37,11 @@ export const useBeadsStore = create<BeadsState>((set, get) => ({
   projectPath: null,
 
   setProjectPath: (path) => {
-    set({ projectPath: path, issues: [], stats: null, error: null });
+    const { projectPath: currentPath } = get();
+    // Only reset state if the path actually changed
+    if (path !== currentPath) {
+      set({ projectPath: path, issues: [], stats: null, error: null });
+    }
   },
 
   fetchIssues: async () => {

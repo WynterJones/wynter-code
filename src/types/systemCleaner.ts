@@ -35,15 +35,6 @@ export interface DeleteResult {
   failedPaths: string[];
 }
 
-export interface CacheLocation {
-  path: string;
-  name: string;
-  category: string;
-  size: number;
-  formattedSize: string;
-  exists: boolean;
-}
-
 export type CleanerCategory = "large-files" | "app-caches" | "installed-apps";
 
 export type LargeFileThreshold = 50 | 100 | 500 | 1000;

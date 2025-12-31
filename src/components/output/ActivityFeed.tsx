@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import {
   Terminal,
   FileEdit,
@@ -274,7 +274,15 @@ function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityI
     ? "text-accent-purple"
     : getToolColor(toolCall.name);
 
-  const summary = formatToolSummary(toolCall.input);
+  // Memoize JSON operations to avoid recalculation on re-render
+  const summary = useMemo(
+    () => formatToolSummary(toolCall.input),
+    [toolCall.input]
+  );
+  const formattedInput = useMemo(
+    () => formatToolInput(toolCall.input),
+    [toolCall.input]
+  );
   const hasDetails = Object.keys(toolCall.input).length > 0 || toolCall.output;
 
   return (
@@ -396,7 +404,7 @@ function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityI
             <>
               {Object.keys(toolCall.input).length > 0 && (
                 <pre className="text-[10px] text-text-secondary font-mono bg-bg-secondary/50 rounded p-1.5 overflow-x-auto max-h-32 mb-1">
-                  {formatToolInput(toolCall.input)}
+                  {formattedInput}
                 </pre>
               )}
               {toolCall.output && (

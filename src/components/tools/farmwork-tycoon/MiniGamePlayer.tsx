@@ -21,7 +21,7 @@ interface MiniGamePlayerProps {
 
 const MIN_SIZE = 200;
 const MAX_SIZE = 600;
-const DEFAULT_SIZE = 306; // Results in 368px container height (306 + 16 chrome + 46 header)
+const DEFAULT_SIZE = 316; // Results in 368px container height (306 + 16 chrome + 46 header)
 
 interface Position {
   x: number;

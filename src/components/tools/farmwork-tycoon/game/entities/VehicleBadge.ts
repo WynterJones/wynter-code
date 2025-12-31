@@ -35,7 +35,7 @@ export class VehicleBadge extends Badge {
     const bgColor = this.getTaskBackgroundColor(task);
     this.setBackgroundColor(bgColor);
 
-    if (task === "delivering" || task === "exiting" || task === "finished") {
+    if (task === "delivering" || task === "exiting" || task === "finished" || task === "bead_completing") {
       this.startPulse();
     }
   }
@@ -51,6 +51,7 @@ export class VehicleBadge extends Badge {
         return 0x1e3a5f;
       case "delivering":
         return 0x1e4620;
+      case "bead_completing":
       case "exiting":
       case "finished":
         return 0x22c55e;

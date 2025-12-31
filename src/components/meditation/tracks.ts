@@ -1,19 +1,3 @@
-/**
- * Convert filename to Title Case display name
- * e.g., "zen-music.mp3" -> "Zen Music"
- * e.g., "my_song_name.mp3" -> "My Song Name"
- */
-export function fileToDisplayName(filename: string): string {
-  return filename
-    .replace(/\.mp3$/i, "")
-    .replace(/-/g, " ")
-    .replace(/_/g, " ")
-    .split(" ")
-    .filter((word) => word.length > 0)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(" ");
-}
-
 export interface Track {
   name: string;
   file: string;

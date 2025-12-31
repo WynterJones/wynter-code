@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
+import { SCROLLBAR_AUTO_HIDE_DELAY } from "@/lib/constants";
 import { LauncherItem, LauncherAction } from "@/types/launcher";
 
 interface LauncherActionsPanelProps {
@@ -70,7 +71,7 @@ export function LauncherActionsPanel({
         options={{
           scrollbars: {
             autoHide: "leave",
-            autoHideDelay: 400,
+            autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
             theme: "os-theme-custom",
           },
         }}

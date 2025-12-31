@@ -71,6 +71,8 @@ import {
   Languages,
   Beer,
   Paintbrush,
+  Github,
+  StickyNote,
   type LucideIcon,
 } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -199,6 +201,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Play,
     actionKey: "openLivePreview",
     category: "code",
+    hiddenInDropdown: true,
+  },
+  {
+    id: "github-manager",
+    name: "GitHub Manager",
+    description: "Browse repos and connect to GitHub",
+    icon: Github,
+    actionKey: "openGitHubManager",
+    category: "utilities",
     hiddenInDropdown: true,
   },
   {
@@ -439,6 +450,14 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     category: "utilities",
     hiddenInDropdown: true,
   },
+  {
+    id: "scratchpad",
+    name: "Scratchpad",
+    description: "Quick text notepad",
+    icon: StickyNote,
+    actionKey: "openScratchpad",
+    category: "utilities",
+  },
 
   // === DEV TOOLKIT MINI-TOOLS ===
   { id: "dt-json-formatter", name: "JSON Formatter", description: "Format & validate JSON", icon: Braces, actionKey: "openDevToolkit", category: "web-tools", hiddenInDropdown: true, parentActionKey: "openDevToolkit", subToolId: "json-formatter", group: "Developer Tools" },
@@ -505,17 +524,7 @@ interface Tool {
   description: string;
   icon: React.ReactNode;
   onClick: () => void;
-  category:
-    | "code"
-    | "testing"
-    | "ai-providers"
-    | "project"
-    | "local-system"
-    | "production"
-    | "design"
-    | "web-tools"
-    | "productivity"
-    | "utilities";
+  category: ToolDefinition["category"];
   disabled?: boolean;
   hiddenInDropdown?: boolean;
 }
@@ -525,6 +534,9 @@ interface ToolCategory {
   label: string;
   tools: Tool[];
 }
+
+/** Maps actionKey to handler function */
+type ActionHandlers = Record<string, (() => void) | undefined>;
 
 interface ToolsDropdownProps {
   onOpenProjectSearch: () => void;
@@ -559,6 +571,10 @@ interface ToolsDropdownProps {
   onOpenJustCommandManager: () => void;
   onOpenUniversalViewer: () => void;
   onOpenDesignerTool: () => void;
+  onOpenGitHubManager: () => void;
+  onOpenScratchpad: () => void;
+  onOpenWebBackup?: () => void;
+  onOpenKanbanBoard?: () => void;
   hasStorybook?: boolean;
   hasJustfile?: boolean;
 }
@@ -596,9 +612,63 @@ export function ToolsDropdown({
   onOpenJustCommandManager,
   onOpenUniversalViewer,
   onOpenDesignerTool,
+  onOpenGitHubManager,
+  onOpenScratchpad,
+  onOpenWebBackup = () => {},
+  onOpenKanbanBoard = () => {},
   hasStorybook = false,
   hasJustfile = false,
 }: ToolsDropdownProps) {
+  // Map actionKey to handler functions - generated from props
+  const actionHandlers: ActionHandlers = useMemo(() => ({
+    openProjectSearch: onOpenProjectSearch,
+    openPortManager: onOpenPortManager,
+    openNodeModulesCleaner: onOpenNodeModulesCleaner,
+    openLocalhostTunnel: onOpenLocalhostTunnel,
+    openSystemHealth: onOpenSystemHealth,
+    openHomebrewManager: onOpenHomebrewManager,
+    openSystemCleaner: onOpenSystemCleaner,
+    openLivePreview: onOpenLivePreview,
+    openEnvManager: onOpenEnvManager,
+    openApiTester: onOpenApiTester,
+    openTestRunner: onOpenTestRunner,
+    openStorybookViewer: onOpenStorybookViewer,
+    openBackgroundServices: onOpenBackgroundServices,
+    openOverwatch: onOpenOverwatch,
+    openMcpManager: onOpenMcpManager,
+    openFaviconGenerator: onOpenFaviconGenerator,
+    openDevToolkit: onOpenDevToolkit,
+    openClaudeCodeStats: onOpenClaudeCodeStats,
+    openLimitsMonitor: onOpenLimitsMonitor,
+    openDomainTools: onOpenDomainTools,
+    openSeoTools: onOpenSeoTools,
+    openNetlifyFtp: onOpenNetlifyFtp,
+    openBookmarks: onOpenBookmarks,
+    openMeditation: onOpenMeditation,
+    openDatabaseViewer: onOpenDatabaseViewer,
+    openProjectTemplates: onOpenProjectTemplates,
+    openFileFinder: onOpenFileFinder,
+    openSubscriptions: onOpenSubscriptions,
+    openFarmwork: onOpenFarmwork,
+    openJustCommandManager: onOpenJustCommandManager,
+    openUniversalViewer: onOpenUniversalViewer,
+    openDesignerTool: onOpenDesignerTool,
+    openGitHubManager: onOpenGitHubManager,
+    openScratchpad: onOpenScratchpad,
+    openWebBackup: onOpenWebBackup,
+    openKanbanBoard: onOpenKanbanBoard,
+  }), [
+    onOpenProjectSearch, onOpenPortManager, onOpenNodeModulesCleaner,
+    onOpenLocalhostTunnel, onOpenSystemHealth, onOpenHomebrewManager,
+    onOpenSystemCleaner, onOpenLivePreview, onOpenEnvManager, onOpenApiTester,
+    onOpenTestRunner, onOpenStorybookViewer, onOpenBackgroundServices,
+    onOpenOverwatch, onOpenMcpManager, onOpenFaviconGenerator, onOpenDevToolkit,
+    onOpenClaudeCodeStats, onOpenLimitsMonitor, onOpenDomainTools, onOpenSeoTools,
+    onOpenNetlifyFtp, onOpenBookmarks, onOpenMeditation, onOpenDatabaseViewer,
+    onOpenProjectTemplates, onOpenFileFinder, onOpenSubscriptions, onOpenFarmwork,
+    onOpenJustCommandManager, onOpenUniversalViewer, onOpenDesignerTool,
+    onOpenGitHubManager, onOpenScratchpad, onOpenWebBackup, onOpenKanbanBoard,
+  ]);
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
@@ -625,447 +695,55 @@ export function ToolsDropdown({
     }
   }, [collapsedCategories]);
 
-  const tools: Tool[] = [
-    // === HIDDEN TOOLS (have dedicated icons in toolbars) ===
-    {
-      id: "meditation",
-      name: "Music / Meditation",
-      description: "Ambient music & meditation",
-      icon: <Music className="w-4 h-4" />,
-      category: "productivity",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenMeditation();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "database-viewer",
-      name: "Database Viewer",
-      description: "Query SQLite, Postgres, MySQL",
-      icon: <Database className="w-4 h-4" />,
-      category: "code",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenDatabaseViewer();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "new-project",
-      name: "New Project",
-      description: "Create from templates",
-      icon: <FolderPlus className="w-4 h-4" />,
-      category: "project",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenProjectTemplates();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "file-finder",
-      name: "File Finder",
-      description: "Browse project files",
-      icon: <FileSearch className="w-4 h-4" />,
-      category: "project",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenFileFinder();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "project-search",
-      name: "Project Search",
-      description: "Search & replace in files",
-      icon: <Search className="w-4 h-4" />,
-      category: "project",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenProjectSearch();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "beads-tracker",
-      name: "Beads Tracker",
-      description: "Manage project issues",
-      icon: <CircleDot className="w-4 h-4" />,
-      category: "project",
-      hiddenInDropdown: true,
-      onClick: () => {
-        window.dispatchEvent(
-          new CustomEvent("command-palette-tool", {
-            detail: { action: "openBeadsTracker" },
-          })
-        );
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "auto-build",
-      name: "Auto Build",
-      description: "Auto-work through issues",
-      icon: <Bot className="w-4 h-4" />,
-      category: "project",
-      hiddenInDropdown: true,
-      onClick: () => {
-        window.dispatchEvent(
-          new CustomEvent("command-palette-tool", {
-            detail: { action: "openAutoBuild" },
-          })
-        );
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "farmwork",
-      name: "Farmwork",
-      description: "Audit & dev workflow",
-      icon: <Wheat className="w-4 h-4" />,
-      category: "project",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenFarmwork();
-        setIsOpen(false);
-      },
-    },
+  // Tools that dispatch events instead of calling handlers directly
+  const eventDispatchTools = new Set(["openBeadsTracker", "openAutoBuild", "openFarmworkTycoon", "openKanbanBoard"]);
 
-    // === CODE ===
-    {
-      id: "live-preview",
-      name: "Live Preview",
-      description: "Preview in browser",
-      icon: <Play className="w-4 h-4" />,
-      category: "code",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenLivePreview();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "storybook-viewer",
-      name: "Storybook Viewer",
-      description: hasStorybook
-        ? "Browse Storybook components"
-        : "Storybook not detected",
-      icon: <BookOpen className="w-4 h-4" />,
-      category: "testing",
-      onClick: () => {
-        if (!hasStorybook) return;
-        onOpenStorybookViewer();
-        setIsOpen(false);
-      },
-      disabled: !hasStorybook,
-    },
-    {
-      id: "claude-code-stats",
-      name: "Claude Code Stats",
-      description: "CLI usage analytics",
-      icon: <BarChart3 className="w-4 h-4" />,
-      category: "ai-providers",
-      onClick: () => {
-        onOpenClaudeCodeStats();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "limits-monitor",
-      name: "Claude Limits Monitor",
-      description: "Track API usage limits",
-      icon: <Gauge className="w-4 h-4" />,
-      category: "ai-providers",
-      onClick: () => {
-        onOpenLimitsMonitor();
-        setIsOpen(false);
-      },
-    },
+  // Generate tools from TOOL_DEFINITIONS (excluding mini-tools that are only for command palette)
+  const tools: Tool[] = useMemo(() => {
+    return TOOL_DEFINITIONS
+      .filter(def => !def.parentActionKey) // Exclude mini-tools
+      .map((def): Tool => {
+        const IconComponent = def.icon;
+        const isEventDispatch = eventDispatchTools.has(def.actionKey);
 
-    // === TESTING ===
-    {
-      id: "test-runner",
-      name: "Test Runner",
-      description: "Run and view test results",
-      icon: <FlaskConical className="w-4 h-4" />,
-      category: "testing",
-      onClick: () => {
-        onOpenTestRunner();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "api-tester",
-      name: "API Tester",
-      description: "Test HTTP APIs",
-      icon: <Send className="w-4 h-4" />,
-      category: "testing",
-      onClick: () => {
-        onOpenApiTester();
-        setIsOpen(false);
-      },
-    },
+        // Special cases for conditional disabled state
+        let disabled = def.disabled;
+        let description = def.description;
 
-    // === PROJECT ===
-    {
-      id: "farmwork-tycoon",
-      name: "Farmwork Tycoon",
-      description: "CLI activity as farm game",
-      icon: <Tractor className="w-4 h-4" />,
-      category: "project",
-      hiddenInDropdown: true,
-      onClick: () => {
-        window.dispatchEvent(
-          new CustomEvent("command-palette-tool", {
-            detail: { action: "openFarmworkTycoon" },
-          })
-        );
-        setIsOpen(false);
-      },
-    },
+        if (def.id === "storybook-viewer") {
+          disabled = !hasStorybook;
+          description = hasStorybook ? def.description : "Storybook not detected";
+        } else if (def.id === "just-command-manager") {
+          disabled = !hasJustfile;
+          description = hasJustfile ? def.description : "Justfile not detected";
+        }
 
-    // === LOCAL SYSTEM ===
-    {
-      id: "port-manager",
-      name: "Port Manager",
-      description: "Manage localhost ports",
-      icon: <Network className="w-4 h-4" />,
-      category: "local-system",
-      onClick: () => {
-        onOpenPortManager();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "localhost-tunnel",
-      name: "Localhost Tunnel",
-      description: "Share localhost publicly",
-      icon: <Globe className="w-4 h-4" />,
-      category: "local-system",
-      onClick: () => {
-        onOpenLocalhostTunnel();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "background-services",
-      name: "Background Services",
-      description: "Manage dev services",
-      icon: <Server className="w-4 h-4" />,
-      category: "local-system",
-      onClick: () => {
-        onOpenBackgroundServices();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "system-health",
-      name: "System Health",
-      description: "Dev tools & resources",
-      icon: <Activity className="w-4 h-4" />,
-      category: "local-system",
-      onClick: () => {
-        onOpenSystemHealth();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "homebrew-manager",
-      name: "Homebrew Manager",
-      description: "Manage Homebrew packages",
-      icon: <Beer className="w-4 h-4" />,
-      category: "local-system",
-      onClick: () => {
-        onOpenHomebrewManager();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "system-cleaner",
-      name: "System Cleaner",
-      description: "Clean up disk space",
-      icon: <HardDrive className="w-4 h-4" />,
-      category: "local-system",
-      onClick: () => {
-        onOpenSystemCleaner();
-        setIsOpen(false);
-      },
-    },
+        return {
+          id: def.id,
+          name: def.name,
+          description,
+          icon: <IconComponent className="w-4 h-4" />,
+          category: def.category,
+          hiddenInDropdown: def.hiddenInDropdown,
+          disabled,
+          onClick: () => {
+            if (disabled) return;
 
-    // === PRODUCTION ===
-    {
-      id: "overwatch",
-      name: "Overwatch",
-      description: "Monitor prod services",
-      icon: <Eye className="w-4 h-4" />,
-      category: "production",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenOverwatch();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "netlify-ftp",
-      name: "Netlify FTP",
-      description: "Deploy with retro FTP",
-      icon: <Upload className="w-4 h-4" />,
-      category: "production",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenNetlifyFtp();
-        setIsOpen(false);
-      },
-    },
-
-    // === DESIGN ===
-    {
-      id: "favicon-generator",
-      name: "Favicon Generator",
-      description: "Generate favicons",
-      icon: <Image className="w-4 h-4" />,
-      category: "design",
-      onClick: () => {
-        onOpenFaviconGenerator();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "designer-tool",
-      name: "Designer Tool",
-      description: "AI-powered image generation",
-      icon: <Paintbrush className="w-4 h-4" />,
-      category: "design",
-      onClick: () => {
-        onOpenDesignerTool();
-        setIsOpen(false);
-      },
-    },
-
-    // === TOOLKITS ===
-    {
-      id: "dev-toolkit",
-      name: "Developer Tools",
-      description: "Text & encoding utilities",
-      icon: <Hammer className="w-4 h-4" />,
-      category: "web-tools",
-      onClick: () => {
-        onOpenDevToolkit();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "domain-tools",
-      name: "Domain Tools",
-      description: "WHOIS, DNS & SSL checks",
-      icon: <AtSign className="w-4 h-4" />,
-      category: "web-tools",
-      onClick: () => {
-        onOpenDomainTools();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "seo-tools",
-      name: "SEO Tools",
-      description: "Meta tags & Open Graph",
-      icon: <FileCode className="w-4 h-4" />,
-      category: "web-tools",
-      onClick: () => {
-        onOpenSeoTools();
-        setIsOpen(false);
-      },
-    },
-
-    // === PRODUCTIVITY ===
-    {
-      id: "bookmarks",
-      name: "Bookmarks",
-      description: "Manage your bookmarks",
-      icon: <Bookmark className="w-4 h-4" />,
-      category: "productivity",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenBookmarks();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "subscription-manager",
-      name: "Subscription Manager",
-      description: "Track subscriptions",
-      icon: <CreditCard className="w-4 h-4" />,
-      category: "productivity",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenSubscriptions();
-        setIsOpen(false);
-      },
-    },
-
-    // === UTILITIES ===
-    {
-      id: "mcp-manager",
-      name: "MCP Servers",
-      description: "Manage MCP servers",
-      icon: <Blocks className="w-4 h-4" />,
-      category: "utilities",
-      onClick: () => {
-        onOpenMcpManager();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "env-manager",
-      name: "Environment Variables",
-      description: "Manage .env & secrets",
-      icon: <Key className="w-4 h-4" />,
-      category: "utilities",
-      onClick: () => {
-        onOpenEnvManager();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "node-modules-cleaner",
-      name: "Node Modules Cleaner",
-      description: "Clean up node_modules folders",
-      icon: <Package className="w-4 h-4" />,
-      category: "utilities",
-      onClick: () => {
-        onOpenNodeModulesCleaner();
-        setIsOpen(false);
-      },
-    },
-    {
-      id: "just-command-manager",
-      name: "Just Command Manager",
-      description: hasJustfile
-        ? "Manage justfile recipes"
-        : "Justfile not detected",
-      icon: <Play className="w-4 h-4" />,
-      category: "utilities",
-      onClick: () => {
-        if (!hasJustfile) return;
-        onOpenJustCommandManager();
-        setIsOpen(false);
-      },
-      disabled: !hasJustfile,
-    },
-    {
-      id: "universal-viewer",
-      name: "File Viewer",
-      description: "Open any file type",
-      icon: <Eye className="w-4 h-4" />,
-      category: "utilities",
-      hiddenInDropdown: true,
-      onClick: () => {
-        onOpenUniversalViewer();
-        setIsOpen(false);
-      },
-    },
-  ];
+            if (isEventDispatch) {
+              window.dispatchEvent(
+                new CustomEvent("command-palette-tool", {
+                  detail: { action: def.actionKey },
+                })
+              );
+            } else {
+              const handler = actionHandlers[def.actionKey];
+              handler?.();
+            }
+            setIsOpen(false);
+          },
+        };
+      });
+  }, [actionHandlers, hasStorybook, hasJustfile]);
 
   // Filter tools based on search query and hiddenInDropdown flag
   const filteredTools = useMemo(() => {

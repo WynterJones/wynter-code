@@ -5,6 +5,28 @@ import type { Session, Message, AIModel, AIProvider, ToolCall, StreamingStats, P
 import type { PendingQuestion, PendingQuestionSet } from "@/components/output/AskUserQuestionBlock";
 import type { CustomHandledCommand } from "@/types/slashCommandResponse";
 
+/** Map update helper - clones map and sets a value */
+function mapSet<K, V>(map: Map<K, V>, key: K, value: V): Map<K, V> {
+  const newMap = new Map(map);
+  newMap.set(key, value);
+  return newMap;
+}
+
+/** Map update helper - clones map and deletes a key */
+function mapDelete<K, V>(map: Map<K, V>, key: K): Map<K, V> {
+  const newMap = new Map(map);
+  newMap.delete(key);
+  return newMap;
+}
+
+/** Map update helper - clones map and updates a value using a transform function */
+function mapUpdate<K, V>(map: Map<K, V>, key: K, fn: (current: V) => V, defaultValue: V): Map<K, V> {
+  const newMap = new Map(map);
+  const current = newMap.get(key) ?? defaultValue;
+  newMap.set(key, fn(current));
+  return newMap;
+}
+
 export interface ClaudeSessionInfo {
   model?: string;
   providerSessionId?: string;
@@ -16,7 +38,7 @@ export interface ClaudeSessionInfo {
 }
 
 // Persistent context stats that survive between streaming turns
-export interface SessionContextStats {
+interface SessionContextStats {
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
@@ -205,11 +227,9 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       setActiveSession: (projectId: string, sessionId: string) => {
-        set((state) => {
-          const newActiveSessionId = new Map(state.activeSessionId);
-          newActiveSessionId.set(projectId, sessionId);
-          return { activeSessionId: newActiveSessionId };
-        });
+        set((state) => ({
+          activeSessionId: mapSet(state.activeSessionId, projectId, sessionId),
+        }));
       },
 
       getSessionsForProject: (projectId: string) => {
@@ -273,11 +293,9 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       clearMessages: (sessionId: string) => {
-        set((state) => {
-          const newMessages = new Map(state.messages);
-          newMessages.set(sessionId, []);
-          return { messages: newMessages };
-        });
+        set((state) => ({
+          messages: mapSet(state.messages, sessionId, []),
+        }));
       },
 
       updateSessionModel: (sessionId: string, model: AIModel) => {
@@ -368,9 +386,8 @@ export const useSessionStore = create<SessionStore>()(
 
       // Streaming state methods
       startStreaming: (sessionId: string) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          newStreamingState.set(sessionId, {
+        set((state) => ({
+          streamingState: mapSet(state.streamingState, sessionId, {
             isStreaming: true,
             streamingText: "",
             thinkingText: "",
@@ -378,65 +395,40 @@ export const useSessionStore = create<SessionStore>()(
             stats: { ...defaultStats, startTime: Date.now() },
             pendingQuestion: null,
             pendingQuestionSet: null,
-          });
-          return { streamingState: newStreamingState };
-        });
+          }),
+        }));
       },
 
       appendStreamingText: (sessionId: string, text: string) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || {
-            ...defaultStreamingState,
-          };
-          newStreamingState.set(sessionId, {
-            ...current,
-            streamingText: current.streamingText + text,
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, streamingText: current.streamingText + text }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       appendThinkingText: (sessionId: string, text: string) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || {
-            ...defaultStreamingState,
-          };
-          newStreamingState.set(sessionId, {
-            ...current,
-            thinkingText: current.thinkingText + text,
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, thinkingText: current.thinkingText + text }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       setThinking: (sessionId: string, isThinking: boolean) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || {
-            ...defaultStreamingState,
-          };
-          newStreamingState.set(sessionId, {
-            ...current,
-            stats: { ...current.stats, isThinking },
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, stats: { ...current.stats, isThinking } }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       setCurrentTool: (sessionId: string, toolName: string | undefined) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || {
-            ...defaultStreamingState,
-          };
-          newStreamingState.set(sessionId, {
-            ...current,
-            stats: { ...current.stats, currentTool: toolName },
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, stats: { ...current.stats, currentTool: toolName } }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       updateStats: (sessionId: string, newStats: Partial<StreamingStats>, isFinal?: boolean) => {
@@ -471,17 +463,11 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       addPendingToolCall: (sessionId: string, toolCall: ToolCall) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || {
-            ...defaultStreamingState,
-          };
-          newStreamingState.set(sessionId, {
-            ...current,
-            pendingToolCalls: [...current.pendingToolCalls, toolCall],
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, pendingToolCalls: [...current.pendingToolCalls, toolCall] }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       updateToolCallStatus: (
@@ -601,69 +587,48 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       setPendingQuestion: (sessionId: string, question: PendingQuestion | null) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || { ...defaultStreamingState };
-          newStreamingState.set(sessionId, {
-            ...current,
-            pendingQuestion: question,
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, pendingQuestion: question }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       setPendingQuestionSet: (sessionId: string, questionSet: PendingQuestionSet | null) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || { ...defaultStreamingState };
-          newStreamingState.set(sessionId, {
-            ...current,
-            pendingQuestionSet: questionSet,
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, pendingQuestionSet: questionSet }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       setLastCommand: (sessionId: string, command: CustomHandledCommand | undefined) => {
-        set((state) => {
-          const newStreamingState = new Map(state.streamingState);
-          const current = newStreamingState.get(sessionId) || { ...defaultStreamingState };
-          newStreamingState.set(sessionId, {
-            ...current,
-            lastCommand: command,
-          });
-          return { streamingState: newStreamingState };
-        });
+        set((state) => ({
+          streamingState: mapUpdate(state.streamingState, sessionId,
+            (current) => ({ ...current, lastCommand: command }),
+            { ...defaultStreamingState }),
+        }));
       },
 
       // Claude session state methods
       setClaudeSessionStarting: (sessionId: string) => {
-        set((state) => {
-          const newClaudeSessionState = new Map(state.claudeSessionState);
-          newClaudeSessionState.set(sessionId, { status: "starting" });
-          return { claudeSessionState: newClaudeSessionState };
-        });
+        set((state) => ({
+          claudeSessionState: mapSet(state.claudeSessionState, sessionId, { status: "starting" }),
+        }));
       },
 
       setClaudeSessionReady: (sessionId: string, info: Partial<ClaudeSessionInfo>) => {
-        set((state) => {
-          const newClaudeSessionState = new Map(state.claudeSessionState);
-          const current = newClaudeSessionState.get(sessionId) || { status: "starting" as const };
-          newClaudeSessionState.set(sessionId, {
-            ...current,
-            ...info,
-            status: "ready",
-          });
-          return { claudeSessionState: newClaudeSessionState };
-        });
+        set((state) => ({
+          claudeSessionState: mapUpdate(state.claudeSessionState, sessionId,
+            (current) => ({ ...current, ...info, status: "ready" as const }),
+            { status: "starting" as const }),
+        }));
       },
 
       setClaudeSessionEnded: (sessionId: string) => {
-        set((state) => {
-          const newClaudeSessionState = new Map(state.claudeSessionState);
-          newClaudeSessionState.delete(sessionId);
-          return { claudeSessionState: newClaudeSessionState };
-        });
+        set((state) => ({
+          claudeSessionState: mapDelete(state.claudeSessionState, sessionId),
+        }));
       },
 
       getClaudeSessionState: (sessionId: string) => {
@@ -681,11 +646,9 @@ export const useSessionStore = create<SessionStore>()(
       },
 
       clearContextStats: (sessionId: string) => {
-        set((state) => {
-          const newContextStats = new Map(state.sessionContextStats);
-          newContextStats.delete(sessionId);
-          return { sessionContextStats: newContextStats };
-        });
+        set((state) => ({
+          sessionContextStats: mapDelete(state.sessionContextStats, sessionId),
+        }));
       },
 
       reset: () => {

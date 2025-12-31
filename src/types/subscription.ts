@@ -68,8 +68,3 @@ export interface ShareableSubscriptionData {
   exportedAt: number;
   version: string;
 }
-
-// Legacy type aliases for migration
-export type SubscriptionGroup = SubscriptionCategory;
-export type SubscriptionGroupInput = SubscriptionCategoryInput;
-export type GroupedSubscriptions = CategorizedSubscriptions;

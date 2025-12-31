@@ -26,11 +26,6 @@ export interface GeminiImageResponse {
   mimeType: string;
 }
 
-export interface GeminiImageError {
-  message: string;
-  code?: string;
-}
-
 const GEMINI_MODEL = "gemini-2.5-flash-image";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
@@ -123,7 +118,7 @@ export async function generateImage(
 /**
  * Convert base64 image data to a Blob
  */
-export function base64ToBlob(base64: string, mimeType: string): Blob {
+function base64ToBlob(base64: string, mimeType: string): Blob {
   const byteCharacters = atob(base64);
   const byteNumbers = new Array(byteCharacters.length);
   for (let i = 0; i < byteCharacters.length; i++) {

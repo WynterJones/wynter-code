@@ -403,6 +403,31 @@ export function TycoonGame({
             continue;
           }
 
+          // Beads vehicles auto-exit after 1 second in bead_completing state
+          const BEAD_COMPLETION_WAIT = 1000; // 1 second
+          if (
+            data.task === "bead_completing" &&
+            data.issueId &&
+            data.waitStartTime &&
+            Date.now() - data.waitStartTime > BEAD_COMPLETION_WAIT
+          ) {
+            // Mark issue as completed to prevent re-spawning
+            useFarmworkTycoonStore.getState().markBeadIssueCompleted(data.issueId);
+            useFarmworkTycoonStore.getState().removeBeadVehicle(data.issueId);
+
+            // Start exiting
+            vehicleSprite.setTask("exiting");
+            const exitPoint = getRandomSpawnPoint("exit");
+            const exitPath = navigationSystem.findPathToExit(data.position, exitPoint.id);
+            if (exitPath && exitPath.length > 0) {
+              vehicleSprite.setPath(exitPath);
+            } else {
+              vehicleSprite.markFinished();
+              setTimeout(() => removeVehicle(data.id), 500);
+            }
+            continue;
+          }
+
           if (arrived) {
             const currentDest = vehicleSprite.getCurrentDestination();
             const task = vehicleSprite.getTask();
@@ -419,16 +444,18 @@ export function TycoonGame({
 
             // Handle bead vehicle arriving at farmhouse after status change to in_progress
             if (task === "traveling_to_farmhouse") {
-              vehicleSprite.setTask("waiting_for_completion", "farmhouse");
+              vehicleSprite.setTask("bead_completing", "farmhouse");
               vehicleSprite.setPath([]);
+              vehicleSprite.getData().waitStartTime = Date.now();
               continue;
             }
 
-            // Handle bead vehicle arriving at office (waiting_at_office)
+            // Handle bead vehicle arriving at office - start completion animation
             // When entering task completes and route leads to office
-            if (data.issueId && currentDest === "office" && task !== "waiting_at_office" && task !== "exiting") {
-              vehicleSprite.setTask("waiting_at_office", "office");
+            if (data.issueId && currentDest === "office" && task !== "bead_completing" && task !== "exiting") {
+              vehicleSprite.setTask("bead_completing", "office");
               vehicleSprite.setPath([]);
+              vehicleSprite.getData().waitStartTime = Date.now();
               continue;
             }
 
@@ -517,8 +544,16 @@ export function TycoonGame({
           localApp.destroy(false, { children: false, texture: false });
         } catch (e) {
           // Suppress common PixiJS cleanup errors that don't affect functionality
+          // These occur when components unmount before PixiJS is fully initialized
+          // or when React's StrictMode causes double-cleanup
           const errorMsg = String(e);
-          if (!errorMsg.includes('_cancelResize') && !errorMsg.includes('textureBatch')) {
+          const suppressedErrors = [
+            '_cancelResize',
+            'textureBatch',
+            'renderer.canvas',
+            'this.renderer',
+          ];
+          if (!suppressedErrors.some(err => errorMsg.includes(err))) {
             console.warn("Error destroying PixiJS app:", e);
           }
         }

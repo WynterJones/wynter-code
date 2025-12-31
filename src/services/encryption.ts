@@ -177,29 +177,6 @@ export async function decrypt(
 }
 
 /**
- * Encrypt a string (convenience wrapper)
- */
-export async function encryptString(
-  text: string,
-  password: string
-): Promise<EncryptedPayload> {
-  const encoder = new TextEncoder();
-  return encrypt(encoder.encode(text), password);
-}
-
-/**
- * Decrypt to a string (convenience wrapper)
- */
-export async function decryptToString(
-  payload: EncryptedPayload,
-  password: string
-): Promise<string> {
-  const decrypted = await decrypt(payload, password);
-  const decoder = new TextDecoder();
-  return decoder.decode(decrypted);
-}
-
-/**
  * Compute SHA-256 hash of data for change detection
  */
 export async function computeDataHash(data: string): Promise<string> {

@@ -89,10 +89,11 @@ export function AutoBuildNewIssuePopup({ onClose }: AutoBuildNewIssuePopupProps)
 
         <div className="flex flex-1 flex-col gap-5 overflow-auto p-5">
           <div>
-            <label className="mb-2 block text-sm font-medium text-text-secondary">
+            <label htmlFor="autobuild-issue-title" className="mb-2 block text-sm font-medium text-text-secondary">
               Title <span className="text-red-400">*</span>
             </label>
             <input
+              id="autobuild-issue-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -104,9 +105,9 @@ export function AutoBuildNewIssuePopup({ onClose }: AutoBuildNewIssuePopupProps)
 
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="mb-2 block text-sm font-medium text-text-secondary">
+              <span className="mb-2 block text-sm font-medium text-text-secondary">
                 Type
-              </label>
+              </span>
               <div className="flex gap-2">
                 {ISSUE_TYPES.map((t) => (
                   <button
@@ -127,10 +128,11 @@ export function AutoBuildNewIssuePopup({ onClose }: AutoBuildNewIssuePopupProps)
             </div>
 
             <div className="w-40">
-              <label className="mb-2 block text-sm font-medium text-text-secondary">
+              <label htmlFor="autobuild-issue-priority" className="mb-2 block text-sm font-medium text-text-secondary">
                 Priority
               </label>
               <select
+                id="autobuild-issue-priority"
                 value={priority}
                 onChange={(e) => setPriority(Number(e.target.value))}
                 className="w-full rounded-lg border border-border bg-bg-secondary px-3 py-2.5 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
@@ -152,11 +154,12 @@ export function AutoBuildNewIssuePopup({ onClose }: AutoBuildNewIssuePopupProps)
           </div>
 
           <div className="flex-1">
-            <label className="mb-2 block text-sm font-medium text-text-secondary">
+            <label htmlFor="autobuild-issue-description" className="mb-2 block text-sm font-medium text-text-secondary">
               Description
               <span className="ml-2 text-xs text-text-secondary/60">(Markdown supported)</span>
             </label>
             <textarea
+              id="autobuild-issue-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the issue in detail...

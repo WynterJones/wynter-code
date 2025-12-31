@@ -8,9 +8,3 @@ export interface Project {
   lastOpenedAt: Date | null;
   createdAt: Date;
 }
-
-export interface ProjectTab {
-  id: string;
-  projectId: string;
-  isActive: boolean;
-}

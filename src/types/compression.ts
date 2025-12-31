@@ -20,8 +20,8 @@ export interface ImageEstimateResult {
 export type CompressionType = "archive" | "image" | "pdf" | "video";
 
 export const OPTIMIZABLE_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"];
-export const OPTIMIZABLE_VIDEO_EXTENSIONS = ["mp4", "mov", "avi", "mkv", "webm"];
-export const OPTIMIZABLE_EXTENSIONS = [
+const OPTIMIZABLE_VIDEO_EXTENSIONS = ["mp4", "mov", "avi", "mkv", "webm"];
+const OPTIMIZABLE_EXTENSIONS = [
   ...OPTIMIZABLE_IMAGE_EXTENSIONS,
   "pdf",
   ...OPTIMIZABLE_VIDEO_EXTENSIONS,

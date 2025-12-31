@@ -8,6 +8,7 @@ import type {
   RadioBrowserFavorite,
 } from "@/types/radio";
 import { NIGHTRIDE_STATIONS } from "@/components/meditation/radioStations";
+import { DEFAULT_SIDEBAR_WIDTH } from "@/lib/constants";
 
 export type EditorTheme =
   | "one-dark"
@@ -34,33 +35,6 @@ export type LightcastHotkey = "alt-space" | "cmd-space" | "ctrl-space" | "cmd-sh
 
 // Claude subscription plan types
 export type ClaudeSubscriptionPlan = "pro" | "max-100" | "max-200";
-
-// Vibrancy material types (macOS NSVisualEffectMaterial)
-export type VibrancyMaterial =
-  | "sidebar"
-  | "window"
-  | "content"
-  | "under-window"
-  | "hud"
-  | "popover"
-  | "menu"
-  | "titlebar"
-  | "dark"
-  | "ultra-dark"
-  | "acrylic"; // Windows only
-
-export const VIBRANCY_MATERIALS: { id: VibrancyMaterial; name: string; description: string }[] = [
-  { id: "sidebar", name: "Sidebar", description: "Default sidebar appearance" },
-  { id: "window", name: "Window", description: "Standard window background" },
-  { id: "content", name: "Content", description: "Content background" },
-  { id: "under-window", name: "Under Window", description: "Behind window content" },
-  { id: "hud", name: "HUD", description: "Heads-up display style" },
-  { id: "popover", name: "Popover", description: "Popover appearance" },
-  { id: "menu", name: "Menu", description: "Menu bar style" },
-  { id: "titlebar", name: "Titlebar", description: "Title bar appearance" },
-  { id: "dark", name: "Dark", description: "Dark vibrant appearance" },
-  { id: "ultra-dark", name: "Ultra Dark", description: "Very dark appearance" },
-];
 
 export const LIGHTCAST_HOTKEYS: { id: LightcastHotkey; name: string; display: string }[] = [
   { id: "alt-space", name: "Option + Space", display: "⌥ Space" },
@@ -239,7 +213,7 @@ export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
       defaultModel: "claude-sonnet-4-20250514",
-      sidebarWidth: 256,
+      sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       sidebarPosition: "right",
       sidebarCollapsed: false,
       sidebarTabOrder: ["files", "modules", "package", "git", "docs", "info"],

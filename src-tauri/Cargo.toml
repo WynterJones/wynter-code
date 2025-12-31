@@ -49,6 +49,15 @@ urlencoding = "2.1"
 url = "2"
 native-tls = "0.2"
 
+# Mobile API server
+axum = { version = "0.7", features = ["ws"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+headers = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }
+mdns-sd = "0.11"
+jsonwebtoken = "9"
+rand = "0.8"
+
 # File compression
 zip = "2.2"
 walkdir = "2"

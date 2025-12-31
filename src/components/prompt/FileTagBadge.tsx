@@ -30,7 +30,7 @@ interface FileTagBadgeProps {
   onRemove: (id: string) => void;
 }
 
-export function FileTagBadge({ file, onRemove }: FileTagBadgeProps) {
+function FileTagBadge({ file, onRemove }: FileTagBadgeProps) {
   const displayPath = truncatePath(file.displayPath);
 
   return (

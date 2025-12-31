@@ -45,10 +45,6 @@ export const NIGHTRIDE_STATIONS: NightrideStationInfo[] = [
   },
 ];
 
-export const DEFAULT_NIGHTRIDE_STATION: NightrideStation = "chillsynth";
-
-export const RADIO_BROWSER_API_BASE = "https://de1.api.radio-browser.info/json";
-
 export function getNightrideStationBySlug(
   slug: NightrideStation
 ): NightrideStationInfo | undefined {

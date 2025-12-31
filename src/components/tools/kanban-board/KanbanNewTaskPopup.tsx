@@ -78,10 +78,11 @@ export function KanbanNewTaskPopup({
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1">
+            <label htmlFor="kanban-task-title" className="block text-xs text-text-secondary mb-1">
               Title
             </label>
             <input
+              id="kanban-task-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -93,10 +94,11 @@ export function KanbanNewTaskPopup({
 
           {/* Description */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1">
+            <label htmlFor="kanban-task-description" className="block text-xs text-text-secondary mb-1">
               Description (optional)
             </label>
             <textarea
+              id="kanban-task-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Add a description..."
@@ -107,11 +109,12 @@ export function KanbanNewTaskPopup({
 
           {/* Priority */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1">
+            <label htmlFor="kanban-task-priority" className="block text-xs text-text-secondary mb-1">
               Priority
             </label>
             <div className="relative">
               <select
+                id="kanban-task-priority"
                 value={priority}
                 onChange={(e) => setPriority(Number(e.target.value) as KanbanPriority)}
                 className="w-full appearance-none bg-bg-tertiary border border-border rounded-md px-3 py-2 pr-8 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-accent"

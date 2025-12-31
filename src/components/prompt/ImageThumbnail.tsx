@@ -13,7 +13,7 @@ interface ImageThumbnailProps {
   onRemove: (id: string) => void;
 }
 
-export function ImageThumbnail({ image, onRemove }: ImageThumbnailProps) {
+function ImageThumbnail({ image, onRemove }: ImageThumbnailProps) {
   return (
     <div
       className={cn(

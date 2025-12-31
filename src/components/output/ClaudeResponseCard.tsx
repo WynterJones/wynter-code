@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Copy, Check } from "lucide-react";
-import { IconButton } from "@/components/ui";
+import { IconButton, useAnnounce } from "@/components/ui";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ToolCallBlock } from "./ToolCallBlock";
 import { ThinkingBlock } from "./ThinkingBlock";
@@ -33,6 +33,18 @@ export function ClaudeResponseCard({
   onReject,
 }: ClaudeResponseCardProps) {
   const [copied, setCopied] = useState(false);
+  const { announce } = useAnnounce();
+  const wasStreamingRef = useRef(false);
+
+  // Announce streaming state changes
+  useEffect(() => {
+    if (isStreaming && !wasStreamingRef.current) {
+      announce("Generating response");
+    } else if (!isStreaming && wasStreamingRef.current && content) {
+      announce("Response complete");
+    }
+    wasStreamingRef.current = isStreaming;
+  }, [isStreaming, content, announce]);
 
   // Parse command response if this is a custom command
   const commandResponse = useMemo(() => {

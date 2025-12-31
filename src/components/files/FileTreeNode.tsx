@@ -24,6 +24,7 @@ interface FileTreeNodeProps {
   selectedPaths?: Set<string>;
   onSelect?: (node: FileNode, shiftKey: boolean) => void;
   allNodes?: FileNode[];
+  focusedPath?: string | null;
 }
 
 export function FileTreeNode({
@@ -39,6 +40,7 @@ export function FileTreeNode({
   selectedPaths,
   onSelect,
   allNodes,
+  focusedPath,
 }: FileTreeNodeProps) {
   const [isHovered, setIsHovered] = useState(false);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -48,6 +50,7 @@ export function FileTreeNode({
   const hoverTargetPath = useDragStore((s) => s.hoverTargetPath);
 
   const isSelected = selectedPaths?.has(node.path) ?? false;
+  const isFocused = focusedPath === node.path;
   const isBeingDragged = isDragging && draggedFiles.some(f => f.path === node.path);
 
   // Compute git status for this node
@@ -196,6 +199,7 @@ export function FileTreeNode({
           "text-sm text-text-primary",
           node.isIgnored && "opacity-50",
           isSelected && "bg-accent/20",
+          isFocused && "ring-1 ring-accent ring-inset",
           // Only highlight the folder being hovered during drag
           hoverTargetPath === node.path && "bg-accent/40 ring-2 ring-accent",
           isBeingDragged && "opacity-40"
@@ -231,7 +235,7 @@ export function FileTreeNode({
       </div>
 
       {node.isExpanded && node.children && (
-        <div>
+        <div role="group">
           {node.children.filter((c) => c.name !== ".DS_Store").map((child) => (
             <FileTreeNode
               key={child.path}
@@ -247,6 +251,7 @@ export function FileTreeNode({
               selectedPaths={selectedPaths}
               onSelect={onSelect}
               allNodes={allNodes}
+              focusedPath={focusedPath}
             />
           ))}
         </div>

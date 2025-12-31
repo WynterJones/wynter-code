@@ -9,10 +9,4 @@ export interface FileNode {
   isIgnored?: boolean;
 }
 
-export interface FileIconProps {
-  name: string;
-  isDirectory: boolean;
-  isExpanded?: boolean;
-}
-
 export type SidebarTab = "files" | "modules" | "package" | "git" | "docs" | "info";

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { handleError } from "@/lib/errorHandler";
 import type {
   BrewPackage,
   BrewSearchResult,
@@ -99,7 +100,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
         set({ brewVersion: version });
       }
     } catch (error) {
-      set({ isBrewInstalled: false, error: String(error) });
+      set({ isBrewInstalled: false, error: handleError(error, "HomebrewStore.checkBrewInstalled") });
     }
   },
 
@@ -110,7 +111,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       const packages = await invoke<BrewPackage[]>("brew_list_installed");
       set({ installedPackages: packages, isLoading: false });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: handleError(error, "HomebrewStore.fetchInstalledPackages"), isLoading: false });
     }
   },
 
@@ -121,7 +122,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       const packages = await invoke<BrewPackage[]>("brew_list_outdated");
       set({ outdatedPackages: packages, isLoading: false });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: handleError(error, "HomebrewStore.fetchOutdatedPackages"), isLoading: false });
     }
   },
 
@@ -137,7 +138,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       const results = await invoke<BrewSearchResult[]>("brew_search", { query });
       set({ searchResults: results, isLoading: false });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: handleError(error, "HomebrewStore.searchPackages"), isLoading: false });
     }
   },
 
@@ -151,7 +152,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       });
       set({ selectedPackage: info, isLoading: false });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: handleError(error, "HomebrewStore.fetchPackageInfo"), isLoading: false });
     }
   },
 
@@ -178,7 +179,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
         return false;
       }
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.installPackage") });
       return false;
     }
   },
@@ -206,7 +207,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
         return false;
       }
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.uninstallPackage") });
       return false;
     }
   },
@@ -236,7 +237,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
         return false;
       }
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.upgradePackage") });
       return false;
     }
   },
@@ -254,7 +255,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       }
       return false;
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.pinPackage") });
       return false;
     }
   },
@@ -272,7 +273,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       }
       return false;
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.unpinPackage") });
       return false;
     }
   },
@@ -293,7 +294,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
         return false;
       }
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.updateBrew") });
       return false;
     }
   },
@@ -306,7 +307,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       set({ isOperating: false, operationMessage: "" });
       return result.stdout;
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.cleanup") });
       return "";
     }
   },
@@ -318,7 +319,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       const taps = await invoke<BrewTap[]>("brew_list_taps");
       set({ taps, isLoading: false });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: handleError(error, "HomebrewStore.fetchTaps"), isLoading: false });
     }
   },
 
@@ -337,7 +338,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
         return false;
       }
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.addTap") });
       return false;
     }
   },
@@ -357,7 +358,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
         return false;
       }
     } catch (error) {
-      set({ isOperating: false, operationMessage: "", error: String(error) });
+      set({ isOperating: false, operationMessage: "", error: handleError(error, "HomebrewStore.removeTap") });
       return false;
     }
   },
@@ -369,7 +370,7 @@ export const useHomebrewStore = create<HomebrewStore>((set, get) => ({
       const result = await invoke<BrewDoctorResult>("brew_doctor");
       set({ doctorResult: result, isLoading: false });
     } catch (error) {
-      set({ error: String(error), isLoading: false });
+      set({ error: handleError(error, "HomebrewStore.runDoctor"), isLoading: false });
     }
   },
 

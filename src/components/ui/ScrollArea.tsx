@@ -1,25 +1,26 @@
 import { HTMLAttributes, forwardRef } from "react";
-import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import { OverlayScrollbarsComponent, OverlayScrollbarsComponentRef } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
+import { SCROLLBAR_AUTO_HIDE_DELAY } from "@/lib/constants";
 import "overlayscrollbars/overlayscrollbars.css";
 
-export interface ScrollAreaProps extends HTMLAttributes<HTMLDivElement> {
+interface ScrollAreaProps extends HTMLAttributes<HTMLDivElement> {
   /** Scrollbar visibility: 'auto' hides when not scrolling, 'visible' always shows, 'hidden' never shows */
   scrollbarVisibility?: "auto" | "visible" | "hidden";
 }
 
-export const ScrollArea = forwardRef<HTMLDivElement, ScrollAreaProps>(
+export const ScrollArea = forwardRef<OverlayScrollbarsComponentRef, ScrollAreaProps>(
   ({ className, children, scrollbarVisibility = "auto", ...props }, ref) => {
     return (
       <OverlayScrollbarsComponent
-        ref={ref as any}
+        ref={ref}
         className={cn("os-theme-custom", className)}
         options={{
           scrollbars: {
             theme: "os-theme-custom",
             visibility: scrollbarVisibility === "hidden" ? "hidden" : "auto",
             autoHide: scrollbarVisibility === "auto" ? "leave" : "never",
-            autoHideDelay: 400,
+            autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
           },
           overflow: {
             x: "scroll",

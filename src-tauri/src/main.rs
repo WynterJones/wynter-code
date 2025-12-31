@@ -7,7 +7,9 @@ mod beads;
 mod claude_process;
 mod codex_process;
 mod gemini_process;
+mod github;
 mod commands;
+mod mobile_api;
 mod cost_popup;
 mod database_viewer;
 mod domain_tools;
@@ -192,6 +194,7 @@ fn main() {
         .manage(Arc::new(mcp_permission_server::McpPermissionManager::new()))
         .manage(Arc::new(file_coordinator::FileCoordinatorManager::new()))
         .manage(Arc::new(audio_proxy::AudioProxyManager::new()))
+        .manage(Arc::new(mobile_api::MobileApiManager::new()))
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -454,6 +457,29 @@ fn main() {
             camera_permission::check_camera_permission,
             camera_permission::request_camera_permission,
             camera_permission::open_camera_privacy_settings,
+            // GitHub Manager
+            github::gh_check_auth,
+            github::gh_list_my_repos,
+            github::gh_list_starred_repos,
+            github::gh_list_orgs,
+            github::gh_list_org_repos,
+            github::gh_search_repos,
+            github::gh_create_repo,
+            github::gh_clone_repo,
+            github::gh_open_auth,
+            github::gh_view_repo,
+            github::gh_get_repo_contents,
+            github::gh_get_file_content,
+            github::gh_edit_repo,
+            github::gh_delete_repo,
+            // Mobile API
+            mobile_api::mobile_api_start,
+            mobile_api::mobile_api_stop,
+            mobile_api::mobile_api_info,
+            mobile_api::mobile_api_generate_pairing_code,
+            mobile_api::mobile_api_verify_pairing,
+            mobile_api::mobile_api_revoke_device,
+            mobile_api::mobile_api_list_devices,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

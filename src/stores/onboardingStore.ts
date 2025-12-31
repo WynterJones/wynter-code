@@ -26,7 +26,7 @@ interface OnboardingStore {
   reset: () => void;
 }
 
-export const ONBOARDING_STEPS = [
+const ONBOARDING_STEPS = [
   { id: 1, name: "Welcome" },
   { id: 2, name: "Features" },
   { id: 3, name: "Workflow" },

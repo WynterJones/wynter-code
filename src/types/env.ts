@@ -24,8 +24,6 @@ export interface EnvFileComparison {
   }[];
 }
 
-export type EnvScope = "global" | "project";
-
 export interface GlobalEnvVariable {
   id: string;
   key: string;

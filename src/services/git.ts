@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { getErrorMessage } from "@/lib/errorHandler";
 
 interface CommandOutput {
   stdout: string;
@@ -37,7 +38,7 @@ async function runGit(args: string[], cwd: string): Promise<CommandOutput> {
   return invoke<CommandOutput>("run_git", { args, cwd });
 }
 
-export interface GitOperationResult {
+interface GitOperationResult {
   success: boolean;
   error?: string;
   hash?: string;
@@ -111,8 +112,8 @@ class GitService {
     try {
       const output = await runGit(["add", filePath], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -120,8 +121,8 @@ class GitService {
     try {
       const output = await runGit(["reset", "HEAD", filePath], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -129,8 +130,8 @@ class GitService {
     try {
       const output = await runGit(["add", "-A"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -138,8 +139,8 @@ class GitService {
     try {
       const output = await runGit(["reset", "HEAD"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -154,8 +155,8 @@ class GitService {
         return { success: true, hash: hashMatch?.[1] };
       }
       return { success: false, error: output.stderr || output.stdout };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -202,8 +203,8 @@ class GitService {
     try {
       const output = await runGit(["fetch"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -240,8 +241,8 @@ class GitService {
       }
       const output = await runGit(args, cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -249,8 +250,8 @@ class GitService {
     try {
       const output = await runGit(["pull"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -260,8 +261,8 @@ class GitService {
     try {
       const output = await runGit(["checkout", branchName], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -269,8 +270,8 @@ class GitService {
     try {
       const output = await runGit(["checkout", "-b", branchName], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -279,8 +280,8 @@ class GitService {
       const flag = force ? "-D" : "-d";
       const output = await runGit(["branch", flag, branchName], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -361,8 +362,8 @@ class GitService {
     try {
       const output = await runGit(["stash", "push", "-m", "autobuild-stash"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 
@@ -370,8 +371,8 @@ class GitService {
     try {
       const output = await runGit(["stash", "pop"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (e) {
-      return { success: false, error: String(e) };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
     }
   }
 

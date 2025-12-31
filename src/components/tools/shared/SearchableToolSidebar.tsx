@@ -11,7 +11,7 @@ export interface ToolItem {
   icon: LucideIcon;
 }
 
-export interface ToolCategory<T extends ToolItem = ToolItem> {
+interface ToolCategory<T extends ToolItem = ToolItem> {
   name: string;
   tools: T[];
 }

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { DEFAULT_TERMINAL_HEIGHT } from "@/lib/constants";
 
 interface TerminalState {
   isOpen: boolean;
@@ -31,11 +32,10 @@ interface TerminalStore {
   reset: () => void;
 }
 
-const DEFAULT_HEIGHT = 200;
 const DEFAULT_STATE: TerminalState = {
   isOpen: false,
   isMaximized: false,
-  height: DEFAULT_HEIGHT,
+  height: DEFAULT_TERMINAL_HEIGHT,
   ptyId: null,
 };
 

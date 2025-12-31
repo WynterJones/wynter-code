@@ -266,9 +266,9 @@ export function TestRunnerPopup({ isOpen, onClose }: TestRunnerPopupProps) {
     <div className="flex-1 flex flex-col p-4">
       {/* Framework Selector */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-text-secondary mb-2">
+        <span className="block text-sm font-medium text-text-secondary mb-2">
           Select Test Framework
-        </label>
+        </span>
         <div className="flex flex-wrap gap-2">
           {frameworks.map((framework) => {
             const Icon = framework.icon;
@@ -298,7 +298,7 @@ export function TestRunnerPopup({ isOpen, onClose }: TestRunnerPopupProps) {
       {/* Command Preview */}
       {selectedFramework && (
         <div className="mb-4">
-          <label className="block text-sm font-medium text-text-secondary mb-2">Command</label>
+          <span className="block text-sm font-medium text-text-secondary mb-2">Command</span>
           <code className="block px-3 py-2 rounded-md bg-bg-tertiary text-text-secondary text-sm font-mono">
             {selectedFramework.command}
           </code>

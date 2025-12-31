@@ -29,6 +29,57 @@ function getShellPath(shell: TerminalShell): string | null {
   return shellConfig?.path ?? null;
 }
 
+/**
+ * Safely load an xterm addon with fallback handling
+ * Returns true if addon loaded successfully
+ */
+function tryLoadAddon(
+  term: XTerm | null,
+  addon: { activate(terminal: XTerm): void; dispose(): void },
+  addonName: string,
+  onSuccess?: () => void
+): boolean {
+  if (!term) return false;
+  try {
+    term.loadAddon(addon);
+    onSuccess?.();
+    return true;
+  } catch (e) {
+    console.warn(`${addonName} addon failed to load:`, e);
+    return false;
+  }
+}
+
+/**
+ * Wait for container to have valid dimensions
+ * Resolves when container has width/height > 0 or when cleanup is called
+ */
+function waitForDimensions(
+  containerRef: React.RefObject<HTMLDivElement | null>,
+  fitAddon: FitAddon,
+  isActiveRef: { current: boolean }
+): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      if (!isActiveRef.current) {
+        resolve();
+        return;
+      }
+      const container = containerRef.current;
+      if (container) {
+        const { width, height } = container.getBoundingClientRect();
+        if (width > 0 && height > 0) {
+          fitAddon.fit();
+          resolve();
+          return;
+        }
+      }
+      requestAnimationFrame(check);
+    };
+    requestAnimationFrame(check);
+  });
+}
+
 interface TerminalProps {
   projectPath: string;
   ptyId: string | null;
@@ -162,64 +213,36 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     // Wait for fonts to be ready, then fit, focus, and load GPU renderer
     const initializeTerminal = async () => {
       // Wait for document fonts to be ready for proper character width calculation
-      try {
-        await document.fonts.ready;
-      } catch (e) {
-        // Font API not available, continue anyway
-        console.debug("Font API not available:", e);
-      }
-
+      await document.fonts.ready.catch(() => {});
       if (!isActive) return;
 
       // Small delay to ensure DOM is fully rendered and terminal is ready
       initRafId = requestAnimationFrame(() => {
-        // Double-check we're still active and terminal exists
         if (!isActive) return;
-
         const currentTerm = xtermRef.current;
         const currentFitAddon = fitAddonRef.current;
         if (!currentTerm || !currentFitAddon) return;
 
-        // Load GPU-accelerated renderer after terminal is fully ready
-        // This must happen after open() and after DOM is rendered
-        // Wrap in try-catch to handle disposed terminal edge cases
-        try {
-          // Check if terminal is disposed before loading addon
-          if (!isActive) return;
-
-          const webglAddon = new WebglAddon();
-          webglAddon.onContextLoss(() => {
-            // Only handle context loss if terminal is still active
-            if (isActive && xtermRef.current) {
-              handleWebGLContextLoss(xtermRef.current);
-            }
-          });
-          currentTerm.loadAddon(webglAddon);
-          webglAddonRef.current = webglAddon;
-        } catch (e) {
-          // Could be WebGL2 not supported OR terminal disposed
-          if (!isActive) return;
-          console.warn("WebGL2 not available, falling back to Canvas renderer:", e);
-
-          // Fall back to canvas renderer for better performance than default DOM
-          try {
-            if (!isActive || !xtermRef.current) return;
-            const canvasAddon = new CanvasAddon();
-            xtermRef.current.loadAddon(canvasAddon);
-          } catch (canvasError) {
-            // Terminal might be disposed, just ignore
-            if (isActive) {
-              console.warn("Canvas addon failed, using default DOM renderer:", canvasError);
-            }
+        // Load GPU-accelerated renderer (WebGL > Canvas > DOM fallback)
+        const webglAddon = new WebglAddon();
+        webglAddon.onContextLoss(() => {
+          if (isActive && xtermRef.current) {
+            handleWebGLContextLoss(xtermRef.current);
           }
+        });
+
+        const webglLoaded = tryLoadAddon(currentTerm, webglAddon, "WebGL", () => {
+          webglAddonRef.current = webglAddon;
+        });
+
+        if (!webglLoaded && isActive) {
+          tryLoadAddon(currentTerm, new CanvasAddon(), "Canvas");
         }
 
-        // Final check before fit/focus
+        // Final fit and focus
         if (!isActive || !xtermRef.current || !fitAddonRef.current) return;
         fitAddonRef.current.fit();
         xtermRef.current.focus();
-
-        // Mark terminal as ready to show (triggers fade-in)
         setIsReady(true);
       });
     };
@@ -227,53 +250,20 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     initializeTerminal();
 
     // Create or attach to PTY
+    const isActiveRef = { current: isActive };
     const initPty = async () => {
-      // If cleanup already ran, don't proceed
-      if (!isActive) return;
+      if (!isActiveRef.current) return;
 
-      // Wait for fonts to be ready for proper character width calculation
-      try {
-        await document.fonts.ready;
-      } catch {
-        // Font API not available, continue anyway
-      }
+      // Wait for fonts and container dimensions
+      await document.fonts.ready.catch(() => {});
+      if (!isActiveRef.current) return;
 
-      if (!isActive) return;
-
-      // Wait for container to have proper dimensions before creating PTY
-      // This ensures the shell starts with the correct COLUMNS/LINES
-      const waitForDimensions = (): Promise<void> => {
-        return new Promise((resolve) => {
-          const check = () => {
-            if (!isActive) {
-              resolve();
-              return;
-            }
-            const container = terminalRef.current;
-            if (container) {
-              const { width, height } = container.getBoundingClientRect();
-              if (width > 0 && height > 0) {
-                // Container ready - fit terminal to get correct cols/rows
-                fitAddon.fit();
-                resolve();
-                return;
-              }
-            }
-            // Container not ready, try again next frame
-            requestAnimationFrame(check);
-          };
-          requestAnimationFrame(check);
-        });
-      };
-
-      await waitForDimensions();
-      if (!isActive) return;
+      await waitForDimensions(terminalRef, fitAddon, isActiveRef);
+      if (!isActiveRef.current) return;
 
       try {
-        // Use initial values from refs - these won't change during the effect lifecycle
         let id = initialPtyId.current;
         if (!id) {
-          // Now term.cols and term.rows have the correct fitted values
           id = await invoke<string>("create_pty", {
             cwd: initialProjectPath.current,
             cols: term.cols,
@@ -281,56 +271,42 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
             shell: initialShellPath.current,
           });
 
-          // Check again after async call
-          if (!isActive) {
-            // Cleanup was called while we were creating PTY, close it
+          if (!isActiveRef.current) {
             invoke("close_pty", { ptyId: id }).catch(() => {});
             return;
           }
-
           onPtyCreatedRef.current(id);
         }
 
-        // Check again before setting up listener
-        if (!isActive) return;
+        if (!isActiveRef.current) return;
 
         // Listen for PTY output
-        unlisten = await listen<{ ptyId: string; data: string }>(
-          "pty-output",
-          (event) => {
-            if (!isActive) return;
-            if (event.payload.ptyId === id && xtermRef.current) {
-              xtermRef.current.write(event.payload.data);
-            }
+        unlisten = await listen<{ ptyId: string; data: string }>("pty-output", (event) => {
+          if (isActiveRef.current && event.payload.ptyId === id && xtermRef.current) {
+            xtermRef.current.write(event.payload.data);
           }
-        );
+        });
 
-        // Check if cleanup was called while setting up listener
-        if (!isActive && unlisten) {
+        if (!isActiveRef.current && unlisten) {
           unlisten();
           unlisten = null;
           return;
         }
 
-        // Send input to PTY
+        // Wire up input and resize handlers
         term.onData((data) => {
-          if (isActive && id) {
-            invoke("write_pty", { ptyId: id, data });
-          }
+          if (isActiveRef.current && id) invoke("write_pty", { ptyId: id, data });
         });
 
-        // Handle resize
         term.onResize(({ cols, rows }) => {
-          if (isActive && id) {
-            invoke("resize_pty", { ptyId: id, cols, rows });
-          }
+          if (isActiveRef.current && id) invoke("resize_pty", { ptyId: id, cols, rows });
         });
 
-        // Do a few extra fits after initialization to catch any layout shifts
-        setTimeout(() => { if (isActive) fitAddon.fit(); }, 100);
-        setTimeout(() => { if (isActive) fitAddon.fit(); }, 300);
+        // Extra fits to catch layout shifts
+        setTimeout(() => { if (isActiveRef.current) fitAddon.fit(); }, 100);
+        setTimeout(() => { if (isActiveRef.current) fitAddon.fit(); }, 300);
       } catch (error) {
-        if (isActive) {
+        if (isActiveRef.current) {
           term.writeln(`\x1b[31mFailed to initialize terminal: ${error}\x1b[0m`);
         }
       }
@@ -341,6 +317,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     return () => {
       // Mark as inactive FIRST - this prevents any pending callbacks from proceeding
       isActive = false;
+      isActiveRef.current = false;
 
       // Cancel pending animation frame to prevent WebGL loading on disposed terminal
       if (initRafId !== null) {
@@ -380,9 +357,6 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       fitAddonRef.current = null;
       searchAddonRef.current = null;
     };
-    // Empty dependency array - effect only runs once on mount
-    // Uses refs to capture initial values
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleWebGLContextLoss]);
 
   useEffect(() => {

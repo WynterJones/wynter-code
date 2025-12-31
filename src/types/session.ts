@@ -65,13 +65,6 @@ export interface ToolCall {
   isError?: boolean; // Tool execution resulted in error
 }
 
-export interface StreamingChunk {
-  type: "text" | "tool_use" | "tool_result" | "init" | "result" | "error" | "done" | "assistant";
-  content?: string;
-  toolCall?: ToolCall;
-  sessionId?: string;
-}
-
 export type PermissionMode = "default" | "plan" | "acceptEdits" | "bypassPermissions" | "manual";
 
 export type ResultSubtype = 'success' | 'error_max_turns' | 'error_during_execution';
@@ -122,22 +115,9 @@ export interface StreamingStats {
   isError?: boolean;
 }
 
-export interface ToolApproval {
-  toolId: string;
-  toolName: string;
-  toolInput: Record<string, unknown>;
-  status: "pending" | "approved" | "rejected";
-}
-
 export interface McpPermissionRequest {
   id: string;
   toolName: string;
   input: Record<string, unknown>;
   sessionId: string;
-}
-
-export interface McpPermissionResponse {
-  behavior: "allow" | "deny";
-  updatedInput?: Record<string, unknown>;
-  message?: string;
 }

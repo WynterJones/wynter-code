@@ -63,16 +63,3 @@ export function getModelLimits(provider: AIProvider, model: string): ModelLimits
   return PROVIDER_DEFAULTS[provider];
 }
 
-/**
- * Get the input context limit for a model.
- */
-export function getInputLimit(provider: AIProvider, model: string): number {
-  return getModelLimits(provider, model).input;
-}
-
-/**
- * Get the output limit for a model.
- */
-export function getOutputLimit(provider: AIProvider, model: string): number {
-  return getModelLimits(provider, model).output;
-}

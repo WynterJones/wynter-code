@@ -288,13 +288,12 @@ export function FileBrowserPopup({
     }
   }, [getSelectedFile, onSelectFile, onClose]);
 
-  const handleCreateFile = useCallback(() => {
-    setDialog({ type: "file", parentPath: currentPath });
+  const openCreateDialog = useCallback((type: "file" | "folder") => {
+    setDialog({ type, parentPath: currentPath });
   }, [currentPath]);
 
-  const handleCreateFolder = useCallback(() => {
-    setDialog({ type: "folder", parentPath: currentPath });
-  }, [currentPath]);
+  const handleCreateFile = useCallback(() => openCreateDialog("file"), [openCreateDialog]);
+  const handleCreateFolder = useCallback(() => openCreateDialog("folder"), [openCreateDialog]);
 
   const handleDialogConfirm = useCallback(async (name: string) => {
     if (!dialog) return;
@@ -462,12 +461,14 @@ export function FileBrowserPopup({
     return items;
   }, [contextMenu, selectedPaths, mode, currentPath, navigateTo, onSelectProject, onSendToPrompt, onClose, deleteToTrash, createArchive, optimizeFile, refetchGitStatus]);
 
-  const selectPrevious = useCallback((extend: boolean = false) => {
+  // Unified navigation handler for keyboard selection
+  const selectInDirection = useCallback((direction: "up" | "down", extend: boolean = false) => {
     const sortedFiles = getSortedFiles();
     if (sortedFiles.length === 0) return;
 
+    // Default selection when nothing is selected
     if (selectedPaths.size === 0) {
-      const file = sortedFiles[sortedFiles.length - 1];
+      const file = direction === "up" ? sortedFiles[sortedFiles.length - 1] : sortedFiles[0];
       setSelectedPaths(new Set([file.path]));
       setLastSelectedPath(file.path);
       return;
@@ -475,8 +476,10 @@ export function FileBrowserPopup({
 
     const currentPath = lastSelectedPath || Array.from(selectedPaths)[0];
     const currentIndex = sortedFiles.findIndex((f) => f.path === currentPath);
-    if (currentIndex > 0) {
-      const newFile = sortedFiles[currentIndex - 1];
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+    if (nextIndex >= 0 && nextIndex < sortedFiles.length) {
+      const newFile = sortedFiles[nextIndex];
       if (extend) {
         const newSelection = new Set(selectedPaths);
         newSelection.add(newFile.path);
@@ -488,31 +491,8 @@ export function FileBrowserPopup({
     }
   }, [getSortedFiles, selectedPaths, lastSelectedPath]);
 
-  const selectNext = useCallback((extend: boolean = false) => {
-    const sortedFiles = getSortedFiles();
-    if (sortedFiles.length === 0) return;
-
-    if (selectedPaths.size === 0) {
-      const file = sortedFiles[0];
-      setSelectedPaths(new Set([file.path]));
-      setLastSelectedPath(file.path);
-      return;
-    }
-
-    const currentPath = lastSelectedPath || Array.from(selectedPaths)[0];
-    const currentIndex = sortedFiles.findIndex((f) => f.path === currentPath);
-    if (currentIndex < sortedFiles.length - 1) {
-      const newFile = sortedFiles[currentIndex + 1];
-      if (extend) {
-        const newSelection = new Set(selectedPaths);
-        newSelection.add(newFile.path);
-        setSelectedPaths(newSelection);
-      } else {
-        setSelectedPaths(new Set([newFile.path]));
-      }
-      setLastSelectedPath(newFile.path);
-    }
-  }, [getSortedFiles, selectedPaths, lastSelectedPath]);
+  const selectPrevious = useCallback((extend: boolean = false) => selectInDirection("up", extend), [selectInDirection]);
+  const selectNext = useCallback((extend: boolean = false) => selectInDirection("down", extend), [selectInDirection]);
 
   useEffect(() => {
     if (!isOpen) return;

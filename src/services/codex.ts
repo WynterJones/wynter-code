@@ -2,14 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import type { StreamChunk, CodexModel, StreamingStats, PermissionMode, ImageAttachment } from "@/types";
 
-export interface CodexSessionInfo {
+interface CodexSessionInfo {
   model?: string;
   providerSessionId?: string; // thread_id for Codex
   tools?: string[];
   cwd?: string;
 }
 
-export interface CodexSessionCallbacks {
+interface CodexSessionCallbacks {
   onSessionStarting: () => void;
   onSessionReady: (info: CodexSessionInfo) => void;
   onSessionEnded: (reason: string) => void;

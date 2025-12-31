@@ -124,6 +124,11 @@ commands:
 agents:
     @echo "{{project_root}}/.claude/agents" && cd {{project_root}}/.claude/agents
 
+# Go to mobile app
+mobile:
+    @echo "Opening mobile app: /Users/wynterjones/Work/SYSTEM/wynter-code-mobile"
+    @cd /Users/wynterjones/Work/SYSTEM/wynter-code-mobile && pwd
+
 # ============================================
 # APP TOOLS
 # ============================================

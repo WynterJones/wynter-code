@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import type { StreamChunk, ClaudeModel, StreamingStats, PermissionMode, McpPermissionRequest, StructuredPrompt } from "@/types";
 
-export interface McpPermissionEvent {
+interface McpPermissionEvent {
   request: McpPermissionRequest;
 }
 

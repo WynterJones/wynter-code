@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { STORYBOOK_DEFAULT_PORT } from "@/lib/constants";
 
 export type StorybookStatus =
   | "idle"
@@ -37,7 +38,7 @@ export const useStorybookStore = create<StorybookStore>()(
   persist(
     (set, get) => ({
       servers: [],
-      preferredPort: 6006,
+      preferredPort: STORYBOOK_DEFAULT_PORT,
 
       setServers: (servers) => set({ servers }),
 
@@ -67,7 +68,7 @@ export const useStorybookStore = create<StorybookStore>()(
       reset: () => {
         set({
           servers: [],
-          preferredPort: 6006,
+          preferredPort: STORYBOOK_DEFAULT_PORT,
         });
       },
     }),

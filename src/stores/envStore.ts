@@ -3,34 +3,9 @@ import { persist } from "zustand/middleware";
 import { invoke } from "@tauri-apps/api/core";
 import { v4 as uuid } from "uuid";
 import type { GlobalEnvVariable } from "@/types";
+import { isSensitiveKey } from "@/lib/sensitiveKeyDetection";
 
-const SENSITIVE_KEY_PATTERNS = [
-  /api[_-]?key/i,
-  /secret/i,
-  /password/i,
-  /pass(?:wd)?$/i,
-  /token/i,
-  /private[_-]?key/i,
-  /auth/i,
-  /credential/i,
-  /database[_-]?url/i,
-  /connection[_-]?string/i,
-  /^aws[_-]/i,
-  /^stripe[_-]/i,
-  /^github[_-]?token/i,
-  /^npm[_-]?token/i,
-  /^openai/i,
-  /^anthropic/i,
-  /^supabase/i,
-  /^redis/i,
-  /^mongo/i,
-  /^postgres/i,
-  /^mysql/i,
-];
-
-export function detectSensitive(key: string): boolean {
-  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(key));
-}
+export { isSensitiveKey as detectSensitive };
 
 interface EnvStore {
   globalVariables: GlobalEnvVariable[];
@@ -65,7 +40,7 @@ export const useEnvStore = create<EnvStore>()(
           id: uuid(),
           key,
           value,
-          isSensitive: isSensitive ?? detectSensitive(key),
+          isSensitive: isSensitive ?? isSensitiveKey(key),
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };

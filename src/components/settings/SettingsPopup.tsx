@@ -1,4 +1,4 @@
-import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe, Sparkles, Bot, Check, Download } from "lucide-react";
+import { X, Code, Info, FolderOpen, Keyboard, Music, FileText, Archive, TerminalSquare, UserCircle, HardDrive, Sprout, ExternalLink, CloudUpload, Zap, RefreshCw, Github, Globe, Sparkles, Bot, Check, Download, Smartphone } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
@@ -23,11 +23,12 @@ import { DataManagementTab } from "./DataManagementTab";
 import { WebBackupTab } from "./WebBackupTab";
 import { LightcastTab } from "./LightcastTab";
 import { VibrancyTab } from "./VibrancyTab";
+import { MobileCompanionTab } from "./MobileCompanionTab";
 import { RadioSourceSelector } from "@/components/meditation/RadioSourceSelector";
 import { NightrideStationSelector } from "@/components/meditation/NightrideStationSelector";
 import { RadioBrowserSearch } from "@/components/meditation/RadioBrowserSearch";
 
-type SettingsTab = "general" | "vibrancy" | "lightcast" | "editor" | "markdown" | "music" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "providers" | "farmwork" | "about";
+type SettingsTab = "general" | "vibrancy" | "lightcast" | "mobile" | "editor" | "markdown" | "music" | "compression" | "terminal" | "keyboard" | "avatar" | "data" | "backup" | "providers" | "farmwork" | "about";
 
 interface SettingsPopupProps {
   onClose: () => void;
@@ -90,6 +91,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     { id: "general", label: "General", icon: FolderOpen },
     { id: "vibrancy", label: "Vibrancy", icon: Sparkles },
     { id: "lightcast", label: "Lightcast", icon: Zap },
+    { id: "mobile", label: "Mobile", icon: Smartphone },
     { id: "editor", label: "Editor", icon: Code },
     { id: "markdown", label: "Markdown", icon: FileText },
     { id: "music", label: "Music", icon: Music },
@@ -147,6 +149,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
             <div className="p-6">
               {activeTab === "lightcast" && <LightcastTab />}
               {activeTab === "vibrancy" && <VibrancyTab />}
+              {activeTab === "mobile" && <MobileCompanionTab />}
               {activeTab === "general" && (
                 <GeneralSettings
                   defaultBrowsePath={defaultBrowsePath}
@@ -294,7 +297,7 @@ function EditorSettings({
       {/* Word Wrap */}
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-text-primary">
+          <label htmlFor="editor-word-wrap" className="text-sm font-medium text-text-primary">
             Word Wrap
           </label>
           <p className="text-xs text-text-secondary">
@@ -302,6 +305,9 @@ function EditorSettings({
           </p>
         </div>
         <button
+          id="editor-word-wrap"
+          role="switch"
+          aria-checked={wordWrap}
           onClick={() => onWordWrapChange(!wordWrap)}
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
@@ -320,7 +326,7 @@ function EditorSettings({
       {/* Minimap */}
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-text-primary">
+          <label htmlFor="editor-minimap" className="text-sm font-medium text-text-primary">
             Minimap
           </label>
           <p className="text-xs text-text-secondary">
@@ -328,6 +334,9 @@ function EditorSettings({
           </p>
         </div>
         <button
+          id="editor-minimap"
+          role="switch"
+          aria-checked={minimap}
           onClick={() => onMinimapChange(!minimap)}
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
@@ -480,7 +489,7 @@ function GeneralSettings({
         {/* Compact Project Tabs */}
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="compact-tabs" className="text-sm font-medium text-text-primary">
               Compact Tabs
             </label>
             <p className="text-xs text-text-secondary">
@@ -488,6 +497,9 @@ function GeneralSettings({
             </p>
           </div>
           <button
+            id="compact-tabs"
+            role="switch"
+            aria-checked={compactProjectTabs}
             onClick={() => onCompactProjectTabsChange(!compactProjectTabs)}
             className={cn(
               "w-11 h-6 rounded-full transition-colors relative",
@@ -506,7 +518,7 @@ function GeneralSettings({
         {/* Dim Inactive Projects */}
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="dim-inactive" className="text-sm font-medium text-text-primary">
               Dim Inactive Projects
             </label>
             <p className="text-xs text-text-secondary">
@@ -514,6 +526,9 @@ function GeneralSettings({
             </p>
           </div>
           <button
+            id="dim-inactive"
+            role="switch"
+            aria-checked={dimInactiveProjects}
             onClick={() => onDimInactiveProjectsChange(!dimInactiveProjects)}
             className={cn(
               "w-11 h-6 rounded-full transition-colors relative",
@@ -543,7 +558,7 @@ function GeneralSettings({
         {/* Auto Open Mini Player */}
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="auto-farmwork-player" className="text-sm font-medium text-text-primary">
               Auto-open Mini Player
             </label>
             <p className="text-xs text-text-secondary">
@@ -551,6 +566,9 @@ function GeneralSettings({
             </p>
           </div>
           <button
+            id="auto-farmwork-player"
+            role="switch"
+            aria-checked={autoOpenFarmworkMiniPlayer}
             onClick={() => onAutoOpenFarmworkMiniPlayerChange(!autoOpenFarmworkMiniPlayer)}
             className={cn(
               "w-11 h-6 rounded-full transition-colors relative",
@@ -576,7 +594,7 @@ function GeneralSettings({
         {/* Safe Mode Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="claude-safe-mode" className="text-sm font-medium text-text-primary">
               Safe Mode
             </label>
             <p className="text-xs text-text-secondary">
@@ -584,6 +602,9 @@ function GeneralSettings({
             </p>
           </div>
           <button
+            id="claude-safe-mode"
+            role="switch"
+            aria-checked={claudeSafeMode}
             onClick={() => onClaudeSafeModeChange(!claudeSafeMode)}
             className={cn(
               "w-11 h-6 rounded-full transition-colors relative",
@@ -608,7 +629,7 @@ function GeneralSettings({
 
         <div className="flex items-center justify-between">
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="launch-startup" className="text-sm font-medium text-text-primary">
               Launch at Startup
             </label>
             <p className="text-xs text-text-secondary">
@@ -616,6 +637,9 @@ function GeneralSettings({
             </p>
           </div>
           <button
+            id="launch-startup"
+            role="switch"
+            aria-checked={launchAtStartup}
             onClick={() => handleAutostartChange(!launchAtStartup)}
             disabled={autostartStatus === "loading"}
             className={cn(
@@ -703,7 +727,7 @@ function GeneralSettings({
 
       {/* Default Browse Path */}
       <div className="space-y-2">
-        <label className="text-sm font-medium text-text-primary">
+        <label htmlFor="default-browse-path" className="text-sm font-medium text-text-primary">
           Default Browse Path
         </label>
         <p className="text-xs text-text-secondary mb-2">
@@ -711,6 +735,7 @@ function GeneralSettings({
         </p>
         <div className="flex gap-2">
           <input
+            id="default-browse-path"
             type="text"
             value={defaultBrowsePath}
             onChange={(e) => onDefaultBrowsePathChange(e.target.value)}
@@ -953,7 +978,7 @@ function TerminalSettings({
       {/* Cursor Blink */}
       <div className="flex items-center justify-between">
         <div>
-          <label className="text-sm font-medium text-text-primary">
+          <label htmlFor="terminal-cursor-blink" className="text-sm font-medium text-text-primary">
             Cursor Blink
           </label>
           <p className="text-xs text-text-secondary">
@@ -961,6 +986,9 @@ function TerminalSettings({
           </p>
         </div>
         <button
+          id="terminal-cursor-blink"
+          role="switch"
+          aria-checked={terminalCursorBlink}
           onClick={() => onTerminalCursorBlinkChange(!terminalCursorBlink)}
           className={cn(
             "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",

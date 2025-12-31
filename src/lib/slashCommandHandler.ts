@@ -14,7 +14,7 @@ import { LOCAL_ONLY_COMMANDS, CUSTOM_UI_COMMANDS } from "@/types/slashCommandRes
 /**
  * All commands with custom handling
  */
-export const ALL_CUSTOM_COMMANDS: CustomHandledCommand[] = [
+const ALL_CUSTOM_COMMANDS: CustomHandledCommand[] = [
   ...LOCAL_ONLY_COMMANDS,
   ...CUSTOM_UI_COMMANDS,
 ];
@@ -25,13 +25,6 @@ export const ALL_CUSTOM_COMMANDS: CustomHandledCommand[] = [
 export function extractCommandName(prompt: string): string | null {
   const match = prompt.trim().match(/^\/(\w+)/);
   return match ? match[1].toLowerCase() : null;
-}
-
-/**
- * Check if a prompt is a slash command
- */
-export function isSlashCommand(prompt: string): boolean {
-  return prompt.trim().startsWith("/");
 }
 
 /**
@@ -341,4 +334,4 @@ function parseTodosResponse(text: string): SlashCommandResponse | null {
 }
 
 // Re-export types for convenience
-export type { CustomHandledCommand, SlashCommandResponse };
+;

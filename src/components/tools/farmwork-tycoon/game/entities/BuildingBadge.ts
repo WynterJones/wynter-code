@@ -61,7 +61,9 @@ export class BuildingBadge extends Badge {
     if (this.buildingType === "garden" || this.buildingType === "compost" || this.buildingType === "office") {
       return `${Math.floor(score)}`;
     }
-    return `${score.toFixed(1)}/10`;
+    // Show whole numbers without decimals (10 not 10.0), but keep decimals for fractions (6.5)
+    const scoreStr = score % 1 === 0 ? score.toString() : score.toFixed(1);
+    return `${scoreStr}/10`;
   }
 
   private drawBuildingBadge(): void {

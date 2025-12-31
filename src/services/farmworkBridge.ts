@@ -74,7 +74,7 @@ class FarmworkBridge {
     if (isSubagent) {
       // Route to specific building based on agent type
       const buildingId = this.getBuildingForSubagent(toolName);
-      const vehicleId = store.spawnVehicle(buildingId);
+      const vehicleId = store.spawnVehicle({ destination: buildingId });
       this.toolVehicleMap.set(toolId, vehicleId);
 
       // Add activity event
@@ -91,10 +91,10 @@ class FarmworkBridge {
       let vehicleId: string;
       if (alsoVisitFarmhouse) {
         // Route: office (Home) -> farmhouse
-        vehicleId = store.spawnVehicleWithTintAndRoute(["office", "farmhouse"], tint);
+        vehicleId = store.spawnVehicle({ route: ["office", "farmhouse"], tint });
       } else {
         // Route: just office (Home)
-        vehicleId = store.spawnVehicleWithTintAndRoute(["office"], tint);
+        vehicleId = store.spawnVehicle({ route: ["office"], tint });
       }
       this.toolVehicleMap.set(toolId, vehicleId);
 

@@ -4,6 +4,7 @@ import type {
   PreviewServerInfo,
   ProjectDetectionResult,
 } from "@/types/livepreview";
+import { LIVE_PREVIEW_DEFAULT_PORT } from "@/lib/constants";
 
 interface LivePreviewStore {
   servers: PreviewServerInfo[];
@@ -35,7 +36,7 @@ export const useLivePreviewStore = create<LivePreviewStore>()(
     (set) => ({
       servers: [],
       detectionResult: null,
-      preferredPort: 9876,
+      preferredPort: LIVE_PREVIEW_DEFAULT_PORT,
       autoOpenBrowser: true,
       showQRByDefault: false,
       expandedServerId: null,
@@ -95,7 +96,7 @@ export const useLivePreviewStore = create<LivePreviewStore>()(
         set({
           servers: [],
           detectionResult: null,
-          preferredPort: 9876,
+          preferredPort: LIVE_PREVIEW_DEFAULT_PORT,
           autoOpenBrowser: true,
           showQRByDefault: false,
           expandedServerId: null,

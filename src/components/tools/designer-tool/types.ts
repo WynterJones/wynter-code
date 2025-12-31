@@ -95,13 +95,3 @@ export interface GeneratedImage {
   width: number;
   height: number;
 }
-
-export interface DesignerToolState {
-  prompt: string;
-  selectedPresetId: string;
-  negativePrompt: string;
-  isGenerating: boolean;
-  generatedImage: GeneratedImage | null;
-  error: string | null;
-  history: GeneratedImage[];
-}

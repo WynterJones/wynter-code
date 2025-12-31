@@ -19,15 +19,3 @@ export function ProviderDropdown({ provider, projectPath }: ProviderDropdownProp
       return <ClaudeDropdown projectPath={projectPath} />;
   }
 }
-
-export function getProviderManagerLabel(provider: AIProvider): string {
-  switch (provider) {
-    case "codex":
-      return "Codex Manager";
-    case "gemini":
-      return "Gemini Manager";
-    case "claude":
-    default:
-      return "Claude Code Manager";
-  }
-}

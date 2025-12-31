@@ -157,7 +157,7 @@ export function WebBackupTab() {
             <CloudOff className="w-5 h-5 text-text-secondary" />
           )}
           <div>
-            <label className="text-sm font-medium text-text-primary">
+            <label htmlFor="enable-web-backup" className="text-sm font-medium text-text-primary">
               Enable Web Backup
             </label>
             <p className="text-xs text-text-secondary">
@@ -166,6 +166,9 @@ export function WebBackupTab() {
           </div>
         </div>
         <button
+          id="enable-web-backup"
+          role="switch"
+          aria-checked={enabled}
           onClick={() => setEnabled(!enabled)}
           className={cn(
             "w-11 h-6 rounded-full transition-colors relative",
@@ -190,10 +193,11 @@ export function WebBackupTab() {
             </h3>
 
             <div className="space-y-2">
-              <label className="text-sm text-text-secondary">API Token</label>
+              <label htmlFor="netlify-api-token" className="text-sm text-text-secondary">API Token</label>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
                   <input
+                    id="netlify-api-token"
                     type={showToken ? "text" : "password"}
                     value={tokenInput}
                     onChange={(e) => setTokenInput(e.target.value)}
@@ -420,7 +424,7 @@ export function WebBackupTab() {
                 {/* Backup on close */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <label className="text-sm font-medium text-text-primary">
+                    <label htmlFor="backup-on-close" className="text-sm font-medium text-text-primary">
                       Backup on app close
                     </label>
                     <p className="text-xs text-text-secondary">
@@ -428,6 +432,9 @@ export function WebBackupTab() {
                     </p>
                   </div>
                   <button
+                    id="backup-on-close"
+                    role="switch"
+                    aria-checked={backupOnClose}
                     onClick={() => setBackupOnClose(!backupOnClose)}
                     className={cn(
                       "w-11 h-6 rounded-full transition-colors relative",
@@ -506,10 +513,11 @@ export function WebBackupTab() {
                   )}
 
                   <div className="space-y-2">
-                    <label className="text-xs text-text-secondary">
+                    <label htmlFor="backup-password" className="text-xs text-text-secondary">
                       Backup password (entered each time, never stored)
                     </label>
                     <input
+                      id="backup-password"
                       type="password"
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}

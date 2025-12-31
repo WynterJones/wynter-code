@@ -1,8 +1,8 @@
 import { create } from "zustand";
 
-export type PopupType = "editor" | "markdown";
+type PopupType = "editor" | "markdown";
 
-export interface MinimizedPopup {
+interface MinimizedPopup {
   id: string;
   filePath: string;
   fileName: string;
