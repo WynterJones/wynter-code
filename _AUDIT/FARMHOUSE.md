@@ -3,8 +3,8 @@
 > Central command for the Farmwork agentic harness.
 > Updated automatically by `the-farmer` agent during `/push` or via "open the farm" phrase.
 
-**Last Updated:** 2025-12-26
-**Score:** 7.5/10
+**Last Updated:** 2025-12-31
+**Score:** 8/10
 **Status:** Active development
 
 ---
@@ -15,11 +15,11 @@
 |--------|-------|
 | Commands | 1 |
 | Agents | 14 |
-| Justfile Recipes | 37 |
-| Test Files | 90 |
-| Completed Issues | 77 |
-| Plans | 3 |
-| Audit Docs | 8 |
+| Justfile Recipes | 39 |
+| Test Files | 147 |
+| Completed Issues | 329 |
+| Plans | 7 |
+| Audit Docs | 9 |
 
 ---
 
@@ -27,16 +27,16 @@
 
 | Category | Count |
 |----------|-------|
-| TSX Components | 322 |
-| TypeScript Files | 168 |
-| Rust Files | 69 |
-| Lines of TS/TSX | ~87,500 |
-| Lines of Rust | ~10,700 |
-| Zustand Stores | 30 |
-| Custom Hooks | 13 |
-| Services | 9 |
-| Dependencies | 44 |
-| Dev Dependencies | 13 |
+| TSX Components | 378 |
+| TypeScript Files | 215 |
+| Rust Files | 48 |
+| Lines of TS/TSX | ~114,100 |
+| Lines of Rust | ~79,300 |
+| Zustand Stores | 39 |
+| Custom Hooks | 16 |
+| Services | 15 |
+| Dependencies | 42 |
+| Dev Dependencies | 11 |
 
 ---
 
@@ -44,29 +44,35 @@
 
 | Directory | Components |
 |-----------|------------|
-| tools | 174 |
+| tools | 189 |
+| output | 23 |
+| files | 21 |
 | meditation | 20 |
-| files | 19 |
-| ui | 14 |
-| panels | 14 |
-| output | 13 |
+| panels | 18 |
+| ui | 17 |
+| settings | 9 |
+| layout | 9 |
 | git | 9 |
 | subscriptions | 8 |
-| settings | 7 |
-| layout | 6 |
+| launcher | 6 |
 | prompt | 6 |
-| onboarding | 5 |
 | workspaces | 5 |
-| colorpicker | 3 |
-| modules | 3 |
+| onboarding | 5 |
+| codespace | 4 |
+| session | 4 |
 | terminal | 3 |
+| modules | 3 |
 | claude | 2 |
-| command-palette | 2 |
 | project | 2 |
-| docs | 1 |
+| command-palette | 2 |
 | livepreview | 1 |
+| context | 1 |
+| gemini | 1 |
+| codex | 1 |
+| provider | 1 |
+| docs | 1 |
+| ai | 1 |
 | model | 1 |
-| session | 1 |
 
 ---
 
@@ -153,7 +159,7 @@ bd close <id>         # Complete work
 
 ## Beads Issue History
 
-**Total Completed Issues:** 77
+**Total Completed Issues:** 329
 
 ---
 
@@ -161,5 +167,6 @@ bd close <id>         # Complete work
 
 | Date | Changes |
 |------|---------|
+| 2025-12-31 | Full metrics audit: 378 TSX, 215 TS, 48 RS files; 147 tests; 329 completed issues; Score 8/10 |
 | 2025-12-26 | Full metrics audit: 322 TSX, 168 TS, 69 RS files; 14 agents; 77 completed issues; Score 7.5/10 |
 | 2025-12-22 | Initial FARMHOUSE setup via Farmwork CLI |

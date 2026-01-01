@@ -210,13 +210,22 @@ class GitService {
 
   async getRemoteStatus(cwd: string): Promise<{ ahead: number; behind: number; hasRemote: boolean }> {
     try {
+      // Check if origin remote exists (separate from upstream tracking)
+      const remoteOutput = await runGit(["remote", "get-url", "origin"], cwd);
+      const hasRemote = remoteOutput.code === 0;
+
+      if (!hasRemote) {
+        return { ahead: 0, behind: 0, hasRemote: false };
+      }
+
       // First fetch to get latest remote info
       await this.fetch(cwd);
 
-      // Check if upstream is set
+      // Check if upstream tracking is set for ahead/behind counts
       const upstreamOutput = await runGit(["rev-parse", "--abbrev-ref", "@{upstream}"], cwd);
       if (upstreamOutput.code !== 0) {
-        return { ahead: 0, behind: 0, hasRemote: false };
+        // Remote exists but no upstream tracking - still "Push" not "Publish"
+        return { ahead: 0, behind: 0, hasRemote: true };
       }
 
       // Get ahead count
