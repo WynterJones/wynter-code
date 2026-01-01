@@ -480,6 +480,9 @@ fn main() {
             mobile_api::mobile_api_verify_pairing,
             mobile_api::mobile_api_revoke_device,
             mobile_api::mobile_api_list_devices,
+            mobile_api::mobile_api_sync_netlify_token,
+            mobile_api::mobile_api_sync_workspaces,
+            mobile_api::mobile_api_sync_all_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

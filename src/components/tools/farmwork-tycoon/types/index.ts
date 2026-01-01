@@ -202,6 +202,7 @@ export interface FarmworkTycoonState {
   showDebug: boolean;
   hideTooltips: boolean;
   showMiniPlayer: boolean;
+  wasOpenBeforePopupHide: boolean;
 
   vehicles: Vehicle[];
   buildings: Building[];
@@ -231,6 +232,8 @@ export interface FarmworkTycoonState {
   showMiniPlayerFn: () => void;
   hideMiniPlayer: () => void;
   toggleMiniPlayer: () => void;
+  hideForPopup: () => void;
+  restoreAfterPopup: () => void;
   dispatchVehicle: (vehicleId: string, destinationBuildingId: string) => void;
   updateBuildingScore: (buildingId: string, score: number) => void;
   addActivity: (event: Omit<ActivityEvent, "id" | "timestamp">) => void;

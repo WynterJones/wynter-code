@@ -17,12 +17,14 @@ interface SubscriptionStore {
 
   // Subscription CRUD
   addSubscription: (input: SubscriptionInput) => Subscription;
+  addSubscriptionWithId: (id: string, input: SubscriptionInput) => Subscription; // For mobile API
   updateSubscription: (id: string, input: Partial<SubscriptionInput>) => void;
   deleteSubscription: (id: string) => void;
   toggleSubscriptionActive: (id: string) => void;
 
   // Category CRUD
   addCategory: (input: SubscriptionCategoryInput) => SubscriptionCategory;
+  addCategoryWithId: (id: string, input: SubscriptionCategoryInput) => SubscriptionCategory; // For mobile API
   updateCategory: (id: string, input: Partial<Omit<SubscriptionCategoryInput, "workspaceId">>) => void;
   deleteCategory: (id: string) => void;
   reorderCategories: (workspaceId: string, categoryIds: string[]) => void;
@@ -86,6 +88,40 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         return subscription;
       },
 
+      addSubscriptionWithId: (id, input) => {
+        // Check if subscription with this ID already exists (prevent duplicates)
+        const existing = get().subscriptions.find(s => s.id === id);
+        if (existing) {
+          console.log(`[subscriptionStore] Subscription ${id} already exists, skipping duplicate`);
+          return existing;
+        }
+
+        const now = Date.now();
+        const workspaceSubs = get().subscriptions.filter(s => s.workspaceId === input.workspaceId);
+        const subscription: Subscription = {
+          id,
+          workspaceId: input.workspaceId,
+          name: input.name,
+          url: input.url ?? null,
+          faviconUrl: input.faviconUrl ?? null,
+          monthlyCost: input.monthlyCost,
+          billingCycle: input.billingCycle ?? "monthly",
+          currency: input.currency ?? "USD",
+          categoryId: input.categoryId ?? null,
+          notes: input.notes ?? null,
+          isActive: input.isActive ?? true,
+          sortOrder: input.sortOrder ?? workspaceSubs.length,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        set((state) => ({
+          subscriptions: [...state.subscriptions, subscription],
+        }));
+
+        return subscription;
+      },
+
       updateSubscription: (id, input) => {
         set((state) => ({
           subscriptions: state.subscriptions.map((sub) =>
@@ -121,6 +157,33 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         const workspaceCategories = get().categories.filter(c => c.workspaceId === input.workspaceId);
         const category: SubscriptionCategory = {
           id: uuid(),
+          workspaceId: input.workspaceId,
+          name: input.name,
+          color: input.color ?? null,
+          sortOrder: input.sortOrder ?? workspaceCategories.length,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        set((state) => ({
+          categories: [...state.categories, category],
+        }));
+
+        return category;
+      },
+
+      addCategoryWithId: (id, input) => {
+        // Check if category with this ID already exists (prevent duplicates)
+        const existing = get().categories.find(c => c.id === id);
+        if (existing) {
+          console.log(`[subscriptionStore] Category ${id} already exists, skipping duplicate`);
+          return existing;
+        }
+
+        const now = Date.now();
+        const workspaceCategories = get().categories.filter(c => c.workspaceId === input.workspaceId);
+        const category: SubscriptionCategory = {
+          id,
           workspaceId: input.workspaceId,
           name: input.name,
           color: input.color ?? null,

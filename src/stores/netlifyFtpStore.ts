@@ -93,6 +93,10 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
           connectionStatus: token ? "disconnected" : "disconnected",
           connectionError: null,
         });
+        // Sync to mobile API
+        invoke("mobile_api_sync_netlify_token", { token }).catch(() => {
+          // Ignore errors - mobile API may not be running
+        });
       },
 
       testConnection: async () => {
@@ -107,6 +111,10 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
         try {
           await invoke("netlify_test_connection", { token: apiToken });
           set({ connectionStatus: "connected", connectionError: null });
+          // Sync to mobile API on successful connection
+          invoke("mobile_api_sync_netlify_token", { token: apiToken }).catch(() => {
+            // Ignore errors - mobile API may not be running
+          });
           // Auto-fetch sites on successful connection
           get().fetchSites();
           return true;
@@ -444,6 +452,14 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
         groups: state.groups,
         ungroupedCollapsed: state.ungroupedCollapsed,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Sync Netlify token to mobile API when store is hydrated from localStorage
+        if (state?.apiToken) {
+          invoke("mobile_api_sync_netlify_token", { token: state.apiToken }).catch(() => {
+            // Ignore errors - mobile API may not be running
+          });
+        }
+      },
     }
   )
 );

@@ -384,6 +384,31 @@ class GitService {
       return "";
     }
   }
+
+  async getRemoteUrl(cwd: string, remoteName: string = "origin"): Promise<string | null> {
+    try {
+      const output = await runGit(["remote", "get-url", remoteName], cwd);
+      if (output.code === 0) {
+        return output.stdout.trim();
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Parse a GitHub URL to extract owner and repo name
+   * Supports: https://github.com/owner/repo.git, git@github.com:owner/repo.git
+   */
+  parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+    // HTTPS format: https://github.com/owner/repo.git
+    const httpsMatch = url.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+    if (httpsMatch) {
+      return { owner: httpsMatch[1], repo: httpsMatch[2].replace(/\.git$/, "") };
+    }
+    return null;
+  }
 }
 
 export const gitService = new GitService();

@@ -21,6 +21,13 @@ interface KanbanStore {
     priority: KanbanPriority,
     description?: string
   ) => string;
+  createTaskWithId: (
+    workspaceId: string,
+    id: string,
+    title: string,
+    priority: KanbanPriority,
+    description?: string
+  ) => void;
   updateTask: (
     workspaceId: string,
     taskId: string,
@@ -92,6 +99,42 @@ export const useKanbanStore = create<KanbanStore>()(
         });
 
         return id;
+      },
+
+      createTaskWithId: (workspaceId, id, title, priority, description) => {
+        const board = get().getBoard(workspaceId);
+
+        // Check if task with this ID already exists to prevent duplicates
+        if (board.tasks.some((t) => t.id === id)) {
+          console.log(`[kanbanStore] Task ${id} already exists, skipping`);
+          return;
+        }
+
+        const backlogTasks = board.tasks.filter((t) => t.status === "backlog");
+        const maxOrder =
+          backlogTasks.length > 0
+            ? Math.max(...backlogTasks.map((t) => t.order)) + 1
+            : 0;
+
+        const newTask: KanbanTask = {
+          id,
+          title,
+          description,
+          status: "backlog",
+          priority,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          order: maxOrder,
+        };
+
+        set((state) => {
+          const newBoards = new Map(state.boards);
+          const existingBoard = newBoards.get(workspaceId) || { tasks: [] };
+          newBoards.set(workspaceId, {
+            tasks: [...existingBoard.tasks, newTask],
+          });
+          return { boards: newBoards };
+        });
       },
 
       updateTask: (workspaceId, taskId, updates) => {

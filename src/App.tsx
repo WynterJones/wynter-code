@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useAppFont } from "@/hooks/useAppFont";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useEnvStore } from "@/stores/envStore";
+import { initializeMobileApi } from "@/stores/mobileApiStore";
 import { ScreenReaderAnnouncerProvider } from "@/components/ui";
 
 type WindowType = "main" | "launcher";
@@ -74,9 +75,19 @@ function App() {
         }
       };
 
+      // Initialize mobile API (auto-start if enabled, sync data if running)
+      const initMobileApi = async () => {
+        try {
+          await initializeMobileApi();
+        } catch (error) {
+          console.error("Failed to initialize mobile API:", error);
+        }
+      };
+
       initLightcast();
       initVibrancy();
       initEnvVars();
+      initMobileApi();
     }
   }, []);
 

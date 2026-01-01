@@ -55,3 +55,21 @@ export function createWorkspace(
     lastOpenedAt: null,
   };
 }
+
+// Helper to create a workspace with a specific ID (for mobile API)
+export function createWorkspaceWithId(
+  id: string,
+  name: string,
+  color: string = WORKSPACE_COLORS[0]
+): Workspace {
+  return {
+    id,
+    name,
+    color,
+    avatar: createDefaultAvatar(),
+    projectIds: [],
+    lastActiveProjectId: null,
+    createdAt: new Date(),
+    lastOpenedAt: null,
+  };
+}

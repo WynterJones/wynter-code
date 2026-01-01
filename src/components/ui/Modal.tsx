@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IconButton } from "./IconButton";
+import { usePopupRegistryStore } from "@/stores/popupRegistryStore";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -29,6 +30,15 @@ export function Modal({
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  const { registerModal, unregisterModal } = usePopupRegistryStore();
+
+  // Register modal in popup registry for mini player visibility
+  useEffect(() => {
+    if (isOpen) {
+      registerModal();
+      return () => unregisterModal();
+    }
+  }, [isOpen, registerModal, unregisterModal]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

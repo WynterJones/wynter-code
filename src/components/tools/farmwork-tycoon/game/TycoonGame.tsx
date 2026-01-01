@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from "react";
-import { Application, Sprite, Graphics, Container, Assets } from "pixi.js";
+import { Application, Sprite, Graphics, Container, Assets, Ticker } from "pixi.js";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { navigationSystem } from "./navigation/NavigationSystem";
 import { BuildingSprite } from "./entities/Building";
@@ -166,6 +166,13 @@ export function TycoonGame({
         sharedTicker: false, // Use own ticker to avoid interference between instances
         preference: 'webgl', // Ensure WebGL renderer
       });
+
+      // In standalone mode, set base path for assets
+      const isStandalone = typeof window !== "undefined" && (window as { FARMWORK_STANDALONE_MODE?: boolean }).FARMWORK_STANDALONE_MODE;
+      if (isStandalone) {
+        // Assets are served from /farmwork/ base path
+        Assets.resolver.basePath = "/farmwork/";
+      }
 
       // Check if this effect was cancelled during async init
       if (cancelled || !app.stage) {
@@ -341,7 +348,9 @@ export function TycoonGame({
           buildingSprite.update(dt);
         }
 
-        if (isPaused) return;
+        // Read isPaused from store directly (not from closure) to ensure we get current value
+        const currentIsPaused = useFarmworkTycoonStore.getState().isPaused;
+        if (currentIsPaused) return;
 
         for (const vehicleSprite of vehicleSpritesRef.current.values()) {
           // Skip processing if vehicle is already finished
@@ -515,6 +524,22 @@ export function TycoonGame({
           }
         }
       });
+
+      // Explicitly start the ticker (required in some PixiJS v8 configurations)
+      app.ticker.start();
+
+      // Fallback: ensure ticker keeps running in mobile WebViews
+      // Some mobile browsers throttle/pause requestAnimationFrame
+      const tickerWatchdog = setInterval(() => {
+        if (cancelled || !app.ticker) return;
+        if (!app.ticker.started) {
+          console.log("[TycoonGame] Restarting paused ticker");
+          app.ticker.start();
+        }
+      }, 1000);
+
+      // Store cleanup for this watchdog
+      (app as unknown as { _tickerWatchdog?: ReturnType<typeof setInterval> })._tickerWatchdog = tickerWatchdog;
     };
 
     initApp();
@@ -526,6 +551,10 @@ export function TycoonGame({
       // Clean up the PixiJS app
       if (localApp) {
         try {
+          // Clear ticker watchdog
+          const watchdog = (localApp as unknown as { _tickerWatchdog?: ReturnType<typeof setInterval> })._tickerWatchdog;
+          if (watchdog) clearInterval(watchdog);
+
           // Stop the ticker first to prevent any pending updates
           localApp.ticker?.stop();
 

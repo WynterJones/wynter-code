@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:farmwork": "vite build --config vite.config.farmwork.ts",
     "preview": "vite preview",
     "tauri": "tauri",
     "version:patch": "node scripts/bump-version.js patch",

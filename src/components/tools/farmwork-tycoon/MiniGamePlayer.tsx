@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { TycoonGame } from "./game/TycoonGame";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
+import { usePopupRegistryStore, selectHasOpenPopup } from "@/stores/popupRegistryStore";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import {
@@ -29,7 +30,17 @@ interface Position {
 }
 
 export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProps) {
-  const { refreshStats, isInitialized, setPendingBuildingSelection } = useFarmworkTycoonStore();
+  const { refreshStats, isInitialized, setPendingBuildingSelection, hideForPopup, restoreAfterPopup } = useFarmworkTycoonStore();
+  const hasOpenPopup = usePopupRegistryStore(selectHasOpenPopup);
+
+  // Hide mini player when any popup is open, restore when all popups close
+  useEffect(() => {
+    if (hasOpenPopup) {
+      hideForPopup();
+    } else {
+      restoreAfterPopup();
+    }
+  }, [hasOpenPopup, hideForPopup, restoreAfterPopup]);
 
   // Generate a unique key each time the mini player opens to force fresh TycoonGame
   const [gameKey, setGameKey] = useState(0);

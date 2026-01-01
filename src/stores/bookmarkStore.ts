@@ -39,6 +39,7 @@ interface BookmarkStore {
 
   // Actions - Bookmarks
   addBookmark: (bookmark: Omit<Bookmark, "id" | "createdAt" | "updatedAt" | "order">) => void;
+  addBookmarkWithId: (id: string, bookmark: Omit<Bookmark, "id" | "createdAt" | "updatedAt">) => void;
   updateBookmark: (id: string, updates: Partial<Bookmark>) => void;
   deleteBookmark: (id: string) => void;
   moveBookmark: (bookmarkId: string, collectionId: string | null) => void;
@@ -50,6 +51,7 @@ interface BookmarkStore {
 
   // Actions - Collections
   addCollection: (collection: Omit<Collection, "id" | "createdAt" | "order">) => void;
+  addCollectionWithId: (id: string, collection: Omit<Collection, "id" | "createdAt">) => void;
   updateCollection: (id: string, updates: Partial<Collection>) => void;
   deleteCollection: (id: string, moveBookmarksToUncategorized?: boolean) => void;
   reorderCollections: (orderedIds: string[]) => void;
@@ -107,6 +109,25 @@ export const useBookmarkStore = create<BookmarkStore>()(
           ...bookmark,
           id: uuidv4(),
           order: maxOrder + 1,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        set((state) => ({
+          bookmarks: [...state.bookmarks, newBookmark],
+        }));
+      },
+
+      addBookmarkWithId: (id, bookmark) => {
+        // Check if bookmark with this ID already exists (prevent duplicates)
+        const existing = get().bookmarks.find(b => b.id === id);
+        if (existing) {
+          console.log(`[bookmarkStore] Bookmark ${id} already exists, skipping duplicate`);
+          return;
+        }
+
+        const newBookmark: Bookmark = {
+          ...bookmark,
+          id,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
@@ -192,6 +213,24 @@ export const useBookmarkStore = create<BookmarkStore>()(
           ...collection,
           id: uuidv4(),
           order: maxOrder + 1,
+          createdAt: Date.now(),
+        };
+        set((state) => ({
+          collections: [...state.collections, newCollection],
+        }));
+      },
+
+      addCollectionWithId: (id, collection) => {
+        // Check if collection with this ID already exists (prevent duplicates)
+        const existing = get().collections.find(c => c.id === id);
+        if (existing) {
+          console.log(`[bookmarkStore] Collection ${id} already exists, skipping duplicate`);
+          return;
+        }
+
+        const newCollection: Collection = {
+          ...collection,
+          id,
           createdAt: Date.now(),
         };
         set((state) => ({

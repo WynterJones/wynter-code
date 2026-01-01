@@ -106,6 +106,46 @@ impl PreviewManager {
             servers: Mutex::new(HashMap::new()),
         }
     }
+
+    /// Get info for a specific server by ID
+    pub fn get_server_info(&self, server_id: &str) -> Option<PreviewServerInfo> {
+        let servers = self.servers.lock().unwrap();
+        servers.get(server_id).map(|instance| PreviewServerInfo {
+            server_id: server_id.to_string(),
+            project_path: instance.project_path.clone(),
+            project_type: instance.project_type.clone(),
+            port: instance.port,
+            url: instance.url.clone(),
+            local_url: instance.local_url.clone(),
+            status: instance.status.clone(),
+            error: None,
+            started_at: instance.created_at,
+            is_framework_server: instance.is_framework_server,
+        })
+    }
+
+    /// List all servers
+    pub fn list_all_servers(&self) -> Vec<PreviewServerInfo> {
+        let servers = self.servers.lock().unwrap();
+        servers.iter().map(|(id, instance)| PreviewServerInfo {
+            server_id: id.clone(),
+            project_path: instance.project_path.clone(),
+            project_type: instance.project_type.clone(),
+            port: instance.port,
+            url: instance.url.clone(),
+            local_url: instance.local_url.clone(),
+            status: instance.status.clone(),
+            error: None,
+            started_at: instance.created_at,
+            is_framework_server: instance.is_framework_server,
+        }).collect()
+    }
+
+    /// Get info for a newly started server (for immediate response after start)
+    pub fn get_started_server_info(&self, server_id: &str) -> Option<(u16, String, Option<String>)> {
+        let servers = self.servers.lock().unwrap();
+        servers.get(server_id).map(|s| (s.port, s.url.clone(), s.local_url.clone()))
+    }
 }
 
 impl Default for PreviewManager {
@@ -354,7 +394,7 @@ pub async fn get_local_ip() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn start_preview_server(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     state: State<'_, Arc<PreviewManager>>,
     project_path: String,
     port: Option<u16>,
@@ -435,7 +475,7 @@ pub async fn start_preview_server(
 }
 
 fn start_framework_server(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     state: Arc<PreviewManager>,
     server_id: String,
     project_path: String,
@@ -648,7 +688,7 @@ fn start_framework_server(
 }
 
 fn start_static_server(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     state: Arc<PreviewManager>,
     server_id: String,
     project_path: String,

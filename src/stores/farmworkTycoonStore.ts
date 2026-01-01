@@ -107,6 +107,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   showDebug: false,
   hideTooltips: false,
   showMiniPlayer: false,
+  wasOpenBeforePopupHide: false,
 
   vehicles: [],
   buildings: createInitialBuildings(),
@@ -149,6 +150,20 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
   showMiniPlayerFn: () => set({ showMiniPlayer: true }),
   hideMiniPlayer: () => set({ showMiniPlayer: false }),
   toggleMiniPlayer: () => set((state) => ({ showMiniPlayer: !state.showMiniPlayer })),
+
+  hideForPopup: () => set((state) => {
+    if (state.showMiniPlayer) {
+      return { showMiniPlayer: false, wasOpenBeforePopupHide: true };
+    }
+    return {};
+  }),
+
+  restoreAfterPopup: () => set((state) => {
+    if (state.wasOpenBeforePopupHide) {
+      return { showMiniPlayer: true, wasOpenBeforePopupHide: false };
+    }
+    return { wasOpenBeforePopupHide: false };
+  }),
 
   dispatchVehicle: (vehicleId: string, destinationBuildingId: string) => {
     set((state) => ({

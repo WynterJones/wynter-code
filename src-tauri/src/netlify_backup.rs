@@ -39,7 +39,7 @@ pub async fn netlify_fetch_sites(token: String) -> Result<serde_json::Value, Str
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
     let response = client
-        .get(format!("{}/sites", NETLIFY_API_BASE))
+        .get(format!("{}/sites?per_page=100", NETLIFY_API_BASE))
         .header("Authorization", format!("Bearer {}", token))
         .send()
         .await

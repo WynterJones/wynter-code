@@ -57,6 +57,38 @@ impl TunnelManager {
             tunnels: Mutex::new(HashMap::new()),
         }
     }
+
+    /// Get info for a specific tunnel by ID
+    pub fn get_tunnel_info(&self, tunnel_id: &str) -> Option<TunnelInfo> {
+        let tunnels = self.tunnels.lock().unwrap();
+        tunnels.get(tunnel_id).map(|instance| TunnelInfo {
+            tunnel_id: tunnel_id.to_string(),
+            port: instance.port,
+            url: instance.url.clone(),
+            status: instance.status.clone(),
+            error: None,
+            created_at: instance.created_at,
+        })
+    }
+
+    /// List all tunnels
+    pub fn list_all_tunnels(&self) -> Vec<TunnelInfo> {
+        let tunnels = self.tunnels.lock().unwrap();
+        tunnels.iter().map(|(id, instance)| TunnelInfo {
+            tunnel_id: id.clone(),
+            port: instance.port,
+            url: instance.url.clone(),
+            status: instance.status.clone(),
+            error: None,
+            created_at: instance.created_at,
+        }).collect()
+    }
+
+    /// Get tunnel URL and status for immediate response
+    pub fn get_tunnel_status(&self, tunnel_id: &str) -> Option<(Option<String>, TunnelStatus)> {
+        let tunnels = self.tunnels.lock().unwrap();
+        tunnels.get(tunnel_id).map(|t| (t.url.clone(), t.status.clone()))
+    }
 }
 
 impl Default for TunnelManager {
@@ -77,7 +109,7 @@ pub async fn check_cloudflared_installed() -> Result<bool, String> {
 
 #[tauri::command]
 pub async fn start_tunnel(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     state: State<'_, Arc<TunnelManager>>,
     port: u16,
 ) -> Result<String, String> {

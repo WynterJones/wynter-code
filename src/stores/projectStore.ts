@@ -8,6 +8,7 @@ interface ProjectStore {
   activeProjectId: string | null;
 
   addProject: (path: string) => void;
+  addProjectWithId: (id: string, path: string, name: string, color?: string) => void; // For mobile API
   removeProject: (id: string) => void;
   setActiveProject: (id: string) => void;
   updateProjectName: (id: string, name: string) => void;
@@ -43,6 +44,26 @@ export const useProjectStore = create<ProjectStore>()(
         set((state) => ({
           projects: [...state.projects, project],
           activeProjectId: project.id,
+        }));
+      },
+
+      addProjectWithId: (id: string, path: string, name: string, color?: string) => {
+        const existing = get().projects.find((p) => p.path === path);
+        if (existing) {
+          return; // Project already exists
+        }
+
+        const project: Project = {
+          id,
+          name,
+          path,
+          color,
+          lastOpenedAt: new Date(),
+          createdAt: new Date(),
+        };
+
+        set((state) => ({
+          projects: [...state.projects, project],
         }));
       },
 

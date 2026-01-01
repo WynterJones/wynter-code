@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import {
   Github,
   Star,
@@ -21,6 +21,7 @@ import { useGitHubManagerStore } from "@/stores/githubManagerStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
+import { gitService } from "@/services/git";
 import { cn } from "@/lib/utils";
 import type { GitHubTab, GhRepo } from "@/types/github";
 import { RepoList } from "./RepoList";
@@ -86,6 +87,9 @@ export function GitHubManagerPopup({
   // Determine if gh is not installed vs just not authenticated
   const ghNotInstalled = authStatus?.error?.includes("not found");
 
+  // Track if we've auto-opened the project repo for this open session
+  const hasAutoOpenedRef = useRef(false);
+
   const handleRunInTerminal = (command: string) => {
     if (!activeProjectId) return;
     const sessionId = createSession(activeProjectId, "terminal");
@@ -103,8 +107,47 @@ export function GitHubManagerPopup({
   useEffect(() => {
     if (isOpen) {
       checkAuth();
+      // Reset auto-open flag when popup opens
+      hasAutoOpenedRef.current = false;
     }
   }, [isOpen, checkAuth]);
+
+  // Auto-open project's GitHub repo if it has one
+  useEffect(() => {
+    const autoOpenProjectRepo = async () => {
+      // Only auto-open once per session, when authenticated
+      if (
+        !isOpen ||
+        !authStatus?.isAuthenticated ||
+        hasAutoOpenedRef.current ||
+        !projectPath ||
+        showRepoDetail // Don't auto-open if already viewing a repo
+      ) {
+        return;
+      }
+
+      try {
+        // Check if project has a git repo with GitHub remote
+        const isGitRepo = await gitService.isGitRepo(projectPath);
+        if (!isGitRepo) return;
+
+        const remoteUrl = await gitService.getRemoteUrl(projectPath);
+        if (!remoteUrl) return;
+
+        const parsed = gitService.parseGitHubUrl(remoteUrl);
+        if (!parsed) return;
+
+        // Mark as auto-opened and view the repo
+        hasAutoOpenedRef.current = true;
+        viewRepo(parsed.owner, parsed.repo);
+      } catch (error) {
+        // Silently fail - just don't auto-open
+        console.debug("Failed to auto-open project repo:", error);
+      }
+    };
+
+    autoOpenProjectRepo();
+  }, [isOpen, authStatus?.isAuthenticated, projectPath, showRepoDetail, viewRepo]);
 
   // Load data when tab changes
   useEffect(() => {

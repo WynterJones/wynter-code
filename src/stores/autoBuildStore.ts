@@ -1829,3 +1829,96 @@ When all audits complete, summarize which audits passed and which found issues.`
     }
   },
 }));
+
+// Listen for mobile app adding issues to the queue
+interface MobileAddToQueueEvent {
+  project_id: string;
+  project_path: string | null;
+  issue_id: string;
+}
+
+listen<MobileAddToQueueEvent>("mobile-autobuild-add-to-queue", async (event) => {
+  const { project_path, issue_id } = event.payload;
+  const { projectPath, addToQueue, cacheIssue, addLog, saveSession } = useAutoBuildStore.getState();
+
+  // Only process if this is for the current project
+  if (!project_path || project_path !== projectPath) {
+    return;
+  }
+
+  // Fetch the issue details and add to queue
+  try {
+    const issues = await invoke<BeadsIssue[]>("beads_list", { projectPath: project_path });
+    const issue = issues.find(i => i.id === issue_id);
+
+    if (issue) {
+      cacheIssue(issue);
+      addToQueue(issue_id);
+      addLog("info", `Added from mobile: ${issue.title}`, issue_id);
+      await saveSession();
+    } else {
+      // Still add to queue even if we can't find the issue details
+      addToQueue(issue_id);
+      addLog("info", `Added from mobile: ${issue_id}`, issue_id);
+      await saveSession();
+    }
+  } catch (err) {
+    console.error("Failed to fetch issue for mobile queue add:", err);
+    // Still add to queue
+    addToQueue(issue_id);
+    addLog("info", `Added from mobile: ${issue_id}`, issue_id);
+  }
+});
+
+// Listen for mobile app removing issues from the queue
+interface MobileRemoveFromQueueEvent {
+  project_id: string;
+  project_path: string | null;
+  issue_id: string;
+}
+
+listen<MobileRemoveFromQueueEvent>("mobile-autobuild-remove-from-queue", async (event) => {
+  const { project_path, issue_id } = event.payload;
+  const { projectPath, removeFromQueue, addLog, saveSession } = useAutoBuildStore.getState();
+
+  // Only process if this is for the current project
+  if (!project_path || project_path !== projectPath) {
+    return;
+  }
+
+  removeFromQueue(issue_id);
+  addLog("info", `Removed from mobile: ${issue_id}`, issue_id);
+  await saveSession();
+});
+
+// Listen for mobile app controlling auto-build (start/pause/stop)
+interface MobileAutoBuildControlEvent {
+  project_id: string;
+  project_path: string | null;
+  action: "start" | "pause" | "stop";
+}
+
+listen<MobileAutoBuildControlEvent>("mobile-autobuild-control", async (event) => {
+  const { project_path, action } = event.payload;
+  const { projectPath, start, pause, stop, addLog } = useAutoBuildStore.getState();
+
+  // Only process if this is for the current project
+  if (!project_path || project_path !== projectPath) {
+    return;
+  }
+
+  switch (action) {
+    case "start":
+      addLog("info", "Start requested from mobile");
+      await start();
+      break;
+    case "pause":
+      addLog("info", "Pause requested from mobile");
+      pause();
+      break;
+    case "stop":
+      addLog("info", "Stop requested from mobile");
+      stop();
+      break;
+  }
+});

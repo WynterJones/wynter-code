@@ -4,7 +4,7 @@ import type {
   Workspace,
   WorkspaceAvatar,
 } from "@/types/workspace";
-import { createWorkspace, createDefaultAvatar } from "@/types/workspace";
+import { createWorkspace, createWorkspaceWithId, createDefaultAvatar } from "@/types/workspace";
 import type { Project } from "@/types";
 
 interface WorkspaceStore {
@@ -14,6 +14,7 @@ interface WorkspaceStore {
 
   // Workspace actions
   addWorkspace: (name: string, color?: string) => string;
+  addWorkspaceWithId: (id: string, name: string, color?: string) => void; // For mobile API
   removeWorkspace: (id: string) => void;
   updateWorkspace: (id: string, updates: Partial<Workspace>) => void;
   setActiveWorkspace: (id: string) => void;
@@ -57,6 +58,20 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
           activeWorkspaceId: state.activeWorkspaceId || workspace.id,
         }));
         return workspace.id;
+      },
+
+      addWorkspaceWithId: (id: string, name: string, color?: string) => {
+        // Check if workspace with this ID already exists to prevent duplicates
+        const existing = get().workspaces.find((w) => w.id === id);
+        if (existing) {
+          console.log(`[workspaceStore] Workspace ${id} already exists, skipping add`);
+          return;
+        }
+        const workspace = createWorkspaceWithId(id, name, color);
+        set((state) => ({
+          workspaces: [...state.workspaces, workspace],
+          activeWorkspaceId: state.activeWorkspaceId || workspace.id,
+        }));
       },
 
       removeWorkspace: (id: string) => {
