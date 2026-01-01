@@ -7,6 +7,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, State};
 use uuid::Uuid;
 
+use crate::process_registry::ProcessRegistry;
+
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum StorybookStatus {
@@ -62,6 +64,7 @@ impl Default for StorybookManager {
 pub async fn start_storybook_server(
     window: tauri::Window,
     state: State<'_, Arc<StorybookManager>>,
+    registry: State<'_, Arc<ProcessRegistry>>,
     project_path: String,
     port: u16,
     command: String,
@@ -138,6 +141,9 @@ pub async fn start_storybook_server(
     })?;
 
     let child_pid = child.id();
+
+    // Register with process registry for safe termination
+    registry.register(child_pid);
 
     // Update with PID
     {
@@ -367,6 +373,7 @@ pub async fn start_storybook_server(
 #[tauri::command]
 pub async fn stop_storybook_server(
     state: State<'_, Arc<StorybookManager>>,
+    registry: State<'_, Arc<ProcessRegistry>>,
     server_id: String,
 ) -> Result<(), String> {
     let child_pid = {
@@ -383,6 +390,8 @@ pub async fn stop_storybook_server(
         let _ = Command::new("kill")
             .args(["-9", &pid.to_string()])
             .output();
+        // Unregister from process registry
+        registry.unregister(pid);
     }
 
     // Remove from manager

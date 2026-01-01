@@ -10,6 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, State};
 use uuid::Uuid;
 
+use crate::process_registry::ProcessRegistry;
+
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum ProjectType {
@@ -396,6 +398,7 @@ pub async fn get_local_ip() -> Result<String, String> {
 pub async fn start_preview_server(
     window: tauri::WebviewWindow,
     state: State<'_, Arc<PreviewManager>>,
+    registry: State<'_, Arc<ProcessRegistry>>,
     project_path: String,
     port: Option<u16>,
     use_framework_server: bool,
@@ -455,6 +458,7 @@ pub async fn start_preview_server(
         start_framework_server(
             window,
             state.inner().clone(),
+            registry.inner().clone(),
             server_id.clone(),
             project_path,
             detection,
@@ -477,6 +481,7 @@ pub async fn start_preview_server(
 fn start_framework_server(
     window: tauri::WebviewWindow,
     state: Arc<PreviewManager>,
+    registry: Arc<ProcessRegistry>,
     server_id: String,
     project_path: String,
     detection: ProjectDetectionResult,
@@ -535,6 +540,9 @@ fn start_framework_server(
     })?;
 
     let child_pid = child.id();
+
+    // Register with process registry for safe termination
+    registry.register(child_pid);
 
     // Update with PID
     {
@@ -880,6 +888,7 @@ fn start_static_server(
 #[tauri::command]
 pub async fn stop_preview_server(
     state: State<'_, Arc<PreviewManager>>,
+    registry: State<'_, Arc<ProcessRegistry>>,
     server_id: String,
 ) -> Result<(), String> {
     let (child_pid, shutdown_signal) = {
@@ -892,6 +901,8 @@ pub async fn stop_preview_server(
         let _ = Command::new("kill")
             .args(["-9", &pid.to_string()])
             .output();
+        // Unregister from process registry
+        registry.unregister(pid);
     }
 
     // For static servers, set shutdown signal

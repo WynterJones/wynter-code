@@ -25,6 +25,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::beads::{BeadsIssue, BeadsStats, BeadsUpdate};
 use crate::live_preview::{PreviewManager, PreviewStatus as LivePreviewStatus};
+use crate::process_registry::ProcessRegistry;
 use crate::tunnel::TunnelManager;
 use crate::path_utils::get_enhanced_path;
 
@@ -310,6 +311,7 @@ pub struct SyncedKanbanBoard {
 // ============================================================================
 
 /// Represents a running CLI process for mobile chat
+#[allow(dead_code)]
 struct MobileCLISession {
     child: Child,
     stdin: Option<ChildStdin>,
@@ -319,6 +321,7 @@ struct MobileCLISession {
 }
 
 /// Manages mobile CLI sessions
+#[allow(dead_code)]
 pub struct MobileCLIManager {
     sessions: std::sync::Mutex<HashMap<String, MobileCLISession>>,
 }
@@ -382,6 +385,7 @@ impl AppState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_broadcast_sender(&self) -> broadcast::Sender<StateUpdate> {
         self.state_tx.clone()
     }
@@ -427,6 +431,7 @@ impl MobileApiManager {
     }
 
     /// Get the current Netlify token
+    #[allow(dead_code)]
     pub async fn get_netlify_token(&self) -> Option<String> {
         self.app_state.netlify_token.read().await.clone()
     }
@@ -621,6 +626,7 @@ impl MobileApiManager {
         devices.values().cloned().collect()
     }
 
+    #[allow(dead_code)]
     pub fn get_broadcast_sender(&self) -> broadcast::Sender<StateUpdate> {
         self.app_state.get_broadcast_sender()
     }
@@ -683,6 +689,8 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/projects/:id/autobuild/stop", post(autobuild_stop))
         .route("/api/v1/projects/:id/autobuild/queue", post(autobuild_add_to_queue))
         .route("/api/v1/projects/:id/autobuild/queue/:issue_id", axum::routing::delete(autobuild_remove_from_queue))
+        // Auto Build Backlog (persistent)
+        .route("/api/v1/projects/:id/autobuild/backlog", get(autobuild_get_backlog))
         .route("/api/v1/projects/:id/sessions", get(list_sessions))
         .route("/api/v1/projects/:id/sessions/:session_id/messages", get(get_messages))
         // Mobile chat endpoint (streaming)
@@ -1407,7 +1415,7 @@ struct BeadsQuery {
 async fn list_beads(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path(project_id): Path<String>,
+    Path(_project_id): Path<String>,
     Query(query): Query<BeadsQuery>,
 ) -> Result<Json<Vec<BeadsIssue>>, (StatusCode, String)> {
     validate_token(&state, auth).await?;
@@ -1422,7 +1430,7 @@ async fn list_beads(
 async fn beads_stats(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path(project_id): Path<String>,
+    Path(_project_id): Path<String>,
     Query(query): Query<BeadsQuery>,
 ) -> Result<Json<BeadsStats>, (StatusCode, String)> {
     validate_token(&state, auth).await?;
@@ -1445,7 +1453,7 @@ struct CreateBeadRequest {
 async fn create_bead(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path(project_id): Path<String>,
+    Path(_project_id): Path<String>,
     Json(req): Json<CreateBeadRequest>,
 ) -> Result<Json<String>, (StatusCode, String)> {
     validate_token(&state, auth).await?;
@@ -1472,7 +1480,7 @@ struct UpdateBeadRequest {
 async fn update_bead(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path((project_id, issue_id)): Path<(String, String)>,
+    Path((_project_id, issue_id)): Path<(String, String)>,
     Json(req): Json<UpdateBeadRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     validate_token(&state, auth).await?;
@@ -1492,7 +1500,7 @@ struct CloseBeadRequest {
 async fn close_bead(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path((project_id, issue_id)): Path<(String, String)>,
+    Path((_project_id, issue_id)): Path<(String, String)>,
     Json(req): Json<CloseBeadRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     validate_token(&state, auth).await?;
@@ -1511,7 +1519,7 @@ struct ReopenBeadRequest {
 async fn reopen_bead(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path((project_id, issue_id)): Path<(String, String)>,
+    Path((_project_id, issue_id)): Path<(String, String)>,
     Json(req): Json<ReopenBeadRequest>,
 ) -> Result<StatusCode, (StatusCode, String)> {
     validate_token(&state, auth).await?;
@@ -1868,6 +1876,125 @@ async fn autobuild_remove_from_queue(
     Ok(StatusCode::ACCEPTED)
 }
 
+// Backlog persistence types
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct AutoBuildBacklog {
+    issues: Vec<String>,
+    completed: Vec<String>,
+    human_review: Vec<String>,
+    updated_at: String,
+}
+
+// Helper to read backlog from file
+fn read_autobuild_backlog(project_path: &str) -> Option<AutoBuildBacklog> {
+    let backlog_path = std::path::Path::new(project_path)
+        .join(".beads")
+        .join(".autobuild-backlog.json");
+
+    if !backlog_path.exists() {
+        return None;
+    }
+
+    match std::fs::read_to_string(&backlog_path) {
+        Ok(content) => serde_json::from_str(&content).ok(),
+        Err(_) => None,
+    }
+}
+
+async fn autobuild_get_backlog(
+    State(state): State<Arc<AppState>>,
+    auth: Option<TypedHeader<Authorization<Bearer>>>,
+    Path(project_id): Path<String>,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    validate_token(&state, auth).await?;
+
+    // Get project path from synced data
+    let synced = state.get_synced_data().await;
+    let project_path = synced
+        .projects
+        .iter()
+        .find(|p| p.id == project_id)
+        .map(|p| p.path.clone());
+
+    let Some(project_path) = project_path else {
+        return Ok(Json(serde_json::json!({
+            "issues": [],
+            "completed": [],
+            "human_review": [],
+            "updated_at": null
+        })));
+    };
+
+    // Read the backlog file
+    let backlog = read_autobuild_backlog(&project_path);
+
+    // Get issue details for backlog items
+    let issues = get_beads_issues(&project_path);
+    let issue_map: std::collections::HashMap<String, &BeadsIssue> = issues
+        .iter()
+        .map(|i| (i.id.clone(), i))
+        .collect();
+
+    match backlog {
+        Some(backlog) => {
+            // Build issues with full details
+            let issues_with_details: Vec<serde_json::Value> = backlog.issues.iter().map(|id| {
+                let issue = issue_map.get(id);
+                serde_json::json!({
+                    "id": id,
+                    "title": issue.map(|i| i.title.as_str()).unwrap_or("Unknown Issue"),
+                    "status": issue.map(|i| i.status.as_str()).unwrap_or("open"),
+                    "priority": issue.map(|i| i.priority).unwrap_or(4),
+                    "issue_type": issue.map(|i| i.issue_type.as_str()).unwrap_or("task"),
+                    "created_at": issue.map(|i| i.created_at.as_str()).unwrap_or("")
+                })
+            }).collect();
+
+            // Build human review with details
+            let human_review_with_details: Vec<serde_json::Value> = backlog.human_review.iter().map(|id| {
+                let issue = issue_map.get(id);
+                serde_json::json!({
+                    "id": id,
+                    "title": issue.map(|i| i.title.as_str()).unwrap_or("Unknown Issue"),
+                    "status": "review",
+                    "priority": issue.map(|i| i.priority).unwrap_or(4),
+                    "issue_type": issue.map(|i| i.issue_type.as_str()).unwrap_or("task"),
+                    "created_at": issue.map(|i| i.created_at.as_str()).unwrap_or("")
+                })
+            }).collect();
+
+            // Build completed with details
+            let completed_with_details: Vec<serde_json::Value> = backlog.completed.iter().map(|id| {
+                let issue = issue_map.get(id);
+                serde_json::json!({
+                    "id": id,
+                    "title": issue.map(|i| i.title.as_str()).unwrap_or("Unknown Issue"),
+                    "status": "completed",
+                    "priority": issue.map(|i| i.priority).unwrap_or(4),
+                    "issue_type": issue.map(|i| i.issue_type.as_str()).unwrap_or("task"),
+                    "created_at": issue.map(|i| i.created_at.as_str()).unwrap_or("")
+                })
+            }).collect();
+
+            Ok(Json(serde_json::json!({
+                "issues": issues_with_details,
+                "completed": completed_with_details,
+                "human_review": human_review_with_details,
+                "updated_at": backlog.updated_at
+            })))
+        }
+        None => {
+            // No backlog file - return empty state
+            Ok(Json(serde_json::json!({
+                "issues": [],
+                "completed": [],
+                "human_review": [],
+                "updated_at": null
+            })))
+        }
+    }
+}
+
 // Session placeholders
 #[derive(Serialize)]
 struct Session {
@@ -1881,7 +2008,7 @@ struct Session {
 async fn list_sessions(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path(project_id): Path<String>,
+    Path(_project_id): Path<String>,
 ) -> Result<Json<Vec<Session>>, (StatusCode, String)> {
     validate_token(&state, auth).await?;
     // TODO: Connect to session store
@@ -1899,7 +2026,7 @@ struct Message {
 async fn get_messages(
     State(state): State<Arc<AppState>>,
     auth: Option<TypedHeader<Authorization<Bearer>>>,
-    Path((project_id, session_id)): Path<(String, String)>,
+    Path((_project_id, _session_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<Message>>, (StatusCode, String)> {
     validate_token(&state, auth).await?;
     // TODO: Connect to message store
@@ -1914,6 +2041,7 @@ struct MobileChatRequest {
     mode: Option<String>, // "normal" | "plan" | "auto"
     message: String,
     cwd: Option<String>,  // Working directory for the CLI
+    #[allow(dead_code)]
     session_id: Option<String>, // For resuming sessions
     history: Option<Vec<MobileChatHistoryItem>>,
 }
@@ -2199,7 +2327,7 @@ fn process_claude_stream_json(
 // Run Codex CLI (OpenAI)
 fn run_codex_cli(
     tx: &tokio::sync::mpsc::Sender<Result<axum::response::sse::Event, std::convert::Infallible>>,
-    model: &str,
+    _model: &str,
     mode: &str,
     message: &str,
     cwd: &str,
@@ -2313,7 +2441,7 @@ fn process_codex_stream_json(
 // Run Gemini CLI
 fn run_gemini_cli(
     tx: &tokio::sync::mpsc::Sender<Result<axum::response::sse::Event, std::convert::Infallible>>,
-    model: &str,
+    _model: &str,
     mode: &str,
     message: &str,
     cwd: &str,
@@ -4857,6 +4985,7 @@ use std::io::Read;
 // Store PTY instances for mobile API
 struct MobilePtyInstance {
     writer: Box<dyn Write + Send>,
+    #[allow(dead_code)]
     master: Box<dyn MasterPty + Send>,
     #[allow(dead_code)]
     reader_handle: Option<std::thread::JoinHandle<()>>,
@@ -5223,9 +5352,10 @@ async fn preview_start(
     let app_handle = app_handle_guard.as_ref()
         .ok_or((StatusCode::SERVICE_UNAVAILABLE, "Desktop app not available".to_string()))?;
 
-    // Use the preview manager from Tauri state
+    // Use the preview manager and process registry from Tauri state
     use tauri::Manager;
     let preview_manager: tauri::State<'_, Arc<PreviewManager>> = app_handle.state();
+    let process_registry: tauri::State<'_, Arc<ProcessRegistry>> = app_handle.state();
 
     // Get a webview window for emitting events
     let window = app_handle.get_webview_window("main")
@@ -5238,6 +5368,7 @@ async fn preview_start(
     let server_id = crate::live_preview::start_preview_server(
         window,
         preview_manager.clone(),
+        process_registry.clone(),
         req.project_path.clone(),
         port,
         use_framework,
@@ -5290,10 +5421,12 @@ async fn preview_stop(
         .ok_or((StatusCode::SERVICE_UNAVAILABLE, "Desktop app not available".to_string()))?;
 
     let preview_manager: tauri::State<'_, Arc<PreviewManager>> = app_handle.state();
+    let process_registry: tauri::State<'_, Arc<ProcessRegistry>> = app_handle.state();
 
     // Stop the server
     crate::live_preview::stop_preview_server(
         preview_manager,
+        process_registry,
         req.server_id.clone(),
     ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
@@ -5464,6 +5597,7 @@ async fn tunnel_start(
         .ok_or((StatusCode::SERVICE_UNAVAILABLE, "Desktop app not available".to_string()))?;
 
     let tunnel_manager: tauri::State<'_, Arc<TunnelManager>> = app_handle.state();
+    let process_registry: tauri::State<'_, Arc<ProcessRegistry>> = app_handle.state();
 
     // Get a webview window for emitting events
     let window = app_handle.get_webview_window("main")
@@ -5473,6 +5607,7 @@ async fn tunnel_start(
     let tunnel_id = crate::tunnel::start_tunnel(
         window,
         tunnel_manager.clone(),
+        process_registry.clone(),
         req.port,
     ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
@@ -5509,10 +5644,12 @@ async fn tunnel_stop(
         .ok_or((StatusCode::SERVICE_UNAVAILABLE, "Desktop app not available".to_string()))?;
 
     let tunnel_manager: tauri::State<'_, Arc<TunnelManager>> = app_handle.state();
+    let process_registry: tauri::State<'_, Arc<ProcessRegistry>> = app_handle.state();
 
     // Stop the tunnel
     crate::tunnel::stop_tunnel(
         tunnel_manager,
+        process_registry,
         req.tunnel_id.clone(),
     ).await.map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 

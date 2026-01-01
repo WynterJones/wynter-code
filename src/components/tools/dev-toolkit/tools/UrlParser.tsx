@@ -1,6 +1,6 @@
 import { Copy, Trash2, Check, AlertCircle, ExternalLink } from "lucide-react";
 import { useState, useMemo } from "react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternalUrl, isValidExternalUrl } from "@/lib/urlSecurity";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -93,9 +93,9 @@ export function UrlParser() {
     setInput(text);
   };
 
-  const handleOpenUrl = () => {
-    if (parsed) {
-      open(input);
+  const handleOpenUrl = async () => {
+    if (parsed && isValidExternalUrl(input)) {
+      await openExternalUrl(input);
     }
   };
 

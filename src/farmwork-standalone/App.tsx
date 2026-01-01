@@ -8,6 +8,7 @@ import { TycoonGame } from "@/components/tools/farmwork-tycoon/game/TycoonGame";
 import { StatsSidebar } from "@/components/tools/farmwork-tycoon/sidebar/StatsSidebar";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { farmworkApi, type FarmworkStats } from "./api";
+import type { AuditItem } from "@/components/tools/farmwork-tycoon/types";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import "overlayscrollbars/overlayscrollbars.css";
 
@@ -80,15 +81,6 @@ export function App() {
   const [showSidebar, setShowSidebar] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const {
-    isInitialized,
-    buildings,
-    auditScores,
-    gardenStats,
-    compostStats,
-    beadsStats,
-  } = useFarmworkTycoonStore();
-
   const store = useFarmworkTycoonStore;
 
   // Update store with fetched stats (API returns snake_case, store uses camelCase)
@@ -97,12 +89,12 @@ export function App() {
 
     // Convert snake_case API response to camelCase for store
     const auditScores = {
-      security: { score: stats.audit_scores.security.score, openItems: stats.audit_scores.security.open_items },
-      tests: { score: stats.audit_scores.tests.score, openItems: stats.audit_scores.tests.open_items },
-      performance: { score: stats.audit_scores.performance.score, openItems: stats.audit_scores.performance.open_items },
-      accessibility: { score: stats.audit_scores.accessibility.score, openItems: stats.audit_scores.accessibility.open_items },
-      codeQuality: { score: stats.audit_scores.code_quality.score, openItems: stats.audit_scores.code_quality.open_items },
-      farmhouse: { score: stats.audit_scores.farmhouse.score, openItems: stats.audit_scores.farmhouse.open_items },
+      security: { score: stats.audit_scores.security.score, openItems: stats.audit_scores.security.open_items as AuditItem[], lastUpdated: stats.audit_scores.security.last_updated ?? null, status: stats.audit_scores.security.status ?? null },
+      tests: { score: stats.audit_scores.tests.score, openItems: stats.audit_scores.tests.open_items as AuditItem[], lastUpdated: stats.audit_scores.tests.last_updated ?? null, status: stats.audit_scores.tests.status ?? null },
+      performance: { score: stats.audit_scores.performance.score, openItems: stats.audit_scores.performance.open_items as AuditItem[], lastUpdated: stats.audit_scores.performance.last_updated ?? null, status: stats.audit_scores.performance.status ?? null },
+      accessibility: { score: stats.audit_scores.accessibility.score, openItems: stats.audit_scores.accessibility.open_items as AuditItem[], lastUpdated: stats.audit_scores.accessibility.last_updated ?? null, status: stats.audit_scores.accessibility.status ?? null },
+      codeQuality: { score: stats.audit_scores.code_quality.score, openItems: stats.audit_scores.code_quality.open_items as AuditItem[], lastUpdated: stats.audit_scores.code_quality.last_updated ?? null, status: stats.audit_scores.code_quality.status ?? null },
+      farmhouse: { score: stats.audit_scores.farmhouse.score, openItems: stats.audit_scores.farmhouse.open_items as AuditItem[], lastUpdated: stats.audit_scores.farmhouse.last_updated ?? null, status: stats.audit_scores.farmhouse.status ?? null },
     };
 
     const gardenStats = stats.garden_stats ? {

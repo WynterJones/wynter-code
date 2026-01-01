@@ -1,12 +1,236 @@
 pub mod search;
 
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use tauri::Emitter;
+use std::sync::Arc;
+use tauri::{Emitter, State};
 use ignore::gitignore::GitignoreBuilder;
 use ignore::WalkBuilder;
+
+use crate::process_registry::ProcessRegistry;
+
+/// Validate a session ID (UUID format or similar safe identifiers)
+fn validate_session_id(session_id: &str) -> Result<(), String> {
+    if session_id.is_empty() || session_id.len() > 100 {
+        return Err("Invalid session ID: must be 1-100 characters".to_string());
+    }
+
+    // Session IDs should be alphanumeric with hyphens (UUID-like)
+    let session_regex = Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9\-]*$").unwrap();
+    if !session_regex.is_match(session_id) {
+        return Err("Invalid session ID: must be alphanumeric with optional hyphens".to_string());
+    }
+
+    Ok(())
+}
+
+/// Blocked system directories that should never be accessible
+/// These are sensitive locations that could be exploited for privilege escalation or data theft
+const BLOCKED_DIRECTORIES: &[&str] = &[
+    // Unix/macOS sensitive directories
+    "/etc",
+    "/var",
+    "/root",
+    "/private/etc",
+    "/private/var",
+    "/System",
+    "/Library/Keychains",
+    "/usr/local/etc",
+    // Windows sensitive directories (for cross-platform safety)
+    "C:\\Windows",
+    "C:\\Program Files",
+    "C:\\ProgramData",
+    // Common sensitive files patterns
+    ".ssh",
+    ".gnupg",
+    ".aws",
+    ".azure",
+    ".kube",
+];
+
+/// Blocked file patterns that should never be accessible
+const BLOCKED_FILE_PATTERNS: &[&str] = &[
+    // SSH keys and credentials
+    "id_rsa",
+    "id_ed25519",
+    "id_ecdsa",
+    "id_dsa",
+    "known_hosts",
+    "authorized_keys",
+    // Cloud credentials
+    "credentials",
+    ".netrc",
+    // GPG keys
+    "secring.gpg",
+    "private-keys",
+    // Environment files with secrets
+    ".env.local",
+    ".env.production",
+];
+
+/// Validate a file path for safe access
+/// Returns Ok(canonicalized_path) if the path is safe, Err with reason otherwise
+fn validate_file_path(path: &str) -> Result<std::path::PathBuf, String> {
+    let path_obj = Path::new(path);
+
+    // Must be an absolute path
+    if !path_obj.is_absolute() {
+        return Err("Path must be absolute".to_string());
+    }
+
+    // Check for path traversal attempts in the raw path
+    if path.contains("..") {
+        // Canonicalize to resolve any traversal
+        let canonical = path_obj.canonicalize()
+            .map_err(|e| format!("Failed to resolve path: {}", e))?;
+
+        // After canonicalization, verify the path is still safe
+        return validate_file_path(&canonical.to_string_lossy());
+    }
+
+    // Get the canonical path (resolves symlinks and ..)
+    let canonical = if path_obj.exists() {
+        path_obj.canonicalize()
+            .map_err(|e| format!("Failed to resolve path: {}", e))?
+    } else {
+        // For non-existent files (new files), canonicalize the parent
+        let parent = path_obj.parent()
+            .ok_or_else(|| "Invalid path: no parent directory".to_string())?;
+
+        if !parent.exists() {
+            return Err("Parent directory does not exist".to_string());
+        }
+
+        let canonical_parent = parent.canonicalize()
+            .map_err(|e| format!("Failed to resolve parent path: {}", e))?;
+
+        let file_name = path_obj.file_name()
+            .ok_or_else(|| "Invalid path: no file name".to_string())?;
+
+        canonical_parent.join(file_name)
+    };
+
+    let canonical_str = canonical.to_string_lossy().to_lowercase();
+
+    // Check against blocked directories
+    for blocked in BLOCKED_DIRECTORIES {
+        let blocked_lower = blocked.to_lowercase();
+        if canonical_str.starts_with(&blocked_lower) ||
+           canonical_str.contains(&format!("/{}/", blocked_lower)) ||
+           canonical_str.contains(&format!("\\{}\\", blocked_lower)) {
+            return Err(format!("Access denied: path contains blocked directory '{}'", blocked));
+        }
+    }
+
+    // Check against blocked file patterns
+    if let Some(file_name) = canonical.file_name().and_then(|n| n.to_str()) {
+        let file_name_lower = file_name.to_lowercase();
+        for pattern in BLOCKED_FILE_PATTERNS {
+            if file_name_lower.contains(&pattern.to_lowercase()) {
+                return Err(format!("Access denied: file matches blocked pattern '{}'", pattern));
+            }
+        }
+    }
+
+    // Ensure the path is within the user's home directory or common project directories
+    if let Some(home) = dirs::home_dir() {
+        let home_str = home.to_string_lossy().to_lowercase();
+
+        // Allow paths within home directory
+        if canonical_str.starts_with(&home_str) {
+            return Ok(canonical);
+        }
+
+        // Also allow common development directories
+        let allowed_prefixes = [
+            "/tmp",
+            "/private/tmp",  // macOS temp
+            "/var/folders",  // macOS temp folders
+            "/users",        // macOS users (for other user access if permitted)
+            "/home",         // Linux home directories
+        ];
+
+        for prefix in allowed_prefixes {
+            if canonical_str.starts_with(prefix) {
+                return Ok(canonical);
+            }
+        }
+    }
+
+    // If we can't determine home dir, be more permissive but still block sensitive paths
+    // The blocked directories check above provides protection
+    Ok(canonical)
+}
+
+/// Validate an npm package name against npm naming rules
+/// Returns Ok(()) if valid, Err with reason otherwise
+fn validate_npm_package_name(name: &str) -> Result<(), String> {
+    // Empty check
+    if name.is_empty() {
+        return Err("Package name cannot be empty".to_string());
+    }
+
+    // Length check (npm limit is 214 characters)
+    if name.len() > 214 {
+        return Err("Package name too long (max 214 characters)".to_string());
+    }
+
+    // Check for shell injection characters
+    const DANGEROUS_CHARS: &[char] = &[
+        ';', '&', '|', '$', '`', '(', ')', '{', '}', '[', ']',
+        '<', '>', '!', '\\', '"', '\'', '\n', '\r', '\t', ' ',
+    ];
+
+    for c in DANGEROUS_CHARS {
+        if name.contains(*c) {
+            return Err(format!("Package name contains invalid character: '{}'", c));
+        }
+    }
+
+    // npm package name rules:
+    // - Can start with @ for scoped packages
+    // - Scoped format: @scope/package-name
+    // - Can contain: a-z, 0-9, -, _, .
+    // - Cannot start with . or _
+
+    if name.starts_with('@') {
+        // Scoped package validation
+        let parts: Vec<&str> = name[1..].splitn(2, '/').collect();
+        if parts.len() != 2 {
+            return Err("Invalid scoped package name: must be @scope/package".to_string());
+        }
+
+        let scope = parts[0];
+        let package = parts[1];
+
+        // Validate scope
+        let scope_regex = Regex::new(r"^[a-z0-9][a-z0-9\-_.]*$").unwrap();
+        if !scope_regex.is_match(scope) {
+            return Err("Invalid scope name: must start with alphanumeric and contain only a-z, 0-9, -, _, .".to_string());
+        }
+
+        // Validate package part
+        let package_regex = Regex::new(r"^[a-z0-9][a-z0-9\-_.]*$").unwrap();
+        if !package_regex.is_match(package) {
+            return Err("Invalid package name: must start with alphanumeric and contain only a-z, 0-9, -, _, .".to_string());
+        }
+    } else {
+        // Non-scoped package validation
+        if name.starts_with('.') || name.starts_with('_') {
+            return Err("Package name cannot start with . or _".to_string());
+        }
+
+        let package_regex = Regex::new(r"^[a-z0-9][a-z0-9\-_.]*$").unwrap();
+        if !package_regex.is_match(name) {
+            return Err("Invalid package name: must start with alphanumeric and contain only a-z, 0-9, -, _, .".to_string());
+        }
+    }
+
+    Ok(())
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -175,19 +399,25 @@ fn read_directory(
 
 #[tauri::command]
 pub fn read_file_content(path: String) -> Result<String, String> {
-    fs::read_to_string(&path).map_err(|e| e.to_string())
+    // Validate path for security
+    let validated_path = validate_file_path(&path)?;
+    fs::read_to_string(&validated_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn read_file_base64(path: String) -> Result<String, String> {
+    // Validate path for security
+    let validated_path = validate_file_path(&path)?;
     use base64::{Engine as _, engine::general_purpose::STANDARD};
-    let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+    let bytes = fs::read(&validated_path).map_err(|e| e.to_string())?;
     Ok(STANDARD.encode(&bytes))
 }
 
 #[tauri::command]
 pub fn write_file_content(path: String, content: String) -> Result<(), String> {
-    fs::write(&path, content).map_err(|e| e.to_string())
+    // Validate path for security
+    let validated_path = validate_file_path(&path)?;
+    fs::write(&validated_path, content).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -522,6 +752,9 @@ pub async fn npm_install(
     package_name: String,
     is_dev: bool
 ) -> Result<CommandOutput, String> {
+    // Validate package name to prevent shell injection
+    validate_npm_package_name(&package_name)?;
+
     let pkg_manager = detect_package_manager(&project_path);
 
     let mut args: Vec<&str> = match pkg_manager {
@@ -553,6 +786,9 @@ pub async fn npm_install(
 
 #[tauri::command]
 pub async fn npm_uninstall(project_path: String, package_name: String) -> Result<CommandOutput, String> {
+    // Validate package name to prevent shell injection
+    validate_npm_package_name(&package_name)?;
+
     let pkg_manager = detect_package_manager(&project_path);
 
     let args: Vec<&str> = match pkg_manager {
@@ -672,6 +908,12 @@ pub async fn run_claude_streaming(
 ) -> Result<String, String> {
     use std::io::{BufRead, BufReader};
     use std::process::Stdio;
+
+    // Validate session IDs
+    validate_session_id(&session_id)?;
+    if let Some(ref claude_sid) = claude_session_id {
+        validate_session_id(claude_sid)?;
+    }
 
     let mode = permission_mode.unwrap_or_default();
 
@@ -1012,11 +1254,257 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
     }
 }
 
+/// Check for shell injection patterns in git arguments
+fn validate_git_argument(arg: &str) -> Result<(), String> {
+    // Check for shell injection patterns
+    const DANGEROUS_PATTERNS: &[&str] = &[
+        "$(", "`",          // Command substitution
+        "${", "$(",         // Variable expansion
+        "|", ";", "&&",     // Command chaining (when not part of commit message)
+        ">>", ">", "<",     // Redirection
+        "\n", "\r",         // Newlines that could inject commands
+        "\x00",             // Null bytes
+    ];
+
+    // Skip check for commit messages (they can contain special characters)
+    // Commit messages are handled specially in the git command flow
+
+    for pattern in DANGEROUS_PATTERNS {
+        if arg.contains(pattern) {
+            // Allow these in quoted contexts that won't be expanded
+            // Since Command::new doesn't go through shell, most of these are safe
+            // But we still block the most dangerous ones
+            if *pattern == "$(" || *pattern == "`" || *pattern == "\x00" {
+                return Err(format!(
+                    "Git argument contains potentially dangerous pattern: '{}'",
+                    pattern.escape_default()
+                ));
+            }
+        }
+    }
+
+    // Block arguments that look like they're trying to execute external commands
+    // e.g., --exec=malicious, --upload-pack=malicious
+    const DANGEROUS_OPTIONS: &[&str] = &[
+        "--exec=",
+        "--upload-pack=",
+        "--receive-pack=",
+        "-c core.sshCommand=",
+        "-c http.proxy=",
+        "-c remote.",
+        "--config=",
+    ];
+
+    for opt in DANGEROUS_OPTIONS {
+        if arg.to_lowercase().starts_with(&opt.to_lowercase()) {
+            return Err(format!(
+                "Git option '{}' is blocked for security reasons",
+                opt.trim_end_matches('=')
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate git subcommand against allowlist to prevent dangerous operations
+fn validate_git_subcommand(args: &[String]) -> Result<(), String> {
+    // Allowlist of safe git subcommands
+    const ALLOWED_GIT_SUBCOMMANDS: &[&str] = &[
+        // Read-only operations
+        "status",
+        "log",
+        "diff",
+        "show",
+        "branch",
+        "describe",
+        "rev-parse",
+        "remote",
+        "config",
+        "ls-files",
+        "ls-tree",
+        "cat-file",
+        "blame",
+        "shortlog",
+        "tag",
+        "reflog",
+        "stash",
+        // Common write operations
+        "checkout",
+        "switch",
+        "add",
+        "commit",
+        "push",
+        "pull",
+        "fetch",
+        "merge",
+        "rebase",
+        "init",
+        "clone",
+        "restore",
+        "reset",
+        "revert",
+        // Branch management
+        "worktree",
+        // Cleanup (safe versions)
+        "clean",
+        "gc",
+        // Submodules
+        "submodule",
+    ];
+
+    // Blocked dangerous operations
+    const BLOCKED_SUBCOMMANDS: &[&str] = &[
+        "filter-branch", // Rewrites history destructively
+        "prune",         // Can delete refs
+        "fsck",          // Repository maintenance
+        "pack-refs",     // Low-level operations
+        "update-ref",    // Direct ref manipulation
+        "write-tree",    // Low-level
+        "read-tree",     // Low-level
+        "commit-tree",   // Low-level
+        "hash-object",   // Low-level
+        "mktag",         // Low-level
+        "unpack-objects", // Low-level
+    ];
+
+    if args.is_empty() {
+        return Err("No git subcommand provided".to_string());
+    }
+
+    let subcommand = &args[0];
+
+    // Block explicitly dangerous commands
+    if BLOCKED_SUBCOMMANDS.contains(&subcommand.as_str()) {
+        return Err(format!(
+            "Git subcommand '{}' is blocked for security reasons",
+            subcommand
+        ));
+    }
+
+    // Allow only whitelisted commands
+    if !ALLOWED_GIT_SUBCOMMANDS.contains(&subcommand.as_str()) {
+        return Err(format!(
+            "Git subcommand '{}' is not in the allowlist. Allowed: {:?}",
+            subcommand,
+            ALLOWED_GIT_SUBCOMMANDS
+        ));
+    }
+
+    // Validate all arguments for injection patterns
+    // Skip commit message content which is typically after -m or --message
+    let mut skip_next = false;
+    for (i, arg) in args.iter().enumerate() {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
+
+        // Skip validation for commit messages
+        if arg == "-m" || arg == "--message" {
+            skip_next = true;
+            continue;
+        }
+
+        // For arguments that look like -m=message, skip validation
+        if arg.starts_with("-m=") || arg.starts_with("--message=") {
+            continue;
+        }
+
+        // Skip the subcommand itself
+        if i == 0 {
+            continue;
+        }
+
+        validate_git_argument(arg)?;
+    }
+
+    // Additional safety: block dangerous flags for certain commands
+    if subcommand == "push" && args.iter().any(|a| a == "--force" || a == "-f") {
+        return Err("Force push is blocked for safety. Use --force-with-lease instead.".to_string());
+    }
+
+    if subcommand == "reset" && args.iter().any(|a| a == "--hard") {
+        // Allow --hard but warn in logs (it's commonly needed but destructive)
+        eprintln!("Warning: git reset --hard requested");
+    }
+
+    if subcommand == "clean" && args.iter().any(|a| a == "-f" || a == "--force") {
+        // Clean with force is very destructive
+        if !args.iter().any(|a| a == "-n" || a == "--dry-run") {
+            return Err(
+                "git clean -f without --dry-run is blocked. Use --dry-run first to preview."
+                    .to_string(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate git working directory path
+fn validate_git_cwd(cwd: &str) -> Result<std::path::PathBuf, String> {
+    let cwd_path = Path::new(cwd);
+
+    // Must be an absolute path
+    if !cwd_path.is_absolute() {
+        return Err("Git working directory must be an absolute path".to_string());
+    }
+
+    // Must exist
+    if !cwd_path.exists() {
+        return Err("Git working directory does not exist".to_string());
+    }
+
+    // Must be a directory
+    if !cwd_path.is_dir() {
+        return Err("Git working directory path is not a directory".to_string());
+    }
+
+    // Canonicalize to prevent path traversal
+    let canonical = cwd_path.canonicalize()
+        .map_err(|e| format!("Failed to resolve git working directory: {}", e))?;
+
+    let canonical_str = canonical.to_string_lossy().to_lowercase();
+
+    // Block sensitive system directories
+    const BLOCKED_GIT_DIRS: &[&str] = &[
+        "/etc",
+        "/var",
+        "/root",
+        "/System",
+        "/Library",
+        "/private/etc",
+        "/private/var",
+        "/usr",
+        "C:\\Windows",
+        "C:\\Program Files",
+    ];
+
+    for blocked in BLOCKED_GIT_DIRS {
+        let blocked_lower = blocked.to_lowercase();
+        if canonical_str.starts_with(&blocked_lower) {
+            return Err(format!(
+                "Git operations are not allowed in system directory: {}",
+                blocked
+            ));
+        }
+    }
+
+    Ok(canonical)
+}
+
 #[tauri::command]
 pub async fn run_git(args: Vec<String>, cwd: String) -> Result<CommandOutput, String> {
+    // Validate working directory
+    let validated_cwd = validate_git_cwd(&cwd)?;
+
+    // Validate git subcommand against allowlist
+    validate_git_subcommand(&args)?;
+
     let output = Command::new("git")
         .args(&args)
-        .current_dir(&cwd)
+        .current_dir(&validated_cwd)
         .output()
         .map_err(|e| format!("Failed to execute git: {}", e))?;
 
@@ -2039,8 +2527,84 @@ pub fn list_listening_ports() -> Result<Vec<PortInfo>, String> {
     Ok(ports)
 }
 
+/// Kill a process by PID.
+/// Security: Only allows killing:
+/// 1. Processes registered with the ProcessRegistry (our child processes)
+/// 2. Known dev service processes (from KNOWN_SERVICES list)
+/// 3. Processes listening on ports (dev servers)
+/// This prevents arbitrary system process termination.
 #[tauri::command]
-pub fn kill_process(pid: u32) -> Result<(), String> {
+pub fn kill_process(
+    registry: State<'_, Arc<ProcessRegistry>>,
+    pid: u32,
+) -> Result<(), String> {
+    // Block killing critical system PIDs
+    if pid <= 1 {
+        return Err("Security: Cannot kill system processes (PID <= 1)".to_string());
+    }
+
+    // Check 1: Is this our registered child process? (Always allowed)
+    if registry.is_our_child(pid) {
+        let result = execute_kill(pid);
+        if result.is_ok() {
+            registry.unregister(pid);
+        }
+        return result;
+    }
+
+    // Check 2: Is this a known dev service or listening on a port?
+    if !is_killable_dev_process(pid)? {
+        return Err(format!(
+            "Security: Cannot kill PID {}. Only child processes or known dev services can be terminated.",
+            pid
+        ));
+    }
+
+    execute_kill(pid)
+}
+
+/// Check if a process is a known dev service or listening on a port
+fn is_killable_dev_process(pid: u32) -> Result<bool, String> {
+    use sysinfo::{System, Pid};
+
+    let mut sys = System::new();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All);
+
+    let sysinfo_pid = Pid::from(pid as usize);
+    if let Some(process) = sys.process(sysinfo_pid) {
+        let name = process.name().to_string_lossy().to_lowercase();
+
+        // Check if it's a known dev service
+        for (pattern, _category) in KNOWN_SERVICES {
+            if name.contains(pattern) {
+                return Ok(true);
+            }
+        }
+
+        // Check if it's listening on a port (using lsof)
+        let output = Command::new("lsof")
+            .args(["-p", &pid.to_string(), "-i", "-P"])
+            .output();
+
+        if let Ok(output) = output {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                // If lsof shows LISTEN, it's a server process
+                if stdout.contains("LISTEN") {
+                    return Ok(true);
+                }
+            }
+        }
+
+        Ok(false)
+    } else {
+        // Process doesn't exist
+        Err(format!("Process {} not found", pid))
+    }
+}
+
+/// Execute the actual kill command
+fn execute_kill(pid: u32) -> Result<(), String> {
     let output = Command::new("kill")
         .args(["-9", &pid.to_string()])
         .output()

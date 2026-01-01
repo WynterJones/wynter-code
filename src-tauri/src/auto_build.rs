@@ -62,6 +62,26 @@ fn get_silo_path(project_path: &str) -> std::path::PathBuf {
     Path::new(project_path).join("_SILO")
 }
 
+fn get_backlog_path(project_path: &str) -> std::path::PathBuf {
+    Path::new(project_path)
+        .join(".beads")
+        .join(".autobuild-backlog.json")
+}
+
+/// Persistent backlog that survives app restarts
+/// This is separate from the session - session can be cleared while backlog persists
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AutoBuildBacklog {
+    /// Issue IDs in the backlog (ordered)
+    pub issues: Vec<String>,
+    /// Issue IDs completed in this project (rolling history)
+    pub completed: Vec<String>,
+    /// Issue IDs awaiting human review
+    pub human_review: Vec<String>,
+    /// When the backlog was last updated
+    pub updated_at: String,
+}
+
 fn get_silo_file_path(project_path: &str, issue_id: &str) -> std::path::PathBuf {
     get_silo_path(project_path).join(format!("{}.md", issue_id))
 }
@@ -114,6 +134,223 @@ pub async fn auto_build_clear_session(project_path: String) -> Result<(), String
     }
 
     Ok(())
+}
+
+// ============================================================================
+// PERSISTENT BACKLOG COMMANDS
+// The backlog is independent of the session and survives app restarts
+// ============================================================================
+
+#[tauri::command]
+pub async fn auto_build_save_backlog(
+    project_path: String,
+    backlog: AutoBuildBacklog,
+) -> Result<(), String> {
+    let backlog_path = get_backlog_path(&project_path);
+
+    // Ensure .beads directory exists
+    if let Some(parent) = backlog_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let json = serde_json::to_string_pretty(&backlog)
+        .map_err(|e| format!("Failed to serialize backlog: {}", e))?;
+
+    fs::write(&backlog_path, json)
+        .map_err(|e| format!("Failed to write backlog file: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn auto_build_load_backlog(project_path: String) -> Result<Option<AutoBuildBacklog>, String> {
+    let backlog_path = get_backlog_path(&project_path);
+
+    if !backlog_path.exists() {
+        return Ok(None);
+    }
+
+    let content = fs::read_to_string(&backlog_path)
+        .map_err(|e| format!("Failed to read backlog file: {}", e))?;
+
+    let backlog: AutoBuildBacklog = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse backlog file: {}", e))?;
+
+    Ok(Some(backlog))
+}
+
+#[tauri::command]
+pub async fn auto_build_add_to_backlog(
+    project_path: String,
+    issue_id: String,
+) -> Result<AutoBuildBacklog, String> {
+    let backlog_path = get_backlog_path(&project_path);
+
+    // Load existing or create new
+    let mut backlog = if backlog_path.exists() {
+        let content = fs::read_to_string(&backlog_path)
+            .map_err(|e| format!("Failed to read backlog: {}", e))?;
+        serde_json::from_str(&content).unwrap_or_else(|_| AutoBuildBacklog {
+            issues: Vec::new(),
+            completed: Vec::new(),
+            human_review: Vec::new(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        })
+    } else {
+        AutoBuildBacklog {
+            issues: Vec::new(),
+            completed: Vec::new(),
+            human_review: Vec::new(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        }
+    };
+
+    // Add if not already present
+    if !backlog.issues.contains(&issue_id) {
+        backlog.issues.push(issue_id);
+        backlog.updated_at = chrono::Utc::now().to_rfc3339();
+
+        // Ensure .beads directory exists
+        if let Some(parent) = backlog_path.parent() {
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+        }
+
+        let json = serde_json::to_string_pretty(&backlog)
+            .map_err(|e| format!("Failed to serialize backlog: {}", e))?;
+        fs::write(&backlog_path, json)
+            .map_err(|e| format!("Failed to write backlog: {}", e))?;
+    }
+
+    Ok(backlog)
+}
+
+#[tauri::command]
+pub async fn auto_build_remove_from_backlog(
+    project_path: String,
+    issue_id: String,
+) -> Result<AutoBuildBacklog, String> {
+    let backlog_path = get_backlog_path(&project_path);
+
+    if !backlog_path.exists() {
+        return Ok(AutoBuildBacklog {
+            issues: Vec::new(),
+            completed: Vec::new(),
+            human_review: Vec::new(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        });
+    }
+
+    let content = fs::read_to_string(&backlog_path)
+        .map_err(|e| format!("Failed to read backlog: {}", e))?;
+
+    let mut backlog: AutoBuildBacklog = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse backlog: {}", e))?;
+
+    backlog.issues.retain(|id| id != &issue_id);
+    backlog.updated_at = chrono::Utc::now().to_rfc3339();
+
+    let json = serde_json::to_string_pretty(&backlog)
+        .map_err(|e| format!("Failed to serialize backlog: {}", e))?;
+    fs::write(&backlog_path, json)
+        .map_err(|e| format!("Failed to write backlog: {}", e))?;
+
+    Ok(backlog)
+}
+
+#[tauri::command]
+pub async fn auto_build_complete_in_backlog(
+    project_path: String,
+    issue_id: String,
+) -> Result<AutoBuildBacklog, String> {
+    let backlog_path = get_backlog_path(&project_path);
+
+    let mut backlog = if backlog_path.exists() {
+        let content = fs::read_to_string(&backlog_path)
+            .map_err(|e| format!("Failed to read backlog: {}", e))?;
+        serde_json::from_str(&content).unwrap_or_else(|_| AutoBuildBacklog {
+            issues: Vec::new(),
+            completed: Vec::new(),
+            human_review: Vec::new(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        })
+    } else {
+        AutoBuildBacklog {
+            issues: Vec::new(),
+            completed: Vec::new(),
+            human_review: Vec::new(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        }
+    };
+
+    // Remove from issues/human_review, add to completed
+    backlog.issues.retain(|id| id != &issue_id);
+    backlog.human_review.retain(|id| id != &issue_id);
+
+    // Add to completed (keep rolling history of last 50)
+    if !backlog.completed.contains(&issue_id) {
+        backlog.completed.push(issue_id);
+        if backlog.completed.len() > 50 {
+            backlog.completed.remove(0);
+        }
+    }
+    backlog.updated_at = chrono::Utc::now().to_rfc3339();
+
+    // Ensure .beads directory exists
+    if let Some(parent) = backlog_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let json = serde_json::to_string_pretty(&backlog)
+        .map_err(|e| format!("Failed to serialize backlog: {}", e))?;
+    fs::write(&backlog_path, json)
+        .map_err(|e| format!("Failed to write backlog: {}", e))?;
+
+    Ok(backlog)
+}
+
+#[tauri::command]
+pub async fn auto_build_move_to_review(
+    project_path: String,
+    issue_id: String,
+) -> Result<AutoBuildBacklog, String> {
+    let backlog_path = get_backlog_path(&project_path);
+
+    let mut backlog = if backlog_path.exists() {
+        let content = fs::read_to_string(&backlog_path)
+            .map_err(|e| format!("Failed to read backlog: {}", e))?;
+        serde_json::from_str(&content).unwrap_or_else(|_| AutoBuildBacklog {
+            issues: Vec::new(),
+            completed: Vec::new(),
+            human_review: Vec::new(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        })
+    } else {
+        AutoBuildBacklog {
+            issues: Vec::new(),
+            completed: Vec::new(),
+            human_review: Vec::new(),
+            updated_at: chrono::Utc::now().to_rfc3339(),
+        }
+    };
+
+    // Remove from issues, add to human_review
+    backlog.issues.retain(|id| id != &issue_id);
+    if !backlog.human_review.contains(&issue_id) {
+        backlog.human_review.push(issue_id);
+    }
+    backlog.updated_at = chrono::Utc::now().to_rfc3339();
+
+    // Ensure .beads directory exists
+    if let Some(parent) = backlog_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let json = serde_json::to_string_pretty(&backlog)
+        .map_err(|e| format!("Failed to serialize backlog: {}", e))?;
+    fs::write(&backlog_path, json)
+        .map_err(|e| format!("Failed to write backlog: {}", e))?;
+
+    Ok(backlog)
 }
 
 // SILO progress file management

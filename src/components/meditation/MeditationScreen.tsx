@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useState } from "react";
+import { useEffect, useCallback, useMemo, useState, useRef } from "react";
 import { Radio } from "lucide-react";
 import { PlanetCarousel } from "./PlanetCarousel";
 import { MeditationAudioPlayer } from "./MeditationAudioPlayer";
@@ -21,6 +21,7 @@ export function MeditationScreen() {
 
   const [ambientPhase, setAmbientPhase] = useState(0);
   const [activePhrase, setActivePhrase] = useState<string | null>(null);
+  const phraseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const POSITIVE_PHRASES = [
     "Create", "Dream", "Love", "Believe", "Be", "Shine", "Grow",
@@ -36,11 +37,25 @@ export function MeditationScreen() {
       if (Math.random() < 1/1400 && !activePhrase) {
         const phrase = POSITIVE_PHRASES[Math.floor(Math.random() * POSITIVE_PHRASES.length)];
         setActivePhrase(phrase);
-        setTimeout(() => setActivePhrase(null), 6000); // 6s duration
+        // Clear any existing timeout before setting a new one
+        if (phraseTimeoutRef.current) {
+          clearTimeout(phraseTimeoutRef.current);
+        }
+        phraseTimeoutRef.current = setTimeout(() => {
+          setActivePhrase(null);
+          phraseTimeoutRef.current = null;
+        }, 6000); // 6s duration
       }
 
     }, 300); // Complete cycle every ~108 seconds
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Clean up pending phrase timeout to prevent memory leaks
+      if (phraseTimeoutRef.current) {
+        clearTimeout(phraseTimeoutRef.current);
+        phraseTimeoutRef.current = null;
+      }
+    };
   }, [activePhrase]);
 
   const handleClose = useCallback(() => {
@@ -64,31 +79,56 @@ export function MeditationScreen() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Generate static stars
+  // Generate static stars with pre-computed styles
   const stars = useMemo(() => {
-    return Array.from({ length: 100 }).map((_, i) => ({
-      id: i,
-      x: Math.random() * 100,
-      y: Math.random() * 100,
-      size: Math.random() * 2 + 0.5,
-      opacity: Math.random() * 0.5 + 0.15,
-      twinkleDelay: Math.random() * 8,
-      twinkleDuration: 3 + Math.random() * 4,
-    }));
+    return Array.from({ length: 100 }).map((_, i) => {
+      const x = Math.random() * 100;
+      const y = Math.random() * 100;
+      const size = Math.random() * 2 + 0.5;
+      const opacity = Math.random() * 0.5 + 0.15;
+      const twinkleDelay = Math.random() * 8;
+      const twinkleDuration = 3 + Math.random() * 4;
+      return {
+        id: i,
+        style: {
+          left: `${x}%`,
+          top: `${y}%`,
+          width: `${size}px`,
+          height: `${size}px`,
+          opacity,
+          animation: `twinkle ${twinkleDuration}s ease-in-out infinite`,
+          animationDelay: `${twinkleDelay}s`,
+        } as React.CSSProperties,
+      };
+    });
   }, []);
 
-  // Generate shooting stars - very rare (once every 2-4 minutes)
+  // Generate shooting stars with pre-computed styles - very rare (once every 2-4 minutes)
   const shootingStars = useMemo(() => {
-    return Array.from({ length: 1 }).map((_, i) => ({
-      id: i,
-      startX: 5 + Math.random() * 35,
-      startY: Math.random() * 25,
-      angle: 25 + Math.random() * 35,
-      delay: 60 + Math.random() * 60, // First one after 1-2 minutes
-      cycleDuration: 120 + Math.random() * 120, // Then every 2-4 minutes
-      duration: 1.5,
-      length: 120 + Math.random() * 60,
-    }));
+    return Array.from({ length: 1 }).map((_, i) => {
+      const startX = 5 + Math.random() * 35;
+      const startY = Math.random() * 25;
+      const angle = 25 + Math.random() * 35;
+      const delay = 60 + Math.random() * 60;
+      const cycleDuration = 120 + Math.random() * 120;
+      const length = 120 + Math.random() * 60;
+      return {
+        id: i,
+        style: {
+          left: `${startX}%`,
+          top: `${startY}%`,
+          width: `${length}px`,
+          height: "1.5px",
+          background: `linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 40%, rgba(255, 255, 255, 0.9) 80%, white 100%)`,
+          transform: `rotate(${angle}deg)`,
+          animation: `shooting-star ${cycleDuration}s linear infinite`,
+          animationDelay: `${delay}s`,
+          opacity: 0,
+          filter: "blur(0.3px)",
+          boxShadow: "0 0 6px rgba(255, 255, 255, 0.6)",
+        } as React.CSSProperties,
+      };
+    });
   }, []);
 
   // Calculate ambient light color based on phase
@@ -128,15 +168,7 @@ export function MeditationScreen() {
           <div
             key={star.id}
             className="absolute rounded-full bg-white"
-            style={{
-              left: `${star.x}%`,
-              top: `${star.y}%`,
-              width: `${star.size}px`,
-              height: `${star.size}px`,
-              opacity: star.opacity,
-              animation: `twinkle ${star.twinkleDuration}s ease-in-out infinite`,
-              animationDelay: `${star.twinkleDelay}s`,
-            }}
+            style={star.style}
           />
         ))}
       </div>
@@ -147,19 +179,7 @@ export function MeditationScreen() {
           <div
             key={star.id}
             className="absolute"
-            style={{
-              left: `${star.startX}%`,
-              top: `${star.startY}%`,
-              width: `${star.length}px`,
-              height: "1.5px",
-              background: `linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.6) 40%, rgba(255, 255, 255, 0.9) 80%, white 100%)`,
-              transform: `rotate(${star.angle}deg)`,
-              animation: `shooting-star ${star.cycleDuration}s linear infinite`,
-              animationDelay: `${star.delay}s`,
-              opacity: 0,
-              filter: "blur(0.3px)",
-              boxShadow: "0 0 6px rgba(255, 255, 255, 0.6)",
-            }}
+            style={star.style}
           />
         ))}
       </div>

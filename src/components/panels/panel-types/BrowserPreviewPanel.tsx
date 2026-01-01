@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, KeyboardEvent, useEffect } from "react";
 import { Globe, RefreshCw, ExternalLink, ArrowLeft, ArrowRight, AlertTriangle, ShieldX, ShieldAlert } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/urlSecurity";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps } from "@/types/panel";
@@ -95,9 +95,13 @@ export function BrowserPreviewPanel({
     }
   }, [currentUrl]);
 
-  const handleOpenExternal = useCallback(() => {
+  const handleOpenExternal = useCallback(async () => {
     if (currentUrl) {
-      open(currentUrl);
+      try {
+        await openExternalUrl(currentUrl);
+      } catch (err) {
+        console.error("Failed to open URL:", err);
+      }
     }
   }, [currentUrl]);
 

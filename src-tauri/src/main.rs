@@ -30,6 +30,7 @@ mod vibrancy;
 mod watcher;
 mod webcam_window;
 mod camera_permission;
+mod process_registry;
 
 use std::sync::Arc;
 use tauri::{
@@ -181,6 +182,7 @@ fn main() {
 
             Ok(())
         })
+        .manage(Arc::new(process_registry::ProcessRegistry::new()))
         .manage(Arc::new(terminal::PtyManager::new()))
         .manage(Arc::new(tunnel::TunnelManager::new()))
         .manage(Arc::new(watcher::FileWatcherManager::new()))
@@ -310,6 +312,13 @@ fn main() {
             auto_build::auto_build_save_session,
             auto_build::auto_build_load_session,
             auto_build::auto_build_clear_session,
+            // Auto Build Backlog (persistent, survives restarts)
+            auto_build::auto_build_save_backlog,
+            auto_build::auto_build_load_backlog,
+            auto_build::auto_build_add_to_backlog,
+            auto_build::auto_build_remove_from_backlog,
+            auto_build::auto_build_complete_in_backlog,
+            auto_build::auto_build_move_to_review,
             auto_build::auto_build_run_claude,
             auto_build::auto_build_run_verification,
             auto_build::auto_build_commit,

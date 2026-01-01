@@ -24,6 +24,7 @@ const PARTICLE_COLORS: Record<ParticleType, number[]> = {
 
 export class FarmParticleEmitter extends Container {
   private pools: Map<ParticleType, ParticlePool> = new Map();
+  private pendingTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
 
   constructor() {
     super();
@@ -187,7 +188,8 @@ export class FarmParticleEmitter extends Container {
     });
 
     // Second wave of confetti after a short delay simulation
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
+      this.pendingTimeouts.delete(timeoutId);
       this.emitParticles({
         type: "confetti",
         position,
@@ -197,6 +199,7 @@ export class FarmParticleEmitter extends Container {
         speed: 120,
       });
     }, 200);
+    this.pendingTimeouts.add(timeoutId);
   }
 
   update(dt: number): void {
@@ -212,6 +215,12 @@ export class FarmParticleEmitter extends Container {
   }
 
   destroy(): void {
+    // Clear all pending timeouts to prevent memory leaks
+    for (const timeoutId of this.pendingTimeouts) {
+      clearTimeout(timeoutId);
+    }
+    this.pendingTimeouts.clear();
+
     for (const pool of this.pools.values()) {
       pool.destroy();
     }

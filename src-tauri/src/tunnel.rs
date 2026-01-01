@@ -7,6 +7,29 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{Emitter, State};
 use uuid::Uuid;
 
+use crate::process_registry::ProcessRegistry;
+
+/// Valid port range for tunnels (non-privileged ports only)
+const MIN_TUNNEL_PORT: u16 = 1024;
+const MAX_TUNNEL_PORT: u16 = 65535;
+
+/// Validate that a port is in a safe range for tunneling
+fn validate_tunnel_port(port: u16) -> Result<(), String> {
+    if port < MIN_TUNNEL_PORT {
+        return Err(format!(
+            "Security: Port {} is in the privileged range (< {}). Use a port >= {}",
+            port, MIN_TUNNEL_PORT, MIN_TUNNEL_PORT
+        ));
+    }
+    if port > MAX_TUNNEL_PORT {
+        return Err(format!(
+            "Security: Port {} is invalid. Maximum port is {}",
+            port, MAX_TUNNEL_PORT
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Clone, Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
 pub enum TunnelStatus {
@@ -59,6 +82,7 @@ impl TunnelManager {
     }
 
     /// Get info for a specific tunnel by ID
+    #[allow(dead_code)]
     pub fn get_tunnel_info(&self, tunnel_id: &str) -> Option<TunnelInfo> {
         let tunnels = self.tunnels.lock().unwrap();
         tunnels.get(tunnel_id).map(|instance| TunnelInfo {
@@ -85,6 +109,7 @@ impl TunnelManager {
     }
 
     /// Get tunnel URL and status for immediate response
+    #[allow(dead_code)]
     pub fn get_tunnel_status(&self, tunnel_id: &str) -> Option<(Option<String>, TunnelStatus)> {
         let tunnels = self.tunnels.lock().unwrap();
         tunnels.get(tunnel_id).map(|t| (t.url.clone(), t.status.clone()))
@@ -111,8 +136,12 @@ pub async fn check_cloudflared_installed() -> Result<bool, String> {
 pub async fn start_tunnel(
     window: tauri::WebviewWindow,
     state: State<'_, Arc<TunnelManager>>,
+    registry: State<'_, Arc<ProcessRegistry>>,
     port: u16,
 ) -> Result<String, String> {
+    // Security: Validate port is in allowed range
+    validate_tunnel_port(port)?;
+
     let tunnel_id = Uuid::new_v4().to_string();
     let created_at = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -159,6 +188,9 @@ pub async fn start_tunnel(
         })?;
 
     let child_pid = child.id();
+
+    // Register with process registry for safe termination
+    registry.register(child_pid);
 
     // Update with PID
     {
@@ -276,6 +308,7 @@ pub async fn start_tunnel(
 #[tauri::command]
 pub async fn stop_tunnel(
     state: State<'_, Arc<TunnelManager>>,
+    registry: State<'_, Arc<ProcessRegistry>>,
     tunnel_id: String,
 ) -> Result<(), String> {
     let child_pid = {
@@ -290,6 +323,8 @@ pub async fn stop_tunnel(
         let _ = Command::new("kill")
             .args(["-9", &pid.to_string()])
             .output();
+        // Unregister from process registry
+        registry.unregister(pid);
     }
 
     // Remove from manager

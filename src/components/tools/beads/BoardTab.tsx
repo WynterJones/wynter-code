@@ -196,9 +196,8 @@ export function BoardTab() {
       closed: [],
     };
 
-    // Filter out epic issues and group by status
+    // Group all issues (including epics) by status
     for (const issue of issues) {
-      if (issue.issue_type === "epic") continue;
       if (result[issue.status]) {
         result[issue.status].push(issue);
       }

@@ -109,6 +109,11 @@ interface AutoBuildActions {
   loadSession: () => Promise<boolean>;
   clearSession: () => Promise<void>;
 
+  // Persistent Backlog (survives app restarts)
+  saveBacklog: () => Promise<void>;
+  loadBacklog: () => Promise<void>;
+  syncBacklogToFile: () => Promise<void>;
+
   // Human Review
   moveToReview: (issueId: string) => void;
   completeReview: (issueId: string) => Promise<void>;
@@ -234,19 +239,21 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
 
   // Queue Management
   addToQueue: (issueId) => {
-    const { queue, saveSession } = get();
+    const { queue, saveSession, syncBacklogToFile } = get();
     if (!queue.includes(issueId)) {
       set({ queue: [...queue, issueId] });
-      // Persist immediately
+      // Persist to both session and backlog
       saveSession();
+      syncBacklogToFile();
     }
   },
 
   removeFromQueue: (issueId) => {
-    const { queue, saveSession } = get();
+    const { queue, saveSession, syncBacklogToFile } = get();
     set({ queue: queue.filter((id) => id !== issueId) });
-    // Persist immediately
+    // Persist to both session and backlog
     saveSession();
+    syncBacklogToFile();
   },
 
   reorderQueue: (fromIndex, toIndex) => {
@@ -451,7 +458,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
 
   // Human Review Actions
   moveToReview: (issueId) => {
-    const { queue, humanReview, addLog, getCachedIssue } = get();
+    const { queue, humanReview, addLog, getCachedIssue, syncBacklogToFile } = get();
     const issue = getCachedIssue(issueId);
     set({
       queue: queue.filter((id) => id !== issueId),
@@ -460,10 +467,12 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
       currentPhase: "reviewing",
     });
     addLog("info", `Moved to Human Review: ${issue?.title || issueId}`, issueId);
+    // Sync to persistent backlog
+    syncBacklogToFile();
   },
 
   completeReview: async (issueId) => {
-    const { humanReview, completed, projectPath, addLog, getCachedIssue, closeIssue, commitChanges, settings, createPullRequest, returnToOriginalBranch, clearSession } = get();
+    const { humanReview, completed, projectPath, addLog, getCachedIssue, closeIssue, commitChanges, settings, createPullRequest, returnToOriginalBranch, clearSession, syncBacklogToFile } = get();
     const issue = getCachedIssue(issueId);
 
     // Commit if auto-commit is enabled
@@ -484,6 +493,8 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
       completed: [...completed.slice(-9), issueId],
     });
     addLog("success", `Review approved: ${issue?.title || issueId}`, issueId);
+    // Sync to persistent backlog
+    await syncBacklogToFile();
 
     // If this was the last review item, finalize the session
     if (remainingReviews.length === 0 && get().queue.length === 0) {
@@ -502,7 +513,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
   },
 
   requestRefactor: async (issueId, reason) => {
-    const { humanReview, queue, projectPath, addLog, getCachedIssue } = get();
+    const { humanReview, queue, projectPath, addLog, getCachedIssue, syncBacklogToFile } = get();
     const issue = getCachedIssue(issueId);
 
     if (!projectPath) return;
@@ -526,6 +537,8 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
         humanReview: humanReview.filter((id) => id !== issueId),
         queue: [issueId, ...queue], // Add to front of queue
       });
+      // Sync to persistent backlog
+      await syncBacklogToFile();
       addLog("info", `Refactor requested: ${issue?.title || issueId}`, issueId);
     } catch (err) {
       addLog("error", `Failed to create refactor issue: ${err}`, issueId);
@@ -636,7 +649,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
   },
 
   loadSession: async () => {
-    const { projectPath, addLog } = get();
+    const { projectPath, addLog, loadBacklog } = get();
     if (!projectPath) return false;
 
     try {
@@ -682,10 +695,16 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
           addLog("info", `Restored ${session.queue.length} queued issue(s)`);
         }
         return wasActive;
+      } else {
+        // No session file, but try to load the persistent backlog
+        // This allows the backlog to survive even when session is cleared
+        await loadBacklog();
       }
       return false;
     } catch (err) {
       console.error("Failed to load session:", err);
+      // Still try to load backlog even if session load fails
+      await loadBacklog();
       return false;
     }
   },
@@ -698,6 +717,75 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
       await invoke("auto_build_clear_session", { projectPath });
     } catch (err) {
       console.error("Failed to clear session:", err);
+    }
+  },
+
+  // Persistent Backlog (survives app restarts, included in backup)
+  saveBacklog: async () => {
+    const { projectPath, queue, completed, humanReview } = get();
+    if (!projectPath) return;
+
+    try {
+      await invoke("auto_build_save_backlog", {
+        projectPath,
+        backlog: {
+          issues: queue,
+          completed,
+          human_review: humanReview,
+          updated_at: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("Failed to save backlog:", err);
+    }
+  },
+
+  loadBacklog: async () => {
+    const { projectPath, addLog } = get();
+    if (!projectPath) return;
+
+    try {
+      const backlog = await invoke<{
+        issues: string[];
+        completed: string[];
+        human_review: string[];
+        updated_at: string;
+      } | null>("auto_build_load_backlog", { projectPath });
+
+      if (backlog) {
+        set({
+          queue: backlog.issues || [],
+          completed: backlog.completed || [],
+          humanReview: backlog.human_review || [],
+        });
+
+        const totalItems = (backlog.issues?.length || 0) +
+          (backlog.human_review?.length || 0);
+        if (totalItems > 0) {
+          addLog("info", `Restored backlog: ${backlog.issues?.length || 0} queued, ${backlog.human_review?.length || 0} in review`);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load backlog:", err);
+    }
+  },
+
+  syncBacklogToFile: async () => {
+    const { projectPath, queue, completed, humanReview } = get();
+    if (!projectPath) return;
+
+    try {
+      await invoke("auto_build_save_backlog", {
+        projectPath,
+        backlog: {
+          issues: queue,
+          completed,
+          human_review: humanReview,
+          updated_at: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      console.error("Failed to sync backlog:", err);
     }
   },
 

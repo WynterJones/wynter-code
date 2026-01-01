@@ -1,5 +1,5 @@
 import { Lock, Unlock, Star, ExternalLink, Loader2 } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/urlSecurity";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import type { GhRepo } from "@/types/github";
 import { cn } from "@/lib/utils";
@@ -123,9 +123,13 @@ function RepoCard({
         </div>
 
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.stopPropagation();
-            open(repo.url);
+            try {
+              await openExternalUrl(repo.url);
+            } catch (err) {
+              console.error("Failed to open repo URL:", err);
+            }
           }}
           className="p-2 rounded hover:bg-bg-hover text-text-tertiary hover:text-text-primary"
           title="Open in browser"

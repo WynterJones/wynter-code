@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Star, ExternalLink, Loader2 } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/urlSecurity";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { useGitHubManagerStore } from "@/stores/githubManagerStore";
 import type { GhSearchRepo } from "@/types/github";
@@ -88,8 +88,12 @@ export function SearchPanel() {
 }
 
 function SearchResultCard({ repo }: { repo: GhSearchRepo }) {
-  const handleOpenRepo = () => {
-    open(repo.url);
+  const handleOpenRepo = async () => {
+    try {
+      await openExternalUrl(repo.url);
+    } catch (err) {
+      console.error("Failed to open repo URL:", err);
+    }
   };
 
   return (

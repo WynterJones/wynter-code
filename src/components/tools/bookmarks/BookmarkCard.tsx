@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { ExternalLink, Edit2, Trash2, GripVertical, CheckSquare, Square } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/urlSecurity";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
@@ -100,7 +100,7 @@ export function BookmarkCard({
       onToggleSelection(bookmark.id);
     } else {
       try {
-        await open(bookmark.url);
+        await openExternalUrl(bookmark.url);
       } catch (err) {
         console.error("Failed to open URL:", err);
       }

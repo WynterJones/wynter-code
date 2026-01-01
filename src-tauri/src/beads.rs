@@ -1,8 +1,87 @@
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
 
 use crate::path_utils::get_enhanced_path;
+
+/// Validate a beads issue ID to prevent command injection
+/// Format: alphanumeric with optional hyphens and dots (e.g., "project-123", "project-123.1")
+fn validate_issue_id(id: &str) -> Result<(), String> {
+    if id.is_empty() || id.len() > 100 {
+        return Err("Invalid issue ID: must be 1-100 characters".to_string());
+    }
+
+    // Issue ID regex: alphanumeric, hyphens, dots
+    let id_regex = Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9\-\.]*$").unwrap();
+    if !id_regex.is_match(id) {
+        return Err("Invalid issue ID: contains invalid characters".to_string());
+    }
+
+    // No shell metacharacters
+    let forbidden_chars = [
+        '|', '&', ';', '$', '`', '(', ')', '{', '}', '[', ']', '<', '>', '!', '\\', '"', '\'',
+        '\n', '\r', '\t', ' ',
+    ];
+    if id.chars().any(|c| forbidden_chars.contains(&c)) {
+        return Err("Invalid issue ID: contains forbidden characters".to_string());
+    }
+
+    Ok(())
+}
+
+/// Validate issue status against allowlist
+fn validate_status(status: &str) -> Result<(), String> {
+    const ALLOWED_STATUSES: &[&str] = &["open", "in_progress", "blocked", "closed", "deferred"];
+    if !ALLOWED_STATUSES.contains(&status) {
+        return Err(format!(
+            "Invalid status: {}. Allowed: {:?}",
+            status, ALLOWED_STATUSES
+        ));
+    }
+    Ok(())
+}
+
+/// Validate issue type against allowlist
+fn validate_issue_type(issue_type: &str) -> Result<(), String> {
+    const ALLOWED_TYPES: &[&str] = &[
+        "bug",
+        "feature",
+        "task",
+        "epic",
+        "chore",
+        "merge-request",
+        "molecule",
+    ];
+    if !ALLOWED_TYPES.contains(&issue_type) {
+        return Err(format!(
+            "Invalid issue type: {}. Allowed: {:?}",
+            issue_type, ALLOWED_TYPES
+        ));
+    }
+    Ok(())
+}
+
+/// Validate priority (0-4)
+fn validate_priority(priority: u8) -> Result<(), String> {
+    if priority > 4 {
+        return Err("Invalid priority: must be 0-4".to_string());
+    }
+    Ok(())
+}
+
+/// Sanitize text input (title, description, reason) to prevent injection
+/// Removes shell metacharacters that could be dangerous when passed to CLI
+fn sanitize_text(text: &str) -> String {
+    // Replace dangerous characters with safe alternatives
+    text.chars()
+        .map(|c| match c {
+            '`' | '$' => ' ', // Could enable command substitution
+            '\n' | '\r' => ' ', // Newlines could break CLI parsing
+            _ => c,
+        })
+        .collect()
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BeadsDependency {
@@ -148,20 +227,19 @@ pub async fn beads_create(
     priority: u8,
     description: Option<String>,
 ) -> Result<String, String> {
+    // Validate inputs
+    validate_issue_type(&issue_type)?;
+    validate_priority(priority)?;
+
+    // Sanitize text inputs
+    let safe_title = sanitize_text(&title);
     let priority_str = priority.to_string();
-    let mut args = vec![
-        "create",
-        &title,
-        "-t",
-        &issue_type,
-        "-p",
-        &priority_str,
-    ];
+    let mut args = vec!["create", &safe_title, "-t", &issue_type, "-p", &priority_str];
 
     let desc_owned;
     if let Some(ref d) = description {
         if !d.trim().is_empty() {
-            desc_owned = d.clone();
+            desc_owned = sanitize_text(d);
             args.push("-d");
             args.push(&desc_owned);
         }
@@ -184,6 +262,9 @@ pub async fn beads_update(
     id: String,
     updates: BeadsUpdate,
 ) -> Result<(), String> {
+    // Validate issue ID
+    validate_issue_id(&id)?;
+
     let mut args = vec!["update", &id];
 
     let title_owned;
@@ -192,25 +273,28 @@ pub async fn beads_update(
     let assignee_owned;
 
     if let Some(ref t) = updates.title {
-        title_owned = t.clone();
+        title_owned = sanitize_text(t);
         args.push("--title");
         args.push(&title_owned);
     }
 
     if let Some(ref s) = updates.status {
+        validate_status(s)?;
         status_owned = s.clone();
         args.push("--status");
         args.push(&status_owned);
     }
 
     if let Some(p) = updates.priority {
+        validate_priority(p)?;
         priority_owned = p.to_string();
         args.push("-p");
         args.push(&priority_owned);
     }
 
     if let Some(ref a) = updates.assignee {
-        assignee_owned = a.clone();
+        // Sanitize assignee (could be a username)
+        assignee_owned = sanitize_text(a);
         args.push("--assignee");
         args.push(&assignee_owned);
     }
@@ -221,13 +305,16 @@ pub async fn beads_update(
 
 #[tauri::command]
 pub async fn beads_close(project_path: String, id: String, reason: String) -> Result<(), String> {
-    let args = vec!["close", &id, "--reason", &reason];
+    validate_issue_id(&id)?;
+    let safe_reason = sanitize_text(&reason);
+    let args = vec!["close", &id, "--reason", &safe_reason];
     run_bd_command(&project_path, &args)?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn beads_reopen(project_path: String, id: String) -> Result<(), String> {
+    validate_issue_id(&id)?;
     let args = vec!["reopen", &id];
     run_bd_command(&project_path, &args)?;
     Ok(())
@@ -235,6 +322,7 @@ pub async fn beads_reopen(project_path: String, id: String) -> Result<(), String
 
 #[tauri::command]
 pub async fn beads_show(project_path: String, id: String) -> Result<BeadsIssue, String> {
+    validate_issue_id(&id)?;
     // Export all and find the specific issue
     let issues = beads_list(project_path).await?;
     issues
@@ -249,6 +337,14 @@ pub async fn beads_update_phase(
     id: String,
     phase: Option<u8>,
 ) -> Result<(), String> {
+    validate_issue_id(&id)?;
+    // Validate phase if provided (0-10 is reasonable for planning phases)
+    if let Some(p) = phase {
+        if p > 10 {
+            return Err("Invalid phase: must be 0-10".to_string());
+        }
+    }
+
     use std::fs;
     use std::io::{BufRead, BufReader, Write};
 

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useCallback, useState } from "react";
-import { Application, Sprite, Graphics, Container, Assets, Ticker } from "pixi.js";
+import { useEffect } from "react";
+import { Application, Sprite, Graphics, Container, Assets } from "pixi.js";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { navigationSystem } from "./navigation/NavigationSystem";
 import { BuildingSprite } from "./entities/Building";
@@ -9,16 +9,11 @@ import { FireEffect } from "./entities/FireEffect";
 import { FarmParticleEmitter } from "./particles/FarmParticleEmitter";
 import { BuildingPopup } from "./BuildingPopup";
 import { BUILDING_POSITIONS, type BuildingType } from "../types";
-import { getRandomSpawnPoint } from "./navigation/SpawnPoints";
-
-const GAME_SIZE = 1000;
-
-const MAP_PATHS: Record<string, string> = {
-  "day-summer": "tycoon/map.png",
-  "night-summer": "tycoon/map-night.png",
-  "day-winter": "tycoon/map-day-winter.png",
-  "night-winter": "tycoon/map-night-winter.png",
-};
+import { GAME_SIZE, MAP_PATHS } from "./tycoonConstants";
+import { useTycoonGameState } from "./useTycoonGameState";
+import { useTycoonNavigation } from "./useTycoonNavigation";
+import { updateMapCycle } from "./useTycoonMapCycle";
+import { createVehicleUpdateLogic } from "./useTycoonVehicles";
 
 interface TycoonGameProps {
   containerWidth?: number;
@@ -39,31 +34,30 @@ export function TycoonGame({
   initialSelectedBuilding = null,
   onOpenAuditFile,
 }: TycoonGameProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const appRef = useRef<Application | null>(null);
-  const initializedRef = useRef(false);
-  const appReadyRef = useRef(false); // true after app.init() completes
-  const mountedRef = useRef(true);
-  const buildingSpritesRef = useRef<Map<string, BuildingSprite>>(new Map());
-  const vehicleSpritesRef = useRef<Map<string, VehicleSprite>>(new Map());
-  const debugGraphicsRef = useRef<Graphics | null>(null);
-  const gardenFlowersRef = useRef<GardenFlowers | null>(null);
-  const particleEmitterRef = useRef<FarmParticleEmitter | null>(null);
-  const fireEffectRef = useRef<FireEffect | null>(null);
-
-  // Map sprites ref (state is in store, not local refs)
-  const mapSpritesRef = useRef<Map<string, Sprite>>(new Map());
-
-  const [scale, setScale] = useState(1);
-  const [selectedBuilding, setSelectedBuilding] = useState<string | null>(initialSelectedBuilding);
-  const [flowerTooltip, setFlowerTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
-
+  const state = useTycoonGameState(initialSelectedBuilding);
   const {
+    containerRef,
+    appRef,
+    initializedRef,
+    appReadyRef,
+    mountedRef,
+    buildingSpritesRef,
+    vehicleSpritesRef,
+    debugGraphicsRef,
+    gardenFlowersRef,
+    particleEmitterRef,
+    fireEffectRef,
+    mapSpritesRef,
+    scale,
+    setScale,
+    selectedBuilding,
+    setSelectedBuilding,
+    flowerTooltip,
+    setFlowerTooltip,
     buildings,
     vehicles,
     showDebug,
     hideTooltips,
-    isPaused,
     navGraph,
     setNavGraph,
     updateVehiclePosition,
@@ -73,68 +67,13 @@ export function TycoonGame({
     simulatedFlowerCount,
     celebrationQueue,
     clearCelebrationQueue,
-  } = useFarmworkTycoonStore();
+  } = state;
 
-  const initializeNavigation = useCallback(async () => {
-    if (!navigationSystem.isInitialized()) {
-      const graph = await navigationSystem.initialize("tycoon/map-mask.png", 16);
-      setNavGraph(graph);
-    }
-  }, [setNavGraph]);
-
-
-  const drawDebugOverlay = useCallback(
-    (graphics: Graphics) => {
-      graphics.clear();
-
-      if (!showDebug) {
-        return;
-      }
-
-      // Draw walkable grid cells (road areas)
-      const grid = navigationSystem.getGrid();
-      if (grid) {
-        for (let gy = 0; gy < grid.rows; gy++) {
-          for (let gx = 0; gx < grid.cols; gx++) {
-            if (grid.isWalkable(gx, gy)) {
-              const px = gx * grid.cellSize;
-              const py = gy * grid.cellSize;
-              graphics.rect(px, py, grid.cellSize, grid.cellSize);
-              graphics.fill({ color: 0xffff00, alpha: 0.3 });
-            }
-          }
-        }
-      }
-
-      if (!navGraph) return;
-
-      // Draw path connections (thicker, more visible)
-      for (const node of navGraph.nodes.values()) {
-        for (const neighborId of node.neighbors) {
-          const neighbor = navGraph.nodes.get(neighborId);
-          if (neighbor) {
-            graphics.moveTo(node.x, node.y);
-            graphics.lineTo(neighbor.x, neighbor.y);
-            graphics.stroke({ color: 0x00ff00, width: 3, alpha: 0.7 });
-          }
-        }
-      }
-
-      // Draw navigation nodes
-      for (const node of navGraph.nodes.values()) {
-        graphics.circle(node.x, node.y, 5);
-        graphics.fill(0x00ff00);
-      }
-
-      // Draw building dock positions (where vehicles stop)
-      for (const building of buildings) {
-        const pos = building.position;
-        graphics.circle(pos.dockX, pos.dockY, 8);
-        graphics.fill(0xff00ff);
-        graphics.stroke({ color: 0xffffff, width: 2 });
-      }
-    },
-    [showDebug, navGraph, buildings]
+  const { initializeNavigation, drawDebugOverlay } = useTycoonNavigation(
+    showDebug,
+    navGraph,
+    buildings,
+    setNavGraph
   );
 
   // Initialize PixiJS app once on mount
@@ -291,46 +230,20 @@ export function TycoonGame({
 
       if (cancelled) return;
 
-      // Easing function for smooth transitions
-      const easeInOutCubic = (t: number): number => {
-        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-      };
+      // Create vehicle update logic
+      const updateVehicles = createVehicleUpdateLogic(
+        { current: vehicleSpritesRef.current },
+        { current: particleEmitterRef.current },
+        updateVehiclePosition,
+        removeVehicle,
+        addActivity
+      );
 
       app.ticker.add((ticker) => {
         const dt = ticker.deltaMS / 1000;
 
         // Update map cycling via store (synced between mini player and full view)
-        const maps = mapSpritesRef.current;
-        if (maps.size > 0) {
-          // Tick the map cycle in the store
-          useFarmworkTycoonStore.getState().tickMapCycle(dt);
-
-          // Get current cycle state from store
-          const cycle = useFarmworkTycoonStore.getState().mapCycle;
-
-          // Update map sprite alphas based on store state
-          if (cycle.isTransitioning) {
-            const progress = easeInOutCubic(cycle.transitionProgress);
-            const fromSprite = maps.get(cycle.transitionFrom);
-            const toSprite = maps.get(cycle.transitionTo);
-
-            if (fromSprite) fromSprite.alpha = 1 - progress;
-            if (toSprite) toSprite.alpha = progress;
-
-            // Hide other sprites
-            for (const [key, sprite] of maps) {
-              if (key !== cycle.transitionFrom && key !== cycle.transitionTo) {
-                sprite.alpha = 0;
-              }
-            }
-          } else {
-            // Set final alpha values for current state
-            const currentKey = `${cycle.timeOfDay}-${cycle.season}`;
-            for (const [key, sprite] of maps) {
-              sprite.alpha = key === currentKey ? 1 : 0;
-            }
-          }
-        }
+        updateMapCycle(dt, mapSpritesRef.current);
 
         if (gardenFlowersRef.current) {
           gardenFlowersRef.current.update(dt);
@@ -348,181 +261,8 @@ export function TycoonGame({
           buildingSprite.update(dt);
         }
 
-        // Read isPaused from store directly (not from closure) to ensure we get current value
-        const currentIsPaused = useFarmworkTycoonStore.getState().isPaused;
-        if (currentIsPaused) return;
-
-        for (const vehicleSprite of vehicleSpritesRef.current.values()) {
-          // Skip processing if vehicle is already finished
-          if (vehicleSprite.isMarkedFinished()) {
-            continue;
-          }
-
-          const arrived = vehicleSprite.update(dt);
-          const data = vehicleSprite.getData();
-
-          updateVehiclePosition(data.id, data.position);
-
-          // Check for vehicles waiting that should now exit (tool completed or beads issue closed)
-          if ((data.task === "waiting_for_completion" || data.task === "waiting_at_office") && data.shouldExit) {
-            // Start exiting
-            vehicleSprite.setTask("exiting");
-            const exitPoint = getRandomSpawnPoint("exit");
-            const exitPath = navigationSystem.findPathToExit(data.position, exitPoint.id);
-            if (exitPath && exitPath.length > 0) {
-              vehicleSprite.setPath(exitPath);
-            } else {
-              vehicleSprite.markFinished();
-              setTimeout(() => removeVehicle(data.id), 500);
-            }
-            continue;
-          }
-
-          // Handle traveling_to_farmhouse: when a bead vehicle needs to move from office to farmhouse
-          if (data.task === "traveling_to_farmhouse" && data.path.length === 0) {
-            // Calculate path to farmhouse
-            const farmhouse = BUILDING_POSITIONS["farmhouse"];
-            if (farmhouse) {
-              const path = navigationSystem.findPath(data.position, { x: farmhouse.dockX, y: farmhouse.dockY });
-              if (path && path.length > 0) {
-                vehicleSprite.setPath(path);
-              }
-            }
-          }
-
-          // Fallback timeout: if waiting > 5 minutes, auto-exit (prevents orphaned vehicles)
-          // Note: waiting_at_office vehicles (beads issues) don't have timeout - they wait until issue changes
-          const MAX_WAIT_TIME = 5 * 60 * 1000; // 5 minutes
-          if (
-            data.task === "waiting_for_completion" &&
-            !data.issueId && // Only timeout non-beads vehicles
-            data.waitStartTime &&
-            Date.now() - data.waitStartTime > MAX_WAIT_TIME
-          ) {
-            // Force exit after timeout
-            vehicleSprite.setTask("exiting");
-            const exitPoint = getRandomSpawnPoint("exit");
-            const exitPath = navigationSystem.findPathToExit(data.position, exitPoint.id);
-            if (exitPath && exitPath.length > 0) {
-              vehicleSprite.setPath(exitPath);
-            } else {
-              vehicleSprite.markFinished();
-              setTimeout(() => removeVehicle(data.id), 500);
-            }
-            continue;
-          }
-
-          // Beads vehicles auto-exit after 1 second in bead_completing state
-          const BEAD_COMPLETION_WAIT = 1000; // 1 second
-          if (
-            data.task === "bead_completing" &&
-            data.issueId &&
-            data.waitStartTime &&
-            Date.now() - data.waitStartTime > BEAD_COMPLETION_WAIT
-          ) {
-            // Mark issue as completed to prevent re-spawning
-            useFarmworkTycoonStore.getState().markBeadIssueCompleted(data.issueId);
-            useFarmworkTycoonStore.getState().removeBeadVehicle(data.issueId);
-
-            // Start exiting
-            vehicleSprite.setTask("exiting");
-            const exitPoint = getRandomSpawnPoint("exit");
-            const exitPath = navigationSystem.findPathToExit(data.position, exitPoint.id);
-            if (exitPath && exitPath.length > 0) {
-              vehicleSprite.setPath(exitPath);
-            } else {
-              vehicleSprite.markFinished();
-              setTimeout(() => removeVehicle(data.id), 500);
-            }
-            continue;
-          }
-
-          if (arrived) {
-            const currentDest = vehicleSprite.getCurrentDestination();
-            const task = vehicleSprite.getTask();
-
-            // Check if vehicle has arrived at exit point (task is exiting, no more route destinations)
-            if (task === "exiting" && !currentDest) {
-              // Vehicle has exited - remove it
-              vehicleSprite.markFinished();
-              setTimeout(() => {
-                removeVehicle(data.id);
-              }, 100);
-              continue;
-            }
-
-            // Handle bead vehicle arriving at farmhouse after status change to in_progress
-            if (task === "traveling_to_farmhouse") {
-              vehicleSprite.setTask("bead_completing", "farmhouse");
-              vehicleSprite.setPath([]);
-              vehicleSprite.getData().waitStartTime = Date.now();
-              continue;
-            }
-
-            // Handle bead vehicle arriving at office - start completion animation
-            // When entering task completes and route leads to office
-            if (data.issueId && currentDest === "office" && task !== "bead_completing" && task !== "exiting") {
-              vehicleSprite.setTask("bead_completing", "office");
-              vehicleSprite.setPath([]);
-              vehicleSprite.getData().waitStartTime = Date.now();
-              continue;
-            }
-
-            // Emit particles only on delivery (at farmhouse), not on pickup or exit
-            if (currentDest && particleEmitterRef.current && task === "traveling_to_delivery") {
-              const destBuilding = BUILDING_POSITIONS[currentDest as BuildingType];
-              if (destBuilding) {
-                particleEmitterRef.current.emitCargoDelivery({
-                  x: destBuilding.dockX,
-                  y: destBuilding.dockY,
-                });
-              }
-            }
-
-            addActivity({
-              type: "vehicle_arrived",
-              message: `Vehicle arrived at ${currentDest || "destination"}`,
-              buildingId: currentDest || data.destination || undefined,
-            });
-
-            const routeComplete = vehicleSprite.advanceRoute();
-            const nextTask = vehicleSprite.getTask();
-
-            if (routeComplete && nextTask === "waiting_for_completion") {
-              // Route complete - vehicle waits at building until tool completes
-              vehicleSprite.setCarrying(false);
-
-              // Clear path immediately to prevent re-triggering arrival detection
-              vehicleSprite.setPath([]);
-              // Vehicle will stay parked here until shouldExit flag is set
-            } else if (routeComplete) {
-              // Fallback: if route is complete but not waiting, mark as finished
-              vehicleSprite.markFinished();
-              setTimeout(() => {
-                removeVehicle(data.id);
-              }, 1000);
-            } else {
-              const nextDest = vehicleSprite.getCurrentDestination();
-
-              if (nextDest) {
-                // If traveling to farmhouse (delivery), set carrying = true
-                if (nextTask === "traveling_to_delivery") {
-                  vehicleSprite.setCarrying(true);
-                }
-
-                const destBuilding = BUILDING_POSITIONS[nextDest as BuildingType];
-                if (destBuilding) {
-                  const from = data.position;
-                  const to = { x: destBuilding.dockX, y: destBuilding.dockY };
-                  const path = navigationSystem.findPath(from, to);
-                  if (path && path.length > 0) {
-                    vehicleSprite.setPath(path);
-                  }
-                }
-              }
-            }
-          }
-        }
+        // Update all vehicles
+        updateVehicles(dt);
       });
 
       // Explicitly start the ticker (required in some PixiJS v8 configurations)

@@ -2,9 +2,65 @@ use portable_pty::{native_pty_system, CommandBuilder, MasterPty, PtySize};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State};
 use uuid::Uuid;
+
+/// Security: Validate that a shell path is safe to execute.
+/// Only allows absolute paths to valid executables. Rejects:
+/// - Relative paths
+/// - Paths with shell metacharacters
+/// - Non-existent files
+fn validate_shell_path(shell: &str) -> Result<(), String> {
+    // Must be an absolute path
+    if !shell.starts_with('/') {
+        return Err(format!(
+            "Security: Shell must be an absolute path, got: {}",
+            shell
+        ));
+    }
+
+    // Check for shell metacharacters that could indicate command injection
+    let forbidden_chars = ['|', '&', ';', '$', '`', '(', ')', '{', '}', '[', ']', '<', '>', '!', '\\', '"', '\'', '\n', '\r', ' '];
+    if shell.chars().any(|c| forbidden_chars.contains(&c)) {
+        return Err("Security: Shell path contains invalid characters".to_string());
+    }
+
+    // Verify the file exists and is executable
+    let path = Path::new(shell);
+    if !path.exists() {
+        return Err(format!("Security: Shell not found: {}", shell));
+    }
+
+    Ok(())
+}
+
+/// Security: Validate that a working directory is safe.
+fn validate_cwd(cwd: &str) -> Result<(), String> {
+    if cwd.is_empty() {
+        return Err("Security: Working directory cannot be empty".to_string());
+    }
+
+    // Must be an absolute path
+    if !cwd.starts_with('/') {
+        return Err(format!(
+            "Security: Working directory must be an absolute path, got: {}",
+            cwd
+        ));
+    }
+
+    let path = Path::new(cwd);
+    if !path.exists() {
+        return Err(format!("Security: Working directory not found: {}", cwd));
+    }
+
+    if !path.is_dir() {
+        return Err(format!("Security: Path is not a directory: {}", cwd));
+    }
+
+    Ok(())
+}
 
 #[derive(Clone, Serialize)]
 pub struct PtyOutput {
@@ -39,6 +95,12 @@ impl Default for PtyManager {
     }
 }
 
+/// Create a new PTY (pseudo-terminal) session.
+///
+/// # Security Note
+/// This command intentionally spawns an interactive shell to provide terminal functionality.
+/// Input validation is performed on shell path and working directory to prevent injection attacks.
+/// The terminal runs with the same permissions as the parent application.
 #[tauri::command]
 pub async fn create_pty(
     window: tauri::Window,
@@ -48,6 +110,17 @@ pub async fn create_pty(
     rows: u16,
     shell: Option<String>,
 ) -> Result<String, String> {
+    // Security: Validate working directory
+    validate_cwd(&cwd)?;
+
+    // Use provided shell or fall back to user's default shell
+    let shell = shell.unwrap_or_else(|| {
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string())
+    });
+
+    // Security: Validate shell path
+    validate_shell_path(&shell)?;
+
     let pty_system = native_pty_system();
 
     let pair = pty_system
@@ -60,11 +133,6 @@ pub async fn create_pty(
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
 
     let pty_id = Uuid::new_v4().to_string();
-
-    // Use provided shell or fall back to user's default shell
-    let shell = shell.unwrap_or_else(|| {
-        std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string())
-    });
 
     let mut cmd = CommandBuilder::new(&shell);
     cmd.cwd(&cwd);

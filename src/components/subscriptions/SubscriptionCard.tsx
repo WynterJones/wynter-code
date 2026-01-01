@@ -1,5 +1,5 @@
 import { ExternalLink, Pencil, Trash2, Power } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/urlSecurity";
 import { cn } from "@/lib/utils";
 import { FaviconImage } from "./FaviconImage";
 import type { Subscription } from "@/types";
@@ -27,9 +27,13 @@ export function SubscriptionCard({
     }).format(amount);
   };
 
-  const handleOpenLink = () => {
+  const handleOpenLink = async () => {
     if (subscription.url) {
-      open(subscription.url);
+      try {
+        await openExternalUrl(subscription.url);
+      } catch (err) {
+        console.error("Failed to open URL:", err);
+      }
     }
   };
 

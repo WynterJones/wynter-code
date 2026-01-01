@@ -226,7 +226,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     };
   }, [projectPath, loadFiles, refetchGitStatus]);
 
-  const handleToggle = async (node: FileNode) => {
+  const handleToggle = useCallback(async (node: FileNode) => {
     if (!node.isDirectory) return;
 
     if (node.isExpanded) {
@@ -245,20 +245,23 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       } catch (err) {
       }
     }
-  };
+  }, []);
 
-  const handleContextMenu = (e: React.MouseEvent, node: FileNode) => {
+  const handleContextMenu = useCallback((e: React.MouseEvent, node: FileNode) => {
     // If right-clicking on a non-selected node, select only that node
-    if (!selectedPaths.has(node.path)) {
-      setSelectedPaths(new Set([node.path]));
-      setLastSelectedPath(node.path);
-    }
+    setSelectedPaths((prev) => {
+      if (!prev.has(node.path)) {
+        setLastSelectedPath(node.path);
+        return new Set([node.path]);
+      }
+      return prev;
+    });
     setContextMenu({
       x: e.clientX,
       y: e.clientY,
       node,
     });
-  };
+  }, []);
 
   // Collect all visible paths in order for shift-select
   const collectVisiblePaths = useCallback((nodes: FileNode[]): string[] => {
@@ -379,7 +382,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         break;
       }
     }
-  }, [focusedPath, visiblePaths, findNodeByPathLocal, getParentPath, projectPath, onFileOpen, onNodeModulesClick]);
+  }, [focusedPath, visiblePaths, findNodeByPathLocal, getParentPath, projectPath, onFileOpen, onNodeModulesClick, handleToggle]);
 
   // Scroll focused item into view
   useEffect(() => {
@@ -449,7 +452,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
     }
   };
 
-  const handleMoveItem = async (sourcePath: string, destinationFolder: string) => {
+  const handleMoveItem = useCallback(async (sourcePath: string, destinationFolder: string) => {
     try {
       await moveItem(sourcePath, destinationFolder);
       await loadFiles(true);
@@ -457,9 +460,9 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       setSelectedPaths(new Set());
     } catch (err) {
     }
-  };
+  }, [moveItem, loadFiles, refetchGitStatus]);
 
-  const handleMoveItems = async (sourcePaths: string[], destinationFolder: string) => {
+  const handleMoveItems = useCallback(async (sourcePaths: string[], destinationFolder: string) => {
     try {
       // Move items sequentially to avoid race conditions
       for (const sourcePath of sourcePaths) {
@@ -470,7 +473,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       setSelectedPaths(new Set());
     } catch (err) {
     }
-  };
+  }, [moveItem, loadFiles, refetchGitStatus]);
 
   const handleCreateArchive = async (paths: string[]) => {
     try {

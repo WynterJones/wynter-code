@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, memo } from "react";
 import { ChevronRight, ChevronDown } from "lucide-react";
 import { FileIcon } from "./FileIcon";
 import { cn } from "@/lib/utils";
@@ -27,7 +27,7 @@ interface FileTreeNodeProps {
   focusedPath?: string | null;
 }
 
-export function FileTreeNode({
+export const FileTreeNode = memo(function FileTreeNode({
   node,
   depth,
   onToggle,
@@ -258,4 +258,38 @@ export function FileTreeNode({
       )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison for optimal memoization
+  // Only re-render if relevant props change for THIS node
+  if (prevProps.node !== nextProps.node) return false;
+  if (prevProps.depth !== nextProps.depth) return false;
+  if (prevProps.onToggle !== nextProps.onToggle) return false;
+  if (prevProps.onFileOpen !== nextProps.onFileOpen) return false;
+  if (prevProps.onContextMenu !== nextProps.onContextMenu) return false;
+  if (prevProps.onNodeModulesClick !== nextProps.onNodeModulesClick) return false;
+  if (prevProps.onMoveItem !== nextProps.onMoveItem) return false;
+  if (prevProps.onMoveItems !== nextProps.onMoveItems) return false;
+  if (prevProps.onSelect !== nextProps.onSelect) return false;
+  if (prevProps.allNodes !== nextProps.allNodes) return false;
+
+  // Check if this node's selection state changed
+  const wasSelected = prevProps.selectedPaths?.has(prevProps.node.path) ?? false;
+  const isSelected = nextProps.selectedPaths?.has(nextProps.node.path) ?? false;
+  if (wasSelected !== isSelected) return false;
+
+  // Check if this node's focus state changed
+  const wasFocused = prevProps.focusedPath === prevProps.node.path;
+  const isFocused = nextProps.focusedPath === nextProps.node.path;
+  if (wasFocused !== isFocused) return false;
+
+  // Check if git status changed for this node's path
+  const prevGitStatus = prevProps.gitStatusMap?.get(prevProps.node.path);
+  const nextGitStatus = nextProps.gitStatusMap?.get(nextProps.node.path);
+  if (prevGitStatus !== nextGitStatus) return false;
+
+  // For directories, we also need to check if any child status changed
+  // but the gitStatusMap reference itself changing doesn't mean THIS node needs to re-render
+  // unless its computed status would change - this is handled inside the component via useMemo
+
+  return true;
+});

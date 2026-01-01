@@ -1,8 +1,87 @@
+use regex::Regex;
 use std::process::Command;
+
+/// Validate a domain name to prevent command injection
+/// Allows: alphanumeric, hyphens, dots, and underscores
+/// Must not start/end with hyphen or dot, no consecutive dots
+fn validate_domain(domain: &str) -> Result<(), String> {
+    if domain.is_empty() || domain.len() > 253 {
+        return Err("Invalid domain: must be 1-253 characters".to_string());
+    }
+
+    // Domain regex: labels separated by dots, each label is alphanumeric with optional hyphens
+    let domain_regex = Regex::new(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$")
+        .map_err(|e| format!("Regex error: {}", e))?;
+
+    if !domain_regex.is_match(domain) {
+        return Err("Invalid domain: contains invalid characters or format".to_string());
+    }
+
+    // Additional check: no shell metacharacters
+    let forbidden_chars = ['|', '&', ';', '$', '`', '(', ')', '{', '}', '[', ']', '<', '>', '!', '\\', '"', '\'', '\n', '\r', '\t', ' '];
+    if domain.chars().any(|c| forbidden_chars.contains(&c)) {
+        return Err("Invalid domain: contains forbidden characters".to_string());
+    }
+
+    Ok(())
+}
+
+/// Validate a DNS record type
+fn validate_record_type(record_type: &str) -> Result<(), String> {
+    const ALLOWED_RECORD_TYPES: &[&str] = &[
+        "A", "AAAA", "CNAME", "MX", "TXT", "NS", "SOA", "PTR", "SRV", "CAA", "DNSKEY", "DS", "NAPTR", "HINFO", "ANY"
+    ];
+
+    let upper = record_type.to_uppercase();
+    if !ALLOWED_RECORD_TYPES.contains(&upper.as_str()) {
+        return Err(format!("Invalid record type: {}. Allowed: {:?}", record_type, ALLOWED_RECORD_TYPES));
+    }
+    Ok(())
+}
+
+/// Validate an IP address (for DNS server)
+fn validate_ip_or_hostname(server: &str) -> Result<(), String> {
+    // Allow IPv4, IPv6, or valid hostnames
+    let ipv4_regex = Regex::new(r"^(\d{1,3}\.){3}\d{1,3}$").unwrap();
+    let ipv6_regex = Regex::new(r"^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$").unwrap();
+
+    if ipv4_regex.is_match(server) || ipv6_regex.is_match(server) {
+        return Ok(());
+    }
+
+    // If not an IP, validate as hostname
+    validate_domain(server)
+}
+
+/// Validate a URL for HTTP requests
+fn validate_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("URL must start with http:// or https://".to_string());
+    }
+
+    // Parse URL and validate host
+    let url_obj = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
+
+    if let Some(host) = url_obj.host_str() {
+        // Validate the host part
+        if !host.is_empty() {
+            // Allow localhost and IP addresses
+            if host == "localhost" || host.parse::<std::net::IpAddr>().is_ok() {
+                return Ok(());
+            }
+            // Validate as domain
+            validate_domain(host)?;
+        }
+    }
+
+    Ok(())
+}
 
 /// Perform a WHOIS lookup for a domain
 #[tauri::command]
 pub async fn whois_lookup(domain: String) -> Result<String, String> {
+    validate_domain(&domain)?;
+
     let output = Command::new("whois")
         .arg(&domain)
         .output()
@@ -24,6 +103,9 @@ pub async fn whois_lookup(domain: String) -> Result<String, String> {
 /// Perform a DNS lookup for a domain using dig
 #[tauri::command]
 pub async fn dns_lookup(domain: String, record_type: String) -> Result<String, String> {
+    validate_domain(&domain)?;
+    validate_record_type(&record_type)?;
+
     let output = Command::new("dig")
         .arg(&domain)
         .arg(&record_type)
@@ -47,6 +129,10 @@ pub async fn dns_lookup_server(
     record_type: String,
     dns_server: String,
 ) -> Result<String, String> {
+    validate_domain(&domain)?;
+    validate_record_type(&record_type)?;
+    validate_ip_or_hostname(&dns_server)?;
+
     let output = Command::new("dig")
         .arg(format!("@{}", dns_server))
         .arg(&domain)
@@ -67,17 +153,48 @@ pub async fn dns_lookup_server(
 }
 
 /// Check SSL certificate for a domain using openssl
+/// SECURITY: Rewrote to avoid shell interpolation (command injection vulnerability)
 #[tauri::command]
 pub async fn ssl_check(domain: String) -> Result<String, String> {
-    // Use openssl s_client to connect and get certificate info
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(format!(
-            "echo | openssl s_client -connect {}:443 -servername {} 2>/dev/null | openssl x509 -noout -text 2>/dev/null",
-            domain, domain
-        ))
+    validate_domain(&domain)?;
+
+    // Step 1: Connect with openssl s_client and get the certificate
+    let connect_arg = format!("{}:443", domain);
+    let s_client = Command::new("openssl")
+        .arg("s_client")
+        .arg("-connect")
+        .arg(&connect_arg)
+        .arg("-servername")
+        .arg(&domain)
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .output()
-        .map_err(|e| format!("Failed to execute openssl command: {}", e))?;
+        .map_err(|e| format!("Failed to execute openssl s_client: {}", e))?;
+
+    if !s_client.status.success() && s_client.stdout.is_empty() {
+        return Err("Could not connect to server for SSL check".to_string());
+    }
+
+    // Step 2: Parse the certificate with openssl x509
+    let mut x509 = Command::new("openssl")
+        .arg("x509")
+        .arg("-noout")
+        .arg("-text")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("Failed to spawn openssl x509: {}", e))?;
+
+    // Write the certificate data to stdin
+    if let Some(mut stdin) = x509.stdin.take() {
+        use std::io::Write;
+        let _ = stdin.write_all(&s_client.stdout);
+    }
+
+    let output = x509
+        .wait_with_output()
+        .map_err(|e| format!("Failed to get openssl x509 output: {}", e))?;
 
     if output.status.success() {
         let result = String::from_utf8_lossy(&output.stdout).to_string();
@@ -87,14 +204,15 @@ pub async fn ssl_check(domain: String) -> Result<String, String> {
             Ok(result)
         }
     } else {
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-        Err(format!("SSL check failed: {}", stderr))
+        Err("SSL check failed: could not parse certificate".to_string())
     }
 }
 
 /// Perform an HTTP HEAD request to get headers
 #[tauri::command]
 pub async fn http_head_request(url: String) -> Result<String, String> {
+    validate_url(&url)?;
+
     let output = Command::new("curl")
         .arg("-s")
         .arg("-I")
@@ -116,6 +234,8 @@ pub async fn http_head_request(url: String) -> Result<String, String> {
 /// Fetch JSON from a URL
 #[tauri::command]
 pub async fn http_get_json(url: String) -> Result<String, String> {
+    validate_url(&url)?;
+
     let output = Command::new("curl")
         .arg("-s")
         .arg("-L")
@@ -157,6 +277,8 @@ pub async fn http_get_json(url: String) -> Result<String, String> {
 /// Fetch HTML content from a URL
 #[tauri::command]
 pub async fn http_get_html(url: String) -> Result<String, String> {
+    validate_url(&url)?;
+
     let output = Command::new("curl")
         .arg("-s")
         .arg("-L")
@@ -179,6 +301,8 @@ pub async fn http_get_html(url: String) -> Result<String, String> {
 /// Follow redirects and return the chain
 #[tauri::command]
 pub async fn http_follow_redirects(url: String) -> Result<String, String> {
+    validate_url(&url)?;
+
     // Use curl with -w to get redirect info in a parseable format
     let output = Command::new("curl")
         .arg("-s")

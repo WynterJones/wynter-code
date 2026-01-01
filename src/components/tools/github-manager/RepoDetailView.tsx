@@ -21,7 +21,7 @@ import {
   X,
   Archive,
 } from "lucide-react";
-import { open } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/urlSecurity";
 import { ScrollArea } from "@/components/ui/ScrollArea";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -72,8 +72,12 @@ export function RepoDetailView() {
     setShowRepoDetail(false);
   };
 
-  const handleOpenInBrowser = () => {
-    open(repoDetails.url);
+  const handleOpenInBrowser = async () => {
+    try {
+      await openExternalUrl(repoDetails.url);
+    } catch (err) {
+      console.error("Failed to open repo URL:", err);
+    }
   };
 
   const handleNavigateToPath = (path: string) => {
@@ -415,7 +419,13 @@ function SettingsTab({
                 <GitFork className="w-4 h-4 text-text-tertiary" />
                 <span className="text-text-secondary">Forked from:</span>
                 <button
-                  onClick={() => open(repoDetails.parent!.url)}
+                  onClick={async () => {
+                    try {
+                      await openExternalUrl(repoDetails.parent!.url);
+                    } catch (err) {
+                      console.error("Failed to open parent repo URL:", err);
+                    }
+                  }}
                   className="text-accent hover:underline"
                 >
                   {repoDetails.parent.fullName}

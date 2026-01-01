@@ -1,3 +1,4 @@
+use regex::Regex;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
@@ -7,6 +8,55 @@ use tauri::{Emitter, State};
 
 use crate::commands::{create_chunk, parse_claude_chunk, PermissionMode};
 use crate::path_utils::get_enhanced_path;
+
+/// Validate a model name to prevent command injection
+/// Allowed: alphanumeric, hyphens, underscores, dots, slashes (for model versions like claude-3-opus-20240229)
+fn validate_model_name(model: &str) -> Result<(), String> {
+    if model.is_empty() || model.len() > 100 {
+        return Err("Invalid model name: must be 1-100 characters".to_string());
+    }
+
+    // Model names can contain: letters, numbers, hyphens, underscores, dots, slashes
+    let model_regex = Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9\-_\./:]*$").unwrap();
+    if !model_regex.is_match(model) {
+        return Err("Invalid model name: contains invalid characters".to_string());
+    }
+
+    // No shell metacharacters
+    let forbidden_chars = [
+        '|', '&', ';', '$', '`', '(', ')', '{', '}', '[', ']', '<', '>', '!', '\\', '"', '\'',
+        '\n', '\r', '\t', ' ',
+    ];
+    if model.chars().any(|c| forbidden_chars.contains(&c)) {
+        return Err("Invalid model name: contains forbidden characters".to_string());
+    }
+
+    Ok(())
+}
+
+/// Validate a session ID (UUID format or similar safe identifiers)
+fn validate_session_id(session_id: &str) -> Result<(), String> {
+    if session_id.is_empty() || session_id.len() > 100 {
+        return Err("Invalid session ID: must be 1-100 characters".to_string());
+    }
+
+    // Session IDs should be alphanumeric with hyphens (UUID-like)
+    let session_regex = Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9\-]*$").unwrap();
+    if !session_regex.is_match(session_id) {
+        return Err("Invalid session ID: must be alphanumeric with optional hyphens".to_string());
+    }
+
+    // No shell metacharacters
+    let forbidden_chars = [
+        '|', '&', ';', '$', '`', '(', ')', '{', '}', '[', ']', '<', '>', '!', '\\', '"', '\'',
+        '\n', '\r', '\t', ' ', '.',
+    ];
+    if session_id.chars().any(|c| forbidden_chars.contains(&c)) {
+        return Err("Invalid session ID: contains forbidden characters".to_string());
+    }
+
+    Ok(())
+}
 
 /// Image data for structured prompts with multimodal content
 #[derive(Debug, Deserialize)]
@@ -62,6 +112,17 @@ pub async fn start_claude_session(
         if instances.contains_key(&session_id) {
             return Err("Session already running".to_string());
         }
+    }
+
+    // Validate session ID
+    validate_session_id(&session_id)?;
+
+    // Validate optional inputs
+    if let Some(ref model_name) = model {
+        validate_model_name(model_name)?;
+    }
+    if let Some(ref resume_sid) = resume_session_id {
+        validate_session_id(resume_sid)?;
     }
 
     let mut mode = permission_mode.unwrap_or_default();
