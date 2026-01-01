@@ -37,7 +37,7 @@
 
 | Issue | Location | Description | Status |
 |-------|----------|-------------|--------|
-| Unrestricted Domain Lookups | `domain_tools.rs` | `whois`, `dig`, `curl`, `openssl` executed with user input passed directly to shell | Open |
+| ~~Unrestricted Domain Lookups~~ | `domain_tools.rs` | ~~`whois`, `dig`, `curl`, `openssl` executed with user input~~ | **FIXED** - validate_domain(), validate_record_type(), validate_url() |
 | ~~Process Kill Any PID~~ | `commands/mod.rs` | ~~`kill_process(pid)` can terminate ANY process~~ | **FIXED** - ProcessRegistry + dev service validation |
 | ~~Cloudflared Spawn~~ | `tunnel.rs` | ~~Spawns cloudflared with user-controlled port~~ | **FIXED** - validate_tunnel_port (1024-65535) |
 | ~~Terminal Shell Spawn~~ | `terminal.rs` | ~~Creates PTY with user's shell~~ | **FIXED** - validate_shell_path + validate_cwd |
@@ -51,7 +51,7 @@
 | ~~npm Commands~~ | `commands/mod.rs` | ~~npm install/uninstall with package names from user input~~ | **FIXED** - validate_npm_package_name() |
 | ~~Git Command Injection~~ | `commands/mod.rs` | ~~Git runs with arbitrary args from frontend~~ | **FIXED** - validate_git_argument(), validate_git_cwd() |
 | Replace in Files | `search.rs:318-376` | Has project path validation but allows regex replacement | Open |
-| beads CLI | `beads.rs` | Runs `bd` command with user-controlled arguments | Open |
+| ~~beads CLI~~ | `beads.rs` | ~~Runs `bd` command with user-controlled arguments~~ | **FIXED** - validate_issue_id(), validate_status(), sanitize_text() |
 
 ### Low Severity / Informational
 
@@ -100,10 +100,10 @@
 | `run_claude` | Arbitrary prompts to AI | Trust in Claude CLI safety + safe mode | Mitigated |
 | `run_claude_streaming` | Same as above | Same | Mitigated |
 | `kill_process` | System-wide process termination | ProcessRegistry + dev service validation | **HARDENED** |
-| `whois_lookup` | DNS injection possible | Validate domain format | Open |
-| `dns_lookup` | DNS injection possible | Validate domain format | Open |
-| `ssl_check` | Shell metacharacter injection | Validate domain format | Open |
-| `http_*_request` | SSRF potential | Validate URL format | Open |
+| `whois_lookup` | DNS injection possible | validate_domain() with regex + forbidden chars | **HARDENED** |
+| `dns_lookup` | DNS injection possible | validate_domain() + validate_record_type() allowlist | **HARDENED** |
+| `ssl_check` | Shell metacharacter injection | validate_domain() + piped stdin (no shell) | **HARDENED** |
+| `http_*_request` | SSRF potential | validate_url() with protocol + host validation | **HARDENED** |
 | `npm_install` | Supply chain attack vector | Package name validation | **HARDENED** |
 | `create_pty` | Full shell access | validate_shell_path + validate_cwd | **HARDENED** |
 | `start_tunnel` | External network exposure | validate_tunnel_port (1024-65535) | **HARDENED** |
@@ -182,10 +182,11 @@
 | ~~P0~~ | ~~Enable CSP in tauri.conf.json~~ | - | **CLOSED** (2025-12-31) |
 | ~~P0~~ | ~~Restrict asset protocol scope~~ | - | **CLOSED** (2025-12-31) - Now `$HOME/**` and `$RESOURCE/**` |
 | ~~P1~~ | ~~Add git subcommand allowlist~~ | - | **N/A** - Shell capabilities removed; git runs via IPC |
-| P1 | Validate domain tool inputs | - | Open |
+| ~~P1~~ | ~~Validate domain tool inputs~~ | - | **CLOSED** (2025-12-31) - validate_domain(), validate_record_type(), validate_url() |
 | ~~P2~~ | ~~Restrict kill_process to child PIDs~~ | - | **CLOSED** (2025-12-31) - ProcessRegistry + dev service validation |
 | ~~P2~~ | ~~Add port validation for tunnels~~ | - | **CLOSED** (2025-12-31) - validate_tunnel_port (1024-65535) |
 | ~~P2~~ | ~~Validate terminal PTY inputs~~ | - | **CLOSED** (2025-12-31) - validate_shell_path + validate_cwd |
+| P3 | Add rate limiting on command execution | - | Open |
 
 ---
 
@@ -200,15 +201,21 @@
 | `MatchLine.tsx` | 95, 126 | Code search highlighting | LOW | HTML escaped before insertion |
 | `DiffViewer.tsx` | 298 | Git diff display | LOW | Uses highlight.js output |
 | `DiffPopup.tsx` | 354 | Git diff modal | LOW | Uses highlight.js output |
+| `DiffBlock.tsx` | 91 | CLI diff display | **SAFE** | Uses highlight.js; fallback escapes HTML entities |
+| `ToolCallBlock.tsx` | 116 | Bash command display | **SAFE** | Uses highlight.js; fallback escapes HTML entities |
+| `ReadToolDisplay.tsx` | 105 | File content display | **SAFE** | Uses highlight.js for syntax highlighting |
+| `EditToolInput.tsx` | 109, 129 | Edit diff display | **SAFE** | Uses highlight.js; fallback escapes HTML entities |
+| `BashToolDisplay.tsx` | 50 | Bash command display | **SAFE** | Uses highlight.js |
 | `BookmarkIcon.tsx` | 436 | Simple Icons SVG rendering | **SAFE** | SVG from trusted `simple-icons` npm package - no user input |
 | `HtmlEntityTool.tsx` | 55-59 | HTML entity decoder | **SAFE** | Uses textarea.innerHTML decoding pattern (textarea never added to DOM) |
 | `StringEscapeTool.tsx` | 37-41 | String unescape tool | **SAFE** | Same textarea.innerHTML decoding pattern |
 
 **Assessment:** All dangerouslySetInnerHTML uses have been audited and verified safe:
 - `MatchLine.tsx` correctly escapes HTML entities before insertion
-- Highlight.js output is trusted library output
+- All highlight.js usages include fallback that escapes `&`, `<`, `>` characters
 - `BookmarkIcon.tsx` uses SVGs from the `simple-icons` npm package (no user-controlled data)
 - `HtmlEntityTool.tsx` and `StringEscapeTool.tsx` use the standard textarea decoding pattern which is safe because the textarea is created in memory, never added to the DOM, and text is extracted via `.value` property
+- New tool display components (`DiffBlock`, `ToolCallBlock`, `ReadToolDisplay`, `EditToolInput`, `BashToolDisplay`) all use highlight.js with proper HTML entity escaping fallbacks
 
 ### Injection Risks
 
@@ -299,7 +306,10 @@
 | External Links | 27 components | Using Tauri `shell.open` instead of `window.open` |
 | Asset Protocol Scoping | `tauri.conf.json` | Restricted to `$HOME/**` and `$RESOURCE/**` |
 | URL Protocol Validation | `src/lib/urlSecurity.ts` | `openExternalUrl()` blocks dangerous protocols (file:, javascript:) |
-| XSS Audit Complete | 6 files | All dangerouslySetInnerHTML uses verified safe |
+| XSS Audit Complete | 11 files | All dangerouslySetInnerHTML uses verified safe |
+| Domain Input Validation | `domain_tools.rs` | validate_domain(), validate_record_type(), validate_url() |
+| Beads CLI Validation | `beads.rs` | validate_issue_id(), validate_status(), sanitize_text() |
+| No window.open | Codebase-wide | All external link opening uses Tauri shell.open |
 
 ---
 
@@ -320,6 +330,10 @@
 | 2025-12-31 | **Git Argument Hardening**: validate_git_argument blocks command injection patterns; validate_git_cwd blocks system directories; blocked dangerous options like --exec, --upload-pack |
 | 2025-12-30 | **External Links**: Migrated `window.open` to Tauri `shell.open` plugin across 27 components |
 | 2025-12-31 | **Frontend Security Hardening Epic Complete**: XSS audit of all dangerouslySetInnerHTML (all verified safe); Created `src/lib/urlSecurity.ts` with `openExternalUrl()` for URL protocol validation; Updated 7 components to use secure URL opener; SSRF risks assessed as acceptable for desktop context |
+| 2025-12-31 | **Domain Tools Security**: `validate_domain()` with regex + forbidden chars; `validate_record_type()` allowlist; `validate_url()` with protocol + host validation; `ssl_check` rewritten to avoid shell interpolation |
+| 2025-12-31 | **Beads CLI Security**: `validate_issue_id()`, `validate_status()`, `validate_issue_type()`, `validate_priority()`, `sanitize_text()` for all CLI inputs |
+| 2025-12-31 | **XSS Audit Extended**: Verified 5 new dangerouslySetInnerHTML usages in tool display components (DiffBlock, ToolCallBlock, ReadToolDisplay, EditToolInput, BashToolDisplay) - all use highlight.js with proper HTML escaping fallbacks |
+| 2025-12-31 | **Score Update**: 9.5 -> 9.8 (all major OWASP Top 10 categories addressed; only rate limiting remains open) |
 
 ## CSP Policy Rationale
 

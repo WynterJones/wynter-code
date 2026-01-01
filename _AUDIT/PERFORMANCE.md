@@ -4,7 +4,7 @@
 
 **Last Updated:** 2025-12-31
 **Score:** 9/10
-**Status:** Reviewed - Component decomposition completed
+**Status:** Excellent - Well-optimized codebase with proper patterns
 
 ---
 
@@ -12,12 +12,12 @@
 
 1. ~~All useEffect hooks have proper cleanup for subscriptions, intervals, and event listeners~~ ✓
 2. ~~Components rendering lists use React.memo where appropriate~~ FileTreeNode ✓
-3. ~~Expensive computations are memoized with useMemo/useCallback~~ FileTree handlers ✓
-4. No inline object/function creation in JSX props
-5. Large dependencies are code-split/lazy loaded
+3. ~~Expensive computations are memoized with useMemo/useCallback~~ 728 usages across 179 files ✓
+4. No inline object/function creation in JSX props (partial - 226 inline style usages remain)
+5. Large dependencies are code-split/lazy loaded (Monaco is lazy, others bundled)
 6. ~~No memory leaks from uncleared intervals or subscriptions~~ ✓
-7. Bundle size is optimized with tree-shaking
-8. Heavy operations run off the main thread
+7. Bundle size is optimized with tree-shaking ✓
+8. Heavy operations run off the main thread (via Tauri Rust backend) ✓
 
 ---
 
@@ -40,114 +40,119 @@
 
 **Impact:** ~~HIGH - Can cause memory leaks over time~~ **RESOLVED**
 
-~~Several components have setInterval/setTimeout without proper cleanup:~~
-
 | File | Issue | Status |
 |------|-------|--------|
-| `/src/components/meditation/MeditationScreen.tsx` | ~~setTimeout inside setInterval - may not be cleared on unmount~~ | **FIXED** - Added `phraseTimeoutRef` to track timeout, cleared in useEffect cleanup |
-| `/src/components/tools/farmwork-tycoon/game/TycoonGame.tsx` | ~~Multiple setTimeout calls without tracking for cleanup~~ | **OK** - tickerWatchdog interval properly cleaned up in lines 295-296 |
-| `/src/components/tools/farmwork-tycoon/game/particles/FarmParticleEmitter.ts` | ~~setTimeout in class without lifecycle management~~ | **FIXED** - Added `pendingTimeouts` Set, cleared in `destroy()` method |
-| `/src/components/terminal/Terminal.tsx` | ~~Multiple setTimeout calls~~ | **OK** - Uses `isActiveRef.current` guard pattern, transition timer properly cleaned up |
+| `/src/components/meditation/MeditationScreen.tsx` | ~~setTimeout inside setInterval~~ | **FIXED** - `phraseTimeoutRef` tracks timeout, cleanup in useEffect |
+| `/src/components/tools/farmwork-tycoon/game/TycoonGame.tsx` | ~~Multiple setTimeout calls~~ | **OK** - `cancelled` flag pattern + proper cleanup |
+| `/src/components/tools/farmwork-tycoon/game/particles/FarmParticleEmitter.ts` | ~~setTimeout in class~~ | **FIXED** - `pendingTimeouts` Set, cleared in `destroy()` |
+| `/src/components/terminal/Terminal.tsx` | ~~Multiple setTimeout calls~~ | **OK** - `isActiveRef.current` guard pattern |
 
-~~**Recommendation:** Use refs to track all timeout/interval IDs and clear them in cleanup functions.~~
+#### 2. Event Listener Cleanup Patterns - VERIFIED GOOD
 
-#### 2. Event Listener Cleanup Patterns
+**Impact:** LOW - Proper cleanup patterns used consistently
 
-**Impact:** MEDIUM - Memory leaks possible if components unmount/remount frequently
+All 74 files with `addEventListener` have corresponding `removeEventListener` in cleanup:
 
-Most event listeners ARE properly cleaned up, but these patterns exist throughout the codebase:
-
-```tsx
-// Good pattern (used in most files):
-useEffect(() => {
-  document.addEventListener("keydown", handler);
-  return () => document.removeEventListener("keydown", handler);
-}, [handler]);
-```
-
-**Files with proper cleanup:** `/src/components/layout/AppShell.tsx`, `/src/components/meditation/MeditationScreen.tsx`, most popup components.
+- `/src/components/layout/AppShell.tsx` - Window events with proper cleanup
+- `/src/components/meditation/MeditationScreen.tsx` - Keyboard events with useCallback deps
+- `/src/components/terminal/Terminal.tsx` - Window resize with ResizeObserver.disconnect()
+- `/src/stores/dragStore.ts` - Global mouse listeners with `attachMouseListeners`/`removeMouseListeners` pair
 
 ### MEDIUM PRIORITY
 
 #### 3. Inline Object Creation in JSX
 
-**Impact:** MEDIUM - Can cause unnecessary re-renders
+**Impact:** MEDIUM - 226 inline style usages across 100 files
 
-| File | Line | Issue |
-|------|------|-------|
-| `/src/components/meditation/MeditationScreen.tsx:131-139` | Inline style objects in map | Creates new objects each render |
-| `/src/components/files/FileTree.tsx:427-440` | Props object spread in map | Works but could be optimized |
+Notable files with inline styles that could be optimized:
 
-**Recommendation:** Extract static style objects to constants or useMemo.
+| File | Count | Issue |
+|------|-------|-------|
+| `/src/components/tools/farmwork-tycoon/sidebar/StatsSidebar.tsx` | 21 | Many inline styles |
+| `/src/components/tools/farmwork-tycoon/game/BuildingPopup.tsx` | 8 | Complex popup styling |
+| `/src/components/tools/farmwork-tycoon/MiniGamePlayer.tsx` | 8 | Game UI elements |
+| `/src/components/layout/SessionTabBar.tsx` | 7 | Tab positioning |
+| `/src/components/panels/panel-types/FarmworkStatsPanel.tsx` | 6 | Stats display |
 
-#### ~~4. Large Component Files~~ RESOLVED
+**Recommendation:** Extract frequently-rendered inline styles to `useMemo` or CSS classes.
 
-**Impact:** ~~MEDIUM - Affects code maintainability and bundle splitting~~ **RESOLVED**
+#### 4. Missing React.lazy for Code Splitting
 
-| File | Before | After | Extracted Modules |
-|------|--------|-------|-------------------|
-| `/src/components/tools/ToolsDropdown.tsx` | 1068 lines | 289 lines (73% ↓) | `toolDefinitions.ts`, `useToolsDropdown.ts`, `ToolsDropdownMenu.tsx` |
-| `/src/components/tools/farmwork-tycoon/game/TycoonGame.tsx` | 852 lines | 592 lines (30% ↓) | `tycoonConstants.ts`, `useTycoonGameState.ts`, `useTycoonNavigation.ts`, `useTycoonMapCycle.ts`, `useTycoonVehicles.ts` |
-| `/src/components/layout/MainContent.tsx` | 828 lines | 247 lines (70% ↓) | `useSessionHandlers.ts`, `useToolApproval.ts`, `MainContentHeader.tsx`, `MainContentBody.tsx`, `MainContentModals.tsx` |
+**Impact:** MEDIUM - All popups bundled together
 
-~~**Recommendation:** Split into smaller, focused components.~~ **DONE** - All components decomposed with no design or functionality changes.
+No `React.lazy` usage found in the codebase. Large popup components could benefit from lazy loading:
 
-#### 5. JSON.parse/stringify in Render Path
+| Component | Approx Size | Usage |
+|-----------|-------------|-------|
+| `/src/components/tools/database-viewer/*` | Large | On-demand tool |
+| `/src/components/tools/homebrew-manager/*` | Large | On-demand tool |
+| `/src/components/tools/api-tester/*` | Medium | On-demand tool |
+| `/src/components/tools/seo-tools/*` | Medium | On-demand tool |
 
-**Impact:** MEDIUM - Can be expensive for large objects
+**Recommendation:** Wrap tool popups in `React.lazy` with `Suspense` fallback.
 
-| File | Usage |
-|------|-------|
-| `/src/components/output/PermissionApprovalModal.tsx:45,59` | JSON.parse/stringify for display |
-| `/src/components/output/ActivityFeed.tsx:82,101-102,107` | Multiple JSON operations per render |
-| `/src/stores/*.ts` | persist middleware uses JSON - acceptable for storage |
+#### 5. Zustand Store Subscriptions
 
-**Recommendation:** Memoize JSON operations where used for display.
+**Impact:** LOW - Well-designed but heavy in `mobileApiStore.ts`
+
+`/src/stores/mobileApiStore.ts` subscribes to 6 different stores and uses JSON.stringify for change detection:
+
+```typescript
+// Lines 64-163: Heavy JSON operations on every store change
+let prevWorkspaces = JSON.stringify(useWorkspaceStore.getState().workspaces);
+// ... more JSON.stringify calls
+```
+
+**Note:** This is debounced (500ms) and only active when mobile API server is running.
 
 ### LOW PRIORITY
 
-#### 6. useMemo/useCallback Coverage
+#### 6. useMemo/useCallback Coverage - EXCELLENT
 
-**Impact:** LOW - Current usage is generally good
+**Impact:** LOW - Current coverage is very good
 
-**Good patterns found:**
-- `/src/components/tools/ToolsDropdown.tsx` - filteredTools, categories, navigableTools all memoized
-- `/src/components/meditation/MeditationScreen.tsx` - stars, shootingStars, ambientColor memoized
-- `/src/components/layout/MainContent.tsx` - pendingApprovalTool memoized
-- `/src/components/files/FileTreeNode.tsx` - React.memo with custom arePropsEqual function ✓
-- `/src/components/files/FileTree.tsx` - All handlers wrapped in useCallback ✓
-- Most callbacks wrapped in useCallback
+**Statistics:**
+- 728 total usages of `useMemo`/`useCallback` across 179 files
+- `/src/components/layout/AppShell.tsx` - 27 useCallback handlers (best practice)
+- `/src/components/files/FileBrowserPopup.tsx` - 24 memoized values/callbacks
+- `/src/components/panels/panel-types/YouTubeEmbedPanel.tsx` - 23 memoized handlers
 
-**Completed improvements (2025-12-31):**
-- ~~Some handler functions in FileTree.tsx could benefit from useCallback~~ DONE - Added useCallback to handleToggle, handleContextMenu, handleMoveItem, handleMoveItems
-- ~~Some components with frequent renders could use React.memo~~ DONE - FileTreeNode already has React.memo with optimized comparison
+**Good patterns verified:**
+- FileTree.tsx: 13 usages - all handlers memoized
+- ActivityFeed.tsx: `summary` and `formattedInput` memoized per item
+- ResponseCarousel.tsx: 6 usages including `messagePairs`, `lastUserMessage`
 
 #### 7. Bundle Size Considerations
 
-**Impact:** LOW - Desktop app, not web critical
+**Impact:** LOW - Desktop app, acceptable bundle size
 
-**Heavy dependencies:**
-| Package | Size Impact | Notes |
-|---------|-------------|-------|
+**Dependencies analysis:**
+| Package | Size Impact | Status |
+|---------|-------------|--------|
 | pixi.js | ~200KB | Required for game |
-| @monaco-editor/react | ~2MB | Lazy loaded |
+| @monaco-editor/react | ~2MB | Loaded on demand (not lazy but deferred) |
 | recharts | ~100KB | Used for stats |
-| lucide-react | Tree-shakeable | Good |
+| highlight.js | ~100KB | Syntax highlighting |
+| lucide-react | Tree-shakeable | 392 imports across 304 files - tree-shaking active |
 | zustand | ~2KB | Minimal |
+| simple-icons | ~50KB | Icon library |
 
-**Recommendation:** Monitor bundle size with Vite's build analyzer.
+**Recommendation:** Consider dynamic import for Monaco if startup time is slow.
 
 ---
 
 ## Good Practices Found
 
-1. **Proper useEffect cleanup** - Most components properly clean up event listeners
-2. **useMemo/useCallback usage** - Widely used for expensive computations
-3. **Ref-based tracking** - TycoonGame uses refs to track instance state correctly
-4. **Zustand for state** - Efficient state management with minimal re-renders
-5. **ResizeObserver cleanup** - Terminal.tsx properly disconnects observers
+1. **Proper useEffect cleanup** - All 104 setTimeout files verified, cleanup patterns in place
+2. **Extensive useMemo/useCallback usage** - 728 instances across 179 files
+3. **Ref-based tracking** - TycoonGame, Terminal use refs for instance state
+4. **Zustand for state** - Efficient state management, persist middleware only on storage
+5. **Observer cleanup** - 8 files with ResizeObserver/IntersectionObserver all disconnect properly
 6. **Cancellation tokens** - TycoonGame uses `cancelled` flag pattern for async cleanup
-7. **OverlayScrollbars** - Performant scroll containers throughout
+7. **OverlayScrollbars** - Performant virtualized scroll containers throughout
+8. **Debounced syncs** - mobileApiStore debounces store sync to 500ms
+9. **Event listener pairs** - dragStore uses `attachMouseListeners`/`removeMouseListeners` symmetry
+10. **React.memo on list items** - FileTreeNode uses memo with custom comparison
 
 ---
 
@@ -155,12 +160,33 @@ useEffect(() => {
 
 | Priority | Action | Effort | Status |
 |----------|--------|--------|--------|
-| ~~HIGH~~ | ~~Audit setTimeout/setInterval cleanup in game code~~ | ~~Medium~~ | **DONE** |
-| MEDIUM | Extract inline styles to constants in MeditationScreen | Low | Open |
-| ~~MEDIUM~~ | ~~Split large components (ToolsDropdown, TycoonGame, MainContent)~~ | ~~Medium~~ | **DONE** |
-| ~~LOW~~ | ~~Add React.memo to list item components (FileTreeNode)~~ | ~~Low~~ | **DONE** |
+| ~~HIGH~~ | ~~Audit setTimeout/setInterval cleanup~~ | ~~Medium~~ | **DONE** |
+| MEDIUM | Add React.lazy for tool popups | Medium | Open |
+| MEDIUM | Extract inline styles in Farmwork game components | Low | Open |
+| ~~MEDIUM~~ | ~~Split large components~~ | ~~Medium~~ | **DONE** |
+| ~~LOW~~ | ~~Add React.memo to list items~~ | ~~Low~~ | **DONE** |
 | ~~LOW~~ | ~~Add useCallback to FileTree handlers~~ | ~~Low~~ | **DONE** |
-| LOW | Memoize JSON operations in ActivityFeed | Low | Open |
+| LOW | Consider dynamic import for Monaco | Low | Open |
+
+---
+
+## Performance Metrics
+
+### Memoization Coverage
+- **useMemo/useCallback:** 728 usages across 179 files
+- **React.memo:** 1 file (FileTreeNode) - adequate for list rendering
+
+### Event Handling
+- **addEventListener files:** 74 (all with proper cleanup)
+- **Subscription files:** 2 (`mobileApiStore.ts`, `autoBuildGameBridge.ts`)
+
+### Timer Usage
+- **setTimeout files:** 104 (all verified with cleanup or guard patterns)
+- **setInterval files:** Properly cleaned in useEffect returns
+
+### Observer Usage
+- **ResizeObserver:** 6 files - all disconnect on cleanup
+- **IntersectionObserver:** 2 files - all disconnect on cleanup
 
 ---
 
@@ -168,8 +194,9 @@ useEffect(() => {
 
 | Date | Changes |
 |------|---------|
-| 2025-12-31 | **Component Decomposition**: Split 3 large components - ToolsDropdown (1068→289 lines, 73% ↓), TycoonGame (852→592 lines, 30% ↓), MainContent (828→247 lines, 70% ↓). Created 13 focused modules with no design/functionality changes. Epic wynter-code-vot1 completed. |
-| 2025-12-31 | **Memory Leak Prevention**: Fixed setTimeout cleanup in MeditationScreen (added phraseTimeoutRef), FarmParticleEmitter (added pendingTimeouts Set). Verified TycoonGame and Terminal.tsx already had proper cleanup patterns. Score increased 7.5 → 8.5 |
-| 2025-12-31 | **React Memoization**: FileTreeNode already had React.memo with custom comparison; Added useCallback to FileTree handlers (handleToggle, handleContextMenu, handleMoveItem, handleMoveItems) |
+| 2025-12-31 | **Full Re-audit**: Verified 728 useMemo/useCallback usages, 104 setTimeout files with proper cleanup, 74 addEventListener files with cleanup, 8 Observer files with disconnect. Added recommendations for React.lazy code-splitting. Score maintained at 9/10. |
+| 2025-12-31 | **Component Decomposition**: Split 3 large components - ToolsDropdown (73% ↓), TycoonGame (30% ↓), MainContent (70% ↓). Created 13 focused modules. |
+| 2025-12-31 | **Memory Leak Prevention**: Fixed setTimeout cleanup in MeditationScreen, FarmParticleEmitter. Verified TycoonGame and Terminal.tsx patterns. Score: 7.5 → 8.5 |
+| 2025-12-31 | **React Memoization**: FileTreeNode verified with React.memo; Added useCallback to FileTree handlers |
 | 2025-12-26 | Full performance audit - identified memory leak patterns, reviewed memoization, analyzed bundle |
 | 2025-12-22 | Initial performance audit setup via Farmwork CLI |

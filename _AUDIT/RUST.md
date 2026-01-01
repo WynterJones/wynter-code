@@ -1,185 +1,277 @@
 # Rust Code Audit
 
-**Last Updated:** 2025-12-26  
-**Files Audited:** 21 Rust source files in `src-tauri/src/`  
-**Build Status:** Compiles with warnings (deprecated cocoa APIs, unused imports)
+**Last Updated:** 2025-12-31
+**Files Audited:** 33 Rust source files in `src-tauri/src/`
+**Build Status:** Compiles with 1 warning (unused `get_all` method in `process_registry.rs`)
 
 ---
 
 ## Executive Summary
 
-The codebase has **102 instances of `.unwrap()`** and **1 instance of `.expect()`**. Most unwrap calls are on Mutex locks, which is acceptable in single-threaded Tauri command handlers but could panic if a thread holding the lock panics. There are **5 unsafe blocks**, all related to macOS-specific Cocoa/Objective-C interop.
+The codebase has **189 instances of `.unwrap()`** across 20 files and **1 instance of `.expect()`** (in `main.rs:497`). The majority of unwrap calls are on:
+1. Mutex locks (acceptable for Tauri state management)
+2. Regex compilation (safe - static patterns)
+3. SystemTime operations (safe - UNIX_EPOCH is always before now)
+4. JSON serialization of known-valid types (safe)
+
+There are **2 unsafe blocks** for macOS-specific Cocoa/Objective-C interop (window level and sharing type).
+
+**No `panic!`, `todo!`, or `unimplemented!` macros found in production code.**
 
 ---
 
 ## Panic Risks
 
-### High Priority - `.unwrap()` on Fallible Operations
+### High Priority - `.expect()` Usage
 
-| File | Line | Issue | Recommendation |
-|------|------|-------|----------------|
-| `tunnel.rs` | 87 | `.unwrap()` on `duration_since(UNIX_EPOCH)` | Safe - UNIX_EPOCH is always before now |
-| `tunnel.rs` | 148 | `.unwrap()` on `Regex::new()` | Safe - static regex pattern |
-| `live_preview.rs` | 309 | `.unwrap()` on `duration_since(UNIX_EPOCH)` | Safe - UNIX_EPOCH is always before now |
-| `storybook.rs` | 72 | `.unwrap()` on `duration_since(UNIX_EPOCH)` | Safe - UNIX_EPOCH is always before now |
-| `api_tester.rs` | 288 | `.unwrap()` on `duration_since(UNIX_EPOCH)` | Safe - UNIX_EPOCH is always before now |
-| `main.rs` | 125 | `.unwrap()` on `default_window_icon()` | **RISK** - Could panic if no icon available |
-| `commands/mod.rs` | 2302 | `.unwrap()` on `chars().next()` | Safe - guarded by `starts_with()` check |
-| `color_picker.rs` | 334 | `.unwrap_or(0)` | Safe - provides fallback |
+| File | Line | Code | Assessment |
+|------|------|------|------------|
+| `main.rs` | 497 | `.expect("error while running tauri application")` | **Acceptable** - Fatal error at app startup, cannot recover |
 
 ### Medium Priority - Mutex Lock Unwraps
 
-**Pattern found across multiple files:** `state.instances.lock().unwrap()`
+**Pattern found across 20 files:** `state.*.lock().unwrap()`
 
-This pattern appears in:
-- `tunnel.rs` (8 occurrences)
-- `live_preview.rs` (12 occurrences)
-- `storybook.rs` (8 occurrences)
-- `terminal.rs` (6 occurrences)
-- `claude_process.rs` (8 occurrences)
-- `api_tester.rs` (4 occurrences)
-- `audio_proxy.rs` (8 occurrences)
-- `cost_popup.rs` (4 occurrences)
-- `webcam_window.rs` (6 occurrences)
-- `color_picker.rs` (4 occurrences)
+| File | Occurrences | Context |
+|------|-------------|---------|
+| `file_coordinator.rs` | 25 | Lock management for concurrent auto-build |
+| `mobile_api.rs` | 20 | Mobile API server state |
+| `mcp_permission_server.rs` | 17 | Permission request handling |
+| `live_preview.rs` | 20 | Preview server management |
+| `tunnel.rs` | 14 | Cloudflare tunnel management |
+| `storybook.rs` | 14 | Storybook server management |
+| `claude_process.rs` | 13 | Claude CLI process management |
+| `audio_proxy.rs` | 11 | Audio streaming proxy |
+| `codex_process.rs` | 8 | Codex CLI process management |
+| `api_tester.rs` | 8 | Webhook server management |
+| `gemini_process.rs` | 7 | Gemini CLI process management |
+| `webcam_window.rs` | 7 | Floating window position |
+| `terminal.rs` | 6 | PTY instance management |
+| `commands/mod.rs` | 5 | Various command utilities |
+| `cost_popup.rs` | 4 | Popup window position |
+| `process_registry.rs` | 4 | Child process tracking |
+| `domain_tools.rs` | 2 | Regex validation |
+| `beads.rs` | 2 | Issue ID regex |
+| `github.rs` | 1 | Command output handling |
+| `limits_monitor.rs` | 1 | Test code only |
 
-**Assessment:** These are generally safe in practice because:
-1. Tauri commands run on the async runtime, not spawning threads that could poison the lock
-2. The pattern is idiomatic for Tauri state management
-3. A poisoned mutex indicates a thread panicked, which is already a serious error
+**Assessment:** These are generally safe because:
+1. Tauri commands run on the async runtime with proper thread isolation
+2. Lock acquisition is brief - no async awaits while holding locks
+3. A poisoned mutex indicates a previous panic, which is already fatal
 
-**Recommendation:** Consider using `lock().expect("mutex poisoned - internal error")` for clearer error messages in production logs.
+**Recommendation:** Consider `.expect("context: lock poisoned")` for better debugging.
 
-### Low Priority - HTTP Header Creation
+### Low Priority - Safe Unwrap Patterns
 
-Files using `Header::from_bytes(...).unwrap()`:
-- `live_preview.rs` (lines 699, 717)
-- `audio_proxy.rs` (lines 113, 183-186, 216-219)
-- `api_tester.rs` (line 301)
+These unwraps are safe and do not need changes:
 
-**Assessment:** Safe - these are static header names/values that are always valid.
+| Pattern | Files | Reason |
+|---------|-------|--------|
+| `Regex::new(...).unwrap()` | Multiple | Static patterns, validated at dev time |
+| `duration_since(UNIX_EPOCH).unwrap()` | Multiple | UNIX_EPOCH is always before current time |
+| `serde_json::to_string(...).unwrap()` | Multiple | Serializing known-valid types |
+| `Header::from_bytes(...).unwrap()` | `api_tester.rs`, `audio_proxy.rs`, `live_preview.rs` | Static ASCII header names |
+| `listener.local_addr().unwrap()` | Multiple | Already bound successfully |
 
 ---
 
-## Error Handling Issues
+## Error Handling Assessment
 
-### Missing Result Propagation
+### Proper Error Propagation
 
-| File | Issue |
-|------|-------|
-| `api_tester.rs:205` | `response.text().await.unwrap_or_default()` - silently swallows errors |
-| `audio_proxy.rs:284` | `manager.running.lock().map(...).unwrap_or(false)` - appropriate fallback |
+The codebase demonstrates good error handling patterns:
 
-### Silent Error Ignoring
+| File | Pattern | Assessment |
+|------|---------|------------|
+| `terminal.rs` | Input validation with `validate_shell_path()`, `validate_cwd()` | Excellent |
+| `tunnel.rs` | Port validation with `validate_tunnel_port()` | Good |
+| `beads.rs` | Input sanitization with `sanitize_text()`, validation functions | Excellent |
+| `commands/mod.rs` | Path validation with `validate_file_path()` | Excellent |
+| `claude_process.rs` | Model and session ID validation | Good |
 
-The pattern `let _ = window.emit(...)` is used throughout the codebase to ignore emit errors. This is intentional but could hide issues if the window is closed unexpectedly.
+### Silent Error Handling
 
-Files using this pattern:
-- `tunnel.rs`
-- `live_preview.rs`
-- `storybook.rs`
-- `claude_process.rs`
+The pattern `let _ = window.emit(...)` is used intentionally:
+- Window may close before emit completes
+- Non-critical status updates that shouldn't fail the operation
 
-**Recommendation:** Consider logging emit failures in debug builds.
+**Files using this pattern:** `tunnel.rs`, `live_preview.rs`, `storybook.rs`, `claude_process.rs`, `file_coordinator.rs`, `mcp_permission_server.rs`
 
 ---
 
 ## Unsafe Code
 
-### All Unsafe Blocks (5 total)
+### All Unsafe Blocks (2 total)
 
 | File | Lines | Purpose | Justification |
 |------|-------|---------|---------------|
-| `color_picker.rs` | 46-89 | macOS Cocoa interop for screen capture | **Required** - Objective-C message passing |
-| `color_picker.rs` | 180-193 | macOS Cocoa interop for cursor position | **Required** - Objective-C message passing |
-| `color_picker.rs` | 273-434 | macOS Cocoa interop for magnifier capture | **Required** - Objective-C message passing |
-| `color_picker.rs` | 477-481 | macOS Cocoa interop for window number | **Required** - Objective-C message passing |
-| `cost_popup.rs` | 61-63 | macOS Cocoa interop for window sharing | **Required** - Objective-C message passing |
+| `launcher.rs` | 99-102 | macOS: Set window level to floating | **Required** - Objective-C message passing via `objc` crate |
+| `cost_popup.rs` | 76-78 | macOS: Set window sharing type to None | **Required** - Hide window from screen recording |
 
-**Assessment:** All unsafe blocks are necessary for macOS-specific functionality using the `objc` crate. The code uses standard patterns for Objective-C interop. No memory safety concerns identified.
+**Code Review:**
+
+```rust
+// launcher.rs:99-102
+if let Ok(ns_window) = window.ns_window() {
+    let ns_window = ns_window as id;
+    unsafe {
+        let _: () = msg_send![ns_window, setLevel: 3i32];
+    }
+}
+```
+
+```rust
+// cost_popup.rs:76-78
+if let Ok(ns_window) = window.ns_window() {
+    let ns_window = ns_window as id;
+    unsafe {
+        let _: () = msg_send![ns_window, setSharingType: NS_WINDOW_SHARING_NONE];
+    }
+}
+```
+
+**Assessment:** Both blocks are properly guarded with `#[cfg(target_os = "macos")]` and `#[allow(deprecated)]`. The unsafe operations are minimal and follow standard `objc` crate patterns. No memory safety issues identified.
+
+---
+
+## Resource Cleanup
+
+### Process Management
+
+| File | Mechanism | Assessment |
+|------|-----------|------------|
+| `process_registry.rs` | Centralized PID tracking for child processes | Excellent - prevents arbitrary process termination |
+| `tunnel.rs` | Processes registered with `ProcessRegistry`, cleaned up on stop | Good |
+| `claude_process.rs` | `drop(instance.stdin.take())` for proper stdin closure | Good |
+| `codex_process.rs` | `drop(instance.stdin.take())` for proper stdin closure | Good |
+| `terminal.rs` | PTY cleanup on child process exit | Good |
+
+### Server Shutdown
+
+| File | Mechanism | Assessment |
+|------|-----------|------------|
+| `file_coordinator.rs` | Shutdown signal via `Arc<RwLock<bool>>`, lock cleanup | Good |
+| `mcp_permission_server.rs` | Shutdown signal, cancels pending requests | Good |
+| `live_preview.rs` | Server removed from manager on stop | Good |
+| `storybook.rs` | Process kill and removal on stop | Good |
+
+---
+
+## Security Patterns
+
+### Input Validation
+
+The codebase has strong input validation:
+
+| File | Function | Validates |
+|------|----------|-----------|
+| `terminal.rs` | `validate_shell_path()` | Absolute paths, no injection |
+| `terminal.rs` | `validate_cwd()` | Directory existence |
+| `tunnel.rs` | `validate_tunnel_port()` | Non-privileged ports only |
+| `beads.rs` | `validate_issue_id()`, `validate_status()`, `validate_issue_type()`, `validate_priority()` | All CLI inputs |
+| `commands/mod.rs` | `validate_file_path()`, `validate_npm_package_name()`, `validate_session_id()` | Path traversal, npm names |
+| `claude_process.rs` | `validate_model_name()`, `validate_session_id()` | CLI arguments |
+
+### Blocked Paths
+
+`commands/mod.rs` defines comprehensive path blocking:
+- System directories (`/etc`, `/var`, `/System`, etc.)
+- Sensitive files (SSH keys, credentials, `.env.production`)
+- Home directory enforcement for file access
 
 ---
 
 ## Async/Await Patterns
 
-### Potential Issues
+### Threading Model
 
-1. **Blocking in async context:**
-   - `std::thread::sleep()` used in `storybook.rs:286` - This is in a spawned thread, so acceptable
-   - `claude_process.rs:352` uses `std::thread::sleep()` in a spawned thread - acceptable
+The codebase correctly separates:
+- **Tauri commands**: Async functions on Tokio runtime
+- **Long-running operations**: `std::thread::spawn` for servers, process monitoring
+- **Mutex access**: Brief, synchronous, no awaits while holding locks
 
-2. **Thread spawning pattern:**
-   All long-running operations (tunnel monitoring, file serving, process IO) correctly spawn `std::thread` rather than blocking async tasks.
+### Potential Blocking
 
-3. **No deadlock risks identified:**
-   - Mutex locks are short-lived and don't await while holding locks
-   - No nested lock acquisitions that could cause deadlocks
-
----
-
-## Tauri Command Best Practices
-
-### Correctly Implemented Patterns
-
-- All commands return `Result<T, String>` as required
-- State is properly accessed via `State<'_, Arc<Manager>>`
-- Proper use of `#[tauri::command]` attributes
-- Window events are emitted for status updates
-
-### Improvement Opportunities
-
-| Pattern | Recommendation |
-|---------|----------------|
-| Error strings | Consider custom error enum for structured errors |
-| State cloning | `state.inner().clone()` is correct for Arc |
+| File | Pattern | Assessment |
+|------|---------|------------|
+| `mcp_permission_server.rs:230` | `rx.blocking_recv()` in spawned thread | Acceptable - dedicated thread |
+| `storybook.rs:294` | Polling loop with sleep | Acceptable - spawned thread |
 
 ---
 
 ## Compiler Warnings
 
-### Deprecation Warnings
-The `cocoa` crate has deprecated many types in favor of `objc2-foundation`. Consider migrating when Tauri ecosystem updates.
+### Current Warning
+```
+warning: method `get_all` is never used
+  --> src/process_registry.rs:39:12
+```
 
-Affected: `color_picker.rs` (60+ deprecation warnings)
-
-### Unused Imports
-- `commands/search.rs:7-8` - Unused `AtomicUsize`, `Ordering`, `Arc`
-- `color_picker.rs:262` - Unused `nil` import
-
-### Unused Variables
-- `audio_proxy.rs:271` - Unused `manager` variable
+**Recommendation:** Either use the method or add `#[allow(dead_code)]` with a comment explaining it's for debugging.
 
 ---
 
 ## Recommendations
 
 ### High Priority
-1. Fix `main.rs:125` - Replace `.unwrap()` with proper error handling for missing icon
+None - no critical issues found.
 
 ### Medium Priority
-2. Replace Mutex `.unwrap()` calls with `.expect("descriptive message")` for better debugging
-3. Clean up unused imports to reduce compiler noise
-4. Log emit failures in debug builds
+1. **Document unsafe blocks** - Add safety comments explaining why the unsafe code is sound
+2. **Use `.expect()` over `.unwrap()` for Mutex locks** - Better debugging in production
+3. **Remove or mark unused `get_all` method** in `process_registry.rs`
 
 ### Low Priority
-5. Plan migration from deprecated `cocoa` crate to `objc2-foundation`
-6. Consider structured error types instead of String errors
+4. **Consider structured error types** - Replace `String` errors with enums for better frontend handling
+5. **Add debug logging for emit failures** - Helps diagnose window lifecycle issues
+6. **Consider `once_cell` or `lazy_static` for compiled Regexes** - Avoid repeated compilation
 
 ---
 
 ## Files Reviewed
 
-1. `main.rs` - Application entry point
-2. `tunnel.rs` - Cloudflare tunnel management
-3. `live_preview.rs` - Dev server preview
-4. `storybook.rs` - Storybook server management
-5. `terminal.rs` - PTY management
-6. `claude_process.rs` - Claude CLI process management
-7. `api_tester.rs` - HTTP client and webhook server
-8. `audio_proxy.rs` - Audio streaming proxy
-9. `color_picker.rs` - Screen color picker (macOS)
-10. `cost_popup.rs` - Cost tracking popup window
-11. `webcam_window.rs` - Floating webcam window
-12. `commands/mod.rs` - Main command handlers
-13. `commands/search.rs` - Search functionality
-14. Additional modules: `watcher.rs`, `domain_tools.rs`, `gif_capture.rs`, `netlify_backup.rs`, `beads.rs`, `auto_build.rs`, `overwatch.rs`, `database_viewer.rs`
+### Core Modules
+1. `main.rs` - Application entry point and Tauri setup
+2. `commands/mod.rs` - Main command handlers (file operations, npm, git)
+3. `commands/search.rs` - Search functionality
+
+### Process Management
+4. `process_registry.rs` - Child process tracking
+5. `claude_process.rs` - Claude CLI process management
+6. `codex_process.rs` - Codex CLI process management
+7. `gemini_process.rs` - Gemini CLI process management
+8. `terminal.rs` - PTY management
+
+### Servers
+9. `live_preview.rs` - Dev server preview
+10. `storybook.rs` - Storybook server management
+11. `api_tester.rs` - HTTP client and webhook server
+12. `audio_proxy.rs` - Audio streaming proxy
+13. `mobile_api.rs` - Mobile companion API
+14. `mcp_permission_server.rs` - MCP permission handling
+15. `file_coordinator.rs` - Concurrent file lock coordination
+
+### Network
+16. `tunnel.rs` - Cloudflare tunnel management
+
+### Windows
+17. `cost_popup.rs` - Cost tracking popup
+18. `webcam_window.rs` - Floating webcam window
+19. `launcher.rs` - App launcher window
+
+### Utilities
+20. `beads.rs` - Issue tracking CLI wrapper
+21. `domain_tools.rs` - DNS/WHOIS lookups
+22. `github.rs` - GitHub CLI integration
+23. `homebrew.rs` - Homebrew management
+24. `limits_monitor.rs` - Usage monitoring
+25. `netlify_backup.rs` - Netlify API
+26. `overwatch.rs` - Service monitoring
+27. `path_utils.rs` - Path utilities
+28. `vibrancy.rs` - Window vibrancy effects
+29. `watcher.rs` - File watcher
+30. `camera_permission.rs` - Camera permissions
+31. `database_viewer.rs` - Database tools
+32. `auto_build.rs` - Auto-build features
+33. `system_cleaner.rs` - System cleanup utilities

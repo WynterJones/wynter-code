@@ -212,9 +212,11 @@ class GitService {
     try {
       // Check if origin remote exists (separate from upstream tracking)
       const remoteOutput = await runGit(["remote", "get-url", "origin"], cwd);
+      console.log("[GitService] remote get-url result:", remoteOutput);
       const hasRemote = remoteOutput.code === 0;
 
       if (!hasRemote) {
+        console.log("[GitService] No remote detected, code:", remoteOutput.code);
         return { ahead: 0, behind: 0, hasRemote: false };
       }
 
@@ -237,7 +239,8 @@ class GitService {
       const behind = parseInt(behindOutput.stdout.trim(), 10) || 0;
 
       return { ahead, behind, hasRemote: true };
-    } catch {
+    } catch (err) {
+      console.error("[GitService] getRemoteStatus error:", err);
       return { ahead: 0, behind: 0, hasRemote: false };
     }
   }

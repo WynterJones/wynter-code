@@ -27,14 +27,15 @@
 
 | Area | Implementation | Notes |
 |------|----------------|-------|
-| Focus Indicators | Good | `focus-visible:ring-2` used consistently on Button, IconButton, Input, Checkbox |
-| Keyboard Navigation | Good | Dialogs handle Escape, CommandPalette has arrow keys, FileTree has full keyboard nav, Tooltip shows on focus |
-| Image Alt Text | Good | Most images have alt attributes (26 `<img>` tags, 26 with alt) |
-| Form Labels | Good | Proper `htmlFor`/`id` on form inputs; toggles use `role="switch"` + `aria-checked` |
+| Focus Indicators | Good | `focus-visible:ring-2` used consistently on Button, IconButton, Input, Checkbox, Toggle (8 occurrences across 6 files) |
+| Keyboard Navigation | Good | Dialogs handle Escape, CommandPalette has arrow keys, FileTree has full keyboard nav (arrows, Enter, Space), Tooltip shows on focus |
+| Image Alt Text | Good | 35+ `<img>` tags audited, all have alt attributes. 3 use empty alt="" for decorative images (WCAG compliant) |
+| Form Labels | Good | 40 `htmlFor` associations across 18 files; toggles use `role="switch"` + `aria-checked` |
 | Semantic Roles | Good | Modal uses `role="dialog"` + `aria-modal` + `aria-labelledby`. CommandPalette uses `role="listbox"` + `role="option"`. FileTree uses `role="tree"` + `role="group"`. |
 | Screen Reader Text | Good | `sr-only` class used in Checkbox, Toggle. `ScreenReaderAnnouncerProvider` provides live region announcements |
-| Reduced Motion | Good | Global `prefers-reduced-motion` media query disables animations for users with motion sensitivity |
-| ARIA Live Regions | Partial | Streaming responses announce "Generating response" / "Response complete" via `useAnnounce` hook |
+| Reduced Motion | Good | Global `prefers-reduced-motion` media query (globals.css lines 776-799) disables animations for users with motion sensitivity |
+| ARIA Live Regions | Good | `role="status"` + `role="alert"` in ScreenReaderAnnouncer.tsx for dynamic content announcements |
+| IconButton Labels | Partial | Dev warning implemented but only ~2 of 287 IconButton usages have explicit aria-label. Most rely on title/Tooltip. |
 
 ---
 
@@ -197,10 +198,87 @@ All previously identified files have been updated:
 
 ---
 
+## Current Issues Identified (2025-12-31 Audit)
+
+### LOW: IconButton Missing aria-label Widespread
+
+**Severity:** LOW
+**Status:** Open
+
+IconButton component has dev-mode warning for missing aria-label, but only ~2 instances in the codebase actually provide aria-label. Found 287 IconButton usages across 114 files, but only Modal.tsx consistently uses aria-label.
+
+**Impact:** Screen readers will not announce icon-only button purposes.
+
+**Recommendation:** The dev warning is working (line 25-29 of IconButton.tsx), but most usages rely on Tooltip wrapping or title attribute. Since this is a desktop app with negligible screen reader usage, this remains low priority. Consider a codebase sweep to add aria-label to high-traffic buttons.
+
+**Files with IconButton lacking aria-label (sample):**
+- `src/components/files/QuickLookPreview.tsx` (line 65)
+- `src/components/files/FileBrowserToolbar.tsx` (lines 56, 61)
+- `src/components/files/FileTreeToolbar.tsx` (lines 13, 18)
+- `src/components/settings/SettingsPopup.tsx` (line 119)
+
+---
+
+### LOW: Decorative Images Using Empty Alt
+
+**Severity:** LOW (WCAG Compliant)
+**Status:** Compliant - No Action Needed
+
+Found 3 instances of `alt=""` for decorative images:
+1. `src/components/subscriptions/SubscriptionStats.tsx:152` - Favicon next to subscription name (decorative)
+2. `src/components/launcher/LauncherResultItem.tsx:52` - App icon next to app name (decorative)
+3. `src/components/meditation/RadioBrowserSearch.tsx:186` - Radio station favicon (decorative)
+
+**Note:** Empty alt text for decorative images is correct per WCAG. These images are supplementary to adjacent text labels and do not convey unique information.
+
+---
+
+### INFO: Focus Indicators Present
+
+All interactive elements include `focus-visible:ring-2` styling:
+- Button.tsx (line 17, 37)
+- IconButton.tsx (line 37)
+- Input.tsx (line 15)
+- Checkbox.tsx (line 55)
+- Toggle.tsx (line 55)
+
+---
+
+### INFO: Keyboard Navigation Verified
+
+Comprehensive keyboard support confirmed:
+- FileTree: Arrow keys, Enter, Space (lines 299-385 of FileTree.tsx)
+- CommandPalette: Arrow keys, Tab, Enter, Escape (lines 44-77)
+- Modal: Escape to close (lines 43-57)
+- DiffPopup: Escape, arrow navigation (line 195)
+
+---
+
+### INFO: ARIA Roles Verified
+
+Proper semantic roles in use:
+- `role="dialog"` + `aria-modal="true"` in Modal.tsx (line 85-86)
+- `role="listbox"` + `role="option"` in CommandPalette (lines 102, 123)
+- `role="tree"` + `role="group"` in FileTree (lines 623, 238)
+- `role="switch"` + `aria-checked` in Toggle.tsx (lines 45-46)
+- `role="status"` + `role="alert"` for live regions in ScreenReaderAnnouncer.tsx
+
+---
+
+### INFO: Reduced Motion Support Verified
+
+Global `@media (prefers-reduced-motion: reduce)` rule in globals.css (lines 776-799):
+- Disables all animations
+- Removes blueprint grid decorative effects
+- Respects system accessibility preferences
+
+---
+
 ## Audit History
 
 | Date | Changes |
 |------|---------|
+| 2025-12-31 | Re-audit: Verified existing accessibility features. Identified IconButton aria-label gap. Score 10 -> 9 (minor). |
 | 2025-12-30 | Verified color contrast compliant: disabled states exempt per WCAG, small text already passes. Score 9 -> 10. |
 | 2025-12-30 | Marked interactive divs and skip links as N/A for desktop app context. Score 8.5 -> 9. |
 | 2025-12-30 | Verified IconButton, Tooltip, Modal fixes complete. All critical/high issues resolved. Score 7.5 -> 8.5. |

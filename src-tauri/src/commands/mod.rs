@@ -1319,6 +1319,7 @@ fn validate_git_subcommand(args: &[String]) -> Result<(), String> {
         "branch",
         "describe",
         "rev-parse",
+        "rev-list",
         "remote",
         "config",
         "ls-files",
