@@ -86,6 +86,14 @@ impl FileWatcherManager {
 
                             // Emit event to frontend
                             if let Some(window) = app_clone.get_webview_window("main") {
+                                #[cfg(debug_assertions)]
+                                if let Err(e) = window.emit("fs-change", serde_json::json!({
+                                    "watchPath": path_clone.clone(),
+                                    "changedPaths": changed_paths.clone(),
+                                })) {
+                                    eprintln!("[DEBUG] Failed to emit 'fs-change': {}", e);
+                                }
+                                #[cfg(not(debug_assertions))]
                                 let _ = window.emit("fs-change", serde_json::json!({
                                     "watchPath": path_clone,
                                     "changedPaths": changed_paths,

@@ -48,6 +48,7 @@ function FileTagBadge({ file, onRemove }: FileTagBadgeProps) {
       <button
         type="button"
         onClick={() => onRemove(file.id)}
+        aria-label="Remove file reference"
         className={cn(
           "flex-shrink-0 p-0.5 -mr-0.5 rounded",
           "hover:bg-accent/20 transition-colors"

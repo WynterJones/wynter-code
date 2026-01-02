@@ -40,7 +40,7 @@ export function JsonViewerModal({
       await navigator.clipboard.writeText(formattedJson);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (error) {
       // Fallback for older browsers
       const textarea = document.createElement("textarea");
       textarea.value = formattedJson;
@@ -60,8 +60,8 @@ export function JsonViewerModal({
       onSave?.(parsed);
       setIsEditing(false);
       onClose();
-    } catch (e) {
-      setError("Invalid JSON: " + (e instanceof Error ? e.message : String(e)));
+    } catch (error) {
+      setError("Invalid JSON: " + (error instanceof Error ? error.message : String(error)));
     }
   };
 
@@ -90,7 +90,7 @@ export function JsonViewerModal({
           </div>
           <div className="flex items-center gap-2">
             <Tooltip content={copied ? "Copied!" : "Copy to clipboard"}>
-              <IconButton size="sm" onClick={handleCopy}>
+              <IconButton size="sm" onClick={handleCopy} aria-label="Copy JSON to clipboard">
                 {copied ? (
                   <Check className="w-4 h-4 text-green-500" />
                 ) : (
@@ -100,13 +100,13 @@ export function JsonViewerModal({
             </Tooltip>
             {isEditable && !isEditing && (
               <Tooltip content="Edit">
-                <IconButton size="sm" onClick={handleEdit}>
+                <IconButton size="sm" onClick={handleEdit} aria-label="Edit JSON">
                   <Edit2 className="w-4 h-4" />
                 </IconButton>
               </Tooltip>
             )}
             <Tooltip content="Close">
-              <IconButton size="sm" onClick={onClose}>
+              <IconButton size="sm" onClick={onClose} aria-label="Close JSON viewer">
                 <X className="w-4 h-4" />
               </IconButton>
             </Tooltip>

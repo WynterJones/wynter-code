@@ -41,7 +41,7 @@ export function ResponseViewer({ requestId, loading }: ResponseViewerProps) {
     if (!response?.body) return "";
     try {
       return JSON.stringify(JSON.parse(response.body), null, 2);
-    } catch {
+    } catch (error) {
       return response.body;
     }
   };

@@ -45,8 +45,8 @@ function AppRow({ app, onUninstall, isDeleting }: AppRowProps) {
   const handleReveal = async () => {
     try {
       await invoke("reveal_in_finder", { path: app.path });
-    } catch (e) {
-      console.error("Failed to reveal in Finder:", e);
+    } catch (error) {
+      console.error("Failed to reveal in Finder:", error);
     }
   };
 

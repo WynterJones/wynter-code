@@ -40,7 +40,7 @@ export function DeadLinkChecker({ url, onUrlChange }: DeadLinkCheckerProps) {
       }
       const base = new URL(baseUrl);
       return new URL(link, base.href).href;
-    } catch {
+    } catch (err) {
       return null;
     }
   };
@@ -50,7 +50,7 @@ export function DeadLinkChecker({ url, onUrlChange }: DeadLinkCheckerProps) {
       const base = new URL(baseUrl);
       const link = new URL(linkUrl);
       return base.hostname === link.hostname;
-    } catch {
+    } catch (err) {
       return false;
     }
   };
@@ -168,7 +168,7 @@ export function DeadLinkChecker({ url, onUrlChange }: DeadLinkCheckerProps) {
       }
 
       return results;
-    } catch {
+    } catch (err) {
       return [];
     }
   };

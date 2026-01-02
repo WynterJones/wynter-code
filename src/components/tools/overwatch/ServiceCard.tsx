@@ -245,6 +245,7 @@ export function ServiceCard({
             size="sm"
             onClick={() => setShowMenu(!showMenu)}
             className="opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Service options menu"
           >
             <MoreVertical className="w-4 h-4" />
           </IconButton>
@@ -325,6 +326,7 @@ export function ServiceCard({
                 size="sm"
                 onClick={onRefresh}
                 disabled={isRefreshing}
+                aria-label="Refresh service status"
               >
                 <RefreshCw
                   className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin")}
@@ -337,6 +339,7 @@ export function ServiceCard({
               <IconButton
                 size="sm"
                 onClick={() => open(config.externalUrl!)}
+                aria-label={isLink ? "Open external link" : "Open service dashboard"}
               >
                 <ExternalLink className="w-3.5 h-3.5" />
               </IconButton>

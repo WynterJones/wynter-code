@@ -31,6 +31,8 @@ mod watcher;
 mod webcam_window;
 mod camera_permission;
 mod process_registry;
+mod rate_limiter;
+mod relay_client;
 
 use std::sync::Arc;
 use tauri::{
@@ -129,21 +131,41 @@ fn main() {
                 match event.id().as_ref() {
                     "settings" => {
                         if let Some(window) = app.get_webview_window("main") {
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window.emit("menu-event", "settings") {
+                                eprintln!("[DEBUG] Failed to emit 'menu-event': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window.emit("menu-event", "settings");
                         }
                     }
                     "new_project" => {
                         if let Some(window) = app.get_webview_window("main") {
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window.emit("menu-event", "new_project") {
+                                eprintln!("[DEBUG] Failed to emit 'menu-event': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window.emit("menu-event", "new_project");
                         }
                     }
                     "open_project" => {
                         if let Some(window) = app.get_webview_window("main") {
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window.emit("menu-event", "open_project") {
+                                eprintln!("[DEBUG] Failed to emit 'menu-event': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window.emit("menu-event", "open_project");
                         }
                     }
                     "toggle_sidebar" => {
                         if let Some(window) = app.get_webview_window("main") {
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window.emit("menu-event", "toggle_sidebar") {
+                                eprintln!("[DEBUG] Failed to emit 'menu-event': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window.emit("menu-event", "toggle_sidebar");
                         }
                     }
@@ -197,6 +219,10 @@ fn main() {
         .manage(Arc::new(file_coordinator::FileCoordinatorManager::new()))
         .manage(Arc::new(audio_proxy::AudioProxyManager::new()))
         .manage(Arc::new(mobile_api::MobileApiManager::new()))
+        .manage({
+            let (tx, _) = tokio::sync::broadcast::channel(32);
+            Arc::new(relay_client::RelayClient::new(tx))
+        })
         .invoke_handler(tauri::generate_handler![
             commands::get_file_tree,
             commands::read_file_content,
@@ -492,6 +518,16 @@ fn main() {
             mobile_api::mobile_api_sync_netlify_token,
             mobile_api::mobile_api_sync_workspaces,
             mobile_api::mobile_api_sync_all_data,
+            // Relay client commands
+            relay_client::relay_configure,
+            relay_client::relay_connect,
+            relay_client::relay_disconnect,
+            relay_client::relay_status,
+            relay_client::relay_generate_pairing_code,
+            relay_client::relay_set_peer_key,
+            relay_client::relay_get_config,
+            relay_client::relay_load_config,
+            relay_client::relay_set_mobile_api_port,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -110,7 +110,7 @@ export function BookmarkCard({
   const getHostname = (url: string) => {
     try {
       return new URL(url).hostname;
-    } catch {
+    } catch (err) {
       return url;
     }
   };

@@ -63,7 +63,7 @@ export function SystemCleanerPopup({ isOpen, onClose }: SystemCleanerPopupProps)
             </span>
           </div>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close system cleaner">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

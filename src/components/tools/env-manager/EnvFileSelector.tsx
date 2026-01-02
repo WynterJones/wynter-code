@@ -79,23 +79,23 @@ export function EnvFileSelector({
                 if (e.key === "Escape") setShowCreate(false);
               }}
             />
-            <IconButton size="sm" onClick={handleCreate}>
+            <IconButton size="sm" onClick={handleCreate} aria-label="Confirm create new file">
               <Check className="w-3.5 h-3.5 text-green-400" />
             </IconButton>
-            <IconButton size="sm" onClick={() => setShowCreate(false)}>
+            <IconButton size="sm" onClick={() => setShowCreate(false)} aria-label="Cancel creating new file">
               <X className="w-3.5 h-3.5 text-red-400" />
             </IconButton>
           </div>
         ) : (
           <Tooltip content="Create new .env file">
-            <IconButton size="sm" onClick={() => setShowCreate(true)}>
+            <IconButton size="sm" onClick={() => setShowCreate(true)} aria-label="Create new .env file">
               <Plus className="w-4 h-4" />
             </IconButton>
           </Tooltip>
         )}
 
         <Tooltip content="Refresh">
-          <IconButton size="sm" onClick={onRefresh} disabled={loading}>
+          <IconButton size="sm" onClick={onRefresh} disabled={loading} aria-label="Refresh environment files">
             <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
           </IconButton>
         </Tooltip>

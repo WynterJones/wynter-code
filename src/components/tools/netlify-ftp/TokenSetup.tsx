@@ -56,6 +56,7 @@ export function TokenSetup({ onSubmit, isConnecting, error }: TokenSetupProps) {
             className="absolute right-1 top-1/2 -translate-y-1/2"
             onClick={() => setShowToken(!showToken)}
             type="button"
+            aria-label={showToken ? "Hide token" : "Show token"}
           >
             {showToken ? (
               <EyeOff className="w-4 h-4" />

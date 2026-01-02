@@ -119,7 +119,7 @@ function parseActions(text: string): KanbanAction[] {
       if (parsed.actions && Array.isArray(parsed.actions)) {
         actions.push(...parsed.actions);
       }
-    } catch {
+    } catch (error) {
       // Ignore malformed JSON
     }
   }

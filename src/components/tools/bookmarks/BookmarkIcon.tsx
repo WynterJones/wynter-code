@@ -343,7 +343,7 @@ export function BookmarkIcon({
     if (!url) return null;
     try {
       return new URL(url).hostname.replace(/^www\./, "");
-    } catch {
+    } catch (error) {
       return null;
     }
   }, [url]);
@@ -354,7 +354,7 @@ export function BookmarkIcon({
       try {
         const urlObj = new URL(url);
         return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
-      } catch {
+      } catch (error) {
         return null;
       }
     }

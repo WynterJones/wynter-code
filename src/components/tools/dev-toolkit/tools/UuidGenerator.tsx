@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 type UuidFormat = "default" | "uppercase" | "no-dashes" | "braces";
 
@@ -24,7 +25,7 @@ export function UuidGenerator() {
   const [uuids, setUuids] = useState<string[]>([]);
   const [count, setCount] = useState(1);
   const [format, setFormat] = useState<UuidFormat>("default");
-  const [copied, setCopied] = useState<number | "all" | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
 
   const handleGenerate = useCallback(() => {
     const newUuids: string[] = [];
@@ -34,14 +35,8 @@ export function UuidGenerator() {
     setUuids(newUuids);
   }, [count, format]);
 
-  const handleCopy = async (text: string, index: number | "all") => {
-    await navigator.clipboard.writeText(text);
-    setCopied(index);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
   const handleCopyAll = () => {
-    handleCopy(uuids.join("\n"), "all");
+    copy(uuids.join("\n"), "all");
   };
 
   const handleClear = () => {
@@ -90,7 +85,7 @@ export function UuidGenerator() {
               Copy All
             </Button>
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear all UUIDs">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -109,13 +104,14 @@ export function UuidGenerator() {
               <code className="flex-1 font-mono text-sm text-text-primary select-all">
                 {uuid}
               </code>
-              <Tooltip content={copied === i ? "Copied!" : "Copy"}>
+              <Tooltip content={isCopied(String(i)) ? "Copied!" : "Copy"}>
                 <IconButton
                   size="sm"
-                  onClick={() => handleCopy(uuid, i)}
+                  onClick={() => copy(uuid, String(i))}
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label="Copy UUID"
                 >
-                  {copied === i ? (
+                  {isCopied(String(i)) ? (
                     <Check className="w-3.5 h-3.5 text-green-400" />
                   ) : (
                     <Copy className="w-3.5 h-3.5" />

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 interface JwtPart {
   label: string;
@@ -44,13 +45,13 @@ function parseJwt(token: string): DecodedJwt | null {
 
   const [headerB64, payloadB64, signature] = parts;
 
-  let header: JwtPart = {
+  const header: JwtPart = {
     label: "Header",
     data: null,
     error: null,
     color: "text-pink-400",
   };
-  let payload: JwtPart = {
+  const payload: JwtPart = {
     label: "Payload",
     data: null,
     error: null,
@@ -59,13 +60,13 @@ function parseJwt(token: string): DecodedJwt | null {
 
   try {
     header.data = JSON.parse(decodeBase64Url(headerB64));
-  } catch {
+  } catch (error) {
     header.error = "Invalid header encoding";
   }
 
   try {
     payload.data = JSON.parse(decodeBase64Url(payloadB64));
-  } catch {
+  } catch (error) {
     payload.error = "Invalid payload encoding";
   }
 
@@ -106,18 +107,12 @@ function formatDate(date: Date): string {
 
 export function JwtDebugger() {
   const [input, setInput] = useState("");
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
 
   const decoded = useMemo(() => {
     if (!input.trim()) return null;
     return parseJwt(input);
   }, [input]);
-
-  const handleCopy = async (text: string, key: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
-  };
 
   const handleClear = () => {
     setInput("");
@@ -133,14 +128,15 @@ export function JwtDebugger() {
       <div className="flex items-center justify-between">
         <span className={cn("text-sm font-medium", part.color)}>{part.label}</span>
         {part.data && (
-          <Tooltip content={copied === part.label ? "Copied!" : "Copy JSON"}>
+          <Tooltip content={isCopied(part.label) ? "Copied!" : "Copy JSON"}>
             <IconButton
               size="sm"
               onClick={() =>
-                handleCopy(JSON.stringify(part.data, null, 2), part.label)
+                copy(JSON.stringify(part.data, null, 2), part.label)
               }
+              aria-label={`Copy ${part.label} as JSON`}
             >
-              {copied === part.label ? (
+              {isCopied(part.label) ? (
                 <Check className="w-3.5 h-3.5 text-green-400" />
               ) : (
                 <Copy className="w-3.5 h-3.5" />
@@ -171,7 +167,7 @@ export function JwtDebugger() {
           </label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -255,12 +251,13 @@ export function JwtDebugger() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-cyan-400">Signature</span>
-              <Tooltip content={copied === "sig" ? "Copied!" : "Copy"}>
+              <Tooltip content={isCopied("sig") ? "Copied!" : "Copy"}>
                 <IconButton
                   size="sm"
-                  onClick={() => handleCopy(decoded.signature, "sig")}
+                  onClick={() => copy(decoded.signature, "sig")}
+                  aria-label="Copy signature"
                 >
-                  {copied === "sig" ? (
+                  {isCopied("sig") ? (
                     <Check className="w-3.5 h-3.5 text-green-400" />
                   ) : (
                     <Copy className="w-3.5 h-3.5" />

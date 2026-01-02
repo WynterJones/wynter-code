@@ -27,6 +27,7 @@ export function CodeBlock({ children, language }: CodeBlockProps) {
           size="sm"
           onClick={handleCopy}
           className="opacity-0 group-hover:opacity-100 transition-opacity"
+          aria-label="Copy code to clipboard"
         >
           {copied ? (
             <Check className="w-3.5 h-3.5 text-accent-green" />

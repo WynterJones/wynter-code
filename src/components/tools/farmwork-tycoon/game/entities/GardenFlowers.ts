@@ -50,8 +50,8 @@ export class GardenFlowers extends Container {
       );
       this.isLoaded = true;
       this.initializeGrid();
-    } catch (e) {
-      console.warn("Failed to load flower textures:", e);
+    } catch (error) {
+      console.warn("Failed to load flower textures:", error);
     }
   }
 

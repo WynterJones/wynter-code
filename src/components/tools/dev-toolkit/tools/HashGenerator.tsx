@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 interface HashResult {
   md5: string;
@@ -243,7 +244,7 @@ export function HashGenerator() {
   const [input, setInput] = useState("");
   const [hashes, setHashes] = useState<HashResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
 
   const handleGenerate = async () => {
     if (!input.trim()) return;
@@ -265,12 +266,6 @@ export function HashGenerator() {
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const handleCopy = async (key: string, value: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
   };
 
   const handleClear = () => {
@@ -328,12 +323,13 @@ export function HashGenerator() {
                   <span className="text-xs font-medium text-text-secondary uppercase">
                     {key}
                   </span>
-                  <Tooltip content={copiedKey === key ? "Copied!" : "Copy"}>
+                  <Tooltip content={isCopied(key) ? "Copied!" : "Copy"}>
                     <IconButton
                       size="sm"
-                      onClick={() => handleCopy(key, hashes[key])}
+                      onClick={() => copy(hashes[key], key)}
+                      aria-label={`Copy ${key.toUpperCase()} hash`}
                     >
-                      {copiedKey === key ? (
+                      {isCopied(key) ? (
                         <Check className="w-3.5 h-3.5 text-green-400" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />

@@ -31,7 +31,7 @@ function naturalSort(a: string, b: string): number {
 }
 
 function sortList(items: string[], sortType: SortType, direction: SortDirection, caseSensitive: boolean): string[] {
-  let sorted = [...items];
+  const sorted = [...items];
 
   if (sortType === "alphabetical") {
     sorted.sort((a, b) => {
@@ -127,12 +127,12 @@ export function ListSorterDeduplicator() {
             {input && (
               <>
                 <Tooltip content="Reset Options">
-                  <IconButton size="sm" onClick={handleReset}>
+                  <IconButton size="sm" onClick={handleReset} aria-label="Reset options to defaults">
                     <RotateCcw className="w-3.5 h-3.5" />
                   </IconButton>
                 </Tooltip>
                 <Tooltip content="Clear">
-                  <IconButton size="sm" onClick={handleClear}>
+                  <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                     <Trash2 className="w-3.5 h-3.5" />
                   </IconButton>
                 </Tooltip>
@@ -183,6 +183,7 @@ export function ListSorterDeduplicator() {
                   className={cn(
                     sortDirection === "asc" && "bg-bg-hover"
                   )}
+                  aria-label="Sort ascending"
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
                 </IconButton>
@@ -194,6 +195,7 @@ export function ListSorterDeduplicator() {
                   className={cn(
                     sortDirection === "desc" && "bg-bg-hover"
                   )}
+                  aria-label="Sort descending"
                 >
                   <ArrowDown className="w-3.5 h-3.5" />
                 </IconButton>
@@ -239,7 +241,7 @@ export function ListSorterDeduplicator() {
               )}
             </span>
             <Tooltip content={copied ? "Copied!" : "Copy Result"}>
-              <IconButton size="sm" onClick={handleCopy}>
+              <IconButton size="sm" onClick={handleCopy} aria-label="Copy result">
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-green-400" />
                 ) : (

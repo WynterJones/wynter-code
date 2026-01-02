@@ -70,7 +70,7 @@ export function KanbanNewTaskPopup({
           <h3 className="text-base font-medium text-text-primary">
             {editTask ? "Edit Task" : "New Task"}
           </h3>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close dialog">
             <X className="w-4 h-4" />
           </IconButton>
         </div>

@@ -97,7 +97,7 @@ export function useBackupScheduler(options: BackupSchedulerOptions = {}) {
           const currentWindow = getCurrentWindow();
           await currentWindow.destroy();
         });
-      } catch {
+      } catch (error) {
         // Listener setup failed, window close will work normally
       }
     };

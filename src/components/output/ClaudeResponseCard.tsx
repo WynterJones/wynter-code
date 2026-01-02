@@ -73,6 +73,7 @@ export function ClaudeResponseCard({
               size="sm"
               onClick={handleCopy}
               className="opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Copy response to clipboard"
             >
               {copied ? (
                 <Check className="w-3.5 h-3.5 text-accent-green" />

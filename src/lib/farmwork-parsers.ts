@@ -55,7 +55,7 @@ export const parseAuditFile = (content: string): AuditMetadata => {
           else if (text.match(/\[LOW\]|\(LOW\)|🟢/i)) priority = "low";
 
           result.openItems.push({
-            text: text.replace(/\[(HIGH|MEDIUM|LOW)\]|\((HIGH|MEDIUM|LOW)\)|[🔴🟡🟢]/gi, "").trim(),
+            text: text.replace(/\[(HIGH|MEDIUM|LOW)\]|\((HIGH|MEDIUM|LOW)\)|[🔴🟡🟢]/giu, "").trim(),
             priority
           });
         }

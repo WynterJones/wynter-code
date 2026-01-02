@@ -11,8 +11,8 @@ export function Base64Tool() {
       const encoded = btoa(unescape(encodeURIComponent(input)));
       setOutput(encoded);
       setError(null);
-    } catch (e) {
-      setError("Failed to encode: " + (e as Error).message);
+    } catch (error) {
+      setError("Failed to encode: " + (error as Error).message);
       setOutput("");
     }
   };
@@ -22,7 +22,7 @@ export function Base64Tool() {
       const decoded = decodeURIComponent(escape(atob(input)));
       setOutput(decoded);
       setError(null);
-    } catch (e) {
+    } catch (error) {
       setError("Invalid Base64 string");
       setOutput("");
     }

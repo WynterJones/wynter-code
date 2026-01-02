@@ -185,7 +185,7 @@ class ClaudeService {
                 cwd: initData.cwd,
                 permissionMode: initData.permissionMode || chunk.permission_mode,
               };
-            } catch {
+            } catch (error) {
               // Use basic info from chunk fields
             }
           }
@@ -268,8 +268,8 @@ class ClaudeService {
               try {
                 const parsed = JSON.parse(accumulatedInput) as AskUserQuestionInput;
                 cb.onAskUserQuestion(currentToolId, parsed);
-              } catch (e) {
-                console.error("[ClaudeService] Failed to parse AskUserQuestion input:", e);
+              } catch (error) {
+                console.error("[ClaudeService] Failed to parse AskUserQuestion input:", error);
               }
             }
             cb.onToolEnd(currentToolId);
@@ -449,7 +449,7 @@ class ClaudeService {
           return `Error: ${parsed.error}`;
         }
         return output.stdout;
-      } catch {
+      } catch (error) {
         return output.stdout || "No response received";
       }
     } catch (error) {
@@ -466,7 +466,7 @@ class ClaudeService {
         cwd: ".",
       });
       return output.code === 0;
-    } catch {
+    } catch (error) {
       return false;
     }
   }

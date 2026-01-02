@@ -88,7 +88,7 @@ export function useStorybookDetection() {
           });
           hasConfig = true;
           break;
-        } catch {
+        } catch (error) {
           // Config doesn't exist
         }
       }
@@ -124,7 +124,7 @@ export function useStorybookDetection() {
         port: STORYBOOK_DEFAULT_PORT,
         isDetecting: false,
       });
-    } catch {
+    } catch (error) {
       setDetection({
         hasStorybook: false,
         version: null,

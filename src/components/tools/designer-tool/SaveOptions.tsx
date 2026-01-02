@@ -48,7 +48,7 @@ export function SaveOptions({ image, preset, onSaved }: SaveOptionsProps) {
       const exists = await invoke<boolean>("path_exists", { path: publicPath });
       const targetPath = exists ? publicPath : activeProjectPath;
       await saveToPath(targetPath);
-    } catch {
+    } catch (error) {
       await saveToPath(activeProjectPath);
     }
   };

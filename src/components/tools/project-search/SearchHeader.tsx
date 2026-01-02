@@ -184,6 +184,7 @@ export function SearchHeader({
             onClick={onNavigatePrev}
             disabled={totalMatches === 0}
             title="Previous match (Shift+Enter)"
+            aria-label="Navigate to previous search match"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </IconButton>
@@ -192,6 +193,7 @@ export function SearchHeader({
             onClick={onNavigateNext}
             disabled={totalMatches === 0}
             title="Next match (Enter)"
+            aria-label="Navigate to next search match"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </IconButton>
@@ -260,6 +262,7 @@ export function SearchHeader({
             size="sm"
             onClick={() => onFileExtensionFilterChange("")}
             title="Clear filter"
+            aria-label="Clear file filter"
           >
             <X className="w-3 h-3" />
           </IconButton>

@@ -160,7 +160,7 @@ export function IpAddressTool() {
           <label className="text-sm font-medium text-text-secondary">IP Address</label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -236,6 +236,7 @@ export function IpAddressTool() {
                         size="sm"
                         onClick={() => handleCopy(info.decimal, "dec")}
                         className="opacity-0 group-hover:opacity-100"
+                        aria-label="Copy decimal representation"
                       >
                         {copied === "dec" ? (
                           <Check className="w-3 h-3 text-green-400" />
@@ -259,6 +260,7 @@ export function IpAddressTool() {
                 <IconButton
                   size="sm"
                   onClick={() => handleCopy(info.binary, "bin")}
+                  aria-label="Copy binary representation"
                 >
                   {copied === "bin" ? (
                     <Check className="w-3 h-3 text-green-400" />

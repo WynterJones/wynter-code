@@ -44,7 +44,7 @@ function highlightCode(code: string, language: string): string {
       return hljs.highlight(code, { language }).value;
     }
     return hljs.highlightAuto(code).value;
-  } catch {
+  } catch (error) {
     return code
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")

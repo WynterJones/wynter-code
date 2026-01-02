@@ -152,6 +152,7 @@ function TapCard({ tap, onRemove, isOperating }: TapCardProps) {
             <IconButton
               size="sm"
               onClick={() => open(tap.remote.replace(".git", ""))}
+              aria-label={`Open ${tap.name} on GitHub`}
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </IconButton>
@@ -163,6 +164,7 @@ function TapCard({ tap, onRemove, isOperating }: TapCardProps) {
               variant="danger"
               onClick={onRemove}
               disabled={isOperating}
+              aria-label={`Remove ${tap.name} tap`}
             >
               <Trash2 className="w-3.5 h-3.5" />
             </IconButton>

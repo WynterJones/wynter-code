@@ -185,7 +185,7 @@ export function Sidebar({ project, isCollapsed, isResizing, onToggleCollapse, on
         ]);
         setHasNodeModules(modulesExist);
         setHasPackageJson(packageExists);
-      } catch {
+      } catch (error) {
         setHasNodeModules(false);
         setHasPackageJson(false);
       }

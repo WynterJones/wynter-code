@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 
 // Format numbers: 0, 10, 100, 1.2k, 12k, 100k, 1.2M
@@ -41,12 +41,29 @@ interface ScoreBarProps {
   hideTooltip?: boolean;
 }
 
+// Memoized static box-shadow values (extracted to avoid inline object creation)
+const SEGMENT_INSET_SHADOW = "inset 0 1px 2px rgba(0,0,0,0.3)";
+const FILLED_SEGMENT_SHADOW = "inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)";
+
 function ScoreBar({ name, metadata, icon: Icon, color, isExpanded, onToggle, hideTooltip }: ScoreBarProps) {
   const { score, lastUpdated, status, openItems } = metadata;
   const segments = 10;
   const filledSegments = Math.floor(score);
   const partialFill = (score % 1) * 100;
   const hasOpenItems = openItems.length > 0;
+
+  // Memoize segment styles to avoid recreation on every render
+  const segmentBaseStyle = useMemo(() => ({
+    backgroundColor: `${color}15`,
+    boxShadow: SEGMENT_INSET_SHADOW,
+  }), [color]);
+
+  const filledSegmentStyle = useMemo(() => ({
+    backgroundColor: color,
+    boxShadow: FILLED_SEGMENT_SHADOW,
+  }), [color]);
+
+  const colorStyle = useMemo(() => ({ color }), [color]);
 
   const tooltipContent = (
     <div className="text-[10px] space-y-0.5">
@@ -68,11 +85,11 @@ function ScoreBar({ name, metadata, icon: Icon, color, isExpanded, onToggle, hid
       {/* Top row: icon + label on left, score + chevron on right */}
       <div className="flex items-center justify-between mb-1 w-full">
         <div className="flex items-center gap-1.5">
-          <Icon className="w-3.5 h-3.5" style={{ color }} />
+          <Icon className="w-3.5 h-3.5" style={colorStyle} />
           <span className="text-[11px] text-text-secondary">{name}</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-[11px] font-mono font-bold" style={{ color }}>
+          <span className="text-[11px] font-mono font-bold" style={colorStyle}>
             {score.toFixed(1)}
           </span>
           {hasOpenItems && (
@@ -96,27 +113,20 @@ function ScoreBar({ name, metadata, icon: Icon, color, isExpanded, onToggle, hid
             <div
               key={i}
               className="flex-1 rounded-[3px] relative overflow-hidden"
-              style={{
-                backgroundColor: `${color}15`,
-                boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
-              }}
+              style={segmentBaseStyle}
             >
               {isFilled && (
                 <div
                   className="absolute inset-0 rounded-[3px]"
-                  style={{
-                    backgroundColor: color,
-                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
-                  }}
+                  style={filledSegmentStyle}
                 />
               )}
               {isPartial && (
                 <div
                   className="absolute inset-y-0 left-0 rounded-[3px]"
                   style={{
-                    backgroundColor: color,
+                    ...filledSegmentStyle,
                     width: `${partialFill}%`,
-                    boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
                   }}
                 />
               )}
@@ -172,6 +182,16 @@ const AUDIT_CONFIG: { key: AuditKey; name: string; icon: LucideIcon; color: stri
   { key: "codeQuality", name: "Code Quality", icon: Code2, color: "#f5c2e7" }, // Pink
 ];
 
+// Static color styles for stat items (extracted to avoid inline object creation)
+const STAT_COLORS = {
+  green: { color: "#a6e3a1" },
+  teal: { color: "#94e2d5" },
+  red: { color: "#f38ba8" },
+  peach: { color: "#fab387" },
+  yellow: { color: "#f9e2af" },
+  overlay: { color: "#6c7086" },
+} as const;
+
 export function StatsSidebar() {
   const { auditScores, beadsStats, gardenStats, compostStats, activityFeed, hideTooltips } =
     useFarmworkTycoonStore();
@@ -190,29 +210,29 @@ export function StatsSidebar() {
           <div className="bg-bg-tertiary rounded-lg p-2 border border-border/50">
             <div className="grid grid-cols-4 gap-1">
               <div className="flex flex-col items-center gap-0.5 py-1">
-                <Sprout className="w-3.5 h-3.5" style={{ color: "#a6e3a1" }} />
-                <span className="text-xs font-mono font-bold" style={{ color: "#a6e3a1" }}>
+                <Sprout className="w-3.5 h-3.5" style={STAT_COLORS.green} />
+                <span className="text-xs font-mono font-bold" style={STAT_COLORS.green}>
                   {formatNumber(gardenStats.planted)}
                 </span>
                 <span className="text-[7px] text-text-tertiary uppercase">Planted</span>
               </div>
               <div className="flex flex-col items-center gap-0.5 py-1">
-                <TreeDeciduous className="w-3.5 h-3.5" style={{ color: "#94e2d5" }} />
-                <span className="text-xs font-mono font-bold" style={{ color: "#94e2d5" }}>
+                <TreeDeciduous className="w-3.5 h-3.5" style={STAT_COLORS.teal} />
+                <span className="text-xs font-mono font-bold" style={STAT_COLORS.teal}>
                   {formatNumber(gardenStats.growing)}
                 </span>
                 <span className="text-[7px] text-text-tertiary uppercase">Growing</span>
               </div>
               <div className="flex flex-col items-center gap-0.5 py-1">
-                <Apple className="w-3.5 h-3.5" style={{ color: "#f38ba8" }} />
-                <span className="text-xs font-mono font-bold" style={{ color: "#f38ba8" }}>
+                <Apple className="w-3.5 h-3.5" style={STAT_COLORS.red} />
+                <span className="text-xs font-mono font-bold" style={STAT_COLORS.red}>
                   {formatNumber(gardenStats.picked)}
                 </span>
                 <span className="text-[7px] text-text-tertiary uppercase">Picked</span>
               </div>
               <div className="flex flex-col items-center gap-0.5 py-1">
-                <LeafyGreen className="w-3.5 h-3.5" style={{ color: "#fab387" }} />
-                <span className="text-xs font-mono font-bold" style={{ color: "#fab387" }}>
+                <LeafyGreen className="w-3.5 h-3.5" style={STAT_COLORS.peach} />
+                <span className="text-xs font-mono font-bold" style={STAT_COLORS.peach}>
                   {formatNumber(compostStats.rejectedIdeas)}
                 </span>
                 <span className="text-[7px] text-text-tertiary uppercase">Compost</span>
@@ -233,29 +253,29 @@ export function StatsSidebar() {
             <div className="bg-bg-tertiary rounded-lg p-2 border border-border/50">
               <div className="grid grid-cols-4 gap-1">
                 <div className="flex flex-col items-center gap-0.5 py-1">
-                  <CircleDot className="w-3.5 h-3.5" style={{ color: "#a6e3a1" }} />
-                  <span className="text-xs font-mono font-bold" style={{ color: "#a6e3a1" }}>
+                  <CircleDot className="w-3.5 h-3.5" style={STAT_COLORS.green} />
+                  <span className="text-xs font-mono font-bold" style={STAT_COLORS.green}>
                     {formatNumber(beadsStats.open)}
                   </span>
                   <span className="text-[7px] text-text-tertiary uppercase">Open</span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 py-1">
-                  <Clock className="w-3.5 h-3.5" style={{ color: "#f9e2af" }} />
-                  <span className="text-xs font-mono font-bold" style={{ color: "#f9e2af" }}>
+                  <Clock className="w-3.5 h-3.5" style={STAT_COLORS.yellow} />
+                  <span className="text-xs font-mono font-bold" style={STAT_COLORS.yellow}>
                     {formatNumber(beadsStats.in_progress)}
                   </span>
                   <span className="text-[7px] text-text-tertiary uppercase">Progress</span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 py-1">
-                  <AlertTriangle className="w-3.5 h-3.5" style={{ color: "#f38ba8" }} />
-                  <span className="text-xs font-mono font-bold" style={{ color: "#f38ba8" }}>
+                  <AlertTriangle className="w-3.5 h-3.5" style={STAT_COLORS.red} />
+                  <span className="text-xs font-mono font-bold" style={STAT_COLORS.red}>
                     {formatNumber(beadsStats.blocked)}
                   </span>
                   <span className="text-[7px] text-text-tertiary uppercase">Blocked</span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 py-1">
-                  <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "#6c7086" }} />
-                  <span className="text-xs font-mono font-bold" style={{ color: "#6c7086" }}>
+                  <CheckCircle2 className="w-3.5 h-3.5" style={STAT_COLORS.overlay} />
+                  <span className="text-xs font-mono font-bold" style={STAT_COLORS.overlay}>
                     {formatNumber(beadsStats.closed)}
                   </span>
                   <span className="text-[7px] text-text-tertiary uppercase">Closed</span>

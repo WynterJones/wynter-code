@@ -96,7 +96,7 @@ export function AudioPlayerPopup({ filePath, onClose }: AudioPlayerPopupProps) {
         >
           <span className="font-mono text-sm text-text-primary truncate">{fileName}</span>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close audio player">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>
@@ -144,7 +144,7 @@ export function AudioPlayerPopup({ filePath, onClose }: AudioPlayerPopupProps) {
               {/* Control buttons */}
               <div className="flex items-center justify-center gap-4">
                 <Tooltip content="Skip -10s" side="top">
-                  <IconButton size="sm" onClick={() => skip(-10)}>
+                  <IconButton size="sm" onClick={() => skip(-10)} aria-label="Skip back 10 seconds">
                     <SkipBack className="w-5 h-5" />
                   </IconButton>
                 </Tooltip>
@@ -161,7 +161,7 @@ export function AudioPlayerPopup({ filePath, onClose }: AudioPlayerPopupProps) {
                   </button>
                 </Tooltip>
                 <Tooltip content="Skip +10s" side="top">
-                  <IconButton size="sm" onClick={() => skip(10)}>
+                  <IconButton size="sm" onClick={() => skip(10)} aria-label="Skip forward 10 seconds">
                     <SkipForward className="w-5 h-5" />
                   </IconButton>
                 </Tooltip>
@@ -170,7 +170,7 @@ export function AudioPlayerPopup({ filePath, onClose }: AudioPlayerPopupProps) {
               {/* Volume */}
               <div className="flex items-center gap-2">
                 <Tooltip content={isMuted ? "Unmute (M)" : "Mute (M)"} side="top">
-                  <IconButton size="sm" onClick={toggleMute}>
+                  <IconButton size="sm" onClick={toggleMute} aria-label={isMuted ? "Unmute audio" : "Mute audio"}>
                     {isMuted || volume === 0 ? (
                       <VolumeX className="w-4 h-4" />
                     ) : (

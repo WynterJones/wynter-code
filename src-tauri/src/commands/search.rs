@@ -6,6 +6,8 @@ use std::io::BufReader;
 use std::path::Path;
 use std::time::Instant;
 
+use super::validate_file_path;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchMatch {
@@ -327,17 +329,32 @@ pub async fn replace_in_files(
     let mut replacements_made = 0;
     let mut errors: Vec<String> = Vec::new();
 
+    // Validate project path first
+    let validated_project = match validate_file_path(&project_path) {
+        Ok(p) => p,
+        Err(e) => return Err(format!("Invalid project path: {}", e)),
+    };
+    let project_path_str = validated_project.to_string_lossy().to_lowercase();
+
     for file_path in file_paths {
-        let path = Path::new(&file_path);
+        // Validate each file path for security (checks blocked dirs, patterns, path traversal)
+        let validated_path = match validate_file_path(&file_path) {
+            Ok(p) => p,
+            Err(e) => {
+                errors.push(format!("Access denied for {}: {}", file_path, e));
+                continue;
+            }
+        };
 
         // Verify the file is within the project path for security
-        if !path.starts_with(&project_path) {
+        let validated_str = validated_path.to_string_lossy().to_lowercase();
+        if !validated_str.starts_with(&project_path_str) {
             errors.push(format!("File outside project: {}", file_path));
             continue;
         }
 
         // Read file content
-        let content = match fs::read_to_string(path) {
+        let content = match fs::read_to_string(&validated_path) {
             Ok(c) => c,
             Err(e) => {
                 errors.push(format!("Failed to read {}: {}", file_path, e));
@@ -355,7 +372,7 @@ pub async fn replace_in_files(
         let new_content = regex.replace_all(&content, replace.as_str()).to_string();
 
         // Write back
-        match fs::write(path, &new_content) {
+        match fs::write(&validated_path, &new_content) {
             Ok(_) => {
                 files_modified += 1;
                 replacements_made += count;

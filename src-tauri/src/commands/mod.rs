@@ -11,6 +11,7 @@ use ignore::gitignore::GitignoreBuilder;
 use ignore::WalkBuilder;
 
 use crate::process_registry::ProcessRegistry;
+use crate::rate_limiter::{check_rate_limit, categories};
 
 /// Validate a session ID (UUID format or similar safe identifiers)
 fn validate_session_id(session_id: &str) -> Result<(), String> {
@@ -29,7 +30,7 @@ fn validate_session_id(session_id: &str) -> Result<(), String> {
 
 /// Blocked system directories that should never be accessible
 /// These are sensitive locations that could be exploited for privilege escalation or data theft
-const BLOCKED_DIRECTORIES: &[&str] = &[
+pub(crate) const BLOCKED_DIRECTORIES: &[&str] = &[
     // Unix/macOS sensitive directories
     "/etc",
     "/var",
@@ -52,7 +53,7 @@ const BLOCKED_DIRECTORIES: &[&str] = &[
 ];
 
 /// Blocked file patterns that should never be accessible
-const BLOCKED_FILE_PATTERNS: &[&str] = &[
+pub(crate) const BLOCKED_FILE_PATTERNS: &[&str] = &[
     // SSH keys and credentials
     "id_rsa",
     "id_ed25519",
@@ -73,7 +74,7 @@ const BLOCKED_FILE_PATTERNS: &[&str] = &[
 
 /// Validate a file path for safe access
 /// Returns Ok(canonicalized_path) if the path is safe, Err with reason otherwise
-fn validate_file_path(path: &str) -> Result<std::path::PathBuf, String> {
+pub(crate) fn validate_file_path(path: &str) -> Result<std::path::PathBuf, String> {
     let path_obj = Path::new(path);
 
     // Must be an absolute path
@@ -752,6 +753,9 @@ pub async fn npm_install(
     package_name: String,
     is_dev: bool
 ) -> Result<CommandOutput, String> {
+    // Rate limit check
+    check_rate_limit(categories::NPM)?;
+
     // Validate package name to prevent shell injection
     validate_npm_package_name(&package_name)?;
 
@@ -786,6 +790,9 @@ pub async fn npm_install(
 
 #[tauri::command]
 pub async fn npm_uninstall(project_path: String, package_name: String) -> Result<CommandOutput, String> {
+    // Rate limit check
+    check_rate_limit(categories::NPM)?;
+
     // Validate package name to prevent shell injection
     validate_npm_package_name(&package_name)?;
 
@@ -960,6 +967,11 @@ pub async fn run_claude_streaming(
                         if chunk.chunk_type == "init" {
                             chunk.claude_session_id = captured_claude_session_id.clone();
                         }
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window.emit("claude-stream", &chunk) {
+                            eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window.emit("claude-stream", &chunk);
                     }
                 }
@@ -968,6 +980,11 @@ pub async fn run_claude_streaming(
             Err(e) => {
                 let mut chunk = create_chunk("error", &session_id);
                 chunk.content = Some(format!("Read error: {}", e));
+                #[cfg(debug_assertions)]
+                if let Err(e) = window.emit("claude-stream", &chunk) {
+                    eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+                }
+                #[cfg(not(debug_assertions))]
                 let _ = window.emit("claude-stream", &chunk);
             }
             _ => {}
@@ -981,6 +998,11 @@ pub async fn run_claude_streaming(
     let mut chunk = create_chunk("done", &session_id);
     chunk.content = Some(format!("exit_code:{}", status.code().unwrap_or(-1)));
     chunk.claude_session_id = captured_claude_session_id.clone();
+    #[cfg(debug_assertions)]
+    if let Err(e) = window.emit("claude-stream", &chunk) {
+        eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+    }
+    #[cfg(not(debug_assertions))]
     let _ = window.emit("claude-stream", &chunk);
 
     // Return the claude session ID for future resumption
@@ -1497,6 +1519,9 @@ fn validate_git_cwd(cwd: &str) -> Result<std::path::PathBuf, String> {
 
 #[tauri::command]
 pub async fn run_git(args: Vec<String>, cwd: String) -> Result<CommandOutput, String> {
+    // Rate limit check
+    check_rate_limit(categories::GIT)?;
+
     // Validate working directory
     let validated_cwd = validate_git_cwd(&cwd)?;
 

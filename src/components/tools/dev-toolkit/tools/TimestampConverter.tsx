@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 interface TimeFormat {
   id: string;
@@ -70,7 +71,7 @@ export function TimestampConverter() {
   const [input, setInput] = useState("");
   const [date, setDate] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -94,12 +95,6 @@ export function TimestampConverter() {
     setInput(Math.floor(now.getTime() / 1000).toString());
     setDate(now);
     setError(null);
-  };
-
-  const handleCopy = async (text: string, id: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
   };
 
   return (
@@ -159,13 +154,14 @@ export function TimestampConverter() {
                     <div className="text-xs text-text-tertiary mb-1">{format.label}</div>
                     <div className="font-mono text-sm text-text-primary truncate">{value}</div>
                   </div>
-                  <Tooltip content={copied === format.id ? "Copied!" : "Copy"}>
+                  <Tooltip content={isCopied(format.id) ? "Copied!" : "Copy"}>
                     <IconButton
                       size="sm"
-                      onClick={() => handleCopy(value, format.id)}
+                      onClick={() => copy(value, format.id)}
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      aria-label={`Copy ${format.label}`}
                     >
-                      {copied === format.id ? (
+                      {isCopied(format.id) ? (
                         <Check className="w-3.5 h-3.5 text-green-400" />
                       ) : (
                         <Copy className="w-3.5 h-3.5" />

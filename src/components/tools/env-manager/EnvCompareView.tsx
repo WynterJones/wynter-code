@@ -100,6 +100,7 @@ export function EnvCompareView({
                       onClick={() =>
                         isRevealed ? onHide(row.key) : onReveal(row.key)
                       }
+                      aria-label={isRevealed ? "Hide value" : "Show value"}
                     >
                       {isRevealed ? (
                         <EyeOff className="w-3 h-3" />

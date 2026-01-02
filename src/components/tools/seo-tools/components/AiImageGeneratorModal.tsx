@@ -99,7 +99,7 @@ export function AiImageGeneratorModal({
         if (exists) {
           targetFolder = publicPath;
         }
-      } catch {
+      } catch (err) {
         // Use project root if check fails
       }
 
@@ -151,7 +151,7 @@ export function AiImageGeneratorModal({
               Generate {config.name}
             </h2>
           </div>
-          <IconButton onClick={onClose} title="Close">
+          <IconButton onClick={onClose} title="Close" aria-label="Close image generator">
             <X className="w-4 h-4" />
           </IconButton>
         </div>

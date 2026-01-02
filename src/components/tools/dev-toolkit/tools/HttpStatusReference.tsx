@@ -136,6 +136,7 @@ export function HttpStatusReference() {
                           size="sm"
                           onClick={() => handleCopy(status.code)}
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label={`Copy HTTP status code ${status.code}`}
                         >
                           {copied === status.code ? (
                             <Check className="w-3 h-3 text-green-400" />

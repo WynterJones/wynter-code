@@ -50,7 +50,7 @@ export function BrowserPreviewPanel({
       return KNOWN_BLOCKED_DOMAINS.some(
         (domain) => hostname === domain || hostname.endsWith("." + domain)
       );
-    } catch {
+    } catch (err) {
       return false;
     }
   }, []);
@@ -132,7 +132,7 @@ export function BrowserPreviewPanel({
             const currentOrigin = window.location.origin;
             const targetOrigin = new URL(currentUrl).origin;
             return currentOrigin !== targetOrigin;
-          } catch {
+          } catch (err) {
             return true;
           }
         })();
@@ -151,7 +151,7 @@ export function BrowserPreviewPanel({
               setIsCorsError(true);
               return;
             }
-          } catch (e) {
+          } catch (err) {
             // SecurityError when accessing cross-origin contentWindow is expected
             // for successfully loaded cross-origin pages - this is NORMAL and OK
             // Only flag as CORS issue if we also detect the iframe is essentially empty
@@ -169,7 +169,7 @@ export function BrowserPreviewPanel({
                     setIsCorsError(true);
                   }
                 }
-              } catch {
+              } catch (err) {
                 // Can't access - check if it looks empty via other means
                 // If loading finished but frame dimensions suggest no content
                 if (iframe.scrollHeight <= 150 && iframe.clientHeight > 150) {
@@ -190,16 +190,16 @@ export function BrowserPreviewPanel({
                   if (stillEmpty && !iframe.contentDocument?.body?.childNodes.length) {
                     setIsBlocked(true);
                   }
-                } catch {
+                } catch (err) {
                   // Can't check anymore
                 }
               }, 500);
             }
-          } catch {
+          } catch (err) {
             // Unexpected error accessing same-origin content
           }
         }
-      } catch {
+      } catch (err) {
         // Something went wrong, but don't block the UI
       }
     }
@@ -382,7 +382,7 @@ export function BrowserPreviewPanel({
                   {(() => {
                     try {
                       return new URL(currentUrl).hostname;
-                    } catch {
+                    } catch (err) {
                       return currentUrl;
                     }
                   })()}
@@ -414,7 +414,7 @@ export function BrowserPreviewPanel({
                   {(() => {
                     try {
                       return new URL(currentUrl).hostname;
-                    } catch {
+                    } catch (err) {
                       return currentUrl;
                     }
                   })()}

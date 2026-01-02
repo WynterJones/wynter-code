@@ -104,6 +104,7 @@ export function FileSection({
             onOpenFile(result.filePath, result.matches[0]?.lineNumber || 1);
           }}
           title="Open file"
+          aria-label="Open file at first match"
         >
           <ExternalLink className="w-3.5 h-3.5" />
         </IconButton>

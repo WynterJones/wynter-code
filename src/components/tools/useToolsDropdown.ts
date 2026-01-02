@@ -47,7 +47,7 @@ export function useToolsDropdown({ isOpen, tools }: UseToolsDropdownProps): UseT
     try {
       const saved = localStorage.getItem("tools-dropdown-collapsed");
       return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
+    } catch (error) {
       return new Set();
     }
   });
@@ -58,7 +58,7 @@ export function useToolsDropdown({ isOpen, tools }: UseToolsDropdownProps): UseT
   useEffect(() => {
     try {
       localStorage.setItem("tools-dropdown-collapsed", JSON.stringify([...collapsedCategories]));
-    } catch {
+    } catch (error) {
       // Ignore storage errors
     }
   }, [collapsedCategories]);

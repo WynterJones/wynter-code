@@ -47,3 +47,6 @@ export { Slider } from "./Slider";
 ;
 
 export { ScreenReaderAnnouncerProvider, useAnnounce } from "./ScreenReaderAnnouncer";
+
+export { ErrorBanner } from "./ErrorBanner";
+export type { ErrorBannerProps } from "./ErrorBanner";

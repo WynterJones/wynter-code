@@ -82,7 +82,7 @@ function formatInputSummary(input: Record<string, unknown>): string {
 function highlightBash(code: string): string {
   try {
     return hljs.highlight(code, { language: "bash" }).value;
-  } catch {
+  } catch (error) {
     return code
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")

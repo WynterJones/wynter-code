@@ -119,6 +119,7 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
                 size="sm"
                 onClick={toggleConnectionsSidebar}
                 className={cn(!connectionsSidebarCollapsed && "bg-accent/20 text-accent")}
+                aria-label={connectionsSidebarCollapsed ? "Show sidebar" : "Hide sidebar"}
               >
                 {connectionsSidebarCollapsed ? (
                   <PanelLeftOpen className="w-4 h-4" />
@@ -134,6 +135,7 @@ export function DatabaseViewerPopup({ isOpen, onClose }: DatabaseViewerPopupProp
                 size="sm"
                 onClick={() => setSidePanel(sidePanel === "history" ? null : "history")}
                 className={cn(sidePanel === "history" && "bg-accent/20 text-accent")}
+                aria-label="Toggle query history"
               >
                 <History className="w-4 h-4" />
               </IconButton>

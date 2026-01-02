@@ -425,7 +425,7 @@ export function MarkdownEditorPopup({
             {hasChanges && (
               <>
                 <Tooltip content="Reset Changes" side="bottom">
-                  <IconButton size="sm" onClick={handleReset}>
+                  <IconButton size="sm" onClick={handleReset} aria-label="Reset changes">
                     <RotateCcw className="w-4 h-4" />
                   </IconButton>
                 </Tooltip>
@@ -435,6 +435,7 @@ export function MarkdownEditorPopup({
                     onClick={handleSave}
                     disabled={isSaving}
                     className="text-accent-green hover:text-accent-green"
+                    aria-label="Save file"
                   >
                     <Save className="w-4 h-4" />
                   </IconButton>
@@ -443,13 +444,13 @@ export function MarkdownEditorPopup({
             )}
             {onMinimize && (
               <Tooltip content="Minimize" side="bottom">
-                <IconButton size="sm" onClick={onMinimize}>
+                <IconButton size="sm" onClick={onMinimize} aria-label="Minimize editor">
                   <Minus className="w-4 h-4" />
                 </IconButton>
               </Tooltip>
             )}
             <Tooltip content="Close (Esc)" side="bottom">
-              <IconButton size="sm" onClick={onClose}>
+              <IconButton size="sm" onClick={onClose} aria-label="Close editor">
                 <X className="w-4 h-4" />
               </IconButton>
             </Tooltip>
@@ -530,7 +531,7 @@ export function MarkdownEditorPopup({
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") {
-                            e.shiftKey ? goToPrevMatch() : goToNextMatch();
+                            if (e.shiftKey) goToPrevMatch(); else goToNextMatch();
                           }
                           if (e.key === "Escape") {
                             setShowFindBar(false);

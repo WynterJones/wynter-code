@@ -46,8 +46,8 @@ export function QrCodeGenerator() {
         });
         setQrDataUrl(dataUrl);
         setError(null);
-      } catch (e) {
-        setError(`Failed to generate QR code: ${(e as Error).message}`);
+      } catch (error) {
+        setError(`Failed to generate QR code: ${(error as Error).message}`);
         setQrDataUrl(null);
       }
     };
@@ -72,7 +72,7 @@ export function QrCodeGenerator() {
       ]);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (error) {
       const img = document.createElement("img");
       img.src = qrDataUrl;
       document.body.appendChild(img);
@@ -113,7 +113,7 @@ export function QrCodeGenerator() {
           </label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -232,7 +232,7 @@ export function QrCodeGenerator() {
               />
               <div className="flex items-center gap-2 mt-4">
                 <Tooltip content={copied ? "Copied!" : "Copy image"}>
-                  <IconButton size="sm" onClick={handleCopyImage}>
+                  <IconButton size="sm" onClick={handleCopyImage} aria-label="Copy QR code image">
                     {copied ? (
                       <Check className="w-4 h-4 text-green-400" />
                     ) : (
@@ -241,7 +241,7 @@ export function QrCodeGenerator() {
                   </IconButton>
                 </Tooltip>
                 <Tooltip content="Download PNG">
-                  <IconButton size="sm" onClick={handleDownload}>
+                  <IconButton size="sm" onClick={handleDownload} aria-label="Download QR code as PNG">
                     <Download className="w-4 h-4" />
                   </IconButton>
                 </Tooltip>

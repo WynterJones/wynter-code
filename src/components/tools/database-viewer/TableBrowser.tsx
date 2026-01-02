@@ -45,7 +45,7 @@ export function TableBrowser() {
       <div className="flex-shrink-0 px-3 py-2 border-b border-border flex items-center justify-between">
         <h3 className="text-sm font-medium">Tables</h3>
         <Tooltip content="Refresh">
-          <IconButton size="sm" onClick={loadTables} disabled={isLoading}>
+          <IconButton size="sm" onClick={loadTables} disabled={isLoading} aria-label="Refresh table list">
             <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
           </IconButton>
         </Tooltip>

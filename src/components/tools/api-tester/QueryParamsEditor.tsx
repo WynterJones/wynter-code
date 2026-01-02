@@ -36,7 +36,7 @@ export function QueryParamsEditor({ requestId }: QueryParamsEditorProps) {
         .filter((p) => p.enabled && p.key)
         .forEach((p) => url.searchParams.set(p.key, p.value));
       return url.toString();
-    } catch {
+    } catch (error) {
       return request.url;
     }
   })();

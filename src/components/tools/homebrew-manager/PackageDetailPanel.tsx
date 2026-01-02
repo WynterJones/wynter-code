@@ -26,7 +26,7 @@ export function PackageDetailPanel() {
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h3 className="font-medium text-text-primary truncate">{selectedPackage.name}</h3>
         <Tooltip content="Close" side="left">
-          <IconButton size="sm" onClick={clearSelectedPackage}>
+          <IconButton size="sm" onClick={clearSelectedPackage} aria-label="Close package details">
             <X className="w-4 h-4" />
           </IconButton>
         </Tooltip>

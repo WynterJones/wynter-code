@@ -96,8 +96,13 @@ pub fn toggle_launcher_window_sync(app: AppHandle) -> Result<bool, String> {
 
         if let Ok(ns_window) = window.ns_window() {
             let ns_window = ns_window as id;
+            // SAFETY: This unsafe block performs Objective-C message passing to set the window level.
+            // - `ns_window` is a valid pointer obtained from `window.ns_window()` which succeeded.
+            // - `setLevel:` is a standard NSWindow method that accepts an integer window level.
+            // - NSFloatingWindowLevel (3) is a valid constant defined in macOS AppKit.
+            // - The `msg_send!` macro from the `objc` crate handles the FFI call correctly.
+            // - No memory allocation or deallocation occurs; this only sets window properties.
             unsafe {
-                // NSFloatingWindowLevel = 3
                 let _: () = msg_send![ns_window, setLevel: 3i32];
             }
         }

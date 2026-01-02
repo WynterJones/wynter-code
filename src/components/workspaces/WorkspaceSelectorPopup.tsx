@@ -313,12 +313,12 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
         size="sm"
       >
         {workspaceToDelete && (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <div className="p-2 bg-accent-red/10 rounded-lg">
+          <div className="p-4 space-y-4">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 p-2 bg-accent-red/10 rounded-lg self-start">
                 <AlertTriangle className="w-5 h-5 text-accent-red" />
               </div>
-              <div>
+              <div className="pt-1">
                 <p className="text-sm text-text-primary">
                   Are you sure you want to delete "{workspaceToDelete.name}"?
                 </p>

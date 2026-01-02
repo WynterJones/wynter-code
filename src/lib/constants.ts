@@ -6,6 +6,9 @@
 export const STORYBOOK_DEFAULT_PORT = 6006;
 export const LIVE_PREVIEW_DEFAULT_PORT = 9876;
 
+// Timing
+export const COPY_FEEDBACK_TIMEOUT = 2000;
+
 // UI Dimensions
 export const DEFAULT_SIDEBAR_WIDTH = 256;
 export const DEFAULT_TERMINAL_HEIGHT = 200;

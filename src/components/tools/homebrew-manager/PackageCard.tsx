@@ -77,6 +77,7 @@ export function PackageCard({ pkg, showActions = true, showUpgrade = false }: Pa
                 size="sm"
                 onClick={() => fetchPackageInfo(pkg.name, isCask)}
                 disabled={isOperating}
+                aria-label={`View details for ${pkg.name}`}
               >
                 <Info className="w-3.5 h-3.5" />
               </IconButton>
@@ -89,6 +90,7 @@ export function PackageCard({ pkg, showActions = true, showUpgrade = false }: Pa
                   variant="primary"
                   onClick={() => upgradePackage(pkg.name, isCask)}
                   disabled={isOperating}
+                  aria-label={`Upgrade ${pkg.name}`}
                 >
                   <ArrowUp className="w-3.5 h-3.5" />
                 </IconButton>
@@ -103,6 +105,7 @@ export function PackageCard({ pkg, showActions = true, showUpgrade = false }: Pa
                     pkg.pinned ? unpinPackage(pkg.name) : pinPackage(pkg.name)
                   }
                   disabled={isOperating}
+                  aria-label={pkg.pinned ? `Unpin ${pkg.name}` : `Pin ${pkg.name}`}
                 >
                   {pkg.pinned ? (
                     <PinOff className="w-3.5 h-3.5" />
@@ -119,6 +122,7 @@ export function PackageCard({ pkg, showActions = true, showUpgrade = false }: Pa
                 variant="danger"
                 onClick={() => uninstallPackage(pkg.name, isCask)}
                 disabled={isOperating}
+                aria-label={`Uninstall ${pkg.name}`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>

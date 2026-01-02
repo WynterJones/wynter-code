@@ -44,7 +44,7 @@ async function fetchWithFallback(
       }
 
       rotateServer();
-    } catch {
+    } catch (error) {
       rotateServer();
     }
   }

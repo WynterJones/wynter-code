@@ -483,37 +483,371 @@ mod tests {
     use super::*;
     use chrono::Weekday;
 
+    // classify_model tests
     #[test]
-    fn test_classify_model() {
+    fn test_classify_model_sonnet() {
         assert_eq!(
             classify_model("claude-sonnet-4-20250514"),
             ModelTier::Sonnet
         );
+    }
+
+    #[test]
+    fn test_classify_model_opus() {
         assert_eq!(
             classify_model("claude-opus-4-5-20251101"),
             ModelTier::Opus
         );
+    }
+
+    #[test]
+    fn test_classify_model_haiku() {
         assert_eq!(
             classify_model("claude-haiku-4-5-20251001"),
             ModelTier::Haiku
         );
+    }
+
+    #[test]
+    fn test_classify_model_unknown() {
         assert_eq!(classify_model("unknown-model"), ModelTier::Unknown);
     }
 
     #[test]
-    fn test_tokens_to_hours() {
+    fn test_classify_model_case_insensitive() {
+        assert_eq!(classify_model("CLAUDE-SONNET-4"), ModelTier::Sonnet);
+        assert_eq!(classify_model("Claude-Opus-4"), ModelTier::Opus);
+        assert_eq!(classify_model("HAIKU-model"), ModelTier::Haiku);
+    }
+
+    #[test]
+    fn test_classify_model_partial_match() {
+        assert_eq!(classify_model("my-custom-sonnet-model"), ModelTier::Sonnet);
+        assert_eq!(classify_model("opus-v2-beta"), ModelTier::Opus);
+    }
+
+    #[test]
+    fn test_classify_model_empty() {
+        assert_eq!(classify_model(""), ModelTier::Unknown);
+    }
+
+    // tokens_to_hours tests
+    #[test]
+    fn test_tokens_to_hours_sonnet() {
         assert!((tokens_to_hours(1_000_000, ModelTier::Sonnet) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_tokens_to_hours_opus() {
         assert!((tokens_to_hours(250_000, ModelTier::Opus) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_tokens_to_hours_haiku() {
         assert!((tokens_to_hours(4_000_000, ModelTier::Haiku) - 1.0).abs() < 0.001);
     }
 
     #[test]
-    fn test_get_week_start() {
-        // Test that we get Monday 00:00 UTC
+    fn test_tokens_to_hours_unknown_uses_sonnet_rate() {
+        // Unknown uses same rate as Sonnet
+        assert!((tokens_to_hours(1_000_000, ModelTier::Unknown) - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_tokens_to_hours_zero() {
+        assert!((tokens_to_hours(0, ModelTier::Sonnet) - 0.0).abs() < 0.001);
+        assert!((tokens_to_hours(0, ModelTier::Opus) - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_tokens_to_hours_fractional() {
+        // 500K tokens = 0.5 hours for Sonnet
+        assert!((tokens_to_hours(500_000, ModelTier::Sonnet) - 0.5).abs() < 0.001);
+        // 125K tokens = 0.5 hours for Opus
+        assert!((tokens_to_hours(125_000, ModelTier::Opus) - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_tokens_to_hours_large_values() {
+        // 10M tokens = 10 hours for Sonnet
+        assert!((tokens_to_hours(10_000_000, ModelTier::Sonnet) - 10.0).abs() < 0.001);
+    }
+
+    // get_five_hour_block_start tests
+    #[test]
+    fn test_five_hour_block_start_hour_0() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 2, 30, 0).unwrap();
+        let block_start = get_five_hour_block_start(now);
+        assert_eq!(block_start.hour(), 0);
+    }
+
+    #[test]
+    fn test_five_hour_block_start_hour_5() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 7, 30, 0).unwrap();
+        let block_start = get_five_hour_block_start(now);
+        assert_eq!(block_start.hour(), 5);
+    }
+
+    #[test]
+    fn test_five_hour_block_start_hour_10() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 12, 30, 0).unwrap();
+        let block_start = get_five_hour_block_start(now);
+        assert_eq!(block_start.hour(), 10);
+    }
+
+    #[test]
+    fn test_five_hour_block_start_hour_15() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 17, 45, 0).unwrap();
+        let block_start = get_five_hour_block_start(now);
+        assert_eq!(block_start.hour(), 15);
+    }
+
+    #[test]
+    fn test_five_hour_block_start_hour_20() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 23, 59, 0).unwrap();
+        let block_start = get_five_hour_block_start(now);
+        assert_eq!(block_start.hour(), 20);
+    }
+
+    #[test]
+    fn test_five_hour_block_start_boundary() {
+        // Exactly at block boundary
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 10, 0, 0).unwrap();
+        let block_start = get_five_hour_block_start(now);
+        assert_eq!(block_start.hour(), 10);
+    }
+
+    #[test]
+    fn test_five_hour_block_start_preserves_date() {
+        let now = Utc.with_ymd_and_hms(2025, 6, 15, 14, 30, 0).unwrap();
+        let block_start = get_five_hour_block_start(now);
+        assert_eq!(block_start.year(), 2025);
+        assert_eq!(block_start.month(), 6);
+        assert_eq!(block_start.day(), 15);
+    }
+
+    // get_week_start tests
+    #[test]
+    fn test_get_week_start_from_thursday() {
         let now = Utc.with_ymd_and_hms(2025, 12, 26, 15, 30, 0).unwrap(); // Thursday
         let week_start = get_week_start(now);
         assert_eq!(week_start.weekday(), Weekday::Mon);
         assert_eq!(week_start.hour(), 0);
         assert_eq!(week_start.minute(), 0);
+    }
+
+    #[test]
+    fn test_get_week_start_from_monday() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 22, 10, 0, 0).unwrap(); // Monday
+        let week_start = get_week_start(now);
+        assert_eq!(week_start.weekday(), Weekday::Mon);
+        assert_eq!(week_start.day(), 22);
+    }
+
+    #[test]
+    fn test_get_week_start_from_sunday() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 28, 23, 59, 0).unwrap(); // Sunday
+        let week_start = get_week_start(now);
+        assert_eq!(week_start.weekday(), Weekday::Mon);
+        assert_eq!(week_start.day(), 22); // Previous Monday
+    }
+
+    #[test]
+    fn test_get_week_start_midnight() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 25, 0, 0, 0).unwrap(); // Thursday midnight
+        let week_start = get_week_start(now);
+        assert_eq!(week_start.hour(), 0);
+        assert_eq!(week_start.minute(), 0);
+        assert_eq!(week_start.second(), 0);
+    }
+
+    // calculate_burn_rate tests
+    #[test]
+    fn test_calculate_burn_rate_empty() {
+        let entries: Vec<UsageEntry> = vec![];
+        let now = Utc::now();
+        let (sonnet_rate, opus_rate) = calculate_burn_rate(&entries, now, 30);
+        assert!((sonnet_rate - 0.0).abs() < 0.001);
+        assert!((opus_rate - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_calculate_burn_rate_sonnet_only() {
+        let now = Utc::now();
+        let entries = vec![UsageEntry {
+            timestamp: now - Duration::minutes(10),
+            tier: ModelTier::Sonnet,
+            total_tokens: 30000,
+        }];
+        let (sonnet_rate, opus_rate) = calculate_burn_rate(&entries, now, 30);
+        assert!((sonnet_rate - 1000.0).abs() < 0.001); // 30000 / 30 = 1000
+        assert!((opus_rate - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_calculate_burn_rate_opus_only() {
+        let now = Utc::now();
+        let entries = vec![UsageEntry {
+            timestamp: now - Duration::minutes(5),
+            tier: ModelTier::Opus,
+            total_tokens: 60000,
+        }];
+        let (sonnet_rate, opus_rate) = calculate_burn_rate(&entries, now, 30);
+        assert!((sonnet_rate - 0.0).abs() < 0.001);
+        assert!((opus_rate - 2000.0).abs() < 0.001); // 60000 / 30 = 2000
+    }
+
+    #[test]
+    fn test_calculate_burn_rate_mixed() {
+        let now = Utc::now();
+        let entries = vec![
+            UsageEntry {
+                timestamp: now - Duration::minutes(10),
+                tier: ModelTier::Sonnet,
+                total_tokens: 15000,
+            },
+            UsageEntry {
+                timestamp: now - Duration::minutes(5),
+                tier: ModelTier::Opus,
+                total_tokens: 30000,
+            },
+        ];
+        let (sonnet_rate, opus_rate) = calculate_burn_rate(&entries, now, 30);
+        assert!((sonnet_rate - 500.0).abs() < 0.001); // 15000 / 30
+        assert!((opus_rate - 1000.0).abs() < 0.001); // 30000 / 30
+    }
+
+    #[test]
+    fn test_calculate_burn_rate_ignores_haiku() {
+        let now = Utc::now();
+        let entries = vec![UsageEntry {
+            timestamp: now - Duration::minutes(10),
+            tier: ModelTier::Haiku,
+            total_tokens: 100000,
+        }];
+        let (sonnet_rate, opus_rate) = calculate_burn_rate(&entries, now, 30);
+        assert!((sonnet_rate - 0.0).abs() < 0.001);
+        assert!((opus_rate - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_calculate_burn_rate_old_entries_excluded() {
+        let now = Utc::now();
+        let entries = vec![UsageEntry {
+            timestamp: now - Duration::minutes(60), // Outside 30 min window
+            tier: ModelTier::Sonnet,
+            total_tokens: 100000,
+        }];
+        let (sonnet_rate, opus_rate) = calculate_burn_rate(&entries, now, 30);
+        assert!((sonnet_rate - 0.0).abs() < 0.001);
+        assert!((opus_rate - 0.0).abs() < 0.001);
+    }
+
+    // calculate_five_hour_blocks tests
+    #[test]
+    fn test_calculate_five_hour_blocks_returns_5_blocks() {
+        let entries: Vec<UsageEntry> = vec![];
+        let now = Utc::now();
+        let blocks = calculate_five_hour_blocks(&entries, now);
+        assert_eq!(blocks.len(), 5);
+    }
+
+    #[test]
+    fn test_calculate_five_hour_blocks_first_is_current() {
+        let entries: Vec<UsageEntry> = vec![];
+        let now = Utc::now();
+        let blocks = calculate_five_hour_blocks(&entries, now);
+        assert!(blocks[0].is_current);
+        assert!(!blocks[1].is_current);
+    }
+
+    #[test]
+    fn test_calculate_five_hour_blocks_accumulates_tokens() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 12, 0, 0).unwrap();
+        let entries = vec![
+            UsageEntry {
+                timestamp: now - Duration::hours(1), // In current block
+                tier: ModelTier::Sonnet,
+                total_tokens: 1000,
+            },
+            UsageEntry {
+                timestamp: now - Duration::hours(2), // In current block
+                tier: ModelTier::Sonnet,
+                total_tokens: 2000,
+            },
+        ];
+        let blocks = calculate_five_hour_blocks(&entries, now);
+        assert_eq!(blocks[0].sonnet_tokens, 3000);
+    }
+
+    #[test]
+    fn test_calculate_five_hour_blocks_separates_tiers() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 12, 0, 0).unwrap();
+        let entries = vec![
+            UsageEntry {
+                timestamp: now - Duration::hours(1),
+                tier: ModelTier::Sonnet,
+                total_tokens: 1000,
+            },
+            UsageEntry {
+                timestamp: now - Duration::hours(1),
+                tier: ModelTier::Opus,
+                total_tokens: 2000,
+            },
+            UsageEntry {
+                timestamp: now - Duration::hours(1),
+                tier: ModelTier::Haiku,
+                total_tokens: 3000,
+            },
+        ];
+        let blocks = calculate_five_hour_blocks(&entries, now);
+        assert_eq!(blocks[0].sonnet_tokens, 1000);
+        assert_eq!(blocks[0].opus_tokens, 2000);
+        assert_eq!(blocks[0].haiku_tokens, 3000);
+    }
+
+    #[test]
+    fn test_calculate_five_hour_blocks_unknown_counted_as_sonnet() {
+        let now = Utc.with_ymd_and_hms(2025, 12, 31, 12, 0, 0).unwrap();
+        let entries = vec![UsageEntry {
+            timestamp: now - Duration::hours(1),
+            tier: ModelTier::Unknown,
+            total_tokens: 5000,
+        }];
+        let blocks = calculate_five_hour_blocks(&entries, now);
+        assert_eq!(blocks[0].sonnet_tokens, 5000);
+    }
+
+    // ModelTier serialization tests
+    #[test]
+    fn test_model_tier_serialize() {
+        assert_eq!(
+            serde_json::to_string(&ModelTier::Sonnet).unwrap(),
+            "\"sonnet\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ModelTier::Opus).unwrap(),
+            "\"opus\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ModelTier::Haiku).unwrap(),
+            "\"haiku\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ModelTier::Unknown).unwrap(),
+            "\"unknown\""
+        );
+    }
+
+    #[test]
+    fn test_model_tier_deserialize() {
+        assert_eq!(
+            serde_json::from_str::<ModelTier>("\"sonnet\"").unwrap(),
+            ModelTier::Sonnet
+        );
+        assert_eq!(
+            serde_json::from_str::<ModelTier>("\"opus\"").unwrap(),
+            ModelTier::Opus
+        );
     }
 }

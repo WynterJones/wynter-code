@@ -123,6 +123,7 @@ export function BranchSection({
             setIsCreating(true);
           }}
           title="Create new branch"
+          aria-label="Create new branch"
         >
           <Plus className="w-3.5 h-3.5" />
         </IconButton>
@@ -144,6 +145,7 @@ export function BranchSection({
               size="sm"
               onClick={handleCreateBranch}
               disabled={!newBranchName.trim() || isCreatingBranch}
+              aria-label="Confirm create branch"
             >
               {isCreatingBranch ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
@@ -157,6 +159,7 @@ export function BranchSection({
                 setIsCreating(false);
                 setNewBranchName("");
               }}
+              aria-label="Cancel create branch"
             >
               <X className="w-3 h-3" />
             </IconButton>
@@ -191,6 +194,7 @@ export function BranchSection({
                 onClick={(e) => handleDeleteBranch(branch.name, e)}
                 disabled={deletingBranch === branch.name}
                 className="opacity-0 group-hover:opacity-100"
+                aria-label={`Delete branch ${branch.name}`}
               >
                 {deletingBranch === branch.name ? (
                   <Loader2 className="w-3 h-3 animate-spin" />

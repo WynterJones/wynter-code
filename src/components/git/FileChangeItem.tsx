@@ -84,6 +84,7 @@ export function FileChangeItem({
             isViewingDiff && "opacity-100 bg-accent/20"
           )}
           title={isViewingDiff ? "Hide diff" : "View diff"}
+          aria-label={isViewingDiff ? "Hide file diff" : "View file diff"}
         >
           {isViewingDiff ? (
             <EyeOff className="w-3 h-3" />

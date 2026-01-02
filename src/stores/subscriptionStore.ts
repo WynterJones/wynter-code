@@ -437,8 +437,8 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         const workspaceCategories = categories.filter(c => c.workspaceId === workspaceId);
 
         return {
-          subscriptions: workspaceSubs.map(({ id, workspaceId: _wid, createdAt, updatedAt, sortOrder, ...rest }) => rest),
-          categories: workspaceCategories.map(({ id, workspaceId: _wid, createdAt, updatedAt, sortOrder, ...rest }) => rest),
+          subscriptions: workspaceSubs.map(({ id: _id, workspaceId: _wid, createdAt: _createdAt, updatedAt: _updatedAt, sortOrder: _sortOrder, ...rest }) => rest),
+          categories: workspaceCategories.map(({ id: _id, workspaceId: _wid, createdAt: _createdAt, updatedAt: _updatedAt, sortOrder: _sortOrder, ...rest }) => rest),
           exportedAt: Date.now(),
           version: "1.0",
         };
@@ -484,7 +484,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         try {
           const urlObj = new URL(url);
           return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
-        } catch {
+        } catch (error) {
           return "";
         }
       },

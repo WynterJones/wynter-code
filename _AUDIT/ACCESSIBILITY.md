@@ -3,8 +3,8 @@
 > WCAG 2.1 Level AA compliance tracking
 
 **Last Updated:** 2025-12-31
-**Score:** 9/10
-**Status:** WCAG 2.1 AA Compliant with Minor Improvements Needed
+**Score:** 9.5/10
+**Status:** WCAG 2.1 AA Compliant (Minor Issues)
 
 ---
 
@@ -35,7 +35,7 @@
 | Screen Reader Text | Good | `sr-only` class used in Checkbox, Toggle. `ScreenReaderAnnouncerProvider` provides live region announcements |
 | Reduced Motion | Good | Global `prefers-reduced-motion` media query (globals.css lines 776-799) disables animations for users with motion sensitivity |
 | ARIA Live Regions | Good | `role="status"` + `role="alert"` in ScreenReaderAnnouncer.tsx for dynamic content announcements |
-| IconButton Labels | Partial | Dev warning implemented but only ~2 of 287 IconButton usages have explicit aria-label. Most rely on title/Tooltip. |
+| IconButton Labels | Good | All 287+ IconButton usages across 114 files now have explicit `aria-label` attributes with descriptive action labels. 2 native `<button>` elements in prompt components need labels (see Current Issues). |
 
 ---
 
@@ -200,22 +200,39 @@ All previously identified files have been updated:
 
 ## Current Issues Identified (2025-12-31 Audit)
 
-### LOW: IconButton Missing aria-label Widespread
+### LOW: Icon-Only Buttons Missing aria-label
 
 **Severity:** LOW
 **Status:** Open
 
-IconButton component has dev-mode warning for missing aria-label, but only ~2 instances in the codebase actually provide aria-label. Found 287 IconButton usages across 114 files, but only Modal.tsx consistently uses aria-label.
+Two native `<button>` elements with icon-only content lack `aria-label` attributes:
 
-**Impact:** Screen readers will not announce icon-only button purposes.
+1. **FileTagBadge.tsx:48-57** - Remove file button (X icon)
+   - Button removes a file reference from prompt input
+   - Missing `aria-label="Remove file"`
 
-**Recommendation:** The dev warning is working (line 25-29 of IconButton.tsx), but most usages rely on Tooltip wrapping or title attribute. Since this is a desktop app with negligible screen reader usage, this remains low priority. Consider a codebase sweep to add aria-label to high-traffic buttons.
+2. **ImageThumbnail.tsx:31-44** - Remove image button (X icon)
+   - Button removes an attached image from prompt input
+   - Missing `aria-label="Remove image"`
 
-**Files with IconButton lacking aria-label (sample):**
-- `src/components/files/QuickLookPreview.tsx` (line 65)
-- `src/components/files/FileBrowserToolbar.tsx` (lines 56, 61)
-- `src/components/files/FileTreeToolbar.tsx` (lines 13, 18)
-- `src/components/settings/SettingsPopup.tsx` (line 119)
+**Impact:** Screen reader users cannot identify the purpose of these buttons. They would hear "button" with no descriptive label.
+
+**Files to fix:**
+- `/Users/wynterjones/Work/SYSTEM/wynter-code/src/components/prompt/FileTagBadge.tsx`
+- `/Users/wynterjones/Work/SYSTEM/wynter-code/src/components/prompt/ImageThumbnail.tsx`
+
+---
+
+### FIXED: IconButton aria-label Coverage
+
+**Severity:** LOW
+**Status:** Fixed 2025-12-31
+
+Added `aria-label` attributes to 287+ IconButton usages across 114 files. All icon-only buttons now have descriptive labels for screen readers.
+
+**Implementation:** Six parallel agents swept the codebase adding action-oriented aria-labels (e.g., "Copy to clipboard", "Close dialog", "Refresh data"). Dynamic labels used where context-specific (e.g., `aria-label={isRevealed ? "Hide value" : "Show value"}`).
+
+**Files modified:** All 114 files containing IconButton components across dev-toolkit, file browser, settings, kanban, database, homebrew, MCP, and tool popup components.
 
 ---
 
@@ -278,6 +295,8 @@ Global `@media (prefers-reduced-motion: reduce)` rule in globals.css (lines 776-
 
 | Date | Changes |
 |------|---------|
+| 2025-12-31 | Re-audit: Found 2 icon-only buttons without aria-labels (FileTagBadge, ImageThumbnail). Score 10 -> 9.5. |
+| 2025-12-31 | Fixed IconButton aria-label coverage: Added labels to 287+ usages across 114 files. Score 9 -> 10. |
 | 2025-12-31 | Re-audit: Verified existing accessibility features. Identified IconButton aria-label gap. Score 10 -> 9 (minor). |
 | 2025-12-30 | Verified color contrast compliant: disabled states exempt per WCAG, small text already passes. Score 9 -> 10. |
 | 2025-12-30 | Marked interactive divs and skip links as N/A for desktop app context. Score 8.5 -> 9. |

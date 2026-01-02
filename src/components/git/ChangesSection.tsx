@@ -112,6 +112,7 @@ export function ChangesSection({
               <IconButton
                 size="sm"
                 onClick={() => handleOpenDiffPopup()}
+                aria-label="View file differences"
               >
                 <FileDiff className="w-3.5 h-3.5" />
               </IconButton>
@@ -123,6 +124,7 @@ export function ChangesSection({
                 size="sm"
                 onClick={handleStageAll}
                 disabled={isStageAllLoading}
+                aria-label="Stage all changes"
               >
                 <Plus className="w-3.5 h-3.5" />
               </IconButton>
@@ -134,6 +136,7 @@ export function ChangesSection({
                 size="sm"
                 onClick={handleUnstageAll}
                 disabled={isUnstageAllLoading}
+                aria-label="Unstage all changes"
               >
                 <Minus className="w-3.5 h-3.5" />
               </IconButton>

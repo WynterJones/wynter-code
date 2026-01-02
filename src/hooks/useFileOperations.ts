@@ -29,7 +29,7 @@ export function useFileOperations() {
     try {
       await invoke<string>("read_file_content", { path });
       return true;
-    } catch {
+    } catch (error) {
       return false;
     }
   };

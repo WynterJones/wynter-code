@@ -101,8 +101,8 @@ export class VehicleSprite extends Container {
       if (this.tintColor !== 0xffffff) {
         this.sprite.tint = this.tintColor;
       }
-    } catch (e) {
-      console.warn("Failed to load vehicle textures:", e);
+    } catch (error) {
+      console.warn("Failed to load vehicle textures:", error);
       // Keep fallback visible if texture loading fails
     }
   }

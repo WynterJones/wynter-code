@@ -78,12 +78,12 @@ impl FileCoordinatorManager {
 
     /// Get the current server port (if running)
     pub fn get_port(&self) -> Option<u16> {
-        *self.server_port.read().unwrap()
+        *self.server_port.read().expect("server_port RwLock poisoned")
     }
 
     /// Try to acquire a lock on a file
     pub fn acquire_lock(&self, file_path: &str, issue_id: &str) -> LockResponse {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = self.locks.write().expect("locks RwLock poisoned");
 
         // Check if already locked
         if let Some(existing) = locks.get(file_path) {
@@ -150,7 +150,7 @@ impl FileCoordinatorManager {
 
     /// Release a lock on a file
     pub fn release_lock(&self, file_path: &str, lock_id: &str) -> LockResponse {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = self.locks.write().expect("locks RwLock poisoned");
 
         if let Some(existing) = locks.get(file_path) {
             if existing.lock_id == lock_id {
@@ -187,7 +187,7 @@ impl FileCoordinatorManager {
 
     /// Check status of a file
     pub fn check_status(&self, file_path: &str) -> LockResponse {
-        let locks = self.locks.read().unwrap();
+        let locks = self.locks.read().expect("locks RwLock poisoned");
 
         if let Some(existing) = locks.get(file_path) {
             // Check if expired
@@ -224,7 +224,7 @@ impl FileCoordinatorManager {
 
     /// Get all locks for an issue
     pub fn get_locks_for_issue(&self, issue_id: &str) -> Vec<FileLock> {
-        let locks = self.locks.read().unwrap();
+        let locks = self.locks.read().expect("locks RwLock poisoned");
         locks
             .values()
             .filter(|l| l.issue_id == issue_id)
@@ -234,7 +234,7 @@ impl FileCoordinatorManager {
 
     /// Release all locks for an issue
     pub fn release_all_for_issue(&self, issue_id: &str) -> usize {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = self.locks.write().expect("locks RwLock poisoned");
         let initial_count = locks.len();
         locks.retain(|_, lock| lock.issue_id != issue_id);
         let released = initial_count - locks.len();
@@ -249,7 +249,7 @@ impl FileCoordinatorManager {
 
     /// Clean up expired locks
     pub fn cleanup_expired(&self) -> usize {
-        let mut locks = self.locks.write().unwrap();
+        let mut locks = self.locks.write().expect("locks RwLock poisoned");
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -272,6 +272,19 @@ impl FileCoordinatorManager {
             "acquire" => {
                 let response = self.acquire_lock(&request.file_path, &request.issue_id);
                 if response.success {
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window.emit(
+                        "file-lock-change",
+                        LockEvent {
+                            action: "acquired".to_string(),
+                            file_path: request.file_path.clone(),
+                            issue_id: request.issue_id.clone(),
+                            lock_id: response.lock_id.clone().unwrap_or_default(),
+                        },
+                    ) {
+                        eprintln!("[DEBUG] Failed to emit 'file-lock-change': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window.emit(
                         "file-lock-change",
                         LockEvent {
@@ -287,6 +300,19 @@ impl FileCoordinatorManager {
             "release" => {
                 let response = self.release_lock(&request.file_path, &request.lock_id);
                 if response.success {
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window.emit(
+                        "file-lock-change",
+                        LockEvent {
+                            action: "released".to_string(),
+                            file_path: request.file_path.clone(),
+                            issue_id: request.issue_id.clone(),
+                            lock_id: request.lock_id.clone(),
+                        },
+                    ) {
+                        eprintln!("[DEBUG] Failed to emit 'file-lock-change': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window.emit(
                         "file-lock-change",
                         LockEvent {
@@ -311,6 +337,19 @@ impl FileCoordinatorManager {
             }
             "release_all" => {
                 let count = self.release_all_for_issue(&request.issue_id);
+                #[cfg(debug_assertions)]
+                if let Err(e) = window.emit(
+                    "file-lock-change",
+                    LockEvent {
+                        action: "released_all".to_string(),
+                        file_path: String::new(),
+                        issue_id: request.issue_id.clone(),
+                        lock_id: String::new(),
+                    },
+                ) {
+                    eprintln!("[DEBUG] Failed to emit 'file-lock-change': {}", e);
+                }
+                #[cfg(not(debug_assertions))]
                 let _ = window.emit(
                     "file-lock-change",
                     LockEvent {
@@ -367,7 +406,7 @@ fn handle_coordinator_connection(
 
     loop {
         // Check shutdown
-        if *shutdown.read().unwrap() {
+        if *shutdown.read().expect("shutdown RwLock poisoned") {
             break;
         }
 
@@ -432,9 +471,9 @@ pub async fn start_file_coordinator_server(
 ) -> Result<u16, String> {
     // Check if already running
     {
-        let port = state.server_port.read().unwrap();
+        let port = state.server_port.read().expect("server_port RwLock poisoned");
         if port.is_some() {
-            return Ok(port.unwrap());
+            return Ok(port.expect("port already checked"));
         }
     }
 
@@ -447,14 +486,14 @@ pub async fn start_file_coordinator_server(
 
     // Store the port
     {
-        let mut server_port = state.server_port.write().unwrap();
+        let mut server_port = state.server_port.write().expect("server_port RwLock poisoned");
         *server_port = Some(port);
     }
 
     // Create shutdown signal
     let shutdown = Arc::new(RwLock::new(false));
     {
-        let mut signal = state.shutdown_signal.write().unwrap();
+        let mut signal = state.shutdown_signal.write().expect("shutdown_signal RwLock poisoned");
         *signal = Some(shutdown.clone());
     }
 
@@ -477,7 +516,7 @@ pub async fn start_file_coordinator_server(
 
         for stream in listener.incoming() {
             // Check shutdown
-            if *shutdown.read().unwrap() {
+            if *shutdown.read().expect("shutdown RwLock poisoned") {
                 break;
             }
 
@@ -511,21 +550,21 @@ pub async fn stop_file_coordinator_server(
 ) -> Result<(), String> {
     // Set shutdown signal
     {
-        let signal = state.shutdown_signal.read().unwrap();
+        let signal = state.shutdown_signal.read().expect("shutdown_signal RwLock poisoned");
         if let Some(shutdown) = signal.as_ref() {
-            *shutdown.write().unwrap() = true;
+            *shutdown.write().expect("shutdown RwLock poisoned") = true;
         }
     }
 
     // Clear port
     {
-        let mut port = state.server_port.write().unwrap();
+        let mut port = state.server_port.write().expect("server_port RwLock poisoned");
         *port = None;
     }
 
     // Clear all locks
     {
-        let mut locks = state.locks.write().unwrap();
+        let mut locks = state.locks.write().expect("locks RwLock poisoned");
         locks.clear();
     }
 
@@ -546,7 +585,7 @@ pub async fn get_file_coordinator_port(
 pub async fn get_all_file_locks(
     state: State<'_, Arc<FileCoordinatorManager>>,
 ) -> Result<Vec<FileLock>, String> {
-    let locks = state.locks.read().unwrap();
+    let locks = state.locks.read().expect("locks RwLock poisoned");
     Ok(locks.values().cloned().collect())
 }
 
@@ -557,4 +596,412 @@ pub async fn release_issue_locks(
     issue_id: String,
 ) -> Result<usize, String> {
     Ok(state.release_all_for_issue(&issue_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper to create a manager with custom timeout for testing
+    fn create_test_manager(timeout_secs: u64) -> FileCoordinatorManager {
+        FileCoordinatorManager {
+            locks: RwLock::new(HashMap::new()),
+            server_port: RwLock::new(None),
+            shutdown_signal: RwLock::new(None),
+            lock_timeout_secs: timeout_secs,
+        }
+    }
+
+    // FileCoordinatorManager::new tests
+    #[test]
+    fn test_manager_new_empty_locks() {
+        let manager = FileCoordinatorManager::new();
+        let locks = manager.locks.read().unwrap();
+        assert!(locks.is_empty());
+    }
+
+    #[test]
+    fn test_manager_new_no_port() {
+        let manager = FileCoordinatorManager::new();
+        assert!(manager.get_port().is_none());
+    }
+
+    #[test]
+    fn test_manager_default() {
+        let manager = FileCoordinatorManager::default();
+        let locks = manager.locks.read().unwrap();
+        assert!(locks.is_empty());
+    }
+
+    // acquire_lock tests
+    #[test]
+    fn test_acquire_lock_success() {
+        let manager = FileCoordinatorManager::new();
+        let response = manager.acquire_lock("/path/to/file.rs", "issue-123");
+        assert!(response.success);
+        assert!(response.lock_id.is_some());
+        assert!(response.holder.is_none());
+    }
+
+    #[test]
+    fn test_acquire_lock_already_held_same_issue() {
+        let manager = FileCoordinatorManager::new();
+        let first = manager.acquire_lock("/path/to/file.rs", "issue-123");
+        assert!(first.success);
+
+        // Same issue requesting lock again
+        let second = manager.acquire_lock("/path/to/file.rs", "issue-123");
+        assert!(second.success);
+        assert_eq!(second.lock_id, first.lock_id); // Same lock_id
+        assert_eq!(second.message, Some("Already holding lock".to_string()));
+    }
+
+    #[test]
+    fn test_acquire_lock_blocked_different_issue() {
+        let manager = FileCoordinatorManager::new();
+        let first = manager.acquire_lock("/path/to/file.rs", "issue-123");
+        assert!(first.success);
+
+        // Different issue trying to get same file
+        let second = manager.acquire_lock("/path/to/file.rs", "issue-456");
+        assert!(!second.success);
+        assert!(second.lock_id.is_none());
+        assert_eq!(second.holder, Some("issue-123".to_string()));
+    }
+
+    #[test]
+    fn test_acquire_lock_multiple_files() {
+        let manager = FileCoordinatorManager::new();
+        let lock1 = manager.acquire_lock("/path/to/file1.rs", "issue-123");
+        let lock2 = manager.acquire_lock("/path/to/file2.rs", "issue-123");
+
+        assert!(lock1.success);
+        assert!(lock2.success);
+        // Different lock IDs
+        assert_ne!(lock1.lock_id, lock2.lock_id);
+    }
+
+    #[test]
+    fn test_acquire_lock_expired_replaced() {
+        // Create manager with short timeout
+        let manager = create_test_manager(1);
+
+        // Insert a lock with an old timestamp (2 seconds ago)
+        let old_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - 2000;
+        {
+            let mut locks = manager.locks.write().unwrap();
+            locks.insert(
+                "/path/to/file.rs".to_string(),
+                FileLock {
+                    lock_id: "old-lock".to_string(),
+                    file_path: "/path/to/file.rs".to_string(),
+                    issue_id: "issue-123".to_string(),
+                    acquired_at: old_timestamp,
+                },
+            );
+        }
+
+        // Lock should be expired, different issue can take it
+        let second = manager.acquire_lock("/path/to/file.rs", "issue-456");
+        assert!(second.success);
+        assert_ne!(second.lock_id.as_deref(), Some("old-lock"));
+    }
+
+    // release_lock tests
+    #[test]
+    fn test_release_lock_success() {
+        let manager = FileCoordinatorManager::new();
+        let acquired = manager.acquire_lock("/path/to/file.rs", "issue-123");
+        let lock_id = acquired.lock_id.unwrap();
+
+        let released = manager.release_lock("/path/to/file.rs", &lock_id);
+        assert!(released.success);
+        assert_eq!(released.message, Some("Lock released".to_string()));
+    }
+
+    #[test]
+    fn test_release_lock_wrong_lock_id() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file.rs", "issue-123");
+
+        let released = manager.release_lock("/path/to/file.rs", "wrong-lock-id");
+        assert!(!released.success);
+        assert_eq!(released.holder, Some("issue-123".to_string()));
+        assert_eq!(released.message, Some("Lock ID mismatch".to_string()));
+    }
+
+    #[test]
+    fn test_release_lock_no_lock_exists() {
+        let manager = FileCoordinatorManager::new();
+
+        let released = manager.release_lock("/path/to/file.rs", "any-lock-id");
+        assert!(released.success);
+        assert_eq!(released.message, Some("No lock to release".to_string()));
+    }
+
+    #[test]
+    fn test_release_lock_file_can_be_relocked() {
+        let manager = FileCoordinatorManager::new();
+
+        // Acquire
+        let first = manager.acquire_lock("/path/to/file.rs", "issue-123");
+        let lock_id = first.lock_id.unwrap();
+
+        // Release
+        manager.release_lock("/path/to/file.rs", &lock_id);
+
+        // Different issue can now acquire
+        let second = manager.acquire_lock("/path/to/file.rs", "issue-456");
+        assert!(second.success);
+    }
+
+    // check_status tests
+    #[test]
+    fn test_check_status_unlocked() {
+        let manager = FileCoordinatorManager::new();
+        let status = manager.check_status("/path/to/file.rs");
+        assert!(status.success);
+        assert!(status.holder.is_none());
+        assert_eq!(status.message, Some("File is available".to_string()));
+    }
+
+    #[test]
+    fn test_check_status_locked() {
+        let manager = FileCoordinatorManager::new();
+        let acquired = manager.acquire_lock("/path/to/file.rs", "issue-123");
+
+        let status = manager.check_status("/path/to/file.rs");
+        assert!(!status.success);
+        assert_eq!(status.holder, Some("issue-123".to_string()));
+        assert_eq!(status.lock_id, acquired.lock_id);
+    }
+
+    #[test]
+    fn test_check_status_expired() {
+        let manager = create_test_manager(1);
+
+        // Insert a lock with an old timestamp (2 seconds ago)
+        let old_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - 2000;
+        {
+            let mut locks = manager.locks.write().unwrap();
+            locks.insert(
+                "/path/to/file.rs".to_string(),
+                FileLock {
+                    lock_id: "old-lock".to_string(),
+                    file_path: "/path/to/file.rs".to_string(),
+                    issue_id: "issue-123".to_string(),
+                    acquired_at: old_timestamp,
+                },
+            );
+        }
+
+        let status = manager.check_status("/path/to/file.rs");
+        assert!(status.success);
+        assert!(status.holder.is_none());
+        assert_eq!(
+            status.message,
+            Some("File is available (lock expired)".to_string())
+        );
+    }
+
+    // get_locks_for_issue tests
+    #[test]
+    fn test_get_locks_for_issue_empty() {
+        let manager = FileCoordinatorManager::new();
+        let locks = manager.get_locks_for_issue("issue-123");
+        assert!(locks.is_empty());
+    }
+
+    #[test]
+    fn test_get_locks_for_issue_single() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file.rs", "issue-123");
+
+        let locks = manager.get_locks_for_issue("issue-123");
+        assert_eq!(locks.len(), 1);
+        assert_eq!(locks[0].file_path, "/path/to/file.rs");
+        assert_eq!(locks[0].issue_id, "issue-123");
+    }
+
+    #[test]
+    fn test_get_locks_for_issue_multiple() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file1.rs", "issue-123");
+        manager.acquire_lock("/path/to/file2.rs", "issue-123");
+        manager.acquire_lock("/path/to/file3.rs", "issue-456"); // Different issue
+
+        let locks = manager.get_locks_for_issue("issue-123");
+        assert_eq!(locks.len(), 2);
+    }
+
+    #[test]
+    fn test_get_locks_for_issue_filters_correctly() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file1.rs", "issue-123");
+        manager.acquire_lock("/path/to/file2.rs", "issue-456");
+
+        let locks_123 = manager.get_locks_for_issue("issue-123");
+        let locks_456 = manager.get_locks_for_issue("issue-456");
+
+        assert_eq!(locks_123.len(), 1);
+        assert_eq!(locks_456.len(), 1);
+        assert_eq!(locks_123[0].issue_id, "issue-123");
+        assert_eq!(locks_456[0].issue_id, "issue-456");
+    }
+
+    // release_all_for_issue tests
+    #[test]
+    fn test_release_all_for_issue_empty() {
+        let manager = FileCoordinatorManager::new();
+        let count = manager.release_all_for_issue("issue-123");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_release_all_for_issue_single() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file.rs", "issue-123");
+
+        let count = manager.release_all_for_issue("issue-123");
+        assert_eq!(count, 1);
+
+        let locks = manager.get_locks_for_issue("issue-123");
+        assert!(locks.is_empty());
+    }
+
+    #[test]
+    fn test_release_all_for_issue_multiple() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file1.rs", "issue-123");
+        manager.acquire_lock("/path/to/file2.rs", "issue-123");
+        manager.acquire_lock("/path/to/file3.rs", "issue-123");
+
+        let count = manager.release_all_for_issue("issue-123");
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_release_all_for_issue_only_target_issue() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file1.rs", "issue-123");
+        manager.acquire_lock("/path/to/file2.rs", "issue-456");
+
+        let count = manager.release_all_for_issue("issue-123");
+        assert_eq!(count, 1);
+
+        // Other issue's lock should still exist
+        let locks = manager.get_locks_for_issue("issue-456");
+        assert_eq!(locks.len(), 1);
+    }
+
+    // cleanup_expired tests
+    #[test]
+    fn test_cleanup_expired_none() {
+        let manager = FileCoordinatorManager::new();
+        manager.acquire_lock("/path/to/file.rs", "issue-123");
+
+        let count = manager.cleanup_expired();
+        assert_eq!(count, 0);
+
+        // Lock should still exist
+        let status = manager.check_status("/path/to/file.rs");
+        assert!(!status.success); // Locked
+    }
+
+    #[test]
+    fn test_cleanup_expired_all() {
+        let manager = create_test_manager(1);
+
+        // Insert locks with old timestamps (2 seconds ago)
+        let old_timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as u64
+            - 2000;
+        {
+            let mut locks = manager.locks.write().unwrap();
+            locks.insert(
+                "/path/to/file1.rs".to_string(),
+                FileLock {
+                    lock_id: "lock-1".to_string(),
+                    file_path: "/path/to/file1.rs".to_string(),
+                    issue_id: "issue-123".to_string(),
+                    acquired_at: old_timestamp,
+                },
+            );
+            locks.insert(
+                "/path/to/file2.rs".to_string(),
+                FileLock {
+                    lock_id: "lock-2".to_string(),
+                    file_path: "/path/to/file2.rs".to_string(),
+                    issue_id: "issue-456".to_string(),
+                    acquired_at: old_timestamp,
+                },
+            );
+        }
+
+        let count = manager.cleanup_expired();
+        assert_eq!(count, 2);
+
+        // All locks should be gone
+        let locks = manager.locks.read().unwrap();
+        assert!(locks.is_empty());
+    }
+
+    // FileLock serialization tests
+    #[test]
+    fn test_file_lock_serialize() {
+        let lock = FileLock {
+            lock_id: "abc-123".to_string(),
+            file_path: "/path/to/file.rs".to_string(),
+            issue_id: "issue-456".to_string(),
+            acquired_at: 1704067200000,
+        };
+        let json = serde_json::to_string(&lock).unwrap();
+        assert!(json.contains("lockId")); // camelCase
+        assert!(json.contains("filePath"));
+        assert!(json.contains("issueId"));
+        assert!(json.contains("acquiredAt"));
+    }
+
+    #[test]
+    fn test_lock_response_serialize() {
+        let response = LockResponse {
+            success: true,
+            lock_id: Some("abc-123".to_string()),
+            holder: None,
+            message: Some("Lock acquired".to_string()),
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"success\":true"));
+        assert!(json.contains("lockId")); // camelCase
+        assert!(!json.contains("holder")); // Should be skipped when None
+    }
+
+    #[test]
+    fn test_lock_request_deserialize() {
+        let json = r#"{"action":"acquire","filePath":"/path/to/file.rs","issueId":"issue-123"}"#;
+        let request: LockRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.action, "acquire");
+        assert_eq!(request.file_path, "/path/to/file.rs");
+        assert_eq!(request.issue_id, "issue-123");
+    }
+
+    #[test]
+    fn test_lock_request_defaults() {
+        let json = r#"{"action":"list"}"#;
+        let request: LockRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.action, "list");
+        assert_eq!(request.file_path, ""); // Default
+        assert_eq!(request.issue_id, ""); // Default
+        assert_eq!(request.lock_id, ""); // Default
+    }
 }

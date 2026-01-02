@@ -72,7 +72,7 @@ export function FontViewerPopup({ filePath, onClose }: FontViewerPopupProps) {
             <span className="font-mono text-sm text-text-primary">{fileName}</span>
           </div>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close font viewer">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

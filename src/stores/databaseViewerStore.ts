@@ -165,7 +165,7 @@ export const useDatabaseViewerStore = create<DatabaseViewerStore>()(
         const state = get();
         try {
           await invoke("db_disconnect", { connectionId });
-        } catch {
+        } catch (error) {
           // Ignore disconnect errors
         }
         const newConnected = new Map(state.isConnected);

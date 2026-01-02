@@ -203,7 +203,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
       try {
         const stats = await invoke<BeadsStats>("beads_stats", { projectPath });
         set({ beadsStats: stats });
-      } catch {
+      } catch (error) {
         // Beads not available
       }
 
@@ -231,7 +231,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
           const content = await readTextFile(filePath);
           const parsed = parseAuditFile(content);
           auditScores[key] = parsed;
-        } catch {
+        } catch (error) {
           // File doesn't exist, use default (0)
         }
       }
@@ -262,7 +262,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
             picked,
           },
         });
-      } catch {
+      } catch (error) {
         // GARDEN.md doesn't exist
       }
 
@@ -276,7 +276,7 @@ export const useFarmworkTycoonStore = create<FarmworkTycoonState>((set, get) => 
         compostCount = compostResult.count;
         compostIdeas = compostResult.ideas;
         set({ compostStats: { rejectedIdeas: compostCount, ideas: compostIdeas } });
-      } catch {
+      } catch (error) {
         // COMPOST.md doesn't exist
       }
 

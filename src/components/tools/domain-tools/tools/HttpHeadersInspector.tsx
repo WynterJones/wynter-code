@@ -146,8 +146,8 @@ export function HttpHeadersInspector({ url, onUrlChange }: HttpHeadersInspectorP
 
       setHeaders(parsedHeaders);
       setSecurityChecks(runSecurityChecks(headerMap));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch headers");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to fetch headers");
     } finally {
       setLoading(false);
     }

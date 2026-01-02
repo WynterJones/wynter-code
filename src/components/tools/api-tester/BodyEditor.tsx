@@ -33,7 +33,7 @@ export function BodyEditor({ requestId }: BodyEditorProps) {
     try {
       const formatted = JSON.stringify(JSON.parse(request.body.content), null, 2);
       handleContentChange(formatted);
-    } catch {
+    } catch (error) {
       // Invalid JSON, ignore
     }
   };
@@ -98,7 +98,7 @@ export function BodyEditor({ requestId }: BodyEditorProps) {
                       Valid JSON
                     </span>
                   );
-                } catch {
+                } catch (error) {
                   return (
                     <span className="text-[10px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">
                       Invalid JSON

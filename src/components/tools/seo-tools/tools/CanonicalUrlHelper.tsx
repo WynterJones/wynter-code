@@ -45,7 +45,7 @@ export function CanonicalUrlHelper() {
       urlObj.search = sortedParams.toString() ? "?" + sortedParams.toString() : "";
 
       return urlObj.toString();
-    } catch {
+    } catch (error) {
       return normalized;
     }
   };

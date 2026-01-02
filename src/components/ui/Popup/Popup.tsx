@@ -105,7 +105,7 @@ function PopupHeader({
         {actions}
         {showCloseButton && (
           <Tooltip content="Close (Esc)">
-            <IconButton size="sm" onClick={handleClose}>
+            <IconButton size="sm" onClick={handleClose} aria-label="Close popup">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

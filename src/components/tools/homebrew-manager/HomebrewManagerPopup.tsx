@@ -177,6 +177,7 @@ export function HomebrewManagerPopup({ isOpen, onClose, initialView }: HomebrewM
                 size="sm"
                 onClick={() => updateBrew()}
                 disabled={isOperating}
+                aria-label="Update Homebrew"
               >
                 <Download className="w-4 h-4" />
               </IconButton>
@@ -191,13 +192,14 @@ export function HomebrewManagerPopup({ isOpen, onClose, initialView }: HomebrewM
                   fetchOutdatedPackages();
                 }}
                 disabled={isLoading}
+                aria-label="Refresh package lists"
               >
                 <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
               </IconButton>
             </Tooltip>
 
             <Tooltip content="Close (Esc)" side="bottom">
-              <IconButton size="sm" onClick={onClose}>
+              <IconButton size="sm" onClick={onClose} aria-label="Close Homebrew Manager">
                 <X className="w-4 h-4" />
               </IconButton>
             </Tooltip>
@@ -208,7 +210,7 @@ export function HomebrewManagerPopup({ isOpen, onClose, initialView }: HomebrewM
         {error && (
           <div className="px-4 py-2 bg-red-500/10 border-b border-red-500/20 flex items-center justify-between">
             <span className="text-sm text-red-400">{error}</span>
-            <IconButton size="sm" onClick={clearError}>
+            <IconButton size="sm" onClick={clearError} aria-label="Dismiss error message">
               <X className="w-3 h-3" />
             </IconButton>
           </div>

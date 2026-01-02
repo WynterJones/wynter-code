@@ -103,7 +103,7 @@ function parseJustfile(content: string, path: string): JustfileData {
 
     // Recipe body (indented lines)
     if (currentRecipe && (line.startsWith("\t") || line.startsWith("    "))) {
-      currentRecipe.body.push(line.replace(/^\t|^    /, ""));
+      currentRecipe.body.push(line.replace(/^\t|^ {4}/, ""));
     }
   }
 
@@ -156,7 +156,7 @@ export function useJustfileDetection() {
           isDetecting: false,
         });
         return;
-      } catch {
+      } catch (error) {
         // File doesn't exist, try next
       }
     }

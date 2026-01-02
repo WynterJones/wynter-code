@@ -504,7 +504,7 @@ export function MarkdownViewerPanel({
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
-                          e.shiftKey ? goToPrevMatch() : goToNextMatch();
+                          if (e.shiftKey) goToPrevMatch(); else goToNextMatch();
                         }
                         if (e.key === "Escape") {
                           setShowFindBar(false);

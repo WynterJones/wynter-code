@@ -93,7 +93,7 @@ export function ImageViewerPopup({ filePath, onClose }: ImageViewerPopupProps) {
           <span className="font-mono text-sm text-text-primary">{fileName}</span>
           <div className="flex items-center gap-1">
             <Tooltip content="Zoom Out (-)" side="bottom">
-              <IconButton size="sm" onClick={handleZoomOut}>
+              <IconButton size="sm" onClick={handleZoomOut} aria-label="Zoom out">
                 <ZoomOut className="w-4 h-4" />
               </IconButton>
             </Tooltip>
@@ -101,24 +101,24 @@ export function ImageViewerPopup({ filePath, onClose }: ImageViewerPopupProps) {
               {Math.round(zoom * 100)}%
             </span>
             <Tooltip content="Zoom In (+)" side="bottom">
-              <IconButton size="sm" onClick={handleZoomIn}>
+              <IconButton size="sm" onClick={handleZoomIn} aria-label="Zoom in">
                 <ZoomIn className="w-4 h-4" />
               </IconButton>
             </Tooltip>
             <div className="w-px h-4 bg-border mx-2" />
             <Tooltip content="Rotate (R)" side="bottom">
-              <IconButton size="sm" onClick={handleRotate}>
+              <IconButton size="sm" onClick={handleRotate} aria-label="Rotate image">
                 <RotateCw className="w-4 h-4" />
               </IconButton>
             </Tooltip>
             <Tooltip content="Reset (0)" side="bottom">
-              <IconButton size="sm" onClick={handleReset}>
+              <IconButton size="sm" onClick={handleReset} aria-label="Reset zoom and rotation">
                 <Maximize2 className="w-4 h-4" />
               </IconButton>
             </Tooltip>
             <div className="w-px h-4 bg-border mx-2" />
             <Tooltip content="Close (Esc)" side="bottom">
-              <IconButton size="sm" onClick={onClose}>
+              <IconButton size="sm" onClick={onClose} aria-label="Close image viewer">
                 <X className="w-4 h-4" />
               </IconButton>
             </Tooltip>

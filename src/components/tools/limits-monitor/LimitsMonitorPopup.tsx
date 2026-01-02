@@ -378,6 +378,7 @@ export function LimitsMonitorPopup({ isOpen, onClose }: LimitsMonitorPopupProps)
                 size="sm"
                 onClick={() => fetchUsage(false)}
                 disabled={loading}
+                aria-label="Refresh usage data"
               >
                 <RefreshCw
                   className={`w-4 h-4 ${loading ? "animate-spin" : ""}`}

@@ -147,12 +147,12 @@ export function TextDiffTool() {
 
         <div className="flex items-center gap-2">
           <Tooltip content="Swap texts">
-            <IconButton size="sm" onClick={handleSwap} disabled={!hasDiff}>
+            <IconButton size="sm" onClick={handleSwap} disabled={!hasDiff} aria-label="Swap texts">
               <ArrowLeftRight className="w-3.5 h-3.5" />
             </IconButton>
           </Tooltip>
           <Tooltip content="Clear all">
-            <IconButton size="sm" onClick={handleClear} disabled={!hasDiff}>
+            <IconButton size="sm" onClick={handleClear} disabled={!hasDiff} aria-label="Clear all text">
               <Trash2 className="w-3.5 h-3.5" />
             </IconButton>
           </Tooltip>
@@ -176,7 +176,7 @@ export function TextDiffTool() {
             </div>
             <div className="flex-1" />
             <Tooltip content={copied ? "Copied!" : "Copy diff"}>
-              <IconButton size="sm" onClick={handleCopy} disabled={!hasChanges}>
+              <IconButton size="sm" onClick={handleCopy} disabled={!hasChanges} aria-label="Copy diff to clipboard">
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-green-400" />
                 ) : (

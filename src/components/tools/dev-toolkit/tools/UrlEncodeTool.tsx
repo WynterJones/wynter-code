@@ -10,8 +10,8 @@ export function UrlEncodeTool() {
     try {
       setOutput(encodeURIComponent(input));
       setError(null);
-    } catch (e) {
-      setError("Failed to encode: " + (e as Error).message);
+    } catch (error) {
+      setError("Failed to encode: " + (error as Error).message);
       setOutput("");
     }
   };
@@ -20,7 +20,7 @@ export function UrlEncodeTool() {
     try {
       setOutput(decodeURIComponent(input));
       setError(null);
-    } catch (e) {
+    } catch (error) {
       setError("Invalid URL-encoded string");
       setOutput("");
     }

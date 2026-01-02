@@ -68,10 +68,10 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
           delete next[column];
           return next;
         });
-      } catch (e) {
+      } catch (error) {
         setJsonErrors((prev) => ({
           ...prev,
-          [column]: e instanceof Error ? e.message : "Invalid JSON",
+          [column]: error instanceof Error ? error.message : "Invalid JSON",
         }));
       }
     } else if (col && isJsonColumn(col.dataType)) {
@@ -100,7 +100,7 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
       if (!value.trim()) return nullable ? null : {};
       try {
         return JSON.parse(value);
-      } catch {
+      } catch (error) {
         return value; // Return as string if invalid JSON
       }
     }
@@ -145,7 +145,7 @@ export function RowForm({ mode, columns, initialData, primaryKeys = [], onClose 
         await updateRow(pk, data);
       }
       onClose();
-    } catch (e) {
+    } catch (error) {
       setError(String(e));
     } finally {
       setLoading(false);

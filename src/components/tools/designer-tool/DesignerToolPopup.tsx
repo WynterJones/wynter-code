@@ -93,6 +93,7 @@ export function DesignerToolPopup({ isOpen, onClose }: DesignerToolPopupProps) {
           <IconButton
             onClick={() => setShowApiKeySetup(true)}
             className="text-text-secondary hover:text-text-primary"
+            aria-label="Configure API settings"
           >
             <Settings className="w-4 h-4" />
           </IconButton>

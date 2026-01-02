@@ -217,6 +217,7 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
                   className={cn(
                     viewMode === "list" && "bg-bg-hover text-accent"
                   )}
+                  aria-label="List view"
                 >
                   <FileText className="w-4 h-4" />
                 </IconButton>
@@ -228,6 +229,7 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
                   className={cn(
                     viewMode === "compare" && "bg-bg-hover text-accent"
                   )}
+                  aria-label="Compare environment files"
                 >
                   <ArrowLeftRight className="w-4 h-4" />
                 </IconButton>
@@ -399,6 +401,7 @@ export function EnvManagerPopup({ isOpen, onClose }: EnvManagerPopupProps) {
                         size="sm"
                         onClick={loadSystemEnvVars}
                         disabled={systemEnvLoading}
+                        aria-label="Refresh system environment variables"
                       >
                         <RefreshCw
                           className={cn(

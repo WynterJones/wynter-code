@@ -74,6 +74,7 @@ export function McpEnvEditor({ value, onChange }: McpEnvEditorProps) {
             <IconButton
               size="sm"
               onClick={() => handleRemove(key)}
+              aria-label="Remove environment variable"
               className="hover:text-red-400 hover:bg-red-500/10"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -105,6 +106,7 @@ export function McpEnvEditor({ value, onChange }: McpEnvEditorProps) {
           size="sm"
           onClick={handleAdd}
           disabled={!newKey.trim()}
+          aria-label="Add environment variable"
           className="text-accent hover:bg-accent/10"
         >
           <Plus className="w-3.5 h-3.5" />

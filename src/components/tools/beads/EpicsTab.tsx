@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, Zap, Search, Copy, Check } from "lucide-react";
+import { ChevronDown, ChevronRight, Zap, Search, Copy, Check, Info } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { cn } from "@/lib/utils";
 import { useBeadsStore } from "@/stores/beadsStore";
+import { IssueDetailPopup } from "./IssueDetailPopup";
 import type { BeadsIssue } from "@/types/beads";
 import {
   STATUS_COLORS,
@@ -28,6 +29,7 @@ export function EpicsTab() {
   const [hideClosed, setHideClosed] = useState(true);
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<BeadsIssue | null>(null);
 
   const handleCopyId = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -185,11 +187,27 @@ export function EpicsTab() {
                       </div>
                     </button>
 
+                    {/* View Details Button */}
+                    <Tooltip content="View details">
+                      <IconButton
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedIssue(epic);
+                        }}
+                        aria-label="View epic details"
+                        className="flex-shrink-0 text-text-secondary hover:text-text-primary transition-colors"
+                      >
+                        <Info className="w-3.5 h-3.5" />
+                      </IconButton>
+                    </Tooltip>
+
                     {/* Copy ID Button */}
                     <Tooltip content={copiedId === epic.id ? "Copied!" : "Copy ID"}>
                       <IconButton
                         size="sm"
                         onClick={(e) => handleCopyId(epic.id, e)}
+                        aria-label="Copy epic ID"
                         className={cn(
                           "flex-shrink-0 transition-colors",
                           copiedId === epic.id
@@ -212,7 +230,8 @@ export function EpicsTab() {
                       {children.map((child) => (
                         <div
                           key={child.id}
-                          className="flex items-center gap-3 px-4 py-2.5 pl-12 hover:bg-bg-tertiary/30 transition-colors"
+                          className="flex items-center gap-3 px-4 py-2.5 pl-12 hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+                          onClick={() => setSelectedIssue(child)}
                         >
                           {/* Type Badge */}
                           <span
@@ -289,6 +308,15 @@ export function EpicsTab() {
           <span>Hide closed</span>
         </label>
       </div>
+
+      {/* Issue Detail Popup */}
+      {selectedIssue && (
+        <IssueDetailPopup
+          issue={selectedIssue}
+          isOpen={!!selectedIssue}
+          onClose={() => setSelectedIssue(null)}
+        />
+      )}
     </div>
   );
 }

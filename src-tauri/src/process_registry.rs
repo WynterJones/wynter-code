@@ -19,25 +19,27 @@ impl ProcessRegistry {
 
     /// Register a child process PID
     pub fn register(&self, pid: u32) {
-        let mut pids = self.pids.lock().unwrap();
+        let mut pids = self.pids.lock().expect("process registry lock poisoned");
         pids.insert(pid);
     }
 
     /// Unregister a child process PID (when it exits)
     pub fn unregister(&self, pid: u32) {
-        let mut pids = self.pids.lock().unwrap();
+        let mut pids = self.pids.lock().expect("process registry lock poisoned");
         pids.remove(&pid);
     }
 
     /// Check if a PID belongs to a process we spawned
     pub fn is_our_child(&self, pid: u32) -> bool {
-        let pids = self.pids.lock().unwrap();
+        let pids = self.pids.lock().expect("process registry lock poisoned");
         pids.contains(&pid)
     }
 
     /// Get all registered PIDs (for debugging/listing)
+    /// This method is intentionally kept for debugging purposes even if not actively used.
+    #[allow(dead_code)]
     pub fn get_all(&self) -> Vec<u32> {
-        let pids = self.pids.lock().unwrap();
+        let pids = self.pids.lock().expect("process registry lock poisoned");
         pids.iter().copied().collect()
     }
 }

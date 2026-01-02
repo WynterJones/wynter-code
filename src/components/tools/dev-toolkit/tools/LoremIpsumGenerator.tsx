@@ -155,7 +155,7 @@ export function LoremIpsumGenerator() {
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-secondary">Generated Text</span>
             <Tooltip content={copied ? "Copied!" : "Copy"}>
-              <IconButton size="sm" onClick={handleCopy}>
+              <IconButton size="sm" onClick={handleCopy} aria-label="Copy generated text">
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-green-400" />
                 ) : (

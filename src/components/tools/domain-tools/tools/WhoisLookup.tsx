@@ -72,8 +72,8 @@ export function WhoisLookup({ url, onUrlChange }: WhoisLookupProps) {
       }
 
       setResult({ raw, parsed });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to perform WHOIS lookup");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to perform WHOIS lookup");
     } finally {
       setLoading(false);
     }
@@ -95,7 +95,7 @@ export function WhoisLookup({ url, onUrlChange }: WhoisLookupProps) {
         month: "short",
         day: "numeric",
       });
-    } catch {
+    } catch (error) {
       return dateStr;
     }
   };

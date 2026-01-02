@@ -70,12 +70,12 @@ export function DnsPropagation({ url, onUrlChange }: DnsPropagationProps) {
         setResults(prev => prev.map((r, i) =>
           i === index ? { ...r, result: parsed, status: "success" } : r
         ));
-      } catch (e) {
+      } catch (error) {
         setResults(prev => prev.map((r, i) =>
           i === index ? {
             ...r,
             status: "error",
-            error: e instanceof Error ? e.message : "Query failed"
+            error: error instanceof Error ? error.message : "Query failed"
           } : r
         ));
       }

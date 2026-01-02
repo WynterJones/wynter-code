@@ -167,7 +167,7 @@ export const useMcpStore = create<McpStore>((set, get) => ({
   validateCommand: async (command) => {
     try {
       return await invoke<boolean>("validate_mcp_command", { command });
-    } catch {
+    } catch (error) {
       return false;
     }
   },

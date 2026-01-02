@@ -48,7 +48,7 @@ export function UniversalViewerPopup({ onClose, projectPath }: UniversalViewerPo
         try {
           const homeDir = await invoke<string>("get_home_dir");
           setInitialPath(homeDir);
-        } catch {
+        } catch (error) {
           setInitialPath(undefined);
         }
       }

@@ -116,7 +116,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
         >
           <span className="font-medium text-text-primary">Settings</span>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close settings">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

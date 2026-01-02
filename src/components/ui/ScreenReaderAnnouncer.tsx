@@ -8,8 +8,6 @@ interface AnnouncerContextType {
 
 const AnnouncerContext = createContext<AnnouncerContextType | null>(null);
 
-let announcementId = 0;
-
 /**
  * Hook to access the screen reader announcer.
  * Use announce("message") for polite announcements (default)
@@ -47,9 +45,6 @@ export function ScreenReaderAnnouncerProvider({ children }: ScreenReaderAnnounce
 
   const announce = useCallback((message: string, priority: AnnouncementPriority = "polite") => {
     if (!message) return;
-
-    // Increment ID to force re-render even for same message
-    announcementId++;
 
     if (priority === "assertive") {
       // Clear first, then set - ensures screen reader picks up change

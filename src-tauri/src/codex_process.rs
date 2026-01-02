@@ -225,7 +225,7 @@ pub async fn start_codex_session(
 ) -> Result<String, String> {
     // Check if session is already running
     {
-        let instances = state.instances.lock().unwrap();
+        let instances = state.instances.lock().expect("Process instances mutex poisoned");
         if instances.contains_key(&session_id) {
             return Err("Session already running".to_string());
         }
@@ -322,7 +322,7 @@ pub async fn start_codex_session(
 
     // Store the process instance
     {
-        let mut instances = state.instances.lock().unwrap();
+        let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
         instances.insert(
             session_id.clone(),
             CodexProcessInstance {
@@ -340,6 +340,11 @@ pub async fn start_codex_session(
     {
         let mut chunk = create_chunk("session_starting", &session_id);
         chunk.content = Some(format!("Starting Codex session in {}", cwd));
+        #[cfg(debug_assertions)]
+        if let Err(e) = window.emit("codex-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window.emit("codex-stream", &chunk);
     }
 
@@ -354,6 +359,11 @@ pub async fn start_codex_session(
                 if !line.is_empty() {
                     let mut chunk = create_chunk("stderr", &session_for_stderr);
                     chunk.content = Some(line);
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_for_stderr.emit("codex-stream", &chunk) {
+                        eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_for_stderr.emit("codex-stream", &chunk);
                 }
             }
@@ -419,6 +429,11 @@ pub async fn start_codex_session(
                                 let mut chunk = create_chunk("session_ready", &session_for_reader);
                                 chunk.thread_id = Some(tid.to_string());
                                 chunk.content = Some(line.clone());
+                                #[cfg(debug_assertions)]
+                                if let Err(e) = window_clone.emit("codex-stream", &chunk) {
+                                    eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                                }
+                                #[cfg(not(debug_assertions))]
                                 let _ = window_clone.emit("codex-stream", &chunk);
                                 session_ready = true;
                             }
@@ -427,12 +442,22 @@ pub async fn start_codex_session(
                         // Parse and emit the chunk
                         if let Some(mut chunk) = parse_codex_chunk(&json, &session_for_reader) {
                             chunk.thread_id = captured_thread_id.clone();
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window_clone.emit("codex-stream", &chunk) {
+                                eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window_clone.emit("codex-stream", &chunk);
                         }
                     } else {
                         // Non-JSON line - emit as raw
                         let mut raw_chunk = create_chunk("raw", &session_for_reader);
                         raw_chunk.content = Some(line);
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window_clone.emit("codex-stream", &raw_chunk) {
+                            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window_clone.emit("codex-stream", &raw_chunk);
                     }
                 }
@@ -440,6 +465,11 @@ pub async fn start_codex_session(
                     eprintln!("[Codex] Read error: {}", e);
                     let mut chunk = create_chunk("error", &session_for_reader);
                     chunk.content = Some(format!("Read error: {}", e));
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_clone.emit("codex-stream", &chunk) {
+                        eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_clone.emit("codex-stream", &chunk);
                 }
                 _ => {}
@@ -457,6 +487,11 @@ pub async fn start_codex_session(
         let mut chunk = create_chunk("result", &session_for_reader);
         chunk.content = Some("Turn completed".to_string());
         chunk.thread_id = captured_thread_id;
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit("codex-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit("codex-stream", &chunk);
 
         // DON'T remove the instance - we need it for thread_id on next prompt
@@ -479,7 +514,7 @@ pub async fn send_codex_input(
 ) -> Result<(), String> {
     // Get the thread_id, cwd, and permission_mode from the existing session
     let (thread_id, cwd, permission_mode) = {
-        let instances = state.instances.lock().unwrap();
+        let instances = state.instances.lock().expect("Process instances mutex poisoned");
         match instances.get(&session_id) {
             Some(instance) => (instance.thread_id.clone(), instance.cwd.clone(), instance.permission_mode.clone()),
             None => return Err("Session not found".to_string()),
@@ -560,7 +595,7 @@ pub async fn send_codex_input(
 
     // Update instance with new child process
     {
-        let mut instances = state.instances.lock().unwrap();
+        let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
         if let Some(instance) = instances.get_mut(&session_id) {
             // Kill old process if still running
             let _ = instance.child.kill();
@@ -581,6 +616,11 @@ pub async fn send_codex_input(
                 if !line.is_empty() {
                     let mut chunk = create_chunk("stderr", &session_for_stderr);
                     chunk.content = Some(line);
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_for_stderr.emit("codex-stream", &chunk) {
+                        eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_for_stderr.emit("codex-stream", &chunk);
                 }
             }
@@ -616,7 +656,7 @@ pub async fn send_codex_input(
                                 eprintln!("[Codex] Thread ID: {}", tid);
 
                                 // Update stored thread_id
-                                let mut instances = state_clone.instances.lock().unwrap();
+                                let mut instances = state_clone.instances.lock().expect("Process instances mutex poisoned");
                                 if let Some(instance) = instances.get_mut(&session_for_reader) {
                                     instance.thread_id = Some(tid.to_string());
                                 }
@@ -625,6 +665,11 @@ pub async fn send_codex_input(
 
                         if let Some(mut chunk) = parse_codex_chunk(&json, &session_for_reader) {
                             chunk.thread_id = captured_thread_id.clone();
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window_clone.emit("codex-stream", &chunk) {
+                                eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window_clone.emit("codex-stream", &chunk);
                         }
                     }
@@ -642,6 +687,11 @@ pub async fn send_codex_input(
         let mut chunk = create_chunk("result", &session_for_reader);
         chunk.content = Some("Turn completed".to_string());
         chunk.thread_id = captured_thread_id;
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit("codex-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit("codex-stream", &chunk);
     });
 
@@ -655,7 +705,7 @@ pub async fn stop_codex_session(
     state: State<'_, Arc<CodexProcessManager>>,
     session_id: String,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
 
     if let Some(mut instance) = instances.remove(&session_id) {
         // Drop stdin to close it
@@ -669,6 +719,11 @@ pub async fn stop_codex_session(
         let mut chunk = create_chunk("session_ended", &session_id);
         chunk.content = Some("Session stopped by user".to_string());
         chunk.thread_id = instance.thread_id;
+        #[cfg(debug_assertions)]
+        if let Err(e) = window.emit("codex-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window.emit("codex-stream", &chunk);
 
         Ok(())
@@ -684,7 +739,7 @@ pub async fn is_codex_session_active(
     state: State<'_, Arc<CodexProcessManager>>,
     session_id: String,
 ) -> Result<bool, String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("Process instances mutex poisoned");
     Ok(instances.contains_key(&session_id))
 }
 
@@ -693,6 +748,6 @@ pub async fn is_codex_session_active(
 pub async fn list_active_codex_sessions(
     state: State<'_, Arc<CodexProcessManager>>,
 ) -> Result<Vec<String>, String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("Process instances mutex poisoned");
     Ok(instances.keys().cloned().collect())
 }

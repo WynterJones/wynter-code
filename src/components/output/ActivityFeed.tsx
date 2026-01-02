@@ -149,7 +149,7 @@ function formatToolSummary(input: Record<string, unknown>): string {
     try {
       const parsed = JSON.parse(input.raw);
       return formatToolSummary(parsed);
-    } catch {
+    } catch (error) {
       return input.raw.slice(0, 100);
     }
   }
@@ -168,7 +168,7 @@ function formatToolInput(input: Record<string, unknown>): string {
     try {
       const parsed = JSON.parse(input.raw);
       return JSON.stringify(parsed, null, 2);
-    } catch {
+    } catch (error) {
       return input.raw;
     }
   }

@@ -41,7 +41,7 @@ async function checkIsDirectory(path: string): Promise<boolean> {
   try {
     const result = await invoke<boolean>("is_directory", { path });
     return result;
-  } catch {
+  } catch (err) {
     // Fallback: check if path has no extension (likely a folder)
     const fileName = path.split("/").pop() || "";
     return !fileName.includes(".");

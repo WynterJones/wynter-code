@@ -70,9 +70,9 @@ ${diff.slice(0, 4000)}`;
         .trim();
 
       setMessage(cleanedMessage);
-    } catch (e) {
+    } catch (error) {
       setError("Failed to generate message");
-      console.error("AI message generation failed:", e);
+      console.error("AI message generation failed:", error);
     } finally {
       setIsGenerating(false);
     }

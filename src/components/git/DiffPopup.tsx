@@ -108,7 +108,7 @@ function highlightCode(code: string, language: string): string {
       return hljs.highlight(code, { language }).value;
     }
     return hljs.highlightAuto(code).value;
-  } catch {
+  } catch (error) {
     return code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 }
@@ -202,6 +202,7 @@ export function DiffPopup({
                 onClick={goToPrevious}
                 disabled={currentIndex === 0}
                 title="Previous file (Left arrow)"
+                aria-label="Go to previous file"
               >
                 <ChevronLeft className="w-4 h-4" />
               </IconButton>
@@ -213,6 +214,7 @@ export function DiffPopup({
                 onClick={goToNext}
                 disabled={currentIndex === files.length - 1}
                 title="Next file (Right arrow)"
+                aria-label="Go to next file"
               >
                 <ChevronRight className="w-4 h-4" />
               </IconButton>

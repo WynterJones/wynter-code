@@ -188,7 +188,7 @@ export function DomainToolsPopup({ isOpen, onClose, initialTool }: DomainToolsPo
             )}
           </div>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close domain tools">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

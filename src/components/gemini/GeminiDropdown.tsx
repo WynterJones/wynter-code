@@ -43,7 +43,7 @@ export function GeminiDropdown() {
     try {
       const v = await getGeminiVersion();
       setVersion(v);
-    } catch {
+    } catch (error) {
       setVersion("unknown");
     } finally {
       setIsCheckingVersion(false);

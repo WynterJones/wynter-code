@@ -129,7 +129,7 @@ export function TestRunnerPopup({ isOpen, onClose }: TestRunnerPopupProps) {
           path: `${activeProject.path}/package.json`,
         });
         packageJson = JSON.parse(content);
-      } catch {
+      } catch (error) {
         // No package.json
       }
 
@@ -150,7 +150,7 @@ export function TestRunnerPopup({ isOpen, onClose }: TestRunnerPopupProps) {
             });
             configFile = cfg;
             break;
-          } catch {
+          } catch (error) {
             // Config doesn't exist
           }
         }

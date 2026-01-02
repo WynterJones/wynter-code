@@ -479,7 +479,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
     if (settings.autoCommit && projectPath) {
       try {
         await commitChanges(issueId);
-      } catch {
+      } catch (error) {
         // Continue even if commit fails
       }
     }
@@ -571,7 +571,7 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
         issueId,
       });
       return content;
-    } catch {
+    } catch (error) {
       return null;
     }
   },
@@ -1215,7 +1215,7 @@ When done, briefly confirm what was completed.`;
                   const cmd = String(input.command).slice(0, 30);
                   action = `${toolName}: ${cmd}...`;
                 }
-              } catch {
+              } catch (error) {
                 // Ignore JSON parse errors
               }
             }
@@ -1319,7 +1319,7 @@ When done, briefly confirm what was completed.`;
       };
 
       // Adjust results based on test attribution
-      let adjustedResult = { ...result };
+      const adjustedResult = { ...result };
 
       if (settings.runLint) {
         if (result.lint.success) {
@@ -1506,7 +1506,7 @@ Fix any issues found. Do NOT commit.`;
                     }
                   }
                 }
-              } catch {
+              } catch (error) {
                 // Ignore JSON parse errors
               }
             }

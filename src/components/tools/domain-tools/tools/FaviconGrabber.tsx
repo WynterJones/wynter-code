@@ -81,7 +81,7 @@ export function FaviconGrabber({ url, onUrlChange }: FaviconGrabberProps) {
                 });
               });
             }
-          } catch {
+          } catch { // Ignore - best effort
             // Manifest not found or invalid
           }
         }
@@ -117,7 +117,7 @@ export function FaviconGrabber({ url, onUrlChange }: FaviconGrabberProps) {
               source: "Common path",
             });
           }
-        } catch {
+        } catch { // Ignore - best effort
           // Path doesn't exist
         }
       }
@@ -187,7 +187,7 @@ export function FaviconGrabber({ url, onUrlChange }: FaviconGrabberProps) {
           const filename = favicon.url.split("/").pop() || `favicon-${index}.png`;
           zip.file(filename, blob);
         }
-      } catch {
+      } catch { // Ignore - best effort
       }
     });
 

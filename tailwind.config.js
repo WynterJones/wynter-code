@@ -13,6 +13,21 @@ export default {
           tertiary: "#0a0a10",
           hover: "#252535",
         },
+        // Catppuccin Mocha surface colors for consistent theming
+        surface: {
+          crust: "#11111b",
+          mantle: "#181825",
+          base: "#1e1e2e",
+          0: "#313244",
+          1: "#45475a",
+          2: "#585b70",
+        },
+        // Catppuccin Mocha overlay/text colors
+        overlay: {
+          0: "#6c7086",
+          1: "#7f849c",
+          2: "#9399b2",
+        },
         text: {
           primary: "#cdd6f4",
           secondary: "#a6adc8",

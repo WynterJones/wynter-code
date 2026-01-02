@@ -147,7 +147,7 @@ export function LighthouseAuditor({ url, onUrlChange }: LighthouseAuditorProps) 
     let data;
     try {
       data = JSON.parse(jsonResponse);
-    } catch {
+    } catch (err) {
       throw new Error(`Invalid response from API: ${jsonResponse.substring(0, 200)}`);
     }
 

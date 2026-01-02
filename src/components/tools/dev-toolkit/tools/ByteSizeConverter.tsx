@@ -3,6 +3,7 @@ import { Copy, Check, Trash2, HardDrive } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 interface SizeUnit {
   id: string;
@@ -39,7 +40,7 @@ export function ByteSizeConverter() {
   const [input, setInput] = useState("");
   const [fromUnit, setFromUnit] = useState("mb");
   const [precision, setPrecision] = useState(4);
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
 
   const bytes = useMemo(() => {
     const num = parseFloat(input);
@@ -58,12 +59,6 @@ export function ByteSizeConverter() {
     }));
   }, [bytes, precision]);
 
-  const handleCopy = async (value: string, id: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
   const handleClear = () => {
     setInput("");
   };
@@ -78,7 +73,7 @@ export function ByteSizeConverter() {
           <label className="text-sm font-medium text-text-secondary">Input Size</label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -144,13 +139,14 @@ export function ByteSizeConverter() {
                 <code className="flex-1 font-mono text-sm text-text-primary truncate">
                   {conv.displayValue}
                 </code>
-                <Tooltip content={copied === conv.id ? "Copied!" : "Copy"}>
+                <Tooltip content={isCopied(conv.id) ? "Copied!" : "Copy"}>
                   <IconButton
                     size="sm"
-                    onClick={() => handleCopy(conv.displayValue, conv.id)}
+                    onClick={() => copy(conv.displayValue, conv.id)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Copy ${conv.shortName} value`}
                   >
-                    {copied === conv.id ? (
+                    {isCopied(conv.id) ? (
                       <Check className="w-3 h-3 text-green-400" />
                     ) : (
                       <Copy className="w-3 h-3" />
@@ -176,13 +172,14 @@ export function ByteSizeConverter() {
                 <code className="flex-1 font-mono text-sm text-text-primary truncate">
                   {conv.displayValue}
                 </code>
-                <Tooltip content={copied === `${conv.id}-bin` ? "Copied!" : "Copy"}>
+                <Tooltip content={isCopied(`${conv.id}-bin`) ? "Copied!" : "Copy"}>
                   <IconButton
                     size="sm"
-                    onClick={() => handleCopy(conv.displayValue, `${conv.id}-bin`)}
+                    onClick={() => copy(conv.displayValue, `${conv.id}-bin`)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Copy ${conv.shortName} value`}
                   >
-                    {copied === `${conv.id}-bin` ? (
+                    {isCopied(`${conv.id}-bin`) ? (
                       <Check className="w-3 h-3 text-green-400" />
                     ) : (
                       <Copy className="w-3 h-3" />

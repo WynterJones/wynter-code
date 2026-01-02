@@ -116,7 +116,7 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
         } else {
           alert("Invalid subscription file format");
         }
-      } catch {
+      } catch (error) {
         alert("Failed to parse subscription file");
       }
     };
@@ -169,7 +169,7 @@ export function SubscriptionPopup({ onClose }: SubscriptionPopupProps) {
               )}
             </div>
             <Tooltip content="Close (Esc)" side="bottom">
-              <IconButton size="sm" onClick={onClose}>
+              <IconButton size="sm" onClick={onClose} aria-label="Close subscriptions popup">
                 <X className="w-4 h-4" />
               </IconButton>
             </Tooltip>

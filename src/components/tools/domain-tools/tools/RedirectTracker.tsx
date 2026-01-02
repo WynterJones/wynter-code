@@ -79,8 +79,8 @@ export function RedirectTracker({ url, onUrlChange }: RedirectTrackerProps) {
       }
 
       setHops(redirectChain);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to track redirects");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to track redirects");
     } finally {
       setLoading(false);
     }

@@ -175,7 +175,7 @@ export async function testApiKey(apiKey: string): Promise<boolean> {
       { method: "GET" }
     );
     return response.ok;
-  } catch {
+  } catch (error) {
     return false;
   }
 }

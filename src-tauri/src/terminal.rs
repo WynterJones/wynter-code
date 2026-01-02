@@ -7,6 +7,8 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State};
 use uuid::Uuid;
 
+use crate::rate_limiter::{check_rate_limit, categories};
+
 /// Security: Validate that a shell path is safe to execute.
 /// Only allows absolute paths to valid executables. Rejects:
 /// - Relative paths
@@ -110,6 +112,9 @@ pub async fn create_pty(
     rows: u16,
     shell: Option<String>,
 ) -> Result<String, String> {
+    // Rate limit check
+    check_rate_limit(categories::TERMINAL)?;
+
     // Security: Validate working directory
     validate_cwd(&cwd)?;
 
@@ -169,6 +174,17 @@ pub async fn create_pty(
                 Ok(0) => break,
                 Ok(n) => {
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_clone.emit(
+                        "pty-output",
+                        PtyOutput {
+                            pty_id: pty_id_clone.clone(),
+                            data: data.clone(),
+                        },
+                    ) {
+                        eprintln!("[DEBUG] Failed to emit 'pty-output': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_clone.emit(
                         "pty-output",
                         PtyOutput {
@@ -183,7 +199,7 @@ pub async fn create_pty(
     });
 
     // Store PTY instance with master handle for resize operations
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("PTY instances mutex poisoned");
     instances.insert(
         pty_id.clone(),
         PtyInstance {
@@ -199,7 +215,7 @@ pub async fn create_pty(
     std::thread::spawn(move || {
         let _ = child.wait();
         // Clean up when the process exits
-        let mut instances = state_clone.instances.lock().unwrap();
+        let mut instances = state_clone.instances.lock().expect("PTY instances mutex poisoned");
         instances.remove(&pty_id_for_wait);
     });
 
@@ -212,7 +228,7 @@ pub async fn write_pty(
     pty_id: String,
     data: String,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("PTY instances mutex poisoned");
 
     if let Some(instance) = instances.get_mut(&pty_id) {
         instance
@@ -236,7 +252,7 @@ pub async fn resize_pty(
     cols: u16,
     rows: u16,
 ) -> Result<(), String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("PTY instances mutex poisoned");
 
     if let Some(instance) = instances.get(&pty_id) {
         instance
@@ -256,13 +272,13 @@ pub async fn resize_pty(
 
 #[tauri::command]
 pub async fn close_pty(state: State<'_, Arc<PtyManager>>, pty_id: String) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("PTY instances mutex poisoned");
     instances.remove(&pty_id);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn is_pty_active(state: State<'_, Arc<PtyManager>>, pty_id: String) -> Result<bool, String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("PTY instances mutex poisoned");
     Ok(instances.contains_key(&pty_id))
 }

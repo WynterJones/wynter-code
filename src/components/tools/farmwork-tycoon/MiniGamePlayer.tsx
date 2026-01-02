@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { TycoonGame } from "./game/TycoonGame";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
@@ -23,6 +23,30 @@ interface MiniGamePlayerProps {
 const MIN_SIZE = 200;
 const MAX_SIZE = 600;
 const DEFAULT_SIZE = 316; // Results in 368px container height (306 + 16 chrome + 46 header)
+
+// Static style constants (extracted to avoid inline object creation)
+const CONTAINER_STATIC_STYLES = {
+  borderRadius: "12px",
+  border: "3px solid #3a3a3a",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
+  background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
+} as const;
+
+const HEADER_BG = "linear-gradient(180deg, #333 0%, #222 100%)";
+const GRIP_COLOR = { color: "#666" } as const;
+const TITLE_STYLE = {
+  color: "#555",
+  textShadow: "0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(255,255,255,0.05)",
+} as const;
+const GAME_AREA_BG = "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)";
+const SCANLINE_BG = `repeating-linear-gradient(
+  0deg,
+  transparent,
+  transparent 2px,
+  rgba(0, 0, 0, 0.1) 2px,
+  rgba(0, 0, 0, 0.1) 4px
+)`;
+const VIGNETTE_SHADOW = "inset 0 0 30px rgba(0,0,0,0.3)";
 
 interface Position {
   x: number;
@@ -192,8 +216,6 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
     onExpand();
   }, [setPendingBuildingSelection, onExpand]);
 
-  if (!isOpen) return null;
-
   // Calculate dimensions for equal padding around game area
   const headerHeight = 46;
   const minimizedHeight = 50; // Extra height when minimized
@@ -206,6 +228,30 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
   const containerWidth = contentSize;
   const containerHeight = isMinimized ? minimizedHeight : headerHeight + contentSize;
 
+  // Memoize combined styles to avoid recreation on every render
+  const containerStyle = useMemo(() => ({
+    left: position.x,
+    top: position.y,
+    width: containerWidth,
+    height: containerHeight,
+    ...CONTAINER_STATIC_STYLES,
+    transition: isMinimized ? "height 0.2s ease-out" : undefined,
+  }), [position.x, position.y, containerWidth, containerHeight, isMinimized]);
+
+  const headerStyle = useMemo(() => ({
+    height: headerHeight,
+    background: HEADER_BG,
+    borderBottom: isMinimized ? "none" : "1px solid #444",
+  }), [isMinimized]);
+
+  const gameAreaStyle = useMemo(() => ({
+    height: contentSize,
+    padding: `${outerPadding}px`,
+    background: GAME_AREA_BG,
+  }), [contentSize, outerPadding]);
+
+  if (!isOpen) return null;
+
   const content = (
     <div
       ref={containerRef}
@@ -214,17 +260,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
         "transition-shadow duration-200",
         (isDragging || isResizing) && "shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)]"
       )}
-      style={{
-        left: position.x,
-        top: position.y,
-        width: containerWidth,
-        height: containerHeight,
-        borderRadius: "12px",
-        border: "3px solid #3a3a3a",
-        boxShadow: "0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
-        background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
-        transition: isMinimized ? "height 0.2s ease-out" : undefined,
-      }}
+      style={containerStyle}
     >
       {/* Header - Drag Handle */}
       <div
@@ -232,21 +268,14 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
           "flex items-center justify-between px-2 py-2.5 cursor-grab",
           isDragging && "cursor-grabbing"
         )}
-        style={{
-          height: headerHeight,
-          background: "linear-gradient(180deg, #333 0%, #222 100%)",
-          borderBottom: isMinimized ? "none" : "1px solid #444",
-        }}
+        style={headerStyle}
         onMouseDown={handleDragStart}
       >
         <div className="flex items-center gap-1.5">
-          <GripVertical className="w-3 h-3" style={{ color: "#666" }} />
+          <GripVertical className="w-3 h-3" style={GRIP_COLOR} />
           <span
             className="text-xs font-bold tracking-widest uppercase"
-            style={{
-              color: "#555",
-              textShadow: "0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(255,255,255,0.05)",
-            }}
+            style={TITLE_STYLE}
           >
             Farmwork Tycoon
           </span>
@@ -260,6 +289,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
                 setIsMinimized(!isMinimized);
               }}
               className="!p-1"
+              aria-label={isMinimized ? "Restore game" : "Minimize game"}
             >
               {isMinimized ? <Plus className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
             </IconButton>
@@ -272,6 +302,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
                 onExpand();
               }}
               className="!p-1"
+              aria-label="Expand game to full window"
             >
               <Maximize2 className="w-3 h-3" />
             </IconButton>
@@ -284,6 +315,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
                 onClose();
               }}
               className="!p-1"
+              aria-label="Close game"
             >
               <X className="w-3 h-3" />
             </IconButton>
@@ -295,11 +327,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
       {!isMinimized && (
         <div
           className="relative"
-          style={{
-            height: contentSize,
-            padding: `${outerPadding}px`,
-            background: "linear-gradient(180deg, #252525 0%, #1a1a1a 30%, #0d0d0d 100%)",
-          }}
+          style={gameAreaStyle}
         >
           {/* Game canvas */}
           <div className="relative w-full h-full overflow-hidden rounded">
@@ -315,13 +343,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                background: `repeating-linear-gradient(
-                  0deg,
-                  transparent,
-                  transparent 2px,
-                  rgba(0, 0, 0, 0.1) 2px,
-                  rgba(0, 0, 0, 0.1) 4px
-                )`,
+                background: SCANLINE_BG,
                 zIndex: 10,
               }}
             />
@@ -330,7 +352,7 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
-                boxShadow: "inset 0 0 30px rgba(0,0,0,0.3)",
+                boxShadow: VIGNETTE_SHADOW,
                 zIndex: 12,
               }}
             />
@@ -341,13 +363,8 @@ export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProp
       {/* Resize Handle - Hidden when minimized */}
       {!isMinimized && (
         <div
-          className={cn(
-            "absolute top-0 left-0 w-4 h-4 cursor-nw-resize",
-            "hover:bg-accent/20 transition-colors"
-          )}
-          style={{
-            background: "linear-gradient(-45deg, transparent 50%, var(--color-border) 50%)",
-          }}
+          className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize hover:bg-accent/20 transition-colors"
+          style={{ background: "linear-gradient(-45deg, transparent 50%, var(--color-border) 50%)" }}
           onMouseDown={handleResizeStart}
         />
       )}

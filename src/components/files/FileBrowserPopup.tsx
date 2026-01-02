@@ -115,7 +115,8 @@ export function FileBrowserPopup({
       });
       setFiles(result);
       setCurrentPath(path);
-    } catch (err) {
+    } catch (error) {
+      // Ignore - directory may not exist or be inaccessible
       setFiles([]);
     } finally {
       setLoading(false);
@@ -268,7 +269,8 @@ export function FileBrowserPopup({
         onClose();
       };
       reader.readAsDataURL(blob);
-    } catch (err) {
+    } catch (error) {
+      // Ignore - best effort file read
     }
   }, [getSelectedFile, onSendToPrompt, onClose]);
 
@@ -308,7 +310,8 @@ export function FileBrowserPopup({
       }
       await loadDirectory(currentPath);
       refetchGitStatus();
-    } catch (err) {
+    } catch (error) {
+      // Ignore - UI will remain unchanged on failure
     }
     setDialog(null);
   }, [dialog, currentPath, createFile, createFolder, renameItem]);
@@ -404,7 +407,8 @@ export function FileBrowserPopup({
               setSelectedPaths(new Set());
               await loadDirectory(currentPath);
             }
-          } catch (err) {
+          } catch (error) {
+            // Ignore - best effort deletion
           }
         },
         separator: true,
@@ -422,7 +426,8 @@ export function FileBrowserPopup({
             if (result.success) {
               await loadDirectory(currentPath);
             }
-          } catch (err) {
+          } catch (error) {
+            // Ignore - best effort optimization
           }
         },
       });

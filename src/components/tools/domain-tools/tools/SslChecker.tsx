@@ -45,8 +45,8 @@ export function SslChecker({ url, onUrlChange }: SslCheckerProps) {
       // Parse OpenSSL output
       const parsed = parseSslOutput(result);
       setSslInfo(parsed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to check SSL certificate");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to check SSL certificate");
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ export function SslChecker({ url, onUrlChange }: SslCheckerProps) {
         hour: "2-digit",
         minute: "2-digit",
       });
-    } catch {
+    } catch (error) {
       return dateStr;
     }
   };

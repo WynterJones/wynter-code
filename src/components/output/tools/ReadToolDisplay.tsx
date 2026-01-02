@@ -63,7 +63,7 @@ export function ReadToolDisplay({ input, output }: ReadToolDisplayProps) {
             ? hljs.highlight(content, { language }).value
             : content;
           return { lineNum, content: highlighted, raw: content };
-        } catch {
+        } catch (error) {
           return { lineNum, content, raw: content };
         }
       }

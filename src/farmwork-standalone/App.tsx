@@ -214,7 +214,7 @@ export function App() {
         clearInterval(pollInterval);
         ws.close();
       };
-    } catch {
+    } catch (error) {
       // WebSocket failed, polling will still work
       return () => clearInterval(pollInterval);
     }

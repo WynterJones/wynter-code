@@ -191,7 +191,7 @@ function extractPayloadFromHtml(html: string): EncryptedPayload {
     try {
       const decoded = atob(newFormatMatch[1]);
       return JSON.parse(decoded);
-    } catch {
+    } catch (error) {
       throw new Error("Invalid backup page: could not decode encrypted data");
     }
   }
@@ -207,7 +207,7 @@ function extractPayloadFromHtml(html: string): EncryptedPayload {
 
   try {
     return JSON.parse(legacyMatch[1]);
-  } catch {
+  } catch (error) {
     throw new Error("Invalid backup page: could not parse encrypted data");
   }
 }
@@ -258,7 +258,7 @@ export async function importFromUrl(
     let payload;
     try {
       payload = extractPayloadFromHtml(html);
-    } catch {
+    } catch (error) {
       throw new Error("Invalid backup page: Could not find encrypted data. Make sure the URL points to a valid Wynter Code backup.");
     }
 
@@ -286,7 +286,7 @@ export async function importFromUrl(
     try {
       const jsonString = await decompressData(decrypted);
       backupData = JSON.parse(jsonString);
-    } catch {
+    } catch (error) {
       throw new Error("Failed to decompress backup data. The backup file may be corrupted.");
     }
 

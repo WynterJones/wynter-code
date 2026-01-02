@@ -96,7 +96,7 @@ export function McpServerForm({ server, onClose }: McpServerFormProps) {
           <span className="font-medium">
             {isEditing ? "Edit MCP Server" : "Add MCP Server"}
           </span>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close dialog">
             <X className="w-4 h-4" />
           </IconButton>
         </div>

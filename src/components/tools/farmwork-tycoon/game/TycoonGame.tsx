@@ -115,13 +115,13 @@ export function TycoonGame({
 
       // Check if this effect was cancelled during async init
       if (cancelled || !app.stage) {
-        try { app.destroy(true, { children: true, texture: false }); } catch {}
+        try { app.destroy(true, { children: true, texture: false }); } catch { /* PixiJS cleanup */ }
         return;
       }
 
       // Check if container already has a canvas (race condition protection)
       if (containerRef.current?.querySelector('canvas')) {
-        try { app.destroy(true, { children: true, texture: false }); } catch {}
+        try { app.destroy(true, { children: true, texture: false }); } catch { /* PixiJS cleanup */ }
         return;
       }
 
@@ -160,8 +160,8 @@ export function TycoonGame({
           mapContainer.addChild(sprite);
           mapSpritesRef.current.set(key, sprite);
         }
-      } catch (e) {
-        console.warn("Could not load map backgrounds:", e);
+      } catch (error) {
+        console.warn("Could not load map backgrounds:", error);
       }
 
       if (cancelled || !app.stage) return;
@@ -311,11 +311,11 @@ export function TycoonGame({
           // Now destroy the app - don't destroy textures as they're shared via Assets cache
           // Use a more defensive destroy that catches internal PixiJS errors
           localApp.destroy(false, { children: false, texture: false });
-        } catch (e) {
+        } catch (error) {
           // Suppress common PixiJS cleanup errors that don't affect functionality
           // These occur when components unmount before PixiJS is fully initialized
           // or when React's StrictMode causes double-cleanup
-          const errorMsg = String(e);
+          const errorMsg = String(error);
           const suppressedErrors = [
             '_cancelResize',
             'textureBatch',
@@ -323,7 +323,7 @@ export function TycoonGame({
             'this.renderer',
           ];
           if (!suppressedErrors.some(err => errorMsg.includes(err))) {
-            console.warn("Error destroying PixiJS app:", e);
+            console.warn("Error destroying PixiJS app:", error);
           }
         }
       }

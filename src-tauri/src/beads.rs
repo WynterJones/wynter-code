@@ -1,9 +1,16 @@
+use lazy_static::lazy_static;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::process::Command;
 
 use crate::path_utils::get_enhanced_path;
+
+lazy_static! {
+    /// Compiled regex for validating issue IDs - alphanumeric with hyphens and dots
+    static ref ISSUE_ID_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9\-\.]*$")
+        .expect("invalid issue ID regex pattern");
+}
 
 /// Validate a beads issue ID to prevent command injection
 /// Format: alphanumeric with optional hyphens and dots (e.g., "project-123", "project-123.1")
@@ -12,9 +19,7 @@ fn validate_issue_id(id: &str) -> Result<(), String> {
         return Err("Invalid issue ID: must be 1-100 characters".to_string());
     }
 
-    // Issue ID regex: alphanumeric, hyphens, dots
-    let id_regex = Regex::new(r"^[a-zA-Z0-9][a-zA-Z0-9\-\.]*$").unwrap();
-    if !id_regex.is_match(id) {
+    if !ISSUE_ID_REGEX.is_match(id) {
         return Err("Invalid issue ID: contains invalid characters".to_string());
     }
 
@@ -145,12 +150,24 @@ pub struct BeadsUpdate {
 }
 
 fn run_bd_command(project_path: &str, args: &[&str]) -> Result<String, String> {
+    // Check if beads is initialized first
+    let beads_path = Path::new(project_path).join(".beads");
+    if !beads_path.exists() {
+        return Err("beads_not_installed: Issue tracking is not set up for this project. Run 'bd init' to initialize.".to_string());
+    }
+
     let output = Command::new("bd")
         .args(args)
         .current_dir(project_path)
         .env("PATH", get_enhanced_path())
         .output()
-        .map_err(|e| format!("Failed to run bd command: {}", e))?;
+        .map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                "beads_not_installed: The 'bd' command is not installed. Please install beads CLI.".to_string()
+            } else {
+                format!("Failed to run bd command: {}", e)
+            }
+        })?;
 
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -402,4 +419,230 @@ pub async fn beads_update_phase(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // validate_issue_id tests
+    #[test]
+    fn test_validate_issue_id_valid_simple() {
+        assert!(validate_issue_id("project-123").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_id_valid_with_dot() {
+        assert!(validate_issue_id("project-123.1").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_id_valid_alphanumeric() {
+        assert!(validate_issue_id("abc123").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_id_empty() {
+        assert!(validate_issue_id("").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_too_long() {
+        let long_id = "a".repeat(101);
+        assert!(validate_issue_id(&long_id).is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_max_length() {
+        let max_id = "a".repeat(100);
+        assert!(validate_issue_id(&max_id).is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_id_shell_metachar_pipe() {
+        assert!(validate_issue_id("test|rm").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_shell_metachar_ampersand() {
+        assert!(validate_issue_id("test&cmd").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_shell_metachar_semicolon() {
+        assert!(validate_issue_id("test;rm").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_shell_metachar_dollar() {
+        assert!(validate_issue_id("test$VAR").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_shell_metachar_backtick() {
+        assert!(validate_issue_id("test`cmd`").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_space() {
+        assert!(validate_issue_id("test id").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_id_newline() {
+        assert!(validate_issue_id("test\nid").is_err());
+    }
+
+    // validate_status tests
+    #[test]
+    fn test_validate_status_open() {
+        assert!(validate_status("open").is_ok());
+    }
+
+    #[test]
+    fn test_validate_status_in_progress() {
+        assert!(validate_status("in_progress").is_ok());
+    }
+
+    #[test]
+    fn test_validate_status_blocked() {
+        assert!(validate_status("blocked").is_ok());
+    }
+
+    #[test]
+    fn test_validate_status_closed() {
+        assert!(validate_status("closed").is_ok());
+    }
+
+    #[test]
+    fn test_validate_status_deferred() {
+        assert!(validate_status("deferred").is_ok());
+    }
+
+    #[test]
+    fn test_validate_status_invalid() {
+        assert!(validate_status("invalid").is_err());
+    }
+
+    #[test]
+    fn test_validate_status_empty() {
+        assert!(validate_status("").is_err());
+    }
+
+    #[test]
+    fn test_validate_status_case_sensitive() {
+        assert!(validate_status("Open").is_err());
+        assert!(validate_status("CLOSED").is_err());
+    }
+
+    // validate_issue_type tests
+    #[test]
+    fn test_validate_issue_type_bug() {
+        assert!(validate_issue_type("bug").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_type_feature() {
+        assert!(validate_issue_type("feature").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_type_task() {
+        assert!(validate_issue_type("task").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_type_epic() {
+        assert!(validate_issue_type("epic").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_type_chore() {
+        assert!(validate_issue_type("chore").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_type_merge_request() {
+        assert!(validate_issue_type("merge-request").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_type_molecule() {
+        assert!(validate_issue_type("molecule").is_ok());
+    }
+
+    #[test]
+    fn test_validate_issue_type_invalid() {
+        assert!(validate_issue_type("invalid").is_err());
+    }
+
+    #[test]
+    fn test_validate_issue_type_empty() {
+        assert!(validate_issue_type("").is_err());
+    }
+
+    // validate_priority tests
+    #[test]
+    fn test_validate_priority_zero() {
+        assert!(validate_priority(0).is_ok());
+    }
+
+    #[test]
+    fn test_validate_priority_max() {
+        assert!(validate_priority(4).is_ok());
+    }
+
+    #[test]
+    fn test_validate_priority_mid() {
+        assert!(validate_priority(2).is_ok());
+    }
+
+    #[test]
+    fn test_validate_priority_over_max() {
+        assert!(validate_priority(5).is_err());
+    }
+
+    #[test]
+    fn test_validate_priority_way_over() {
+        assert!(validate_priority(255).is_err());
+    }
+
+    // sanitize_text tests
+    #[test]
+    fn test_sanitize_text_clean() {
+        assert_eq!(sanitize_text("Hello World"), "Hello World");
+    }
+
+    #[test]
+    fn test_sanitize_text_backtick() {
+        assert_eq!(sanitize_text("test`cmd`"), "test cmd ");
+    }
+
+    #[test]
+    fn test_sanitize_text_dollar() {
+        assert_eq!(sanitize_text("test$VAR"), "test VAR");
+    }
+
+    #[test]
+    fn test_sanitize_text_newline() {
+        assert_eq!(sanitize_text("line1\nline2"), "line1 line2");
+    }
+
+    #[test]
+    fn test_sanitize_text_carriage_return() {
+        assert_eq!(sanitize_text("line1\rline2"), "line1 line2");
+    }
+
+    #[test]
+    fn test_sanitize_text_preserves_safe_chars() {
+        assert_eq!(
+            sanitize_text("Title: My Issue (v1.0) - Fixed!"),
+            "Title: My Issue (v1.0) - Fixed!"
+        );
+    }
+
+    #[test]
+    fn test_sanitize_text_empty() {
+        assert_eq!(sanitize_text(""), "");
+    }
 }

@@ -70,6 +70,7 @@ function HoldToDeleteButton({ onDelete }: HoldToDeleteButtonProps) {
         onTouchStart={startHold}
         onTouchEnd={cancelHold}
         title="Hold to delete"
+        aria-label="Delete site (hold to confirm)"
         className={cn(
           "relative overflow-hidden",
           isHolding && "!bg-accent-red/20"

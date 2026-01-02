@@ -80,7 +80,7 @@ export function KanbanColumn({
 
         {column.id === "backlog" && onAddTask && (
           <Tooltip content="Add Task">
-            <IconButton size="sm" onClick={onAddTask}>
+            <IconButton size="sm" onClick={onAddTask} aria-label="Add task to backlog">
               <Plus className="w-4 h-4" />
             </IconButton>
           </Tooltip>

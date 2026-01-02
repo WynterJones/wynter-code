@@ -192,14 +192,15 @@ export function StorybookViewerPopup({
       await navigator.clipboard.writeText(currentServer.url);
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
-    } catch {
+    } catch (error) {
       setError("Failed to copy URL");
     }
   }, [currentServer?.url]);
 
   const handleRefreshIframe = useCallback(() => {
     if (iframeRef.current) {
-      iframeRef.current.src = iframeRef.current.src;
+      const currentSrc = iframeRef.current.src;
+      iframeRef.current.src = currentSrc;
     }
   }, []);
 

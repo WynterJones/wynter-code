@@ -42,8 +42,8 @@ export function HmacGenerator() {
       const hmac = await generateHmac(message, secretKey, algorithm);
       setResult(hmac);
       setError(null);
-    } catch (e) {
-      setError(`Error: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Error: ${(error as Error).message}`);
       setResult("");
     }
   }, [message, secretKey, algorithm]);
@@ -129,7 +129,7 @@ export function HmacGenerator() {
           <div className="flex items-center justify-between">
             <span className="text-sm text-text-secondary">HMAC-{algorithm}</span>
             <Tooltip content={copied ? "Copied!" : "Copy"}>
-              <IconButton size="sm" onClick={handleCopy}>
+              <IconButton size="sm" onClick={handleCopy} aria-label="Copy HMAC">
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-green-400" />
                 ) : (

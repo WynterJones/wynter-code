@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { GitBranch, GitCommit as GitCommitIcon, Loader2 } from "lucide-react";
-import { ScrollArea } from "@/components/ui";
+import { ScrollArea, ErrorBanner } from "@/components/ui";
 import { gitService, type GitStatus, type GitCommit, type GitBranch as GitBranchType } from "@/services/git";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { ChangesSection } from "./ChangesSection";
@@ -23,11 +23,13 @@ export function GitPanel({ projectPath }: GitPanelProps) {
   });
   const [isGitRepo, setIsGitRepo] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadGitData = useCallback(async (isRefresh = false) => {
     if (!isRefresh) {
       setLoading(true);
     }
+    setError(null);
 
     const isRepo = await gitService.isGitRepo(projectPath);
     setIsGitRepo(isRepo);
@@ -46,6 +48,11 @@ export function GitPanel({ projectPath }: GitPanelProps) {
       // Get remote status (includes fetch)
       const remote = await gitService.getRemoteStatus(projectPath);
       setRemoteStatus(remote);
+
+      // Check for rate limit error
+      if (remote.error) {
+        setError(remote.error);
+      }
 
       // Update status with remote counts if different
       if (remote.ahead !== statusData.ahead || remote.behind !== statusData.behind) {
@@ -91,6 +98,13 @@ export function GitPanel({ projectPath }: GitPanelProps) {
   return (
     <ScrollArea className="h-full">
       <div className="space-y-2 p-2">
+        {/* Rate limit error banner */}
+        {error && (
+          <div className="px-2">
+            <ErrorBanner message={error} className="text-xs py-2" />
+          </div>
+        )}
+
         {/* Sync Section (Branch + Push/Pull) */}
         <SyncSection
           projectPath={projectPath}

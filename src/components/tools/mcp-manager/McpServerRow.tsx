@@ -145,7 +145,7 @@ export function McpServerRow({ server, onEdit, onDelete }: McpServerRowProps) {
         {/* Actions */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Tooltip content="Edit">
-            <IconButton size="sm" onClick={() => onEdit(server)}>
+            <IconButton size="sm" onClick={() => onEdit(server)} aria-label="Edit MCP server">
               <Pencil className="w-3.5 h-3.5" />
             </IconButton>
           </Tooltip>
@@ -162,6 +162,7 @@ export function McpServerRow({ server, onEdit, onDelete }: McpServerRowProps) {
                   open(`https://www.npmjs.com/package/${pkgArg}`);
                 }
               }}
+              aria-label="View on npm"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </IconButton>
@@ -171,6 +172,7 @@ export function McpServerRow({ server, onEdit, onDelete }: McpServerRowProps) {
             <IconButton
               size="sm"
               onClick={handleDelete}
+              aria-label={confirmDelete ? "Confirm delete" : "Delete MCP server"}
               className={cn(
                 "hover:text-red-400 hover:bg-red-500/10",
                 confirmDelete && "text-red-400 bg-red-500/10"
@@ -228,6 +230,7 @@ export function McpServerRow({ server, onEdit, onDelete }: McpServerRowProps) {
                             ? hideEnvKey(server.name, key)
                             : revealEnvKey(server.name, key)
                         }
+                        aria-label={isRevealed ? "Hide environment variable" : "Show environment variable"}
                       >
                         {isRevealed ? (
                           <EyeOff className="w-3 h-3" />
@@ -239,6 +242,7 @@ export function McpServerRow({ server, onEdit, onDelete }: McpServerRowProps) {
                     <IconButton
                       size="sm"
                       onClick={() => handleCopyEnvValue(key, value)}
+                      aria-label="Copy environment variable value"
                     >
                       {isCopied ? (
                         <Check className="w-3 h-3 text-green-400" />

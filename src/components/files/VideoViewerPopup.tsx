@@ -90,7 +90,7 @@ export function VideoViewerPopup({ filePath, onClose }: VideoViewerPopupProps) {
         >
           <span className="font-mono text-sm text-text-primary">{fileName}</span>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close video player">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>
@@ -132,17 +132,17 @@ export function VideoViewerPopup({ filePath, onClose }: VideoViewerPopupProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Tooltip content="Skip -10s" side="top">
-                  <IconButton size="sm" onClick={() => skip(-10)}>
+                  <IconButton size="sm" onClick={() => skip(-10)} aria-label="Skip back 10 seconds">
                     <SkipBack className="w-4 h-4" />
                   </IconButton>
                 </Tooltip>
                 <Tooltip content={isPlaying ? "Pause (Space)" : "Play (Space)"} side="top">
-                  <IconButton size="sm" onClick={togglePlay}>
+                  <IconButton size="sm" onClick={togglePlay} aria-label={isPlaying ? "Pause video" : "Play video"}>
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                   </IconButton>
                 </Tooltip>
                 <Tooltip content="Skip +10s" side="top">
-                  <IconButton size="sm" onClick={() => skip(10)}>
+                  <IconButton size="sm" onClick={() => skip(10)} aria-label="Skip forward 10 seconds">
                     <SkipForward className="w-4 h-4" />
                   </IconButton>
                 </Tooltip>
@@ -153,12 +153,12 @@ export function VideoViewerPopup({ filePath, onClose }: VideoViewerPopupProps) {
 
               <div className="flex items-center gap-2">
                 <Tooltip content={isMuted ? "Unmute (M)" : "Mute (M)"} side="top">
-                  <IconButton size="sm" onClick={toggleMute}>
+                  <IconButton size="sm" onClick={toggleMute} aria-label={isMuted ? "Unmute audio" : "Mute audio"}>
                     {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                   </IconButton>
                 </Tooltip>
                 <Tooltip content="Fullscreen (F)" side="top">
-                  <IconButton size="sm" onClick={toggleFullscreen}>
+                  <IconButton size="sm" onClick={toggleFullscreen} aria-label="Toggle fullscreen">
                     <Maximize className="w-4 h-4" />
                   </IconButton>
                 </Tooltip>

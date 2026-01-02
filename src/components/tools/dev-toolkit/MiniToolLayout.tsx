@@ -40,7 +40,7 @@ export function MiniToolLayout({
           </label>
           {(value || output) && (
             <Tooltip content="Clear all">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear all">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -84,7 +84,7 @@ export function MiniToolLayout({
           </label>
           {output && (
             <Tooltip content={copied ? "Copied!" : "Copy to clipboard"}>
-              <IconButton size="sm" onClick={handleCopy}>
+              <IconButton size="sm" onClick={handleCopy} aria-label="Copy output">
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-green-400" />
                 ) : (

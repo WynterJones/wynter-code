@@ -18,7 +18,7 @@ export function BashToolDisplay({ input, output }: BashToolDisplayProps) {
   const highlightedCommand = useMemo(() => {
     try {
       return hljs.highlight(command, { language: "bash" }).value;
-    } catch {
+    } catch (error) {
       return command;
     }
   }, [command]);

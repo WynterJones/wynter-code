@@ -128,7 +128,7 @@ function parsePackageJson(content: string): Partial<ExtractedSeoData> {
       author: author,
       canonical: pkg.homepage || "",
     };
-  } catch {
+  } catch (error) {
     return {};
   }
 }

@@ -6,7 +6,7 @@ export function isValidExternalUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
     return ALLOWED_PROTOCOLS.includes(parsed.protocol);
-  } catch {
+  } catch (error) {
     return false;
   }
 }

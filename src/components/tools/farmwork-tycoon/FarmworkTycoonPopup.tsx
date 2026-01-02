@@ -162,7 +162,7 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
 
       setFarmworkStatus("installed");
       return true;
-    } catch {
+    } catch (error) {
       setFarmworkStatus("not_installed_globally");
       return false;
     }
@@ -210,7 +210,7 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
           } else {
             setBeadsEnabled(false);
           }
-        } catch {
+        } catch (error) {
           // Beads not available
           setBeadsEnabled(false);
         }
@@ -457,6 +457,7 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
                 size="sm"
                 onClick={toggleHideTooltips}
                 className={cn(hideTooltips && "text-yellow-400 bg-yellow-400/10")}
+                aria-label={hideTooltips ? "Show game tooltips" : "Hide game tooltips"}
               >
                 <MessageSquareOff className="w-3.5 h-3.5" />
               </IconButton>
@@ -472,12 +473,13 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
                     size="sm"
                     onClick={isPaused ? resume : pause}
                     className={cn(isPaused && "text-amber-400")}
+                    aria-label={isPaused ? "Resume game" : "Pause game"}
                   >
                     {isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                   </IconButton>
                 </Tooltip>
                 <Tooltip content="Refresh Stats">
-                  <IconButton size="sm" onClick={refreshStats}>
+                  <IconButton size="sm" onClick={refreshStats} aria-label="Refresh game statistics">
                     <RefreshCw className="w-3.5 h-3.5" />
                   </IconButton>
                 </Tooltip>
@@ -486,6 +488,7 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
                     size="sm"
                     onClick={toggleDebug}
                     className={cn(showDebug && "text-green-400 bg-green-400/10")}
+                    aria-label="Toggle debug mode"
                   >
                     <Bug className="w-3.5 h-3.5" />
                   </IconButton>
@@ -496,6 +499,7 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
                     size="sm"
                     onClick={startTestRun}
                     className="text-purple-400 hover:bg-purple-400/10"
+                    aria-label="Start test run with spawned vehicles"
                   >
                     <TestTube className="w-3.5 h-3.5" />
                   </IconButton>
@@ -505,6 +509,7 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
                     size="sm"
                     onClick={clearAllVehicles}
                     className="text-red-400 hover:bg-red-400/10"
+                    aria-label="Clear all spawned vehicles"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </IconButton>

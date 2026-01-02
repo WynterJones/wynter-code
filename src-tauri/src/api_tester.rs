@@ -237,7 +237,7 @@ pub async fn start_webhook_server(
 
     // Store instance
     {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("WebhookManager servers mutex poisoned");
         servers.insert(
             server_id.clone(),
             WebhookServerInstance {
@@ -254,7 +254,7 @@ pub async fn start_webhook_server(
     std::thread::spawn(move || {
         loop {
             // Check shutdown signal
-            if *shutdown_signal.lock().unwrap() {
+            if *shutdown_signal.lock().expect("webhook shutdown_signal mutex poisoned") {
                 break;
             }
 
@@ -290,6 +290,14 @@ pub async fn start_webhook_server(
                         };
 
                         // Emit event to frontend
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window.emit("webhook-request", serde_json::json!({
+                            "serverId": server_id_clone,
+                            "request": event
+                        })) {
+                            eprintln!("[DEBUG] Failed to emit 'webhook-request': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window.emit("webhook-request", serde_json::json!({
                             "serverId": server_id_clone,
                             "request": event
@@ -323,9 +331,9 @@ pub async fn stop_webhook_server(
     state: State<'_, Arc<WebhookManager>>,
     server_id: String,
 ) -> Result<(), String> {
-    let mut servers = state.servers.lock().unwrap();
+    let mut servers = state.servers.lock().expect("WebhookManager servers mutex poisoned");
     if let Some(instance) = servers.get(&server_id) {
-        let mut signal = instance.shutdown_signal.lock().unwrap();
+        let mut signal = instance.shutdown_signal.lock().expect("webhook shutdown_signal mutex poisoned");
         *signal = true;
     }
     servers.remove(&server_id);
@@ -336,14 +344,14 @@ pub async fn stop_webhook_server(
 pub fn list_webhook_servers(
     state: State<'_, Arc<WebhookManager>>,
 ) -> Result<Vec<WebhookServerInfo>, String> {
-    let servers = state.servers.lock().unwrap();
+    let servers = state.servers.lock().expect("WebhookManager servers mutex poisoned");
     let list: Vec<WebhookServerInfo> = servers
         .iter()
         .map(|(id, instance)| WebhookServerInfo {
             id: id.clone(),
             port: instance.port,
             path: instance.path.clone(),
-            is_running: !*instance.shutdown_signal.lock().unwrap(),
+            is_running: !*instance.shutdown_signal.lock().expect("webhook shutdown_signal mutex poisoned"),
         })
         .collect();
     Ok(list)

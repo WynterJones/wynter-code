@@ -117,7 +117,7 @@ export function SeoToolsPopup({ isOpen, onClose, initialTool }: SeoToolsPopupPro
             )}
           </div>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close SEO tools">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

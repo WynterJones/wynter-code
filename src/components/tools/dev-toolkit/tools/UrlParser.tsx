@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 interface ParsedUrl {
   protocol: string;
@@ -34,7 +35,7 @@ function parseUrl(urlString: string): ParsedUrl | null {
       origin: url.origin,
       searchParams,
     };
-  } catch {
+  } catch (error) {
     return null;
   }
 }
@@ -44,10 +45,10 @@ interface UrlFieldProps {
   value: string;
   color?: string;
   onCopy: () => void;
-  copied: boolean;
+  isCopied: boolean;
 }
 
-function UrlField({ label, value, color, onCopy, copied }: UrlFieldProps) {
+function UrlField({ label, value, color, onCopy, isCopied }: UrlFieldProps) {
   if (!value) return null;
 
   return (
@@ -56,9 +57,9 @@ function UrlField({ label, value, color, onCopy, copied }: UrlFieldProps) {
       <span className={cn("text-sm font-mono flex-1 break-all", color || "text-text-primary")}>
         {value}
       </span>
-      <Tooltip content={copied ? "Copied!" : "Copy"}>
-        <IconButton size="sm" onClick={onCopy}>
-          {copied ? (
+      <Tooltip content={isCopied ? "Copied!" : "Copy"}>
+        <IconButton size="sm" onClick={onCopy} aria-label="Copy to clipboard">
+          {isCopied ? (
             <Check className="w-3 h-3 text-green-400" />
           ) : (
             <Copy className="w-3 h-3" />
@@ -71,18 +72,12 @@ function UrlField({ label, value, color, onCopy, copied }: UrlFieldProps) {
 
 export function UrlParser() {
   const [input, setInput] = useState("");
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
 
   const parsed = useMemo(() => {
     if (!input.trim()) return null;
     return parseUrl(input.trim());
   }, [input]);
-
-  const handleCopy = async (text: string, key: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(key);
-    setTimeout(() => setCopied(null), 2000);
-  };
 
   const handleClear = () => {
     setInput("");
@@ -108,7 +103,7 @@ export function UrlParser() {
           </label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -150,50 +145,50 @@ export function UrlParser() {
               label="Protocol"
               value={parsed.protocol}
               color="text-blue-400"
-              onCopy={() => handleCopy(parsed.protocol, "protocol")}
-              copied={copied === "protocol"}
+              onCopy={() => copy(parsed.protocol, "protocol")}
+              isCopied={isCopied("protocol")}
             />
             <UrlField
               label="Hostname"
               value={parsed.hostname}
               color="text-green-400"
-              onCopy={() => handleCopy(parsed.hostname, "hostname")}
-              copied={copied === "hostname"}
+              onCopy={() => copy(parsed.hostname, "hostname")}
+              isCopied={isCopied("hostname")}
             />
             <UrlField
               label="Port"
               value={parsed.port}
               color="text-yellow-400"
-              onCopy={() => handleCopy(parsed.port, "port")}
-              copied={copied === "port"}
+              onCopy={() => copy(parsed.port, "port")}
+              isCopied={isCopied("port")}
             />
             <UrlField
               label="Origin"
               value={parsed.origin}
               color="text-purple-400"
-              onCopy={() => handleCopy(parsed.origin, "origin")}
-              copied={copied === "origin"}
+              onCopy={() => copy(parsed.origin, "origin")}
+              isCopied={isCopied("origin")}
             />
             <UrlField
               label="Pathname"
               value={parsed.pathname}
               color="text-orange-400"
-              onCopy={() => handleCopy(parsed.pathname, "pathname")}
-              copied={copied === "pathname"}
+              onCopy={() => copy(parsed.pathname, "pathname")}
+              isCopied={isCopied("pathname")}
             />
             <UrlField
               label="Search"
               value={parsed.search}
               color="text-cyan-400"
-              onCopy={() => handleCopy(parsed.search, "search")}
-              copied={copied === "search"}
+              onCopy={() => copy(parsed.search, "search")}
+              isCopied={isCopied("search")}
             />
             <UrlField
               label="Hash"
               value={parsed.hash}
               color="text-pink-400"
-              onCopy={() => handleCopy(parsed.hash, "hash")}
-              copied={copied === "hash"}
+              onCopy={() => copy(parsed.hash, "hash")}
+              isCopied={isCopied("hash")}
             />
           </div>
 
@@ -205,7 +200,7 @@ export function UrlParser() {
                 </span>
                 <Tooltip
                   content={
-                    copied === "allParams" ? "Copied!" : "Copy as JSON"
+                    isCopied("allParams") ? "Copied!" : "Copy as JSON"
                   }
                 >
                   <IconButton
@@ -214,10 +209,11 @@ export function UrlParser() {
                       const obj = Object.fromEntries(
                         parsed.searchParams.map((p) => [p.key, p.value])
                       );
-                      handleCopy(JSON.stringify(obj, null, 2), "allParams");
+                      copy(JSON.stringify(obj, null, 2), "allParams");
                     }}
+                    aria-label="Copy query parameters as JSON"
                   >
-                    {copied === "allParams" ? (
+                    {isCopied("allParams") ? (
                       <Check className="w-3 h-3 text-green-400" />
                     ) : (
                       <Copy className="w-3 h-3" />
@@ -240,20 +236,21 @@ export function UrlParser() {
                     </span>
                     <Tooltip
                       content={
-                        copied === `param-${i}` ? "Copied!" : "Copy value"
+                        isCopied(`param-${i}`) ? "Copied!" : "Copy value"
                       }
                     >
                       <IconButton
                         size="sm"
                         className="opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={() =>
-                          handleCopy(
+                          copy(
                             decodeURIComponent(param.value),
                             `param-${i}`
                           )
                         }
+                        aria-label={`Copy parameter value for ${param.key}`}
                       >
-                        {copied === `param-${i}` ? (
+                        {isCopied(`param-${i}`) ? (
                           <Check className="w-3 h-3 text-green-400" />
                         ) : (
                           <Copy className="w-3 h-3" />

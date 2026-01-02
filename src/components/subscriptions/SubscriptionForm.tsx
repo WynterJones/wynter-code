@@ -77,7 +77,7 @@ export function SubscriptionForm({
     if (formData.url) {
       try {
         new URL(formData.url);
-      } catch {
+      } catch (error) {
         newErrors.url = "Invalid URL format";
       }
     }
@@ -118,7 +118,7 @@ export function SubscriptionForm({
             {isEditing ? "Edit Subscription" : "Add Subscription"}
           </span>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onCancel}>
+            <IconButton size="sm" onClick={onCancel} aria-label="Cancel subscription form">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

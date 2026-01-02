@@ -40,7 +40,7 @@ export function IpAddressLookup({ url, onUrlChange }: IpAddressLookupProps) {
       const result = await invoke<string>("http_get_json", { url: "https://api.ipify.org?format=json" });
       const data = JSON.parse(result);
       setMyIp(data.ip);
-    } catch {
+    } catch (error) {
       // Silently fail for my IP
     } finally {
       setLoadingMyIp(false);
@@ -65,8 +65,8 @@ export function IpAddressLookup({ url, onUrlChange }: IpAddressLookupProps) {
       }
 
       setIpInfo(data);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to lookup IP address");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to lookup IP address");
     } finally {
       setLoading(false);
     }

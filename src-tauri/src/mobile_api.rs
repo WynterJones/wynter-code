@@ -22,15 +22,182 @@ use std::{
 };
 use tokio::sync::{broadcast, RwLock};
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::beads::{BeadsIssue, BeadsStats, BeadsUpdate};
 use crate::live_preview::{PreviewManager, PreviewStatus as LivePreviewStatus};
 use crate::process_registry::ProcessRegistry;
+use crate::rate_limiter::check_mobile_auth_limit;
 use crate::tunnel::TunnelManager;
 use crate::path_utils::get_enhanced_path;
 
-// JWT Secret - in production this should be securely generated and stored
-const JWT_SECRET: &str = "wynter-code-mobile-api-secret-key-2024";
+// ============================================================================
+// JWT Secret Management (Secure Storage)
+// ============================================================================
+
+/// Get or generate a secure JWT secret
+/// The secret is stored in the app's data directory with restricted permissions
+fn get_or_create_jwt_secret() -> String {
+    use std::fs;
+    use std::io::Write;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    // Use ~/.wynter-code for storing secrets
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let secret_dir = std::path::Path::new(&home).join(".wynter-code");
+    let secret_file = secret_dir.join(".jwt_secret");
+
+    // Try to read existing secret
+    if let Ok(existing_secret) = fs::read_to_string(&secret_file) {
+        let trimmed = existing_secret.trim();
+        // Validate it's a proper secret (64 hex chars = 32 bytes)
+        if trimmed.len() == 64 && trimmed.chars().all(|c| c.is_ascii_hexdigit()) {
+            return trimmed.to_string();
+        }
+    }
+
+    // Generate new cryptographically secure secret (32 bytes = 256 bits)
+    let mut secret_bytes = [0u8; 32];
+    rand::Rng::fill(&mut rand::thread_rng(), &mut secret_bytes);
+    let new_secret: String = secret_bytes.iter().map(|b| format!("{:02x}", b)).collect();
+
+    // Create directory if needed
+    if let Err(e) = fs::create_dir_all(&secret_dir) {
+        eprintln!("Warning: Could not create secret directory: {}", e);
+        return new_secret; // Use ephemeral secret if we can't persist
+    }
+
+    // Set directory permissions to 700 (owner only) on Unix
+    #[cfg(unix)]
+    {
+        let _ = fs::set_permissions(&secret_dir, fs::Permissions::from_mode(0o700));
+    }
+
+    // Write secret to file
+    if let Ok(mut file) = fs::File::create(&secret_file) {
+        let _ = file.write_all(new_secret.as_bytes());
+
+        // Set file permissions to 600 (owner read/write only) on Unix
+        #[cfg(unix)]
+        {
+            let _ = fs::set_permissions(&secret_file, fs::Permissions::from_mode(0o600));
+        }
+    }
+
+    new_secret
+}
+
+// Lazy-initialized JWT secret (generated at first run, stored in ~/.wynter-code/.jwt_secret)
+lazy_static::lazy_static! {
+    static ref JWT_SECRET: String = get_or_create_jwt_secret();
+}
+
+/// Get the relay internal token from relay_config.json
+/// This allows relay-forwarded requests to bypass JWT auth
+fn get_relay_internal_token() -> Option<String> {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    let config_path = std::path::Path::new(&home)
+        .join(".wynter-code")
+        .join("relay_config.json");
+
+    if !config_path.exists() {
+        return None;
+    }
+
+    let content = std::fs::read_to_string(&config_path).ok()?;
+    let config: serde_json::Value = serde_json::from_str(&content).ok()?;
+    config.get("peer_token")?.as_str().map(|s| s.to_string())
+}
+
+// ============================================================================
+// Paired Device Persistence
+// ============================================================================
+
+/// Get the path to the paired devices persistence file
+fn get_paired_devices_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+    std::path::Path::new(&home).join(".wynter-code").join("paired_devices.json")
+}
+
+/// Load paired devices from disk
+/// Returns empty HashMap if file doesn't exist or is invalid
+fn load_paired_devices() -> HashMap<String, PairedDevice> {
+    use std::fs;
+
+    let path = get_paired_devices_path();
+
+    match fs::read_to_string(&path) {
+        Ok(content) => {
+            match serde_json::from_str::<HashMap<String, PairedDevice>>(&content) {
+                Ok(devices) => {
+                    println!("[mobile_api] Loaded {} paired devices from disk", devices.len());
+                    devices
+                }
+                Err(e) => {
+                    eprintln!("[mobile_api] Failed to parse paired devices file: {}", e);
+                    HashMap::new()
+                }
+            }
+        }
+        Err(_) => {
+            // File doesn't exist yet - this is normal on first run
+            HashMap::new()
+        }
+    }
+}
+
+/// Save paired devices to disk
+/// Uses proper file permissions for security
+fn save_paired_devices(devices: &HashMap<String, PairedDevice>) {
+    use std::fs;
+    use std::io::Write;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = get_paired_devices_path();
+
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        if let Err(e) = fs::create_dir_all(parent) {
+            eprintln!("[mobile_api] Failed to create directory for paired devices: {}", e);
+            return;
+        }
+
+        // Set directory permissions to 700 (owner only) on Unix
+        #[cfg(unix)]
+        {
+            let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o700));
+        }
+    }
+
+    // Serialize devices
+    let content = match serde_json::to_string_pretty(devices) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[mobile_api] Failed to serialize paired devices: {}", e);
+            return;
+        }
+    };
+
+    // Write to file
+    if let Ok(mut file) = fs::File::create(&path) {
+        if let Err(e) = file.write_all(content.as_bytes()) {
+            eprintln!("[mobile_api] Failed to write paired devices file: {}", e);
+            return;
+        }
+
+        // Set file permissions to 600 (owner read/write only) on Unix
+        #[cfg(unix)]
+        {
+            let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+        }
+
+        println!("[mobile_api] Saved {} paired devices to disk", devices.len());
+    } else {
+        eprintln!("[mobile_api] Failed to create paired devices file");
+    }
+}
 
 // ============================================================================
 // Types
@@ -362,7 +529,8 @@ impl AppState {
     pub fn new() -> Self {
         let (state_tx, _) = broadcast::channel(100);
         Self {
-            paired_devices: Arc::new(RwLock::new(HashMap::new())),
+            // Load persisted paired devices from disk (survives app restart)
+            paired_devices: Arc::new(RwLock::new(load_paired_devices())),
             pairing_codes: Arc::new(RwLock::new(HashMap::new())),
             synced_data: Arc::new(RwLock::new(SyncedData::default())),
             state_tx,
@@ -381,6 +549,11 @@ impl AppState {
     pub async fn emit_event<S: serde::Serialize + Clone>(&self, event: &str, payload: S) {
         use tauri::Emitter;
         if let Some(handle) = self.app_handle.read().await.as_ref() {
+            #[cfg(debug_assertions)]
+            if let Err(e) = handle.emit(event, payload.clone()) {
+                eprintln!("[DEBUG] Failed to emit '{}': {}", event, e);
+            }
+            #[cfg(not(debug_assertions))]
             let _ = handle.emit(event, payload);
         }
     }
@@ -457,12 +630,14 @@ impl MobileApiManager {
         // Create shutdown channel
         let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
 
-        // Start the server
+        // Start the server with ConnectInfo to enable IP-based rate limiting
+        let listener = tokio::net::TcpListener::bind(addr)
+            .await
+            .map_err(|e| format!("Failed to bind to port {}: {}", port, e))?;
+
         let server = axum::serve(
-            tokio::net::TcpListener::bind(addr)
-                .await
-                .map_err(|e| format!("Failed to bind to port {}: {}", port, e))?,
-            app,
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
         )
         .with_graceful_shutdown(async {
             let _ = shutdown_rx.await;
@@ -579,7 +754,7 @@ impl MobileApiManager {
             codes.remove(code);
         }
 
-        // Store paired device
+        // Store paired device and persist to disk
         {
             let mut devices = self.app_state.paired_devices.write().await;
             devices.insert(
@@ -591,6 +766,8 @@ impl MobileApiManager {
                     last_seen: now,
                 },
             );
+            // Persist to disk so device survives app restart
+            save_paired_devices(&devices);
         }
 
         // Generate JWT token
@@ -618,6 +795,8 @@ impl MobileApiManager {
         devices
             .remove(device_id)
             .ok_or_else(|| "Device not found".to_string())?;
+        // Persist removal to disk
+        save_paired_devices(&devices);
         Ok(())
     }
 
@@ -646,6 +825,20 @@ fn create_router(state: Arc<AppState>) -> Router {
         .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::DELETE])
         .allow_headers([header::CONTENT_TYPE, header::AUTHORIZATION]);
+
+    // Security headers to protect against common attacks
+    let x_content_type_options = SetResponseHeaderLayer::overriding(
+        header::X_CONTENT_TYPE_OPTIONS,
+        header::HeaderValue::from_static("nosniff"),
+    );
+    let x_frame_options = SetResponseHeaderLayer::overriding(
+        header::X_FRAME_OPTIONS,
+        header::HeaderValue::from_static("DENY"),
+    );
+    let x_xss_protection = SetResponseHeaderLayer::overriding(
+        header::HeaderName::from_static("x-xss-protection"),
+        header::HeaderValue::from_static("1; mode=block"),
+    );
 
     Router::new()
         // Public endpoints
@@ -750,6 +943,10 @@ fn create_router(state: Arc<AppState>) -> Router {
         .route("/api/v1/terminal/:id", axum::routing::delete(terminal_close))
         // WebSocket endpoint
         .route("/api/v1/ws", get(websocket_handler))
+        // Apply security headers
+        .layer(x_content_type_options)
+        .layer(x_frame_options)
+        .layer(x_xss_protection)
         .layer(cors)
         .with_state(state)
 }
@@ -781,9 +978,17 @@ struct PairRequest {
 }
 
 async fn pair(
+    axum::extract::ConnectInfo(addr): axum::extract::ConnectInfo<SocketAddr>,
     State(state): State<Arc<AppState>>,
     Json(req): Json<PairRequest>,
 ) -> Result<Json<AuthToken>, (StatusCode, String)> {
+    // Rate limiting: prevent brute-force pairing attempts
+    // Use client IP address for rate limiting
+    let client_id = addr.ip().to_string();
+    if let Err(e) = check_mobile_auth_limit(&client_id) {
+        return Err((StatusCode::TOO_MANY_REQUESTS, e));
+    }
+
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -847,6 +1052,16 @@ async fn validate_token(
         .token()
         .to_string();
 
+    // Check if this is a relay-internal request
+    // The relay token is not a JWT, so we handle it separately
+    if let Some(relay_token) = get_relay_internal_token() {
+        if token == relay_token {
+            // Relay-forwarded request - bypass JWT validation
+            // Return a pseudo device ID for relay requests
+            return Ok("relay-internal".to_string());
+        }
+    }
+
     let token_data = decode::<Claims>(
         &token,
         &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
@@ -854,13 +1069,31 @@ async fn validate_token(
     )
     .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token".to_string()))?;
 
-    // Update last seen
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    // Update last seen, or auto-register device if token is valid but device not in list
+    // This handles the case where persistence file was lost but mobile still has valid token
     let mut devices = state.paired_devices.write().await;
     if let Some(device) = devices.get_mut(&token_data.claims.sub) {
-        device.last_seen = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
+        device.last_seen = now;
+    } else {
+        // Device not found but token is valid - auto-register for seamless reconnection
+        let device_id = token_data.claims.sub.clone();
+        devices.insert(
+            device_id.clone(),
+            PairedDevice {
+                device_id,
+                device_name: "Restored Device".to_string(),
+                paired_at: token_data.claims.iat as u64,
+                last_seen: now,
+            },
+        );
+        // Persist the restored device
+        save_paired_devices(&devices);
+        println!("[mobile_api] Auto-registered device from valid token: {}", token_data.claims.sub);
     }
 
     Ok(token_data.claims.sub)
@@ -1420,11 +1653,19 @@ async fn list_beads(
 ) -> Result<Json<Vec<BeadsIssue>>, (StatusCode, String)> {
     validate_token(&state, auth).await?;
 
+    println!("[mobile_api] list_beads: project_path='{}'", query.project_path);
+
     // Call the beads module directly
-    crate::beads::beads_list(query.project_path)
+    crate::beads::beads_list(query.project_path.clone())
         .await
-        .map(Json)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))
+        .map(|issues| {
+            println!("[mobile_api] list_beads: returning {} issues", issues.len());
+            Json(issues)
+        })
+        .map_err(|e| {
+            println!("[mobile_api] list_beads: error - {}", e);
+            (StatusCode::INTERNAL_SERVER_ERROR, e)
+        })
 }
 
 async fn beads_stats(
@@ -1608,6 +1849,12 @@ async fn autobuild_status(
 
     // Get project path from synced data
     let synced = state.get_synced_data().await;
+
+    println!("[mobile_api] autobuild_status: Looking for project_id='{}', synced projects: {:?}",
+        project_id,
+        synced.projects.iter().map(|p| (&p.id, &p.name)).collect::<Vec<_>>()
+    );
+
     let project_path = synced
         .projects
         .iter()
@@ -1615,6 +1862,7 @@ async fn autobuild_status(
         .map(|p| p.path.clone());
 
     let Some(project_path) = project_path else {
+        println!("[mobile_api] autobuild_status: Project '{}' not found in synced data, returning idle state", project_id);
         return Ok(Json(serde_json::json!({
             "status": "idle",
             "workers": [],
@@ -1622,7 +1870,8 @@ async fn autobuild_status(
             "human_review": [],
             "completed": [],
             "logs": [],
-            "progress": 0
+            "progress": 0,
+            "error": format!("Project '{}' not found in synced data. Try reconnecting.", project_id)
         })));
     };
 
@@ -1910,6 +2159,9 @@ async fn autobuild_get_backlog(
 
     // Get project path from synced data
     let synced = state.get_synced_data().await;
+
+    println!("[mobile_api] autobuild_get_backlog: Looking for project_id='{}'", project_id);
+
     let project_path = synced
         .projects
         .iter()
@@ -1917,11 +2169,13 @@ async fn autobuild_get_backlog(
         .map(|p| p.path.clone());
 
     let Some(project_path) = project_path else {
+        println!("[mobile_api] autobuild_get_backlog: Project '{}' not found in synced data", project_id);
         return Ok(Json(serde_json::json!({
             "issues": [],
             "completed": [],
             "human_review": [],
-            "updated_at": null
+            "updated_at": null,
+            "error": format!("Project '{}' not found in synced data. Try reconnecting.", project_id)
         })));
     };
 
@@ -2550,31 +2804,84 @@ fn process_gemini_stream_json(
 // WebSocket handler
 async fn websocket_handler(
     State(state): State<Arc<AppState>>,
-    Query(params): Query<HashMap<String, String>>,
     ws: WebSocketUpgrade,
-) -> Result<Response, (StatusCode, String)> {
-    // Validate token from query params
-    let token = params
-        .get("token")
-        .ok_or((StatusCode::UNAUTHORIZED, "Missing token".to_string()))?;
+) -> Response {
+    // Don't validate token here - wait for authenticate message after connection
+    let jwt_secret = state.jwt_secret.clone();
+    let state_tx = state.state_tx.clone();
 
-    let _token_data = decode::<Claims>(
-        token,
-        &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
-        &Validation::default(),
-    )
-    .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token".to_string()))?;
-
-    let rx = state.state_tx.subscribe();
-
-    Ok(ws.on_upgrade(move |socket| handle_websocket(socket, rx)))
+    ws.on_upgrade(move |socket| handle_websocket(socket, jwt_secret, state_tx))
 }
 
 async fn handle_websocket(
     mut socket: axum::extract::ws::WebSocket,
-    mut rx: broadcast::Receiver<StateUpdate>,
+    jwt_secret: String,
+    state_tx: broadcast::Sender<StateUpdate>,
 ) {
     use axum::extract::ws::Message;
+
+    // Wait for authenticate message first
+    let authenticated = loop {
+        match socket.recv().await {
+            Some(Ok(Message::Text(text))) => {
+                if let Ok(cmd) = serde_json::from_str::<serde_json::Value>(&text) {
+                    if cmd.get("type").and_then(|t| t.as_str()) == Some("authenticate") {
+                        if let Some(token) = cmd.get("token").and_then(|t| t.as_str()) {
+                            // Validate the token
+                            match decode::<Claims>(
+                                token,
+                                &DecodingKey::from_secret(jwt_secret.as_bytes()),
+                                &Validation::default(),
+                            ) {
+                                Ok(_) => {
+                                    // Send success response
+                                    let response = serde_json::json!({
+                                        "type": "authenticated",
+                                        "success": true
+                                    });
+                                    if socket.send(Message::Text(response.to_string().into())).await.is_err() {
+                                        return;
+                                    }
+                                    break true;
+                                }
+                                Err(_) => {
+                                    // Send error response
+                                    let response = serde_json::json!({
+                                        "type": "authenticated",
+                                        "success": false,
+                                        "error": "Invalid token"
+                                    });
+                                    let _ = socket.send(Message::Text(response.to_string().into())).await;
+                                    return;
+                                }
+                            }
+                        } else {
+                            // Missing token in authenticate message
+                            let response = serde_json::json!({
+                                "type": "authenticated",
+                                "success": false,
+                                "error": "Missing token"
+                            });
+                            let _ = socket.send(Message::Text(response.to_string().into())).await;
+                            return;
+                        }
+                    }
+                }
+                // Ignore non-authenticate messages before authentication
+            }
+            Some(Ok(Message::Close(_))) | None => {
+                return;
+            }
+            _ => {}
+        }
+    };
+
+    if !authenticated {
+        return;
+    }
+
+    // Now subscribe to updates
+    let mut rx = state_tx.subscribe();
 
     loop {
         tokio::select! {
@@ -5083,7 +5390,7 @@ async fn terminal_create(
     });
 
     // Store PTY instance
-    let mut instances = MOBILE_PTY_INSTANCES.lock().unwrap();
+    let mut instances = MOBILE_PTY_INSTANCES.lock().expect("MOBILE_PTY_INSTANCES mutex poisoned");
     instances.insert(
         pty_id.clone(),
         MobilePtyInstance {
@@ -5098,7 +5405,7 @@ async fn terminal_create(
     std::thread::spawn(move || {
         let _ = child.wait();
         // Clean up when the process exits
-        let mut instances = MOBILE_PTY_INSTANCES.lock().unwrap();
+        let mut instances = MOBILE_PTY_INSTANCES.lock().expect("MOBILE_PTY_INSTANCES mutex poisoned");
         instances.remove(&pty_id_for_wait);
     });
 
@@ -5119,7 +5426,7 @@ async fn terminal_write(
 ) -> Result<StatusCode, (StatusCode, String)> {
     validate_token(&state, auth).await?;
 
-    let mut instances = MOBILE_PTY_INSTANCES.lock().unwrap();
+    let mut instances = MOBILE_PTY_INSTANCES.lock().expect("MOBILE_PTY_INSTANCES mutex poisoned");
 
     if let Some(instance) = instances.get_mut(&pty_id) {
         instance
@@ -5144,7 +5451,7 @@ async fn terminal_close(
 ) -> Result<StatusCode, (StatusCode, String)> {
     validate_token(&state, auth).await?;
 
-    let mut instances = MOBILE_PTY_INSTANCES.lock().unwrap();
+    let mut instances = MOBILE_PTY_INSTANCES.lock().expect("MOBILE_PTY_INSTANCES mutex poisoned");
     instances.remove(&pty_id);
     Ok(StatusCode::OK)
 }

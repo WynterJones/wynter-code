@@ -99,7 +99,7 @@ export function WebBackupTab() {
     }
     try {
       await downloadBackup(passwordInput);
-    } catch {
+    } catch (error) {
       // Error handling in orchestrator
     }
   };

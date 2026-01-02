@@ -53,12 +53,12 @@ export function FileBrowserToolbar({
     <div className="flex items-center justify-between px-3 py-2 border-t border-border bg-bg-secondary flex-shrink-0 rounded-b-lg">
       <div className="flex items-center gap-1">
         <Tooltip content="New File">
-          <IconButton size="sm" onClick={onCreateFile}>
+          <IconButton size="sm" onClick={onCreateFile} aria-label="Create new file">
             <FilePlus className="w-4 h-4" />
           </IconButton>
         </Tooltip>
         <Tooltip content="New Folder">
-          <IconButton size="sm" onClick={onCreateFolder}>
+          <IconButton size="sm" onClick={onCreateFolder} aria-label="Create new folder">
             <FolderPlus className="w-4 h-4" />
           </IconButton>
         </Tooltip>

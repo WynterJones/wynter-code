@@ -58,7 +58,7 @@ export function HistoryPanel({ projectId, onClose }: HistoryPanelProps) {
     try {
       const u = new URL(url);
       return u.pathname + u.search;
-    } catch {
+    } catch (error) {
       return url;
     }
   };

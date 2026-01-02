@@ -64,7 +64,7 @@ impl McpPermissionManager {
 
     /// Get the current server port (if running)
     pub fn get_port(&self) -> Option<u16> {
-        *self.server_port.lock().unwrap()
+        *self.server_port.lock().expect("McpPermissionManager server_port mutex poisoned")
     }
 }
 
@@ -84,7 +84,7 @@ pub async fn start_mcp_permission_server(
 ) -> Result<u16, String> {
     // Check if already running
     {
-        let port = state.server_port.lock().unwrap();
+        let port = state.server_port.lock().expect("McpPermissionManager server_port mutex poisoned");
         if port.is_some() {
             return Ok(port.unwrap());
         }
@@ -99,14 +99,14 @@ pub async fn start_mcp_permission_server(
 
     // Store the port
     {
-        let mut server_port = state.server_port.lock().unwrap();
+        let mut server_port = state.server_port.lock().expect("McpPermissionManager server_port mutex poisoned");
         *server_port = Some(port);
     }
 
     // Create shutdown signal
     let shutdown = Arc::new(Mutex::new(false));
     {
-        let mut signal = state.shutdown_signal.lock().unwrap();
+        let mut signal = state.shutdown_signal.lock().expect("McpPermissionManager shutdown_signal mutex poisoned");
         *signal = Some(shutdown.clone());
     }
 
@@ -121,7 +121,7 @@ pub async fn start_mcp_permission_server(
 
         for stream in listener.incoming() {
             // Check shutdown
-            if *shutdown.lock().unwrap() {
+            if *shutdown.lock().expect("MCP permission shutdown mutex poisoned") {
                 break;
             }
 
@@ -174,7 +174,7 @@ fn handle_mcp_connection(
 
     loop {
         // Check shutdown
-        if *shutdown.lock().unwrap() {
+        if *shutdown.lock().expect("MCP permission shutdown mutex poisoned") {
             break;
         }
 
@@ -202,7 +202,7 @@ fn handle_mcp_connection(
 
                         // Store pending request
                         {
-                            let mut pending = state.pending_requests.lock().unwrap();
+                            let mut pending = state.pending_requests.lock().expect("McpPermissionManager pending_requests mutex poisoned");
                             pending.insert(
                                 request_id.clone(),
                                 PendingRequest {
@@ -250,7 +250,7 @@ fn handle_mcp_connection(
 
                         // Clean up pending request
                         {
-                            let mut pending = state.pending_requests.lock().unwrap();
+                            let mut pending = state.pending_requests.lock().expect("McpPermissionManager pending_requests mutex poisoned");
                             pending.remove(&request_id);
                         }
                     }
@@ -296,7 +296,7 @@ pub async fn respond_to_mcp_permission(
         request_id, approved
     );
 
-    let mut pending = state.pending_requests.lock().unwrap();
+    let mut pending = state.pending_requests.lock().expect("McpPermissionManager pending_requests mutex poisoned");
 
     // Log all pending request IDs for debugging
     let pending_ids: Vec<String> = pending.keys().cloned().collect();
@@ -359,21 +359,21 @@ pub async fn stop_mcp_permission_server(
 ) -> Result<(), String> {
     // Set shutdown signal
     {
-        let signal = state.shutdown_signal.lock().unwrap();
+        let signal = state.shutdown_signal.lock().expect("McpPermissionManager shutdown_signal mutex poisoned");
         if let Some(shutdown) = signal.as_ref() {
-            *shutdown.lock().unwrap() = true;
+            *shutdown.lock().expect("MCP permission shutdown mutex poisoned") = true;
         }
     }
 
     // Clear port
     {
-        let mut port = state.server_port.lock().unwrap();
+        let mut port = state.server_port.lock().expect("McpPermissionManager server_port mutex poisoned");
         *port = None;
     }
 
     // Cancel all pending requests
     {
-        let mut pending = state.pending_requests.lock().unwrap();
+        let mut pending = state.pending_requests.lock().expect("McpPermissionManager pending_requests mutex poisoned");
         for (_, request) in pending.drain() {
             if let Some(tx) = request.response_tx {
                 let _ = tx.send(McpPermissionResponse {

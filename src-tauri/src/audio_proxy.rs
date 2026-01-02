@@ -72,7 +72,7 @@ pub async fn start_audio_proxy(app: AppHandle) -> Result<AudioProxyInfo, String>
     let handle = thread::spawn(move || {
         for request in server.incoming_requests() {
             {
-                let running = manager_clone.running.lock().unwrap();
+                let running = manager_clone.running.lock().expect("AudioProxyManager running mutex poisoned");
                 if !*running {
                     break;
                 }

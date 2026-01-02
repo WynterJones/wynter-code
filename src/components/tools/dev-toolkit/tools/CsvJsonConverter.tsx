@@ -92,8 +92,8 @@ export function CsvJsonConverter() {
         setOutput(jsonToCsv(parsed));
       }
       setError(null);
-    } catch (e) {
-      setError(`Conversion error: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Conversion error: ${(error as Error).message}`);
       setOutput("");
     }
   };

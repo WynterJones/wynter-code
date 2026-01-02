@@ -117,7 +117,7 @@ export const useWebBackupStore = create<WebBackupStore>()(
             token: netlifyToken,
           });
           set({ availableSites: sites, isLoadingSites: false });
-        } catch {
+        } catch (error) {
           set({ isLoadingSites: false });
         }
       },

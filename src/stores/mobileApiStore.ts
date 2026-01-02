@@ -192,6 +192,34 @@ export interface MobileApiInfo {
   host: string;
 }
 
+export interface RelayConfig {
+  url: string;
+  enabled: boolean;
+  desktop_id: string;
+  private_key: string;
+  public_key: string;
+  peer_public_key?: string;
+  peer_token?: string;
+}
+
+export interface RelayStatus {
+  connected: boolean;
+  peer_online: boolean;
+  pending_count: number;
+  relay_url?: string;
+  desktop_id?: string;
+}
+
+export interface RelayPairingData {
+  mode: string;
+  relay_url: string;
+  desktop_id: string;
+  public_key: string;
+  token: string;
+}
+
+export type ConnectionMode = "wifi" | "relay";
+
 interface MobileApiStore {
   // State
   serverInfo: MobileApiInfo | null;
@@ -201,6 +229,12 @@ interface MobileApiStore {
   error: string | null;
   preferredPort: number;
   autoStartServer: boolean;
+
+  // Relay state
+  connectionMode: ConnectionMode;
+  relayConfig: RelayConfig | null;
+  relayStatus: RelayStatus | null;
+  relayPairingData: RelayPairingData | null;
 
   // Actions
   startServer: (port?: number) => Promise<void>;
@@ -214,6 +248,15 @@ interface MobileApiStore {
   clearError: () => void;
   reset: () => void;
   syncWorkspaces: () => Promise<void>;
+
+  // Relay actions
+  setConnectionMode: (mode: ConnectionMode) => void;
+  configureRelay: (url: string) => Promise<void>;
+  connectRelay: () => Promise<void>;
+  disconnectRelay: () => Promise<void>;
+  refreshRelayStatus: () => Promise<void>;
+  generateRelayPairingCode: () => Promise<void>;
+  loadRelayConfig: () => Promise<void>;
 }
 
 const DEFAULT_PORT = 8765;
@@ -229,6 +272,12 @@ export const useMobileApiStore = create<MobileApiStore>()(
       preferredPort: DEFAULT_PORT,
       autoStartServer: false,
 
+      // Relay state defaults
+      connectionMode: "wifi" as ConnectionMode,
+      relayConfig: null,
+      relayStatus: null,
+      relayPairingData: null,
+
       startServer: async (port?: number) => {
         set({ loading: true, error: null });
         try {
@@ -238,6 +287,8 @@ export const useMobileApiStore = create<MobileApiStore>()(
           });
           set({ serverInfo: info, loading: false });
           console.log("[mobileApiStore] Server started, refreshing devices...");
+          // Inform relay client of the mobile API port for HTTP tunneling
+          await invoke("relay_set_mobile_api_port", { port: actualPort });
           // Refresh devices list after starting
           await get().refreshDevices();
           // Wait for all stores to rehydrate before syncing
@@ -249,9 +300,9 @@ export const useMobileApiStore = create<MobileApiStore>()(
           console.log("[mobileApiStore] Initial sync complete, setting up subscriptions...");
           // Subscribe to store changes to keep mobile API in sync
           setupStoreSubscriptions(get().syncWorkspaces);
-        } catch (e) {
+        } catch (error) {
           set({
-            error: e instanceof Error ? e.message : String(e),
+            error: error instanceof Error ? error.message : String(error),
             loading: false,
           });
         }
@@ -268,9 +319,9 @@ export const useMobileApiStore = create<MobileApiStore>()(
             currentPairingCode: null,
             loading: false,
           });
-        } catch (e) {
+        } catch (error) {
           set({
-            error: e instanceof Error ? e.message : String(e),
+            error: error instanceof Error ? error.message : String(error),
             loading: false,
           });
         }
@@ -280,8 +331,8 @@ export const useMobileApiStore = create<MobileApiStore>()(
         try {
           const info = await invoke<MobileApiInfo | null>("mobile_api_info");
           set({ serverInfo: info });
-        } catch (e) {
-          console.error("Failed to refresh server info:", e);
+        } catch (error) {
+          console.error("Failed to refresh server info:", error);
         }
       },
 
@@ -293,9 +344,9 @@ export const useMobileApiStore = create<MobileApiStore>()(
           );
           set({ currentPairingCode: code, loading: false });
           return code;
-        } catch (e) {
+        } catch (error) {
           set({
-            error: e instanceof Error ? e.message : String(e),
+            error: error instanceof Error ? error.message : String(error),
             loading: false,
           });
           return null;
@@ -312,9 +363,9 @@ export const useMobileApiStore = create<MobileApiStore>()(
             ),
             loading: false,
           }));
-        } catch (e) {
+        } catch (error) {
           set({
-            error: e instanceof Error ? e.message : String(e),
+            error: error instanceof Error ? error.message : String(error),
             loading: false,
           });
         }
@@ -326,8 +377,8 @@ export const useMobileApiStore = create<MobileApiStore>()(
             "mobile_api_list_devices"
           );
           set({ pairedDevices: devices });
-        } catch (e) {
-          console.error("Failed to refresh devices:", e);
+        } catch (error) {
+          console.error("Failed to refresh devices:", error);
         }
       },
 
@@ -503,8 +554,8 @@ export const useMobileApiStore = create<MobileApiStore>()(
             `${overwatch_services.length} services, ${subscriptions.length} subscriptions, ${bookmarks.length} bookmarks, ` +
             `${kanban_boards.length} kanban boards`
           );
-        } catch (e) {
-          console.error("[mobileApiStore] Failed to sync data:", e);
+        } catch (error) {
+          console.error("[mobileApiStore] Failed to sync data:", error);
         }
       },
 
@@ -517,7 +568,87 @@ export const useMobileApiStore = create<MobileApiStore>()(
           error: null,
           preferredPort: DEFAULT_PORT,
           autoStartServer: false,
+          connectionMode: "wifi" as ConnectionMode,
+          relayConfig: null,
+          relayStatus: null,
+          relayPairingData: null,
         });
+      },
+
+      // Relay actions
+      setConnectionMode: (mode: ConnectionMode) => {
+        set({ connectionMode: mode });
+      },
+
+      configureRelay: async (url: string) => {
+        set({ loading: true, error: null });
+        try {
+          const config = await invoke<RelayConfig>("relay_configure", { url });
+          set({ relayConfig: config, loading: false });
+        } catch (error) {
+          set({ error: String(error), loading: false });
+        }
+      },
+
+      connectRelay: async () => {
+        set({ loading: true, error: null });
+        try {
+          await invoke("relay_connect");
+          // Wait briefly for WebSocket handshake to complete before querying status
+          await new Promise(resolve => setTimeout(resolve, 500));
+          const status = await invoke<RelayStatus>("relay_status");
+          set({ relayStatus: status, loading: false });
+
+          // Sync workspace data to make it available via relay requests
+          // This is needed because relay mode bypasses the normal server start flow
+          await waitForStoreRehydration();
+          await get().syncWorkspaces();
+          // Set up store subscriptions to keep data synced while relay is connected
+          setupStoreSubscriptions(get().syncWorkspaces);
+          console.log("[mobileApiStore] Synced workspace data for relay mode");
+        } catch (error) {
+          set({ error: String(error), loading: false });
+        }
+      },
+
+      disconnectRelay: async () => {
+        set({ loading: true, error: null });
+        try {
+          await invoke("relay_disconnect");
+          set({ relayStatus: null, loading: false });
+        } catch (error) {
+          set({ error: String(error), loading: false });
+        }
+      },
+
+      refreshRelayStatus: async () => {
+        try {
+          const status = await invoke<RelayStatus>("relay_status");
+          set({ relayStatus: status });
+        } catch (error) {
+          console.error("[mobileApiStore] Failed to refresh relay status:", error);
+        }
+      },
+
+      generateRelayPairingCode: async () => {
+        set({ loading: true, error: null });
+        try {
+          const pairingData = await invoke<RelayPairingData>("relay_generate_pairing_code");
+          set({ relayPairingData: pairingData, loading: false });
+        } catch (error) {
+          set({ error: String(error), loading: false });
+        }
+      },
+
+      loadRelayConfig: async () => {
+        try {
+          const config = await invoke<RelayConfig | null>("relay_load_config");
+          if (config) {
+            set({ relayConfig: config });
+          }
+        } catch (error) {
+          console.error("[mobileApiStore] Failed to load relay config:", error);
+        }
       },
     }),
     {
@@ -525,14 +656,27 @@ export const useMobileApiStore = create<MobileApiStore>()(
       partialize: (state) => ({
         preferredPort: state.preferredPort,
         autoStartServer: state.autoStartServer,
+        connectionMode: state.connectionMode,
       }),
     }
   )
 );
 
-// Helper to generate QR code data URL
+// Helper to generate QR code data URL for WiFi mode
 export function generateQRCodeUrl(pairingCode: PairingCode): string {
-  return `wynter://pair?code=${pairingCode.code}&host=${pairingCode.host}&port=${pairingCode.port}`;
+  return `wynter://pair?mode=wifi&code=${pairingCode.code}&host=${pairingCode.host}&port=${pairingCode.port}`;
+}
+
+// Helper to generate QR code data URL for Relay mode
+export function generateRelayQRCodeUrl(pairingData: RelayPairingData): string {
+  const params = new URLSearchParams({
+    mode: "relay",
+    relay: pairingData.relay_url,
+    desktop_id: pairingData.desktop_id,
+    pubkey: pairingData.public_key,
+    token: pairingData.token,
+  });
+  return `wynter://pair?${params.toString()}`;
 }
 
 // Helper to format pairing code for display (with dashes)

@@ -62,7 +62,7 @@ pub async fn create_floating_webcam_window(
     .visible(true)
     .shadow(false);
 
-    if let Some((px, py)) = *LAST_POSITION.lock().unwrap() {
+    if let Some((px, py)) = *LAST_POSITION.lock().expect("webcam position lock poisoned") {
         builder = builder.position(px, py);
     } else {
         builder = builder.position(x, y);
@@ -86,8 +86,8 @@ pub async fn create_floating_webcam_window(
 
     let _ = window; // Silence unused warning on Linux
 
-    *LAST_POSITION.lock().unwrap() = Some((x, y));
-    *LAST_SIZE.lock().unwrap() = Some((width, height));
+    *LAST_POSITION.lock().expect("webcam position lock poisoned") = Some((x, y));
+    *LAST_SIZE.lock().expect("webcam size lock poisoned") = Some((width, height));
 
     Ok(())
 }
@@ -96,10 +96,10 @@ pub async fn create_floating_webcam_window(
 pub async fn close_floating_webcam_window(app: AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window(WEBCAM_WINDOW_LABEL) {
         if let Ok(pos) = window.outer_position() {
-            *LAST_POSITION.lock().unwrap() = Some((pos.x as f64, pos.y as f64));
+            *LAST_POSITION.lock().expect("webcam position lock poisoned") = Some((pos.x as f64, pos.y as f64));
         }
         if let Ok(size) = window.outer_size() {
-            *LAST_SIZE.lock().unwrap() = Some((size.width as f64, size.height as f64));
+            *LAST_SIZE.lock().expect("webcam size lock poisoned") = Some((size.width as f64, size.height as f64));
         }
         window.close().map_err(|e| e.to_string())?;
     }
@@ -115,7 +115,7 @@ pub async fn update_floating_webcam_position(app: AppHandle, x: f64, y: f64) -> 
         window
             .set_position(PhysicalPosition::new(x as i32, y as i32))
             .map_err(|e| e.to_string())?;
-        *LAST_POSITION.lock().unwrap() = Some((x, y));
+        *LAST_POSITION.lock().expect("webcam position lock poisoned") = Some((x, y));
     }
     Ok(())
 }
@@ -130,7 +130,7 @@ pub async fn update_floating_webcam_size(
         window
             .set_size(PhysicalSize::new(width as u32, height as u32))
             .map_err(|e| e.to_string())?;
-        *LAST_SIZE.lock().unwrap() = Some((width, height));
+        *LAST_SIZE.lock().expect("webcam size lock poisoned") = Some((width, height));
     }
     Ok(())
 }

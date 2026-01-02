@@ -37,8 +37,8 @@ function parseCron(expression: string): { description: string; error: string | n
       use24HourTimeFormat: true,
     });
     return { description, error: null };
-  } catch (e) {
-    return { description: "", error: (e as Error).message };
+  } catch (error) {
+    return { description: "", error: (error as Error).message };
   }
 }
 
@@ -119,7 +119,7 @@ export function CronParser() {
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-text-secondary">Cron Expression</label>
           <Tooltip content={copied ? "Copied!" : "Copy"}>
-            <IconButton size="sm" onClick={handleCopy}>
+            <IconButton size="sm" onClick={handleCopy} aria-label="Copy cron expression">
               {copied ? (
                 <Check className="w-3.5 h-3.5 text-green-400" />
               ) : (

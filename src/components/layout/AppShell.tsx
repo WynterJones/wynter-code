@@ -88,7 +88,7 @@ export function AppShell() {
             projectPath: activeProject.path,
           });
           setHasBeads(hasInit);
-        } catch {
+        } catch (error) {
           setHasBeads(false);
         }
       } else {
@@ -167,7 +167,7 @@ export function AppShell() {
     try {
       const homeDir = await invoke<string>("get_home_dir");
       setProjectBrowserInitialPath(homeDir);
-    } catch {
+    } catch (error) {
       setProjectBrowserInitialPath(undefined);
     }
     setShowProjectFileBrowser(true);

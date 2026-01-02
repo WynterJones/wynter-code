@@ -62,7 +62,7 @@ export function QuickLookPreview({ file, onClose }: QuickLookPreviewProps) {
         <span className="text-sm font-medium text-text-primary truncate">
           {file.name}
         </span>
-        <IconButton size="sm" onClick={onClose}>
+        <IconButton size="sm" onClick={onClose} aria-label="Close">
           <X className="w-4 h-4" />
         </IconButton>
       </div>

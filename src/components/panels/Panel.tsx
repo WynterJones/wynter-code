@@ -59,7 +59,7 @@ export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) 
     if (panel.type === "terminal" && panel.terminalPtyId) {
       try {
         await invoke("close_pty", { ptyId: panel.terminalPtyId });
-      } catch {
+      } catch (error) {
         // PTY may already be closed, ignore
       }
     }
@@ -83,7 +83,7 @@ export function Panel({ panel, projectId, projectPath, sessionId }: PanelProps) 
             reason: "There may be a running process in this terminal.",
           };
         }
-      } catch {
+      } catch (error) {
         // If check fails, assume it's safe
       }
     }

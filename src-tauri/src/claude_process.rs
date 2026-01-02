@@ -8,6 +8,7 @@ use tauri::{Emitter, State};
 
 use crate::commands::{create_chunk, parse_claude_chunk, PermissionMode};
 use crate::path_utils::get_enhanced_path;
+use crate::rate_limiter::{check_rate_limit, categories};
 
 /// Validate a model name to prevent command injection
 /// Allowed: alphanumeric, hyphens, underscores, dots, slashes (for model versions like claude-3-opus-20240229)
@@ -106,9 +107,12 @@ pub async fn start_claude_session(
     mcp_permission_port: Option<u16>,
     model: Option<String>,
 ) -> Result<String, String> {
+    // Rate limit check
+    check_rate_limit(categories::CLAUDE)?;
+
     // Check if session is already running
     {
-        let instances = state.instances.lock().unwrap();
+        let instances = state.instances.lock().expect("Claude process instances mutex poisoned");
         if instances.contains_key(&session_id) {
             return Err("Session already running".to_string());
         }
@@ -266,7 +270,7 @@ pub async fn start_claude_session(
 
     // Store the process instance
     {
-        let mut instances = state.instances.lock().unwrap();
+        let mut instances = state.instances.lock().expect("Claude process instances mutex poisoned");
         instances.insert(
             session_id.clone(),
             ClaudeProcessInstance {
@@ -281,6 +285,11 @@ pub async fn start_claude_session(
     {
         let mut chunk = create_chunk("session_starting", &session_id);
         chunk.content = Some(format!("Starting Claude session in {}", cwd));
+        #[cfg(debug_assertions)]
+        if let Err(e) = window.emit("claude-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window.emit("claude-stream", &chunk);
     }
 
@@ -290,6 +299,11 @@ pub async fn start_claude_session(
         let mut chunk = create_chunk("session_ready", &session_id);
         chunk.content = Some(format!("Session ready in {}", cwd));
         chunk.model = Some("claude".to_string()); // Will be updated when we get actual init
+        #[cfg(debug_assertions)]
+        if let Err(e) = window.emit("claude-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window.emit("claude-stream", &chunk);
     }
 
@@ -304,6 +318,11 @@ pub async fn start_claude_session(
                 if !line.is_empty() {
                     let mut chunk = create_chunk("stderr", &session_for_stderr);
                     chunk.content = Some(line);
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_for_stderr.emit("claude-stream", &chunk) {
+                        eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_for_stderr.emit("claude-stream", &chunk);
                 }
             }
@@ -368,10 +387,9 @@ pub async fn start_claude_session(
                         }
 
                         // Check for init message - marks session as ready
-                        let msg_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
                         let subtype = json.get("subtype").and_then(|v| v.as_str()).unwrap_or("");
 
-                        if subtype == "init" || (msg_type == "system" && subtype == "init") {
+                        if subtype == "init" {
                             session_ready = true;
                             eprintln!(
                                 "[Claude] Session ready! Claude session ID: {:?}",
@@ -386,6 +404,11 @@ pub async fn start_claude_session(
                                 .map(|s| s.to_string());
                             chunk.content = Some(line.clone()); // Include full init JSON
                             chunk.claude_session_id = captured_claude_session_id.clone();
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window_clone.emit("claude-stream", &chunk) {
+                                eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window_clone.emit("claude-stream", &chunk);
                         }
 
@@ -394,12 +417,22 @@ pub async fn start_claude_session(
                             if chunk.chunk_type == "init" {
                                 chunk.claude_session_id = captured_claude_session_id.clone();
                             }
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window_clone.emit("claude-stream", &chunk) {
+                                eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window_clone.emit("claude-stream", &chunk);
                         }
                     } else {
                         // Non-JSON line - emit as raw
                         let mut raw_chunk = create_chunk("raw", &session_for_reader);
                         raw_chunk.content = Some(line);
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window_clone.emit("claude-stream", &raw_chunk) {
+                            eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window_clone.emit("claude-stream", &raw_chunk);
                     }
                 }
@@ -407,6 +440,11 @@ pub async fn start_claude_session(
                     eprintln!("[Claude] Read error: {}", e);
                     let mut chunk = create_chunk("error", &session_for_reader);
                     chunk.content = Some(format!("Read error: {}", e));
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_clone.emit("claude-stream", &chunk) {
+                        eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_clone.emit("claude-stream", &chunk);
                 }
                 _ => {}
@@ -422,10 +460,15 @@ pub async fn start_claude_session(
         let mut chunk = create_chunk("session_ended", &session_for_reader);
         chunk.content = Some(format!("Session ended after {} lines", line_count));
         chunk.claude_session_id = captured_claude_session_id;
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit("claude-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit("claude-stream", &chunk);
 
         // Clean up the instance
-        let mut instances = state_clone.instances.lock().unwrap();
+        let mut instances = state_clone.instances.lock().expect("Claude process instances mutex poisoned");
         instances.remove(&session_for_reader);
     });
 
@@ -440,7 +483,7 @@ pub async fn send_claude_input(
     session_id: String,
     input: String,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("Claude process instances mutex poisoned");
 
     if let Some(instance) = instances.get_mut(&session_id) {
         if let Some(ref mut stdin) = instance.stdin {
@@ -482,7 +525,7 @@ pub async fn send_claude_raw_input(
     session_id: String,
     input: String,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("Claude process instances mutex poisoned");
 
     if let Some(instance) = instances.get_mut(&session_id) {
         if let Some(ref mut stdin) = instance.stdin {
@@ -516,7 +559,7 @@ pub async fn send_claude_structured_input(
     images: Option<Vec<ImageData>>,
     files: Option<Vec<String>>,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("Claude process instances mutex poisoned");
 
     // Capture counts for logging before consuming the values
     let image_count = images.as_ref().map_or(0, |i| i.len());
@@ -599,7 +642,7 @@ pub async fn stop_claude_session(
     state: State<'_, Arc<ClaudeProcessManager>>,
     session_id: String,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("Claude process instances mutex poisoned");
 
     if let Some(mut instance) = instances.remove(&session_id) {
         // In stream-json mode, we can't send /exit - just close stdin and kill
@@ -613,6 +656,11 @@ pub async fn stop_claude_session(
         // Emit session_ended event
         let mut chunk = create_chunk("session_ended", &session_id);
         chunk.content = Some("Session stopped by user".to_string());
+        #[cfg(debug_assertions)]
+        if let Err(e) = window.emit("claude-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'claude-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window.emit("claude-stream", &chunk);
 
         Ok(())
@@ -628,7 +676,7 @@ pub async fn is_claude_session_active(
     state: State<'_, Arc<ClaudeProcessManager>>,
     session_id: String,
 ) -> Result<bool, String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("Claude process instances mutex poisoned");
     Ok(instances.contains_key(&session_id))
 }
 
@@ -637,7 +685,7 @@ pub async fn is_claude_session_active(
 pub async fn list_active_claude_sessions(
     state: State<'_, Arc<ClaudeProcessManager>>,
 ) -> Result<Vec<String>, String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("Claude process instances mutex poisoned");
     Ok(instances.keys().cloned().collect())
 }
 
@@ -681,4 +729,220 @@ pub async fn terminate_claude_session(
     session_id: String,
 ) -> Result<(), String> {
     stop_claude_session(window, state, session_id).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // validate_model_name tests
+    #[test]
+    fn test_validate_model_name_valid_claude_4() {
+        assert!(validate_model_name("claude-4-opus-20240229").is_ok());
+    }
+
+    #[test]
+    fn test_validate_model_name_valid_sonnet() {
+        assert!(validate_model_name("claude-sonnet-4-20250514").is_ok());
+    }
+
+    #[test]
+    fn test_validate_model_name_valid_with_slash() {
+        assert!(validate_model_name("anthropic/claude-3-opus").is_ok());
+    }
+
+    #[test]
+    fn test_validate_model_name_valid_with_colon() {
+        assert!(validate_model_name("claude:latest").is_ok());
+    }
+
+    #[test]
+    fn test_validate_model_name_valid_underscore() {
+        assert!(validate_model_name("claude_opus_v2").is_ok());
+    }
+
+    #[test]
+    fn test_validate_model_name_empty() {
+        assert!(validate_model_name("").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_too_long() {
+        let long_name = "a".repeat(101);
+        assert!(validate_model_name(&long_name).is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_max_length() {
+        let max_name = "a".repeat(100);
+        assert!(validate_model_name(&max_name).is_ok());
+    }
+
+    #[test]
+    fn test_validate_model_name_shell_pipe() {
+        assert!(validate_model_name("claude|rm").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_shell_ampersand() {
+        assert!(validate_model_name("claude&cmd").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_shell_semicolon() {
+        assert!(validate_model_name("claude;rm").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_shell_dollar() {
+        assert!(validate_model_name("claude$VAR").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_shell_backtick() {
+        assert!(validate_model_name("claude`cmd`").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_space() {
+        assert!(validate_model_name("claude opus").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_newline() {
+        assert!(validate_model_name("claude\nrm").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_quotes() {
+        assert!(validate_model_name("claude\"test").is_err());
+        assert!(validate_model_name("claude'test").is_err());
+    }
+
+    #[test]
+    fn test_validate_model_name_brackets() {
+        assert!(validate_model_name("claude[test]").is_err());
+        assert!(validate_model_name("claude{test}").is_err());
+        assert!(validate_model_name("claude(test)").is_err());
+    }
+
+    // validate_session_id tests
+    #[test]
+    fn test_validate_session_id_valid_uuid_like() {
+        assert!(validate_session_id("550e8400-e29b-41d4-a716-446655440000").is_ok());
+    }
+
+    #[test]
+    fn test_validate_session_id_valid_simple() {
+        assert!(validate_session_id("session-123").is_ok());
+    }
+
+    #[test]
+    fn test_validate_session_id_valid_alphanumeric() {
+        assert!(validate_session_id("abc123def456").is_ok());
+    }
+
+    #[test]
+    fn test_validate_session_id_empty() {
+        assert!(validate_session_id("").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_too_long() {
+        let long_id = "a".repeat(101);
+        assert!(validate_session_id(&long_id).is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_max_length() {
+        let max_id = "a".repeat(100);
+        assert!(validate_session_id(&max_id).is_ok());
+    }
+
+    #[test]
+    fn test_validate_session_id_with_dot_not_allowed() {
+        // Session IDs don't allow dots (unlike model names)
+        assert!(validate_session_id("session.123").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_shell_pipe() {
+        assert!(validate_session_id("session|rm").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_shell_ampersand() {
+        assert!(validate_session_id("session&cmd").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_shell_semicolon() {
+        assert!(validate_session_id("session;rm").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_shell_dollar() {
+        assert!(validate_session_id("session$VAR").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_shell_backtick() {
+        assert!(validate_session_id("session`cmd`").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_space() {
+        assert!(validate_session_id("session 123").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_newline() {
+        assert!(validate_session_id("session\n123").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_quotes() {
+        assert!(validate_session_id("session\"test").is_err());
+        assert!(validate_session_id("session'test").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_brackets() {
+        assert!(validate_session_id("session[test]").is_err());
+        assert!(validate_session_id("session{test}").is_err());
+        assert!(validate_session_id("session(test)").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_slash_not_allowed() {
+        // Slashes not allowed in session IDs (unlike model names)
+        assert!(validate_session_id("session/123").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_colon_not_allowed() {
+        // Colons not allowed in session IDs (unlike model names)
+        assert!(validate_session_id("session:123").is_err());
+    }
+
+    #[test]
+    fn test_validate_session_id_underscore_not_allowed() {
+        // Underscores not allowed (session IDs are UUID-like with hyphens only)
+        assert!(validate_session_id("session_123").is_err());
+    }
+
+    // ClaudeProcessManager tests
+    #[test]
+    fn test_process_manager_new() {
+        let manager = ClaudeProcessManager::new();
+        let instances = manager.instances.lock().unwrap();
+        assert!(instances.is_empty());
+    }
+
+    #[test]
+    fn test_process_manager_default() {
+        let manager = ClaudeProcessManager::default();
+        let instances = manager.instances.lock().unwrap();
+        assert!(instances.is_empty());
+    }
 }

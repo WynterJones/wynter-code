@@ -34,7 +34,7 @@ export function DomainAvailability({ url, onUrlChange }: DomainAvailabilityProps
                          result.toLowerCase().includes("no data found") ||
                          result.toLowerCase().includes("status: free");
       return isAvailable;
-    } catch {
+    } catch (error) {
       // If lookup fails, we can't determine availability
       throw new Error("Could not check availability");
     }

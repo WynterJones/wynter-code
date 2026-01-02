@@ -102,7 +102,7 @@ export function AIAssistantPopup({
       // Stop session when popup closes
       stopSession().catch(console.error);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [isOpen]);
 
   // Focus input when popup opens
@@ -186,10 +186,11 @@ export function AIAssistantPopup({
               onClick={clearMessages}
               title="Clear chat"
               disabled={messages.length === 0}
+              aria-label="Clear chat history"
             >
               <Trash2 className="w-4 h-4" />
             </IconButton>
-            <IconButton size="sm" onClick={onClose} title="Close">
+            <IconButton size="sm" onClick={onClose} title="Close" aria-label="Close AI assistant">
               <X className="w-4 h-4" />
             </IconButton>
           </div>

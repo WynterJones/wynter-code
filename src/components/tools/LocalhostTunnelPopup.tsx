@@ -149,7 +149,7 @@ export function LocalhostTunnelPopup({ isOpen, onClose }: LocalhostTunnelPopupPr
       await navigator.clipboard.writeText(url);
       setCopiedUrl(url);
       setTimeout(() => setCopiedUrl(null), 2000);
-    } catch {
+    } catch (error) {
       setError("Failed to copy URL");
     }
   };

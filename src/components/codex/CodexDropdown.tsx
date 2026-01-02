@@ -43,7 +43,7 @@ export function CodexDropdown() {
     try {
       const v = await getCodexVersion();
       setVersion(v);
-    } catch {
+    } catch (error) {
       setVersion("unknown");
     } finally {
       setIsCheckingVersion(false);

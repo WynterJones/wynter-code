@@ -224,7 +224,7 @@ pub async fn start_gemini_session(
 ) -> Result<String, String> {
     // Check if session is already running
     {
-        let instances = state.instances.lock().unwrap();
+        let instances = state.instances.lock().expect("Process instances mutex poisoned");
         if instances.contains_key(&session_id) {
             return Err("Session already running".to_string());
         }
@@ -259,7 +259,7 @@ pub async fn start_gemini_session(
 
     // Store the session info
     {
-        let mut instances = state.instances.lock().unwrap();
+        let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
         instances.insert(
             session_id.clone(),
             GeminiProcessInstance {
@@ -277,6 +277,11 @@ pub async fn start_gemini_session(
         let mut chunk = create_chunk("session_ready", &session_id);
         chunk.content = Some(format!("Gemini session ready in {}", cwd));
         chunk.model = model;
+        #[cfg(debug_assertions)]
+        if let Err(e) = window.emit("gemini-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'gemini-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window.emit("gemini-stream", &chunk);
     }
 
@@ -296,7 +301,7 @@ pub async fn send_gemini_input(
 ) -> Result<(), String> {
     // Get session config
     let (cwd, stored_model, yolo_mode) = {
-        let instances = state.instances.lock().unwrap();
+        let instances = state.instances.lock().expect("Process instances mutex poisoned");
         match instances.get(&session_id) {
             Some(instance) => (
                 instance.cwd.clone(),
@@ -373,7 +378,7 @@ pub async fn send_gemini_input(
 
     // Update instance with new child process
     {
-        let mut instances = state.instances.lock().unwrap();
+        let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
         if let Some(instance) = instances.get_mut(&session_id) {
             // Kill old process if still running
             let _ = instance.child.kill();
@@ -392,6 +397,11 @@ pub async fn send_gemini_input(
                 if !line.is_empty() {
                     let mut chunk = create_chunk("stderr", &session_for_stderr);
                     chunk.content = Some(line);
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_for_stderr.emit("gemini-stream", &chunk) {
+                        eprintln!("[DEBUG] Failed to emit 'gemini-stream': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_for_stderr.emit("gemini-stream", &chunk);
                 }
             }
@@ -445,6 +455,11 @@ pub async fn send_gemini_input(
                             if chunk.model.is_none() {
                                 chunk.model = effective_model_for_reader.clone();
                             }
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window_clone.emit("gemini-stream", &chunk) {
+                                eprintln!("[DEBUG] Failed to emit 'gemini-stream': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window_clone.emit("gemini-stream", &chunk);
                         }
                     } else {
@@ -452,6 +467,11 @@ pub async fn send_gemini_input(
                         // Emit as text chunk
                         let mut chunk = create_chunk("text", &session_for_reader);
                         chunk.content = Some(line);
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window_clone.emit("gemini-stream", &chunk) {
+                            eprintln!("[DEBUG] Failed to emit 'gemini-stream': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window_clone.emit("gemini-stream", &chunk);
                     }
                 }
@@ -459,6 +479,11 @@ pub async fn send_gemini_input(
                     eprintln!("[Gemini] Read error: {}", e);
                     let mut chunk = create_chunk("error", &session_for_reader);
                     chunk.content = Some(format!("Read error: {}", e));
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_clone.emit("gemini-stream", &chunk) {
+                        eprintln!("[DEBUG] Failed to emit 'gemini-stream': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_clone.emit("gemini-stream", &chunk);
                 }
                 _ => {}
@@ -471,6 +496,11 @@ pub async fn send_gemini_input(
         let mut chunk = create_chunk("result", &session_for_reader);
         chunk.content = Some("Turn completed".to_string());
         chunk.model = effective_model_for_reader;
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit("gemini-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'gemini-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit("gemini-stream", &chunk);
     });
 
@@ -484,7 +514,7 @@ pub async fn stop_gemini_session(
     state: State<'_, Arc<GeminiProcessManager>>,
     session_id: String,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().unwrap();
+    let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
 
     if let Some(mut instance) = instances.remove(&session_id) {
         // Kill the process
@@ -493,6 +523,11 @@ pub async fn stop_gemini_session(
         // Emit session_ended event
         let mut chunk = create_chunk("session_ended", &session_id);
         chunk.content = Some("Session stopped by user".to_string());
+        #[cfg(debug_assertions)]
+        if let Err(e) = window.emit("gemini-stream", &chunk) {
+            eprintln!("[DEBUG] Failed to emit 'gemini-stream': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window.emit("gemini-stream", &chunk);
 
         Ok(())
@@ -508,7 +543,7 @@ pub async fn is_gemini_session_active(
     state: State<'_, Arc<GeminiProcessManager>>,
     session_id: String,
 ) -> Result<bool, String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("Process instances mutex poisoned");
     Ok(instances.contains_key(&session_id))
 }
 
@@ -517,6 +552,6 @@ pub async fn is_gemini_session_active(
 pub async fn list_active_gemini_sessions(
     state: State<'_, Arc<GeminiProcessManager>>,
 ) -> Result<Vec<String>, String> {
-    let instances = state.instances.lock().unwrap();
+    let instances = state.instances.lock().expect("Process instances mutex poisoned");
     Ok(instances.keys().cloned().collect())
 }

@@ -88,10 +88,10 @@ export function EnvVariableRow({
             className="flex-1 px-3 py-2 rounded-md bg-bg-secondary border border-border text-sm font-mono focus:outline-none focus:border-accent"
             placeholder="value"
           />
-          <IconButton size="sm" onClick={handleSave}>
+          <IconButton size="sm" onClick={handleSave} aria-label="Save changes">
             <Save className="w-4 h-4 text-green-400" />
           </IconButton>
-          <IconButton size="sm" onClick={handleCancel}>
+          <IconButton size="sm" onClick={handleCancel} aria-label="Cancel editing">
             <X className="w-4 h-4 text-red-400" />
           </IconButton>
         </div>
@@ -138,7 +138,7 @@ export function EnvVariableRow({
 
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <Tooltip content={isRevealed ? "Hide" : "Reveal"}>
-          <IconButton size="sm" onClick={isRevealed ? onHide : onReveal}>
+          <IconButton size="sm" onClick={isRevealed ? onHide : onReveal} aria-label={isRevealed ? "Hide value" : "Reveal value"}>
             {isRevealed ? (
               <EyeOff className="w-3.5 h-3.5" />
             ) : (
@@ -148,7 +148,7 @@ export function EnvVariableRow({
         </Tooltip>
 
         <Tooltip content={copied ? "Copied!" : "Copy value"}>
-          <IconButton size="sm" onClick={handleCopy}>
+          <IconButton size="sm" onClick={handleCopy} aria-label={copied ? "Copied to clipboard" : "Copy value to clipboard"}>
             {copied ? (
               <Check className="w-3.5 h-3.5 text-green-400" />
             ) : (
@@ -158,7 +158,7 @@ export function EnvVariableRow({
         </Tooltip>
 
         <Tooltip content="Edit">
-          <IconButton size="sm" onClick={() => setIsEditing(true)}>
+          <IconButton size="sm" onClick={() => setIsEditing(true)} aria-label="Edit variable">
             <Pencil className="w-3.5 h-3.5" />
           </IconButton>
         </Tooltip>
@@ -171,6 +171,7 @@ export function EnvVariableRow({
               "hover:text-red-400 hover:bg-red-500/10",
               confirmDelete && "text-red-400 bg-red-500/10"
             )}
+            aria-label="Delete variable"
           >
             <Trash2 className="w-3.5 h-3.5" />
           </IconButton>

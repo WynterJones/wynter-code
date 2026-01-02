@@ -79,7 +79,7 @@ pub async fn start_storybook_server(
 
     // Create initial server instance
     {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("Storybook servers mutex poisoned");
         servers.insert(
             server_id.clone(),
             StorybookInstance {
@@ -94,6 +94,20 @@ pub async fn start_storybook_server(
     }
 
     // Emit starting event
+    #[cfg(debug_assertions)]
+    if let Err(e) = window.emit(
+        "storybook-event",
+        StorybookEvent {
+            server_id: server_id.clone(),
+            event_type: "status_change".to_string(),
+            url: Some(url.clone()),
+            status: Some(StorybookStatus::Starting),
+            message: Some("Starting Storybook...".to_string()),
+        },
+    ) {
+        eprintln!("[DEBUG] Failed to emit 'storybook-event': {}", e);
+    }
+    #[cfg(not(debug_assertions))]
     let _ = window.emit(
         "storybook-event",
         StorybookEvent {
@@ -135,7 +149,7 @@ pub async fn start_storybook_server(
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     let mut child = cmd.spawn().map_err(|e| {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("Storybook servers mutex poisoned");
         servers.remove(&server_id);
         format!("Failed to start Storybook: {}", e)
     })?;
@@ -147,7 +161,7 @@ pub async fn start_storybook_server(
 
     // Update with PID
     {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("Storybook servers mutex poisoned");
         if let Some(server) = servers.get_mut(&server_id) {
             server.child_pid = Some(child_pid);
         }
@@ -201,7 +215,7 @@ pub async fn start_storybook_server(
 
         // Helper to mark ready
         let mark_ready = |server_id: &str, state: &Arc<StorybookManager>, window: &tauri::Window, url: &str, ready_flag: &Arc<Mutex<bool>>| {
-            let mut ready = ready_flag.lock().unwrap();
+            let mut ready = ready_flag.lock().expect("Storybook servers mutex poisoned");
             if *ready {
                 return false;
             }
@@ -209,12 +223,26 @@ pub async fn start_storybook_server(
             drop(ready);
 
             {
-                let mut servers = state.servers.lock().unwrap();
+                let mut servers = state.servers.lock().expect("Storybook servers mutex poisoned");
                 if let Some(server) = servers.get_mut(server_id) {
                     server.status = StorybookStatus::Running;
                 }
             }
 
+            #[cfg(debug_assertions)]
+            if let Err(e) = window.emit(
+                "storybook-event",
+                StorybookEvent {
+                    server_id: server_id.to_string(),
+                    event_type: "ready".to_string(),
+                    url: Some(url.to_string()),
+                    status: Some(StorybookStatus::Running),
+                    message: Some("Storybook is ready!".to_string()),
+                },
+            ) {
+                eprintln!("[DEBUG] Failed to emit 'storybook-event': {}", e);
+            }
+            #[cfg(not(debug_assertions))]
             let _ = window.emit(
                 "storybook-event",
                 StorybookEvent {
@@ -235,7 +263,7 @@ pub async fn start_storybook_server(
                 for line in reader.lines().map_while(Result::ok) {
                     // Capture stderr for error reporting
                     {
-                        let mut output = stderr_output_clone.lock().unwrap();
+                        let mut output = stderr_output_clone.lock().expect("Storybook servers mutex poisoned");
                         output.push(line.clone());
                         // Keep only last 20 lines
                         if output.len() > 20 {
@@ -291,23 +319,37 @@ pub async fn start_storybook_server(
         // Wait a bit then check if we should auto-mark as ready (fallback)
         std::thread::sleep(Duration::from_secs(10));
         {
-            let ready = server_ready.lock().unwrap();
+            let ready = server_ready.lock().expect("Storybook servers mutex poisoned");
             if !*ready {
                 drop(ready);
                 // Check if process is still running - if so, assume it's ready
                 if child.try_wait().ok().flatten().is_none() {
-                    let mut ready = server_ready.lock().unwrap();
+                    let mut ready = server_ready.lock().expect("Storybook servers mutex poisoned");
                     if !*ready {
                         *ready = true;
                         drop(ready);
 
                         {
-                            let mut servers = state_clone.servers.lock().unwrap();
+                            let mut servers = state_clone.servers.lock().expect("Storybook servers mutex poisoned");
                             if let Some(server) = servers.get_mut(&server_id_clone) {
                                 server.status = StorybookStatus::Running;
                             }
                         }
 
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window_clone.emit(
+                            "storybook-event",
+                            StorybookEvent {
+                                server_id: server_id_clone.clone(),
+                                event_type: "ready".to_string(),
+                                url: Some(url_clone.clone()),
+                                status: Some(StorybookStatus::Running),
+                                message: Some("Storybook appears to be ready".to_string()),
+                            },
+                        ) {
+                            eprintln!("[DEBUG] Failed to emit 'storybook-event': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window_clone.emit(
                             "storybook-event",
                             StorybookEvent {
@@ -337,7 +379,7 @@ pub async fn start_storybook_server(
             Ok(status) if status.success() => None,
             Ok(status) => {
                 // Include stderr output in error message
-                let stderr_lines = stderr_output.lock().unwrap();
+                let stderr_lines = stderr_output.lock().expect("Storybook servers mutex poisoned");
                 let stderr_str = if stderr_lines.is_empty() {
                     String::new()
                 } else {
@@ -349,12 +391,26 @@ pub async fn start_storybook_server(
         };
 
         {
-            let mut servers = state_clone.servers.lock().unwrap();
+            let mut servers = state_clone.servers.lock().expect("Storybook servers mutex poisoned");
             if let Some(server) = servers.get_mut(&server_id_clone) {
                 server.status = StorybookStatus::Idle;
             }
         }
 
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit(
+            "storybook-event",
+            StorybookEvent {
+                server_id: server_id_clone.clone(),
+                event_type: "stopped".to_string(),
+                url: None,
+                status: Some(StorybookStatus::Idle),
+                message: error_msg.clone(),
+            },
+        ) {
+            eprintln!("[DEBUG] Failed to emit 'storybook-event': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit(
             "storybook-event",
             StorybookEvent {
@@ -377,7 +433,7 @@ pub async fn stop_storybook_server(
     server_id: String,
 ) -> Result<(), String> {
     let child_pid = {
-        let servers = state.servers.lock().unwrap();
+        let servers = state.servers.lock().expect("Storybook servers mutex poisoned");
         servers.get(&server_id).and_then(|s| s.child_pid)
     };
 
@@ -395,7 +451,7 @@ pub async fn stop_storybook_server(
     }
 
     // Remove from manager
-    let mut servers = state.servers.lock().unwrap();
+    let mut servers = state.servers.lock().expect("Storybook servers mutex poisoned");
     servers.remove(&server_id);
 
     Ok(())

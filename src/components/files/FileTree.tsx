@@ -89,7 +89,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
           }
           return prev;
         });
-      } catch {
+      } catch { // Ignore - best effort
         // Folder may have been deleted, ignore
       }
     }
@@ -126,7 +126,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       if (!silent) {
         setError(null);
       }
-    } catch (err) {
+    } catch (err) { // Ignore - best effort
       if (!silent) {
         setError(err as string);
       }
@@ -172,7 +172,8 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         await loadFiles(true);
         refetchGitStatus();
         setSelectedPaths(new Set());
-      } catch (err) {
+      } catch { // Ignore - best effort
+        // Ignore - best effort move operation
       }
     };
 
@@ -211,7 +212,8 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
             }
           }
         );
-      } catch (err) {
+      } catch { // Ignore - best effort
+        // Ignore - watcher setup is best effort
       }
     };
 
@@ -242,7 +244,8 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         setFiles((prev) =>
           updateNodeInTree(prev, node.path, { ...node, isExpanded: true, children })
         );
-      } catch (err) {
+      } catch { // Ignore - best effort
+        // Ignore - directory contents may be inaccessible
       }
     }
   }, []);
@@ -448,7 +451,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       await deleteToTrash(node.path);
       await loadFiles(true);
       refetchGitStatus();
-    } catch (err) {
+    } catch { // Ignore - best effort
     }
   };
 
@@ -458,7 +461,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       await loadFiles(true);
       refetchGitStatus();
       setSelectedPaths(new Set());
-    } catch (err) {
+    } catch { // Ignore - best effort
     }
   }, [moveItem, loadFiles, refetchGitStatus]);
 
@@ -471,7 +474,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       await loadFiles(true);
       refetchGitStatus();
       setSelectedPaths(new Set());
-    } catch (err) {
+    } catch { // Ignore - best effort
     }
   }, [moveItem, loadFiles, refetchGitStatus]);
 
@@ -482,7 +485,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
         setSelectedPaths(new Set());
         await loadFiles(true);
       }
-    } catch (err) {
+    } catch { // Ignore - best effort
     }
   };
 
@@ -507,7 +510,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       if (result.success) {
         await loadFiles(true);
       }
-    } catch (err) {
+    } catch { // Ignore - best effort
     }
   };
 
@@ -524,7 +527,7 @@ export function FileTree({ projectPath, onFileOpen, onNodeModulesClick }: FileTr
       }
       await loadFiles(true);
       refetchGitStatus();
-    } catch (err) {
+    } catch { // Ignore - best effort
     }
 
     setDialog(null);

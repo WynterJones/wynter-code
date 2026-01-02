@@ -3,6 +3,7 @@ import { Copy, Check, Trash2 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 interface BaseConversion {
   id: string;
@@ -38,7 +39,7 @@ function parseNumber(value: string): bigint | null {
     }
 
     return BigInt(trimmed);
-  } catch {
+  } catch (error) {
     return null;
   }
 }
@@ -54,7 +55,7 @@ function formatWithSeparator(value: string, groupSize: number): string {
 export function NumberBaseConverter() {
   const [input, setInput] = useState("");
   const [showGrouped, setShowGrouped] = useState(true);
-  const [copied, setCopied] = useState<string | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
 
   const number = useMemo(() => {
     if (!input.trim()) return null;
@@ -80,12 +81,6 @@ export function NumberBaseConverter() {
     });
   }, [number, showGrouped]);
 
-  const handleCopy = async (value: string, id: string) => {
-    await navigator.clipboard.writeText(value);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
   const handleClear = () => {
     setInput("");
   };
@@ -97,7 +92,7 @@ export function NumberBaseConverter() {
           <label className="text-sm font-medium text-text-secondary">Input Number</label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -158,13 +153,14 @@ export function NumberBaseConverter() {
                   {conv.displayValue}
                 </code>
               </div>
-              <Tooltip content={copied === conv.id ? "Copied!" : "Copy (with prefix)"}>
+              <Tooltip content={isCopied(conv.id) ? "Copied!" : "Copy (with prefix)"}>
                 <IconButton
                   size="sm"
-                  onClick={() => handleCopy(conv.withPrefix, conv.id)}
+                  onClick={() => copy(conv.withPrefix, conv.id)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`Copy ${conv.name} value with prefix`}
                 >
-                  {copied === conv.id ? (
+                  {isCopied(conv.id) ? (
                     <Check className="w-3.5 h-3.5 text-green-400" />
                   ) : (
                     <Copy className="w-3.5 h-3.5" />

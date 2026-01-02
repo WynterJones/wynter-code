@@ -48,6 +48,7 @@ export function SystemHealthPopup({ isOpen, onClose }: SystemHealthPopupProps) {
         size="sm"
         onClick={() => fetchData(true)}
         disabled={loading}
+        aria-label="Refresh system health"
       >
         <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
       </IconButton>

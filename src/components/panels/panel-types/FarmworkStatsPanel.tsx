@@ -226,7 +226,7 @@ export function FarmworkStatsPanel({
           const filePath = await join(auditPath, filename);
           const content = await invoke<string>("read_file_content", { path: filePath });
           newScores[key as AuditKey] = parseAuditFile(content, filename);
-        } catch {
+        } catch (error) {
           // File doesn't exist, keep default
         }
       }
@@ -246,12 +246,12 @@ export function FarmworkStatsPanel({
             else if (issue.status === "in_progress") stats.in_progress++;
             else if (issue.status === "blocked") stats.blocked++;
             else if (issue.status === "closed") stats.closed++;
-          } catch {
+          } catch (error) {
             // Invalid JSON line
           }
         }
         setBeadsStats(stats);
-      } catch {
+      } catch (error) {
         setBeadsStats(null);
       }
 
@@ -264,7 +264,7 @@ export function FarmworkStatsPanel({
         const growing = (content.match(/Status:\s*In Progress/gi) || []).length;
         const picked = (content.match(/Status:\s*Graduated/gi) || []).length;
         setGardenStats({ planted, growing, picked });
-      } catch {
+      } catch (error) {
         setGardenStats({ planted: 0, growing: 0, picked: 0 });
       }
 
@@ -274,7 +274,7 @@ export function FarmworkStatsPanel({
         const content = await invoke<string>("read_file_content", { path: compostPath });
         const rejected = (content.match(/^##\s+/gm) || []).length;
         setCompostStats({ rejectedIdeas: rejected });
-      } catch {
+      } catch (error) {
         setCompostStats({ rejectedIdeas: 0 });
       }
 
@@ -302,7 +302,7 @@ export function FarmworkStatsPanel({
           loadStats();
         }, { recursive: true });
         cleanup = unwatch;
-      } catch {
+      } catch (error) {
         // Watcher setup failed, rely on manual refresh
       }
     };

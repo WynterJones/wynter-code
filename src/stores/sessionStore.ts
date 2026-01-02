@@ -521,7 +521,7 @@ export const useSessionStore = create<SessionStore>()(
               let parsedInput: Record<string, unknown> = { raw: newRaw };
               try {
                 parsedInput = JSON.parse(newRaw);
-              } catch {
+              } catch (error) {
                 // Not yet valid JSON, keep accumulating
               }
               return { ...tc, input: parsedInput };

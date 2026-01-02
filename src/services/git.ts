@@ -94,7 +94,7 @@ class GitService {
         modified,
         untracked,
       };
-    } catch {
+    } catch (err) {
       return {
         branch: "main",
         ahead: 0,
@@ -112,8 +112,8 @@ class GitService {
     try {
       const output = await runGit(["add", filePath], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -121,8 +121,8 @@ class GitService {
     try {
       const output = await runGit(["reset", "HEAD", filePath], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -130,8 +130,8 @@ class GitService {
     try {
       const output = await runGit(["add", "-A"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -139,8 +139,8 @@ class GitService {
     try {
       const output = await runGit(["reset", "HEAD"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -155,8 +155,8 @@ class GitService {
         return { success: true, hash: hashMatch?.[1] };
       }
       return { success: false, error: output.stderr || output.stdout };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -164,7 +164,7 @@ class GitService {
     try {
       const output = await runGit(["diff", "--cached", "--stat"], cwd);
       return output.stdout;
-    } catch {
+    } catch (err) {
       return "";
     }
   }
@@ -173,7 +173,7 @@ class GitService {
     try {
       const output = await runGit(["diff", "--cached"], cwd);
       return output.stdout;
-    } catch {
+    } catch (err) {
       return "";
     }
   }
@@ -183,7 +183,7 @@ class GitService {
       const args = isStaged ? ["diff", "--cached", filePath] : ["diff", filePath];
       const output = await runGit(args, cwd);
       return output.stdout;
-    } catch {
+    } catch (err) {
       return "";
     }
   }
@@ -192,7 +192,7 @@ class GitService {
     try {
       const output = await runGit(["show", `:${filePath}`], cwd);
       return output.stdout;
-    } catch {
+    } catch (err) {
       return "";
     }
   }
@@ -203,12 +203,12 @@ class GitService {
     try {
       const output = await runGit(["fetch"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
-  async getRemoteStatus(cwd: string): Promise<{ ahead: number; behind: number; hasRemote: boolean }> {
+  async getRemoteStatus(cwd: string): Promise<{ ahead: number; behind: number; hasRemote: boolean; error?: string }> {
     try {
       // Check if origin remote exists (separate from upstream tracking)
       const remoteOutput = await runGit(["remote", "get-url", "origin"], cwd);
@@ -240,7 +240,22 @@ class GitService {
 
       return { ahead, behind, hasRemote: true };
     } catch (err) {
-      console.error("[GitService] getRemoteStatus error:", err);
+      const errorMessage = getErrorMessage(err);
+      console.error("[GitService] getRemoteStatus error:", errorMessage);
+
+      // Check if this is a rate limit error and surface it to the UI
+      if (errorMessage.includes("Rate limit exceeded")) {
+        // Extract retry time from error message like "Try again in 21 seconds"
+        const retryMatch = errorMessage.match(/Try again in (\d+) seconds/);
+        const retrySeconds = retryMatch ? retryMatch[1] : "a few";
+        return {
+          ahead: 0,
+          behind: 0,
+          hasRemote: false,
+          error: `Rate limited - try again in ${retrySeconds}s`
+        };
+      }
+
       return { ahead: 0, behind: 0, hasRemote: false };
     }
   }
@@ -253,8 +268,8 @@ class GitService {
       }
       const output = await runGit(args, cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -262,8 +277,8 @@ class GitService {
     try {
       const output = await runGit(["pull"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -273,8 +288,8 @@ class GitService {
     try {
       const output = await runGit(["checkout", branchName], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -282,8 +297,8 @@ class GitService {
     try {
       const output = await runGit(["checkout", "-b", branchName], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -292,8 +307,8 @@ class GitService {
       const flag = force ? "-D" : "-d";
       const output = await runGit(["branch", flag, branchName], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -311,7 +326,7 @@ class GitService {
           const [hash, message, author, date] = line.split("|");
           return { hash, message, author, date };
         });
-    } catch {
+    } catch (err) {
       return [];
     }
   }
@@ -335,7 +350,7 @@ class GitService {
           };
         })
         .filter((b) => !b.name.includes("HEAD"));
-    } catch {
+    } catch (err) {
       return [];
     }
   }
@@ -344,7 +359,7 @@ class GitService {
     try {
       const output = await runGit(["rev-parse", "--git-dir"], cwd);
       return output.code === 0;
-    } catch {
+    } catch (err) {
       return false;
     }
   }
@@ -356,7 +371,7 @@ class GitService {
         return output.stdout.trim();
       }
       return null;
-    } catch {
+    } catch (err) {
       return null;
     }
   }
@@ -365,7 +380,7 @@ class GitService {
     try {
       const output = await runGit(["rev-parse", "--verify", branchName], cwd);
       return output.code === 0;
-    } catch {
+    } catch (err) {
       return false;
     }
   }
@@ -374,8 +389,8 @@ class GitService {
     try {
       const output = await runGit(["stash", "push", "-m", "autobuild-stash"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -383,8 +398,8 @@ class GitService {
     try {
       const output = await runGit(["stash", "pop"], cwd);
       return { success: output.code === 0, error: output.stderr };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
     }
   }
 
@@ -392,7 +407,7 @@ class GitService {
     try {
       const output = await runGit(["diff", `${baseBranch}...HEAD`, "--stat"], cwd);
       return output.stdout;
-    } catch {
+    } catch (err) {
       return "";
     }
   }
@@ -404,7 +419,7 @@ class GitService {
         return output.stdout.trim();
       }
       return null;
-    } catch {
+    } catch (err) {
       return null;
     }
   }

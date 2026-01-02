@@ -260,7 +260,7 @@ export function PlaceholderImageGenerator() {
             <label className="text-sm font-medium text-text-secondary">Preview</label>
             <div className="flex items-center gap-2">
               <Tooltip content="Copy Data URI">
-                <IconButton size="sm" onClick={handleCopyUrl}>
+                <IconButton size="sm" onClick={handleCopyUrl} aria-label="Copy image data URI">
                   {copied ? (
                     <Check className="w-3.5 h-3.5 text-green-400" />
                   ) : (
@@ -269,7 +269,7 @@ export function PlaceholderImageGenerator() {
                 </IconButton>
               </Tooltip>
               <Tooltip content="Download">
-                <IconButton size="sm" onClick={handleDownload}>
+                <IconButton size="sm" onClick={handleDownload} aria-label="Download image">
                   <Download className="w-3.5 h-3.5" />
                 </IconButton>
               </Tooltip>

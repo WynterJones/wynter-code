@@ -28,7 +28,7 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
           cwd: projectPath,
         });
         setGhAvailable(result.success);
-      } catch {
+      } catch (error) {
         setGhAvailable(false);
       }
     }
@@ -48,7 +48,7 @@ export function AutoBuildSettingsPopup({ onClose }: AutoBuildSettingsPopupProps)
           className="flex items-center justify-between border-b border-border px-4 py-3 cursor-grab active:cursor-grabbing"
         >
           <h3 className="font-medium" data-tauri-drag-region>Settings</h3>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close settings">
             <X className="h-4 w-4" />
           </IconButton>
         </div>

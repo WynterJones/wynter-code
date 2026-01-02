@@ -135,7 +135,7 @@ export function DataGrid() {
         </div>
         <div className="flex items-center gap-2">
           <Tooltip content="Add Row">
-            <IconButton size="sm" onClick={() => setShowAddForm(true)}>
+            <IconButton size="sm" onClick={() => setShowAddForm(true)} aria-label="Add new row">
               <Plus className="w-4 h-4" />
             </IconButton>
           </Tooltip>
@@ -203,6 +203,7 @@ export function DataGrid() {
                               className="p-1"
                               onClick={() => setEditingRow(row)}
                               disabled={primaryKeys.length === 0}
+                              aria-label="Edit row"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </IconButton>
@@ -213,6 +214,7 @@ export function DataGrid() {
                               className="p-1"
                               onClick={() => handleDelete(row)}
                               disabled={primaryKeys.length === 0 || isDeleting}
+                              aria-label="Delete row"
                             >
                               {isDeleting ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -254,6 +256,7 @@ export function DataGrid() {
                                       row,
                                       column: col,
                                     })}
+                                    aria-label={`Edit JSON data in ${col.name}`}
                                   >
                                     <Maximize2 className="w-3 h-3" />
                                   </IconButton>
@@ -297,6 +300,7 @@ export function DataGrid() {
               className="p-1"
               onClick={() => handlePageChange(1)}
               disabled={currentPage === 1}
+              aria-label="Go to first page"
             >
               <ChevronsLeft className="w-4 h-4" />
             </IconButton>
@@ -305,6 +309,7 @@ export function DataGrid() {
               className="p-1"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
+              aria-label="Go to previous page"
             >
               <ChevronLeft className="w-4 h-4" />
             </IconButton>
@@ -313,6 +318,7 @@ export function DataGrid() {
               className="p-1"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage >= totalPages}
+              aria-label="Go to next page"
             >
               <ChevronRight className="w-4 h-4" />
             </IconButton>
@@ -321,6 +327,7 @@ export function DataGrid() {
               className="p-1"
               onClick={() => handlePageChange(totalPages)}
               disabled={currentPage >= totalPages}
+              aria-label="Go to last page"
             >
               <ChevronsRight className="w-4 h-4" />
             </IconButton>

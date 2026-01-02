@@ -20,7 +20,7 @@ export function AutoBuildHelpPopup({ onClose }: AutoBuildHelpPopupProps) {
           className="flex items-center justify-between border-b border-border px-4 py-3 cursor-grab active:cursor-grabbing"
         >
           <h3 className="font-medium" data-tauri-drag-region>How Auto Build Works</h3>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close help">
             <X className="h-4 w-4" />
           </IconButton>
         </div>

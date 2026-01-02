@@ -114,6 +114,7 @@ export function DeployHistory({
                   handleOpenUrl(deploy.deploy_ssl_url || deploy.deploy_url)
                 }
                 title="Open deploy preview"
+                aria-label="Open deploy preview"
               >
                 <ExternalLink className="w-3 h-3" />
               </IconButton>
@@ -123,6 +124,7 @@ export function DeployHistory({
                   size="sm"
                   onClick={() => onRollback(deploy.id)}
                   title="Rollback to this version"
+                  aria-label="Rollback to this deploy version"
                 >
                   <RotateCcw className="w-3 h-3" />
                 </IconButton>

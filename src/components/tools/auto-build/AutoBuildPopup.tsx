@@ -226,6 +226,7 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
                 size="sm"
                 onClick={canResume ? resume : start}
                 disabled={!canStart && !canResume}
+                aria-label={isPaused ? "Resume build" : "Start build"}
                 className={cn(
                   (canStart || canResume) && "text-green-400 hover:bg-green-500/20"
                 )}
@@ -240,6 +241,7 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
                 size="sm"
                 onClick={pause}
                 disabled={!canPause}
+                aria-label="Pause build"
                 className={cn(canPause && "text-amber-400 hover:bg-amber-500/20")}
               >
                 <Pause className="h-4 w-4" />
@@ -252,6 +254,7 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
                 size="sm"
                 onClick={stop}
                 disabled={!canStop}
+                aria-label="Stop build"
                 className={cn(canStop && "text-red-400 hover:bg-red-500/20")}
               >
                 <Square className="h-4 w-4" />
@@ -264,6 +267,7 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
                 size="sm"
                 onClick={skipCurrent}
                 disabled={!canSkip}
+                aria-label="Skip current issue"
                 className={cn(canSkip && "text-blue-400 hover:bg-blue-500/20")}
               >
                 <SkipForward className="h-4 w-4" />
@@ -282,18 +286,18 @@ export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
             <div className="h-6 w-px bg-border" />
 
             <Tooltip content="How it works">
-              <IconButton size="sm" onClick={() => setShowHelp(true)}>
+              <IconButton size="sm" onClick={() => setShowHelp(true)} aria-label="Show help">
                 <HelpCircle className="h-4 w-4" />
               </IconButton>
             </Tooltip>
 
             <Tooltip content="Settings">
-              <IconButton size="sm" onClick={() => setShowSettings(true)}>
+              <IconButton size="sm" onClick={() => setShowSettings(true)} aria-label="Show settings">
                 <Settings className="h-4 w-4" />
               </IconButton>
             </Tooltip>
 
-            <IconButton size="sm" onClick={closePopup}>
+            <IconButton size="sm" onClick={closePopup} aria-label="Close">
               <X className="h-4 w-4" />
             </IconButton>
           </div>

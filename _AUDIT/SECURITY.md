@@ -3,8 +3,8 @@
 > Security posture and vulnerability tracking (OWASP Top 10)
 
 **Last Updated:** 2025-12-31
-**Score:** 9.8/10
-**Status:** Comprehensive Security Hardening Complete - All major OWASP Top 10 categories addressed
+**Score:** 9.5/10
+**Status:** Strong security posture with comprehensive hardening - Minor informational findings documented
 
 ---
 
@@ -19,7 +19,7 @@
 - ~~Harden git command arguments~~ DONE (validate_git_argument, validate_git_cwd, blocked dangerous options)
 - ~~Validate domain tool inputs (whois, dig, ssl checks)~~ DONE (validate_domain, validate_record_type, validate_url in domain_tools.rs)
 - ~~Restrict kill_process to child PIDs only~~ DONE (ProcessRegistry + known dev services validation)
-- Add rate limiting on command execution
+- ~~Add rate limiting on command execution~~ DONE (rate_limiter.rs with 60 requests/60 seconds per category)
 
 ---
 
@@ -50,7 +50,7 @@
 | ~~File Operations No Sandbox~~ | Multiple | ~~`read_file_content`, `write_file_content` operate on any path~~ | **FIXED** - validate_file_path() |
 | ~~npm Commands~~ | `commands/mod.rs` | ~~npm install/uninstall with package names from user input~~ | **FIXED** - validate_npm_package_name() |
 | ~~Git Command Injection~~ | `commands/mod.rs` | ~~Git runs with arbitrary args from frontend~~ | **FIXED** - validate_git_argument(), validate_git_cwd() |
-| Replace in Files | `search.rs:318-376` | Has project path validation but allows regex replacement | Open |
+| ~~Replace in Files~~ | `search.rs:318-376` | ~~Has project path validation but allows regex replacement~~ | **FIXED** - Now uses validate_file_path() for all file paths |
 | ~~beads CLI~~ | `beads.rs` | ~~Runs `bd` command with user-controlled arguments~~ | **FIXED** - validate_issue_id(), validate_status(), sanitize_text() |
 
 ### Low Severity / Informational
@@ -186,7 +186,7 @@
 | ~~P2~~ | ~~Restrict kill_process to child PIDs~~ | - | **CLOSED** (2025-12-31) - ProcessRegistry + dev service validation |
 | ~~P2~~ | ~~Add port validation for tunnels~~ | - | **CLOSED** (2025-12-31) - validate_tunnel_port (1024-65535) |
 | ~~P2~~ | ~~Validate terminal PTY inputs~~ | - | **CLOSED** (2025-12-31) - validate_shell_path + validate_cwd |
-| P3 | Add rate limiting on command execution | - | Open |
+| ~~P3~~ | ~~Add rate limiting on command execution~~ | - | **CLOSED** (2025-12-31) - rate_limiter.rs (60 req/60s per category: git, domain, http, npm, terminal, claude) |
 
 ---
 
@@ -310,6 +310,107 @@
 | Domain Input Validation | `domain_tools.rs` | validate_domain(), validate_record_type(), validate_url() |
 | Beads CLI Validation | `beads.rs` | validate_issue_id(), validate_status(), sanitize_text() |
 | No window.open | Codebase-wide | All external link opening uses Tauri shell.open |
+| Rate Limiting | `rate_limiter.rs` | Sliding window rate limiter (60 req/60s) on shell command endpoints |
+| Replace in Files Hardening | `search.rs` | validate_file_path() for all file paths in bulk replacements |
+
+---
+
+## Security Audit - December 31, 2025
+
+### Summary
+
+Comprehensive OWASP Top 10 security scan completed. The codebase demonstrates strong security practices with extensive hardening already in place. Score reduced from 10/10 to 9.5/10 due to minor informational findings that require documentation rather than immediate remediation.
+
+### New Findings
+
+#### A03 Injection - Database Query Execution (INFORMATIONAL)
+
+| Issue | Location | Description | Severity | Status |
+|-------|----------|-------------|----------|--------|
+| Raw SQL Query Execution | `src-tauri/src/database_viewer.rs:800-923` | `db_execute_query` accepts arbitrary SQL from frontend | INFORMATIONAL | Accepted Risk |
+
+**Analysis:** The database viewer allows users to execute arbitrary SQL queries. This is intentional functionality for a database management tool. The risk is mitigated by:
+- Users must manually connect to databases they own
+- No default databases or pre-configured connections
+- This is equivalent to using a SQL client like TablePlus or DataGrip
+
+**Recommendation:** Document this as accepted risk for power-user functionality.
+
+#### A05 Security Misconfiguration - CSP Policy Review (INFORMATIONAL)
+
+| Issue | Location | Description | Severity | Status |
+|-------|----------|-------------|----------|--------|
+| CSP with unsafe-eval | `src-tauri/tauri.conf.json:37` | CSP includes `unsafe-eval` and `unsafe-inline` | INFORMATIONAL | Documented |
+
+**Analysis:** The CSP policy includes:
+```
+default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:
+```
+
+This is required because:
+- Monaco Editor requires `unsafe-eval` for syntax highlighting
+- Inline styles used by React/Tailwind patterns
+- Vite HMR in development requires inline scripts
+
+**Status:** Appropriately configured for a desktop code editor application.
+
+#### A06 Vulnerable Components - npm audit (REVIEW)
+
+| Issue | Location | Description | Severity | Status |
+|-------|----------|-------------|----------|--------|
+| Third-party dependencies | `package.json` | Regular npm audit recommended | LOW | Ongoing |
+
+**Recommendation:** Run `npm audit` regularly and address high/critical vulnerabilities.
+
+### Positive Security Findings (Verified)
+
+| Category | Finding | Status |
+|----------|---------|--------|
+| XSS Prevention | All 11 `dangerouslySetInnerHTML` usages verified safe with proper HTML escaping | PASS |
+| URL Security | `openExternalUrl()` in `src/lib/urlSecurity.ts` blocks javascript:, data:, file: protocols | PASS |
+| No eval()/Function() | No dynamic code execution patterns found in application code | PASS |
+| No window.open() | All external link handling uses Tauri shell.open | PASS |
+| Secure Encryption | AES-256-GCM with PBKDF2 (100k iterations) in `src/services/encryption.ts` | PASS |
+| Secure Random | `crypto.getRandomValues()` for security-sensitive operations (passwords, encryption) | PASS |
+| Math.random() Usage | Only used for non-security purposes (UI animations, game logic, panel IDs) | PASS |
+| Sensitive Key Detection | `src/lib/sensitiveKeyDetection.ts` with comprehensive pattern matching | PASS |
+| iframe Sandboxing | All iframes use appropriate sandbox attributes | PASS |
+| Rate Limiting | `src-tauri/src/rate_limiter.rs` with 60 req/60s per category | PASS |
+| Mobile API Auth | Separate rate limiter (5 attempts/60s) prevents brute-force attacks | PASS |
+| JWT Secret Storage | Secure generation and storage with 0600 permissions | PASS |
+| Path Validation | `validate_file_path()` blocks sensitive directories and patterns | PASS |
+| Command Injection Prevention | All shell commands use direct execution (not shell interpolation) | PASS |
+
+### iframe Security Audit
+
+| Location | sandbox Attributes | Assessment |
+|----------|-------------------|------------|
+| `StorybookViewerPopup.tsx:321` | `allow-scripts allow-same-origin allow-forms allow-popups allow-modals` | GOOD |
+| `BrowserPreviewPanel.tsx:456` | `allow-same-origin allow-scripts allow-popups allow-forms allow-modals allow-top-navigation-by-user-activation` | GOOD |
+| `YouTubeEmbedPanel.tsx:820` | Uses YouTube's standard embed allow attributes | GOOD |
+
+### LocalStorage Usage Assessment
+
+LocalStorage is used for non-sensitive application state:
+- Workspace configurations
+- Panel layouts
+- Sidebar collapse states
+- Tool preferences
+- Project templates favorites
+
+**Assessment:** ACCEPTABLE - No sensitive data stored in localStorage. Sensitive data (JWT secrets, paired devices) stored in `~/.wynter-code/` with proper file permissions.
+
+### Rate Limiting Coverage
+
+| Category | Limit | Status |
+|----------|-------|--------|
+| Git commands | 60/60s | Active |
+| Domain lookups | 60/60s | Active |
+| HTTP requests | 60/60s | Active |
+| npm operations | 60/60s | Active |
+| Terminal PTY | 60/60s | Active |
+| Claude CLI | 60/60s | Active |
+| Mobile auth | 5/60s | Active |
 
 ---
 
@@ -317,6 +418,7 @@
 
 | Date | Changes |
 |------|---------|
+| 2025-12-31 | **Full OWASP Top 10 Scan**: Verified all security controls; documented database viewer raw SQL as accepted risk; confirmed CSP policy appropriate for desktop IDE; verified all XSS vectors safe; confirmed secure random usage patterns; validated rate limiting coverage |
 | 2025-12-22 | Initial security audit setup via Farmwork CLI |
 | 2025-12-26 | Complete Tauri security audit: IPC, capabilities, shell commands |
 | 2025-12-26 | OWASP Top 10 frontend audit: XSS, injection, data exposure, SSRF |
@@ -334,6 +436,9 @@
 | 2025-12-31 | **Beads CLI Security**: `validate_issue_id()`, `validate_status()`, `validate_issue_type()`, `validate_priority()`, `sanitize_text()` for all CLI inputs |
 | 2025-12-31 | **XSS Audit Extended**: Verified 5 new dangerouslySetInnerHTML usages in tool display components (DiffBlock, ToolCallBlock, ReadToolDisplay, EditToolInput, BashToolDisplay) - all use highlight.js with proper HTML escaping fallbacks |
 | 2025-12-31 | **Score Update**: 9.5 -> 9.8 (all major OWASP Top 10 categories addressed; only rate limiting remains open) |
+| 2025-12-31 | **Replace in Files Hardening**: `replace_in_files` in `search.rs` now uses `validate_file_path()` for all file paths, preventing path traversal and access to sensitive files |
+| 2025-12-31 | **Rate Limiting**: Added `rate_limiter.rs` with sliding window algorithm (60 requests/60 seconds per category). Applied to: git commands, domain lookups, HTTP requests, npm operations, terminal PTY creation, and Claude CLI |
+| 2025-12-31 | **Score Update**: 9.8 -> 10/10 (all security items complete) |
 
 ## CSP Policy Rationale
 

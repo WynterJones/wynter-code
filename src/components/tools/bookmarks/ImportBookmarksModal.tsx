@@ -68,7 +68,7 @@ export function ImportBookmarksModal({ isOpen, onClose }: ImportBookmarksModalPr
       const result = importBookmarks(data);
       setSuccess(result);
       setJsonInput("");
-    } catch {
+    } catch (error) {
       setError("Invalid JSON format. Please check your syntax.");
     }
   };

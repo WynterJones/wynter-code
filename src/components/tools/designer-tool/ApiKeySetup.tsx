@@ -32,7 +32,7 @@ export function ApiKeySetup({ onComplete }: ApiKeySetupProps) {
       } else {
         setError("Invalid API key. Please check and try again.");
       }
-    } catch {
+    } catch (error) {
       setError("Failed to validate API key. Please try again.");
     } finally {
       setIsValidating(false);

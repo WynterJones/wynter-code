@@ -157,13 +157,13 @@ export function ExifDataRemover() {
             <>
               {images.length > 1 && (
                 <Tooltip content="Download All as ZIP">
-                  <IconButton size="sm" onClick={handleDownloadAll}>
+                  <IconButton size="sm" onClick={handleDownloadAll} aria-label="Download all images as ZIP">
                     <FileDown className="w-3.5 h-3.5" />
                   </IconButton>
                 </Tooltip>
               )}
               <Tooltip content="Clear All">
-                <IconButton size="sm" onClick={handleClear}>
+                <IconButton size="sm" onClick={handleClear} aria-label="Clear all images">
                   <Trash2 className="w-3.5 h-3.5" />
                 </IconButton>
               </Tooltip>
@@ -237,12 +237,12 @@ export function ExifDataRemover() {
                 </div>
                 <div className="flex items-center gap-1">
                   <Tooltip content="Download Cleaned">
-                    <IconButton size="sm" onClick={() => handleDownload(image)}>
+                    <IconButton size="sm" onClick={() => handleDownload(image)} aria-label="Download cleaned image">
                       <Download className="w-3.5 h-3.5" />
                     </IconButton>
                   </Tooltip>
                   <Tooltip content="Remove">
-                    <IconButton size="sm" onClick={() => handleRemove(image.id)}>
+                    <IconButton size="sm" onClick={() => handleRemove(image.id)} aria-label="Remove image from list">
                       <X className="w-3.5 h-3.5" />
                     </IconButton>
                   </Tooltip>

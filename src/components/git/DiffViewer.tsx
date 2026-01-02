@@ -127,7 +127,7 @@ function highlightCode(code: string, language: string): string {
       return hljs.highlight(code, { language }).value;
     }
     return hljs.highlightAuto(code).value;
-  } catch {
+  } catch (error) {
     return code
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -186,7 +186,7 @@ export function DiffViewer({ projectPath, file, isStaged, onClose }: DiffViewerP
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-text-primary">{fileName}</span>
           </div>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close diff">
             <X className="w-3.5 h-3.5" />
           </IconButton>
         </div>
@@ -210,7 +210,7 @@ export function DiffViewer({ projectPath, file, isStaged, onClose }: DiffViewerP
             <span className="text-accent-red">-{stats.deletions}</span>
           </div>
         </div>
-        <IconButton size="sm" onClick={onClose} title="Close diff">
+        <IconButton size="sm" onClick={onClose} title="Close diff" aria-label="Close diff viewer">
           <X className="w-3.5 h-3.5" />
         </IconButton>
       </div>

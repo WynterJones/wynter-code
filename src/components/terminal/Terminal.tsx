@@ -44,8 +44,8 @@ function tryLoadAddon(
     term.loadAddon(addon);
     onSuccess?.();
     return true;
-  } catch (e) {
-    console.warn(`${addonName} addon failed to load:`, e);
+  } catch (error) {
+    console.warn(`${addonName} addon failed to load:`, error);
     return false;
   }
 }
@@ -134,8 +134,8 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     try {
       const canvasAddon = new CanvasAddon();
       term.loadAddon(canvasAddon);
-    } catch (e) {
-      console.warn("Canvas fallback also failed, using default renderer:", e);
+    } catch (error) {
+      console.warn("Canvas fallback also failed, using default renderer:", error);
     }
   }, []);
 
@@ -341,7 +341,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       if (webglAddonRef.current) {
         try {
           webglAddonRef.current.dispose();
-        } catch {
+        } catch (error) {
           // Ignore disposal errors
         }
         webglAddonRef.current = null;
@@ -350,7 +350,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       // Dispose xterm
       try {
         term.dispose();
-      } catch {
+      } catch (error) {
         // Ignore disposal errors
       }
       xtermRef.current = null;

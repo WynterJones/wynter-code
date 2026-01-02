@@ -124,7 +124,7 @@ class FarmworkStandaloneApi {
       try {
         const data = JSON.parse(event.data);
         onMessage(data);
-      } catch {
+      } catch (error) {
         console.error("Failed to parse WebSocket message");
       }
     };

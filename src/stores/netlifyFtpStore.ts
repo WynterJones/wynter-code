@@ -153,7 +153,7 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
         try {
           const sites = await invoke<NetlifySite[]>("netlify_fetch_sites", { token: apiToken });
           set({ sites, isLoadingSites: false });
-        } catch {
+        } catch (error) {
           set({ isLoadingSites: false });
         }
       },
@@ -184,7 +184,7 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
           const site = await invoke<NetlifySite>("netlify_create_site", { token: apiToken, name });
           set(state => ({ sites: [...state.sites, site] }));
           return site;
-        } catch {
+        } catch (error) {
           // Handle error
         }
         return null;
@@ -201,7 +201,7 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
             currentSiteId: state.currentSiteId === siteId ? null : state.currentSiteId,
           }));
           return true;
-        } catch {
+        } catch (error) {
           // Handle error
         }
         return false;
@@ -242,7 +242,7 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
           } else if (!skipLoadingState) {
             set({ isLoadingDeploys: false });
           }
-        } catch {
+        } catch (error) {
           set({ isLoadingDeploys: false });
         }
       },
@@ -311,7 +311,7 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
           await get().fetchDeploys(siteId);
           await get().fetchSites();
           return true;
-        } catch {
+        } catch (error) {
           // Handle error
         }
         return false;

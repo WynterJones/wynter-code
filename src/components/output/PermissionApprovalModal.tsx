@@ -45,7 +45,7 @@ function formatToolInput(input: Record<string, unknown>): string {
     try {
       const parsed = JSON.parse(input.raw);
       return formatToolInput(parsed);
-    } catch {
+    } catch (error) {
       return input.raw.slice(0, 200);
     }
   }

@@ -170,6 +170,22 @@ The foundation everything else is built on.
 
 ---
 
+### Mobile Companion App
+
+Control Wynter Code from your phone or tablet. The mobile companion app lets you monitor Claude sessions, send prompts, browse files, and manage your development workflow from anywhere on your local network — or from anywhere in the world using the relay server.
+
+**[wynter-code-mobile](https://github.com/WynterJones/wynter-code-mobile)** — Built with React Native and Expo for iOS and Android.
+
+---
+
+### Relay Server
+
+Need to connect your mobile app when you're not on the same WiFi network? The relay server enables secure mobile-to-desktop communication from anywhere. All messages are end-to-end encrypted using XChaCha20-Poly1305 with X25519 key exchange — the relay only sees opaque encrypted blobs.
+
+**[wynter-code-relay](https://github.com/WynterJones/wynter-code-relay)** — A lightweight Rust server you can self-host or deploy to Fly.io.
+
+---
+
 ## Built With
 
 | | |

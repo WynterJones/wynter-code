@@ -182,7 +182,7 @@ export function KanbanAIPopup({
               <span className="text-xs text-text-secondary">(connecting...)</span>
             )}
           </div>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close AI Assistant">
             <X className="w-4 h-4" />
           </IconButton>
         </div>

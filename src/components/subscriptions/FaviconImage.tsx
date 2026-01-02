@@ -30,7 +30,7 @@ export function FaviconImage({
       try {
         const urlObj = new URL(url);
         return `https://www.google.com/s2/favicons?domain=${urlObj.hostname}&sz=32`;
-      } catch {
+      } catch (error) {
         return null;
       }
     }

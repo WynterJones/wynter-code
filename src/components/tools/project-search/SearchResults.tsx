@@ -120,12 +120,12 @@ export function SearchResults({
 
           <div className="flex items-center gap-1">
             <Tooltip content="Expand All">
-              <IconButton size="sm" onClick={onExpandAll}>
+              <IconButton size="sm" onClick={onExpandAll} aria-label="Expand all search results">
                 <UnfoldVertical className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
             <Tooltip content="Collapse All">
-              <IconButton size="sm" onClick={onCollapseAll}>
+              <IconButton size="sm" onClick={onCollapseAll} aria-label="Collapse all search results">
                 <FoldVertical className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>

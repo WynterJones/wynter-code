@@ -259,7 +259,7 @@ Help the user with questions about their justfile, creating new recipes, or unde
               </span>
               <div className="flex items-center gap-2">
                 <Tooltip content="AI Assistant">
-                  <IconButton size="sm" onClick={() => setShowAIPopup(true)}>
+                  <IconButton size="sm" onClick={() => setShowAIPopup(true)} aria-label="Open AI assistant">
                     <Bot className="w-4 h-4" />
                   </IconButton>
                 </Tooltip>

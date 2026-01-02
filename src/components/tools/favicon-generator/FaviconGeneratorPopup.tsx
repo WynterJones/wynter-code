@@ -151,7 +151,7 @@ export function FaviconGeneratorPopup({
     try {
       const homeDir = await invoke<string>("get_home_dir");
       setInitialPath(homeDir);
-    } catch {
+    } catch (err) {
       setInitialPath(undefined);
     }
     setShowFileBrowser(true);
@@ -172,7 +172,7 @@ export function FaviconGeneratorPopup({
         const result = await process(file);
         setFavicons(result);
         setViewState("preview");
-      } catch {
+      } catch (err) {
         setViewState("upload");
       }
     },
@@ -230,7 +230,7 @@ export function FaviconGeneratorPopup({
       await navigator.clipboard.writeText(generateHtmlTags());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
       // Clipboard API failed
     }
   }, []);

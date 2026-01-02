@@ -44,8 +44,8 @@ function testRegex(pattern: string, flags: string, text: string): RegexResult {
     }
 
     return { matches, error: null };
-  } catch (e) {
-    return { matches: [], error: (e as Error).message };
+  } catch (error) {
+    return { matches: [], error: (error as Error).message };
   }
 }
 
@@ -112,7 +112,7 @@ export function RegexTester() {
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-text-secondary">Regular Expression</label>
           <Tooltip content={copied ? "Copied!" : "Copy regex"}>
-            <IconButton size="sm" onClick={handleCopy}>
+            <IconButton size="sm" onClick={handleCopy} aria-label="Copy regular expression">
               {copied ? (
                 <Check className="w-3.5 h-3.5 text-green-400" />
               ) : (

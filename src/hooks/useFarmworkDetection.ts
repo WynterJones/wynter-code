@@ -45,7 +45,7 @@ export function useFarmworkDetection() {
           path: `${activeProject.path}/_AUDIT/FARMHOUSE.md`,
         });
         hasFarmhouse = true;
-      } catch {
+      } catch (error) {
         // File doesn't exist
       }
 
@@ -55,7 +55,7 @@ export function useFarmworkDetection() {
           path: `${activeProject.path}/_AUDIT/GARDEN.md`,
         });
         hasGarden = true;
-      } catch {
+      } catch (error) {
         // File doesn't exist
       }
 
@@ -68,7 +68,7 @@ export function useFarmworkDetection() {
         hasFarmhouse,
         isDetecting: false,
       });
-    } catch {
+    } catch (error) {
       setDetection({
         hasFarmwork: false,
         hasGarden: false,

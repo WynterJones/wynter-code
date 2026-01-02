@@ -205,7 +205,7 @@ export function DevToolkitPopup({ isOpen, onClose, initialTool }: DevToolkitPopu
             )}
           </div>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close Dev Toolkit">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

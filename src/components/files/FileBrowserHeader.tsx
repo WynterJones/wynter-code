@@ -73,16 +73,16 @@ export function FileBrowserHeader({
   return (
     <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-secondary flex-shrink-0">
       <div className="flex items-center gap-1">
-        <IconButton size="sm" onClick={onGoBack} disabled={!canGoBack}>
+        <IconButton size="sm" onClick={onGoBack} disabled={!canGoBack} aria-label="Go back">
           <ChevronLeft className="w-4 h-4" />
         </IconButton>
-        <IconButton size="sm" onClick={onGoForward} disabled={!canGoForward}>
+        <IconButton size="sm" onClick={onGoForward} disabled={!canGoForward} aria-label="Go forward">
           <ChevronRight className="w-4 h-4" />
         </IconButton>
-        <IconButton size="sm" onClick={onGoUp}>
+        <IconButton size="sm" onClick={onGoUp} aria-label="Go up one level">
           <ChevronUp className="w-4 h-4" />
         </IconButton>
-        <IconButton size="sm" onClick={onGoHome}>
+        <IconButton size="sm" onClick={onGoHome} aria-label="Go to home directory">
           <Home className="w-4 h-4" />
         </IconButton>
         <div className="w-px h-4 bg-border mx-1" />
@@ -91,6 +91,7 @@ export function FileBrowserHeader({
             size="sm"
             onClick={onToggleHiddenFiles}
             className={showHiddenFiles ? "text-accent" : ""}
+            aria-label={showHiddenFiles ? "Hide hidden files" : "Show hidden files"}
           >
             {showHiddenFiles ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
           </IconButton>

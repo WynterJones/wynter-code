@@ -85,7 +85,7 @@ export function WordCounter() {
           <label className="text-sm font-medium text-text-secondary">Enter Text</label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear text">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>

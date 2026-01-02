@@ -24,8 +24,8 @@ export function BcryptGenerator() {
       const salt = await bcrypt.genSalt(saltRounds);
       const hashed = await bcrypt.hash(password, salt);
       setHash(hashed);
-    } catch (e) {
-      setHash(`Error: ${(e as Error).message}`);
+    } catch (error) {
+      setHash(`Error: ${(error as Error).message}`);
     }
     setIsHashing(false);
   }, [password, saltRounds]);
@@ -37,7 +37,7 @@ export function BcryptGenerator() {
     try {
       const result = await bcrypt.compare(verifyPassword, verifyHash);
       setVerifyResult(result);
-    } catch {
+    } catch (error) {
       setVerifyResult(false);
     }
     setIsVerifying(false);
@@ -110,7 +110,7 @@ export function BcryptGenerator() {
               {hash}
             </code>
             <Tooltip content={copied ? "Copied!" : "Copy"}>
-              <IconButton size="sm" onClick={handleCopy}>
+              <IconButton size="sm" onClick={handleCopy} aria-label="Copy hash">
                 {copied ? (
                   <Check className="w-3.5 h-3.5 text-green-400" />
                 ) : (

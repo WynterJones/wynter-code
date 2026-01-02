@@ -311,7 +311,7 @@ export function HtmlCssValidator() {
           {input && (
             <>
               <Tooltip content="Format & Copy">
-                <IconButton size="sm" onClick={handleCopy}>
+                <IconButton size="sm" onClick={handleCopy} aria-label="Format and copy code">
                   {copied ? (
                     <Check className="w-3.5 h-3.5 text-green-400" />
                   ) : (
@@ -320,7 +320,7 @@ export function HtmlCssValidator() {
                 </IconButton>
               </Tooltip>
               <Tooltip content="Clear">
-                <IconButton size="sm" onClick={handleClear}>
+                <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                   <Trash2 className="w-3.5 h-3.5" />
                 </IconButton>
               </Tooltip>

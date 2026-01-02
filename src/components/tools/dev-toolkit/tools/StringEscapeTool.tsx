@@ -20,7 +20,7 @@ function escapeJson(text: string): string {
 function unescapeJson(text: string): string {
   try {
     return JSON.parse(`"${text}"`);
-  } catch {
+  } catch (error) {
     return text;
   }
 }
@@ -115,8 +115,8 @@ export function StringEscapeTool() {
     try {
       setOutput(escape(input, mode));
       setError(null);
-    } catch (e) {
-      setError(`Escape error: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Escape error: ${(error as Error).message}`);
       setOutput("");
     }
   };
@@ -125,8 +125,8 @@ export function StringEscapeTool() {
     try {
       setOutput(unescape(input, mode));
       setError(null);
-    } catch (e) {
-      setError(`Unescape error: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Unescape error: ${(error as Error).message}`);
       setOutput("");
     }
   };

@@ -69,7 +69,7 @@ export function WorkspaceAvatarEditor({
     try {
       const homeDir = await invoke<string>("get_home_dir");
       setInitialPath(homeDir);
-    } catch {
+    } catch (error) {
       setInitialPath(undefined);
     }
     setShowFileBrowser(true);

@@ -85,7 +85,7 @@ export function UserAgentParser() {
           <label className="text-sm font-medium text-text-secondary">User Agent String</label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -110,7 +110,7 @@ export function UserAgentParser() {
         </Button>
         {parsed && (
           <Tooltip content={copied ? "Copied!" : "Copy as JSON"}>
-            <IconButton size="sm" onClick={handleCopy}>
+            <IconButton size="sm" onClick={handleCopy} aria-label="Copy parsed data as JSON">
               {copied ? (
                 <Check className="w-3.5 h-3.5 text-green-400" />
               ) : (

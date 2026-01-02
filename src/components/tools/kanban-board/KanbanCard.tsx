@@ -122,6 +122,7 @@ export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggl
                   e.stopPropagation();
                   onToggleLock(task.id);
                 }}
+                aria-label={task.locked ? "Mark incomplete" : "Mark complete"}
                 className={cn(
                   "h-6 w-6",
                   task.locked ? "bg-green-500/20 text-green-400" : "bg-bg-tertiary"
@@ -139,6 +140,7 @@ export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggl
                   e.stopPropagation();
                   onEdit(task);
                 }}
+                aria-label="Edit task"
                 className="h-6 w-6 bg-bg-tertiary"
               >
                 <Pencil className="w-3 h-3" />
@@ -181,6 +183,7 @@ export function KanbanCard({ task, onEdit, onDelete, onToggleLock, showLockToggl
                   onPointerDown={handleDeletePointerDown}
                   onPointerUp={handleDeletePointerUp}
                   onPointerCancel={handleDeletePointerCancel}
+                  aria-label="Delete task"
                   className={cn(
                     "h-6 w-6 select-none touch-none",
                     deleteProgress > 0 && "bg-red-500/20"
@@ -288,6 +291,7 @@ export function LockedKanbanCard({ task, onToggleLock }: LockedKanbanCardProps) 
                 e.stopPropagation();
                 onToggleLock(task.id);
               }}
+              aria-label="Mark task incomplete"
               className="h-5 w-5 bg-bg-tertiary"
             >
               <Square className="w-2.5 h-2.5" />

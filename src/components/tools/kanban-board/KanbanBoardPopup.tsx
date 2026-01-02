@@ -262,17 +262,17 @@ export function KanbanBoardPopup({
 
             <div className="flex items-center gap-2">
               <Tooltip content="AI Assistant">
-                <IconButton size="sm" onClick={() => setShowAIPopup(true)}>
+                <IconButton size="sm" onClick={() => setShowAIPopup(true)} aria-label="Open AI Assistant">
                   <Bot className="w-4 h-4" />
                 </IconButton>
               </Tooltip>
               <Tooltip content="New Task (Ctrl+N)">
-                <IconButton size="sm" onClick={() => setShowNewTaskPopup(true)}>
+                <IconButton size="sm" onClick={() => setShowNewTaskPopup(true)} aria-label="Add new task">
                   <Plus className="w-4 h-4" />
                 </IconButton>
               </Tooltip>
               <Tooltip content="Close">
-                <IconButton size="sm" onClick={onClose}>
+                <IconButton size="sm" onClick={onClose} aria-label="Close">
                   <X className="w-4 h-4" />
                 </IconButton>
               </Tooltip>

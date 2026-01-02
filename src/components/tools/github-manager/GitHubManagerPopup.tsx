@@ -281,7 +281,7 @@ export function GitHubManagerPopup({
             {/* Connect button */}
             {projectPath && authStatus?.isAuthenticated && (
               <Tooltip content="Create repo from this project">
-                <IconButton size="sm" onClick={() => setShowConnectWorkflow(true)}>
+                <IconButton size="sm" onClick={() => setShowConnectWorkflow(true)} aria-label="Create new repository">
                   <Plus className="w-4 h-4" />
                 </IconButton>
               </Tooltip>
@@ -290,7 +290,7 @@ export function GitHubManagerPopup({
             {/* Refresh */}
             {authStatus?.isAuthenticated && activeTab !== "search" && (
               <Tooltip content="Refresh">
-                <IconButton size="sm" onClick={handleRefresh} disabled={isLoading}>
+                <IconButton size="sm" onClick={handleRefresh} disabled={isLoading} aria-label="Refresh repositories">
                   <RefreshCw className={cn("w-4 h-4", isLoading && "animate-spin")} />
                 </IconButton>
               </Tooltip>
@@ -298,7 +298,7 @@ export function GitHubManagerPopup({
 
             {/* Close */}
             <Tooltip content="Close (Esc)">
-              <IconButton size="sm" onClick={onClose}>
+              <IconButton size="sm" onClick={onClose} aria-label="Close GitHub manager">
                 <X className="w-4 h-4" />
               </IconButton>
             </Tooltip>
@@ -312,7 +312,7 @@ export function GitHubManagerPopup({
               <AlertCircle className="w-4 h-4 text-red-400" />
               <span className="text-sm text-red-400">{error}</span>
             </div>
-            <IconButton size="sm" onClick={clearError}>
+            <IconButton size="sm" onClick={clearError} aria-label="Dismiss error">
               <X className="w-3 h-3" />
             </IconButton>
           </div>
@@ -359,6 +359,7 @@ export function GitHubManagerPopup({
                           <IconButton
                             size="sm"
                             onClick={() => handleCopyCommand("brew install gh")}
+                            aria-label="Copy GitHub CLI install command"
                           >
                             {copiedCommand === "brew install gh" ? (
                               <Check className="w-3.5 h-3.5 text-green-400" />
@@ -398,6 +399,7 @@ export function GitHubManagerPopup({
                           <IconButton
                             size="sm"
                             onClick={() => handleCopyCommand("gh auth login")}
+                            aria-label="Copy GitHub authentication command"
                           >
                             {copiedCommand === "gh auth login" ? (
                               <Check className="w-3.5 h-3.5 text-green-400" />

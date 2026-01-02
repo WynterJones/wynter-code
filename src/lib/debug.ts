@@ -20,7 +20,7 @@ const isDebugEnabled = (): boolean => {
   if (import.meta.env.DEV) return true;
   try {
     return localStorage.getItem(DEBUG_STORAGE_KEY) === "true";
-  } catch {
+  } catch (error) {
     return false;
   }
 };
@@ -68,7 +68,7 @@ export const debug = {
     try {
       localStorage.setItem(DEBUG_STORAGE_KEY, "true");
       console.log("[DEBUG] Debug mode enabled");
-    } catch {
+    } catch (error) {
       console.warn("Could not enable debug mode");
     }
   },
@@ -78,7 +78,7 @@ export const debug = {
     try {
       localStorage.removeItem(DEBUG_STORAGE_KEY);
       console.log("[DEBUG] Debug mode disabled");
-    } catch {
+    } catch (error) {
       console.warn("Could not disable debug mode");
     }
   },

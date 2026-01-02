@@ -236,7 +236,7 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
       await navigator.clipboard.writeText(url);
       setCopiedUrl(url);
       setTimeout(() => setCopiedUrl(null), 2000);
-    } catch {
+    } catch (error) {
       setError("Failed to copy URL");
     }
   };

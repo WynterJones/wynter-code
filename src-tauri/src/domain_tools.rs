@@ -1,5 +1,22 @@
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::process::Command;
+
+use crate::rate_limiter::{check_rate_limit, categories};
+
+lazy_static! {
+    /// Compiled regex for validating domain names
+    static ref DOMAIN_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$")
+        .expect("invalid domain regex pattern");
+
+    /// Compiled regex for validating IPv4 addresses
+    static ref IPV4_REGEX: Regex = Regex::new(r"^(\d{1,3}\.){3}\d{1,3}$")
+        .expect("invalid IPv4 regex pattern");
+
+    /// Compiled regex for validating IPv6 addresses
+    static ref IPV6_REGEX: Regex = Regex::new(r"^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$")
+        .expect("invalid IPv6 regex pattern");
+}
 
 /// Validate a domain name to prevent command injection
 /// Allows: alphanumeric, hyphens, dots, and underscores
@@ -9,11 +26,7 @@ fn validate_domain(domain: &str) -> Result<(), String> {
         return Err("Invalid domain: must be 1-253 characters".to_string());
     }
 
-    // Domain regex: labels separated by dots, each label is alphanumeric with optional hyphens
-    let domain_regex = Regex::new(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$")
-        .map_err(|e| format!("Regex error: {}", e))?;
-
-    if !domain_regex.is_match(domain) {
+    if !DOMAIN_REGEX.is_match(domain) {
         return Err("Invalid domain: contains invalid characters or format".to_string());
     }
 
@@ -42,10 +55,7 @@ fn validate_record_type(record_type: &str) -> Result<(), String> {
 /// Validate an IP address (for DNS server)
 fn validate_ip_or_hostname(server: &str) -> Result<(), String> {
     // Allow IPv4, IPv6, or valid hostnames
-    let ipv4_regex = Regex::new(r"^(\d{1,3}\.){3}\d{1,3}$").unwrap();
-    let ipv6_regex = Regex::new(r"^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$").unwrap();
-
-    if ipv4_regex.is_match(server) || ipv6_regex.is_match(server) {
+    if IPV4_REGEX.is_match(server) || IPV6_REGEX.is_match(server) {
         return Ok(());
     }
 
@@ -80,6 +90,7 @@ fn validate_url(url: &str) -> Result<(), String> {
 /// Perform a WHOIS lookup for a domain
 #[tauri::command]
 pub async fn whois_lookup(domain: String) -> Result<String, String> {
+    check_rate_limit(categories::DOMAIN)?;
     validate_domain(&domain)?;
 
     let output = Command::new("whois")
@@ -103,6 +114,7 @@ pub async fn whois_lookup(domain: String) -> Result<String, String> {
 /// Perform a DNS lookup for a domain using dig
 #[tauri::command]
 pub async fn dns_lookup(domain: String, record_type: String) -> Result<String, String> {
+    check_rate_limit(categories::DOMAIN)?;
     validate_domain(&domain)?;
     validate_record_type(&record_type)?;
 
@@ -129,6 +141,7 @@ pub async fn dns_lookup_server(
     record_type: String,
     dns_server: String,
 ) -> Result<String, String> {
+    check_rate_limit(categories::DOMAIN)?;
     validate_domain(&domain)?;
     validate_record_type(&record_type)?;
     validate_ip_or_hostname(&dns_server)?;
@@ -156,6 +169,7 @@ pub async fn dns_lookup_server(
 /// SECURITY: Rewrote to avoid shell interpolation (command injection vulnerability)
 #[tauri::command]
 pub async fn ssl_check(domain: String) -> Result<String, String> {
+    check_rate_limit(categories::DOMAIN)?;
     validate_domain(&domain)?;
 
     // Step 1: Connect with openssl s_client and get the certificate
@@ -211,6 +225,7 @@ pub async fn ssl_check(domain: String) -> Result<String, String> {
 /// Perform an HTTP HEAD request to get headers
 #[tauri::command]
 pub async fn http_head_request(url: String) -> Result<String, String> {
+    check_rate_limit(categories::HTTP)?;
     validate_url(&url)?;
 
     let output = Command::new("curl")
@@ -234,6 +249,7 @@ pub async fn http_head_request(url: String) -> Result<String, String> {
 /// Fetch JSON from a URL
 #[tauri::command]
 pub async fn http_get_json(url: String) -> Result<String, String> {
+    check_rate_limit(categories::HTTP)?;
     validate_url(&url)?;
 
     let output = Command::new("curl")
@@ -277,6 +293,7 @@ pub async fn http_get_json(url: String) -> Result<String, String> {
 /// Fetch HTML content from a URL
 #[tauri::command]
 pub async fn http_get_html(url: String) -> Result<String, String> {
+    check_rate_limit(categories::HTTP)?;
     validate_url(&url)?;
 
     let output = Command::new("curl")
@@ -301,6 +318,7 @@ pub async fn http_get_html(url: String) -> Result<String, String> {
 /// Follow redirects and return the chain
 #[tauri::command]
 pub async fn http_follow_redirects(url: String) -> Result<String, String> {
+    check_rate_limit(categories::HTTP)?;
     validate_url(&url)?;
 
     // Use curl with -w to get redirect info in a parseable format

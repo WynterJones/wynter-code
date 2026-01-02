@@ -113,7 +113,7 @@ export function BeadsTrackerPopup({
 
       setBeadsStatus("installed");
       return true;
-    } catch {
+    } catch (error) {
       setBeadsStatus("not_installed_globally");
       return false;
     }
@@ -326,12 +326,12 @@ export function BeadsTrackerPopup({
 
             <div className="flex items-center gap-2">
               <Tooltip content="Refresh">
-                <IconButton size="sm" onClick={handleRefresh} disabled={loading}>
+                <IconButton size="sm" onClick={handleRefresh} disabled={loading} aria-label="Refresh issues">
                   <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
                 </IconButton>
               </Tooltip>
               <Tooltip content="Close">
-                <IconButton size="sm" onClick={onClose}>
+                <IconButton size="sm" onClick={onClose} aria-label="Close beads tracker">
                   <X className="w-4 h-4" />
                 </IconButton>
               </Tooltip>
@@ -419,7 +419,7 @@ function CreateIssueModal({ isOpen, onClose }: CreateIssueModalProps) {
           <h3 className="text-base font-medium text-text-primary">
             Create Issue
           </h3>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close create issue dialog">
             <X className="w-4 h-4" />
           </IconButton>
         </div>

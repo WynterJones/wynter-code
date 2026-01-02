@@ -50,7 +50,7 @@ export function getCategoryData(keys: string[]): Record<string, unknown> {
     if (item) {
       try {
         data[key] = JSON.parse(item);
-      } catch {
+      } catch (error) {
         data[key] = item;
       }
     }

@@ -42,7 +42,7 @@ export function PdfViewerPopup({ filePath, onClose }: PdfViewerPopupProps) {
           <span className="font-mono text-sm text-text-primary">{fileName}</span>
           <div className="flex items-center gap-1">
             <Tooltip content="Zoom Out (-)" side="bottom">
-              <IconButton size="sm" onClick={handleZoomOut}>
+              <IconButton size="sm" onClick={handleZoomOut} aria-label="Zoom out">
                 <ZoomOut className="w-4 h-4" />
               </IconButton>
             </Tooltip>
@@ -50,18 +50,18 @@ export function PdfViewerPopup({ filePath, onClose }: PdfViewerPopupProps) {
               {zoom}%
             </span>
             <Tooltip content="Zoom In (+)" side="bottom">
-              <IconButton size="sm" onClick={handleZoomIn}>
+              <IconButton size="sm" onClick={handleZoomIn} aria-label="Zoom in">
                 <ZoomIn className="w-4 h-4" />
               </IconButton>
             </Tooltip>
             <Tooltip content="Reset (0)" side="bottom">
-              <IconButton size="sm" onClick={handleResetZoom}>
+              <IconButton size="sm" onClick={handleResetZoom} aria-label="Reset zoom level">
                 <Maximize2 className="w-4 h-4" />
               </IconButton>
             </Tooltip>
             <div className="w-px h-4 bg-border mx-2" />
             <Tooltip content="Close (Esc)" side="bottom">
-              <IconButton size="sm" onClick={onClose}>
+              <IconButton size="sm" onClick={onClose} aria-label="Close PDF viewer">
                 <X className="w-4 h-4" />
               </IconButton>
             </Tooltip>

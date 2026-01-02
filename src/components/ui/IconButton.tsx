@@ -1,4 +1,4 @@
-import { ButtonHTMLAttributes, forwardRef, useEffect } from "react";
+import { ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 interface IconButtonProps
@@ -20,15 +20,6 @@ const variantStyles = {
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
   ({ className, size = "md", variant = "default", children, ...props }, ref) => {
-    // Dev warning for missing aria-label on icon-only buttons
-    useEffect(() => {
-      if (process.env.NODE_ENV === "development" && !props["aria-label"] && !props.title) {
-        console.warn(
-          "IconButton: Missing aria-label. Icon-only buttons should have an aria-label for accessibility."
-        );
-      }
-    }, []);
-
     return (
       <button
         ref={ref}

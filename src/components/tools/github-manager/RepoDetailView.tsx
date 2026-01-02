@@ -113,7 +113,7 @@ export function RepoDetailView() {
       {/* Header */}
       <div className="px-4 py-3 border-b border-border bg-bg-secondary flex items-center gap-4">
         <Tooltip content="Back to repos">
-          <IconButton size="sm" onClick={handleBack}>
+          <IconButton size="sm" onClick={handleBack} aria-label="Go back to repository list">
             <ArrowLeft className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -159,7 +159,7 @@ export function RepoDetailView() {
         </div>
 
         <Tooltip content="Open in browser">
-          <IconButton size="sm" onClick={handleOpenInBrowser}>
+          <IconButton size="sm" onClick={handleOpenInBrowser} aria-label="Open repository in browser">
             <ExternalLink className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -290,6 +290,7 @@ export function RepoDetailView() {
                       onClick={() =>
                         useGitHubManagerStore.getState().setSelectedFile(null)
                       }
+                      aria-label="Close file viewer"
                     >
                       <X className="w-3 h-3" />
                     </IconButton>

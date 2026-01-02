@@ -151,6 +151,7 @@ export function CaseConverter() {
                     size="sm"
                     onClick={() => handleCopy(converted, option.id)}
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={`Copy ${option.name} text`}
                   >
                     {copied === option.id ? (
                       <Check className="w-3.5 h-3.5 text-green-400" />

@@ -532,8 +532,8 @@ function loadFavorites(): Set<string> {
     if (stored) {
       return new Set(JSON.parse(stored));
     }
-  } catch (e) {
-    console.error("Failed to load favorites:", e);
+  } catch (error) {
+    console.error("Failed to load favorites:", error);
   }
   return new Set();
 }
@@ -541,8 +541,8 @@ function loadFavorites(): Set<string> {
 function saveFavorites(favorites: Set<string>) {
   try {
     localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify([...favorites]));
-  } catch (e) {
-    console.error("Failed to save favorites:", e);
+  } catch (error) {
+    console.error("Failed to save favorites:", error);
   }
 }
 
@@ -813,7 +813,7 @@ export function ProjectTemplatesPopup({
     return (
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-3 pb-3 border-b border-border">
-          <IconButton size="sm" onClick={handleBack}>
+          <IconButton size="sm" onClick={handleBack} aria-label="Go back to template selection">
             <ArrowLeft className="w-4 h-4" />
           </IconButton>
           <div className={selectedTemplate.color}>

@@ -52,7 +52,7 @@ export function KeyboardShortcutsPopup({ onClose }: KeyboardShortcutsPopupProps)
             <span className="font-medium text-text-primary">Keyboard Shortcuts</span>
           </div>
           <Tooltip content="Close (Esc)" side="bottom">
-            <IconButton size="sm" onClick={onClose}>
+            <IconButton size="sm" onClick={onClose} aria-label="Close keyboard shortcuts">
               <X className="w-4 h-4" />
             </IconButton>
           </Tooltip>

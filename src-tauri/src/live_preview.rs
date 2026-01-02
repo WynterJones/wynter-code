@@ -111,7 +111,7 @@ impl PreviewManager {
 
     /// Get info for a specific server by ID
     pub fn get_server_info(&self, server_id: &str) -> Option<PreviewServerInfo> {
-        let servers = self.servers.lock().unwrap();
+        let servers = self.servers.lock().expect("PreviewManager servers mutex poisoned");
         servers.get(server_id).map(|instance| PreviewServerInfo {
             server_id: server_id.to_string(),
             project_path: instance.project_path.clone(),
@@ -128,7 +128,7 @@ impl PreviewManager {
 
     /// List all servers
     pub fn list_all_servers(&self) -> Vec<PreviewServerInfo> {
-        let servers = self.servers.lock().unwrap();
+        let servers = self.servers.lock().expect("PreviewManager servers mutex poisoned");
         servers.iter().map(|(id, instance)| PreviewServerInfo {
             server_id: id.clone(),
             project_path: instance.project_path.clone(),
@@ -145,7 +145,7 @@ impl PreviewManager {
 
     /// Get info for a newly started server (for immediate response after start)
     pub fn get_started_server_info(&self, server_id: &str) -> Option<(u16, String, Option<String>)> {
-        let servers = self.servers.lock().unwrap();
+        let servers = self.servers.lock().expect("PreviewManager servers mutex poisoned");
         servers.get(server_id).map(|s| (s.port, s.url.clone(), s.local_url.clone()))
     }
 }
@@ -221,6 +221,14 @@ pub async fn check_port_status(port: u16) -> Result<PortCheckResult, String> {
 
 #[tauri::command]
 pub async fn kill_process_on_port(port: u16) -> Result<(), String> {
+    // Security: Restrict to non-privileged ports (>= 1024) to prevent killing system services
+    if port < 1024 {
+        return Err(format!(
+            "Cannot kill processes on privileged ports (< 1024). Port {} is restricted.",
+            port
+        ));
+    }
+
     // Use lsof to find the process listening on the port, then kill it
     let output = Command::new("lsof")
         .args(["-t", "-i", &format!(":{}", port)])
@@ -234,12 +242,55 @@ pub async fn kill_process_on_port(port: u16) -> Result<(), String> {
         return Err(format!("No process found on port {}", port));
     }
 
+    // Get current user for ownership validation
+    let current_user = std::env::var("USER").unwrap_or_else(|_| "".to_string());
+    if current_user.is_empty() {
+        return Err("Could not determine current user for process validation".to_string());
+    }
+
+    let mut killed_count = 0;
+    let mut skipped_count = 0;
+
     for pid in pids {
-        if !pid.is_empty() {
-            let _ = Command::new("kill")
-                .args(["-9", pid])
-                .output();
+        if pid.is_empty() {
+            continue;
         }
+
+        // Validate PID is numeric
+        if pid.parse::<u32>().is_err() {
+            continue;
+        }
+
+        // Security: Verify process ownership before killing
+        // Use ps to check the owner of the process
+        let ps_output = Command::new("ps")
+            .args(["-o", "user=", "-p", pid])
+            .output()
+            .map_err(|e| format!("Failed to verify process ownership: {}", e))?;
+
+        let process_owner = String::from_utf8_lossy(&ps_output.stdout).trim().to_string();
+
+        if process_owner != current_user {
+            skipped_count += 1;
+            continue;
+        }
+
+        // Process is owned by current user, safe to kill
+        let _ = Command::new("kill")
+            .args(["-9", pid])
+            .output();
+        killed_count += 1;
+    }
+
+    if killed_count == 0 && skipped_count > 0 {
+        return Err(format!(
+            "Found {} process(es) on port {} but none are owned by current user",
+            skipped_count, port
+        ));
+    }
+
+    if killed_count == 0 {
+        return Err(format!("No valid process found on port {}", port));
     }
 
     Ok(())
@@ -423,7 +474,7 @@ pub async fn start_preview_server(
 
     // Create initial server instance
     {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
         servers.insert(
             server_id.clone(),
             PreviewInstance {
@@ -442,6 +493,20 @@ pub async fn start_preview_server(
     }
 
     // Emit starting event
+    #[cfg(debug_assertions)]
+    if let Err(e) = window.emit(
+        "preview-event",
+        PreviewEvent {
+            server_id: server_id.clone(),
+            event_type: "status_change".to_string(),
+            url: Some(url.clone()),
+            status: Some(PreviewStatus::Starting),
+            message: Some("Starting preview server...".to_string()),
+        },
+    ) {
+        eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+    }
+    #[cfg(not(debug_assertions))]
     let _ = window.emit(
         "preview-event",
         PreviewEvent {
@@ -534,7 +599,7 @@ fn start_framework_server(
     cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
     let mut child = cmd.spawn().map_err(|e| {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
         servers.remove(&server_id);
         format!("Failed to start dev server: {}", e)
     })?;
@@ -546,7 +611,7 @@ fn start_framework_server(
 
     // Update with PID
     {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
         if let Some(server) = servers.get_mut(&server_id) {
             server.child_pid = Some(child_pid);
         }
@@ -586,12 +651,26 @@ fn start_framework_server(
                             server_ready = true;
 
                             {
-                                let mut servers = state_clone.servers.lock().unwrap();
+                                let mut servers = state_clone.servers.lock().expect("PreviewManager servers mutex poisoned");
                                 if let Some(server) = servers.get_mut(&server_id_clone) {
                                     server.status = PreviewStatus::Running;
                                 }
                             }
 
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window_clone.emit(
+                                "preview-event",
+                                PreviewEvent {
+                                    server_id: server_id_clone.clone(),
+                                    event_type: "ready".to_string(),
+                                    url: Some(url.clone()),
+                                    status: Some(PreviewStatus::Running),
+                                    message: Some("Server is ready!".to_string()),
+                                },
+                            ) {
+                                eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window_clone.emit(
                                 "preview-event",
                                 PreviewEvent {
@@ -608,6 +687,20 @@ fn start_framework_server(
                 }
 
                 // Emit output
+                #[cfg(debug_assertions)]
+                if let Err(e) = window_clone.emit(
+                    "preview-event",
+                    PreviewEvent {
+                        server_id: server_id_clone.clone(),
+                        event_type: "output".to_string(),
+                        url: None,
+                        status: None,
+                        message: Some(line),
+                    },
+                ) {
+                    eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+                }
+                #[cfg(not(debug_assertions))]
                 let _ = window_clone.emit(
                     "preview-event",
                     PreviewEvent {
@@ -631,12 +724,26 @@ fn start_framework_server(
                             server_ready = true;
 
                             {
-                                let mut servers = state_clone.servers.lock().unwrap();
+                                let mut servers = state_clone.servers.lock().expect("PreviewManager servers mutex poisoned");
                                 if let Some(server) = servers.get_mut(&server_id_clone) {
                                     server.status = PreviewStatus::Running;
                                 }
                             }
 
+                            #[cfg(debug_assertions)]
+                            if let Err(e) = window_clone.emit(
+                                "preview-event",
+                                PreviewEvent {
+                                    server_id: server_id_clone.clone(),
+                                    event_type: "ready".to_string(),
+                                    url: Some(url.clone()),
+                                    status: Some(PreviewStatus::Running),
+                                    message: Some("Server is ready!".to_string()),
+                                },
+                            ) {
+                                eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+                            }
+                            #[cfg(not(debug_assertions))]
                             let _ = window_clone.emit(
                                 "preview-event",
                                 PreviewEvent {
@@ -652,6 +759,20 @@ fn start_framework_server(
                     }
                 }
 
+                #[cfg(debug_assertions)]
+                if let Err(e) = window_clone.emit(
+                    "preview-event",
+                    PreviewEvent {
+                        server_id: server_id_clone.clone(),
+                        event_type: "output".to_string(),
+                        url: None,
+                        status: None,
+                        message: Some(line),
+                    },
+                ) {
+                    eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+                }
+                #[cfg(not(debug_assertions))]
                 let _ = window_clone.emit(
                     "preview-event",
                     PreviewEvent {
@@ -674,12 +795,26 @@ fn start_framework_server(
         };
 
         {
-            let mut servers = state_clone.servers.lock().unwrap();
+            let mut servers = state_clone.servers.lock().expect("PreviewManager servers mutex poisoned");
             if let Some(server) = servers.get_mut(&server_id_clone) {
                 server.status = PreviewStatus::Idle;
             }
         }
 
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit(
+            "preview-event",
+            PreviewEvent {
+                server_id: server_id_clone,
+                event_type: "stopped".to_string(),
+                url: None,
+                status: Some(PreviewStatus::Idle),
+                message: error_msg,
+            },
+        ) {
+            eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit(
             "preview-event",
             PreviewEvent {
@@ -706,7 +841,7 @@ fn start_static_server(
 
     // Store shutdown signal
     {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
         if let Some(server) = servers.get_mut(&server_id) {
             server.shutdown_signal = Some(shutdown_signal.clone());
         }
@@ -719,13 +854,27 @@ fn start_static_server(
 
     // Update status to running
     {
-        let mut servers = state.servers.lock().unwrap();
+        let mut servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
         if let Some(server) = servers.get_mut(&server_id) {
             server.status = PreviewStatus::Running;
         }
     }
 
     // Emit ready event
+    #[cfg(debug_assertions)]
+    if let Err(e) = window.emit(
+        "preview-event",
+        PreviewEvent {
+            server_id: server_id.clone(),
+            event_type: "ready".to_string(),
+            url: Some(url.clone()),
+            status: Some(PreviewStatus::Running),
+            message: Some("Static server is ready!".to_string()),
+        },
+    ) {
+        eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+    }
+    #[cfg(not(debug_assertions))]
     let _ = window.emit(
         "preview-event",
         PreviewEvent {
@@ -777,7 +926,7 @@ fn start_static_server(
 
         loop {
             // Check shutdown signal
-            if *shutdown_signal.lock().unwrap() {
+            if *shutdown_signal.lock().expect("PreviewManager servers mutex poisoned") {
                 break;
             }
 
@@ -864,12 +1013,26 @@ fn start_static_server(
 
         // Server stopped
         {
-            let mut servers = state_clone.servers.lock().unwrap();
+            let mut servers = state_clone.servers.lock().expect("PreviewManager servers mutex poisoned");
             if let Some(server) = servers.get_mut(&server_id_clone) {
                 server.status = PreviewStatus::Idle;
             }
         }
 
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit(
+            "preview-event",
+            PreviewEvent {
+                server_id: server_id_clone,
+                event_type: "stopped".to_string(),
+                url: None,
+                status: Some(PreviewStatus::Idle),
+                message: None,
+            },
+        ) {
+            eprintln!("[DEBUG] Failed to emit 'preview-event': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit(
             "preview-event",
             PreviewEvent {
@@ -892,7 +1055,7 @@ pub async fn stop_preview_server(
     server_id: String,
 ) -> Result<(), String> {
     let (child_pid, shutdown_signal) = {
-        let servers = state.servers.lock().unwrap();
+        let servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
         servers.get(&server_id).map(|s| (s.child_pid, s.shutdown_signal.clone())).unwrap_or((None, None))
     };
 
@@ -907,12 +1070,12 @@ pub async fn stop_preview_server(
 
     // For static servers, set shutdown signal
     if let Some(signal) = shutdown_signal {
-        let mut sig = signal.lock().unwrap();
+        let mut sig = signal.lock().expect("PreviewManager servers mutex poisoned");
         *sig = true;
     }
 
     // Remove from manager
-    let mut servers = state.servers.lock().unwrap();
+    let mut servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
     servers.remove(&server_id);
 
     Ok(())
@@ -920,7 +1083,7 @@ pub async fn stop_preview_server(
 
 #[tauri::command]
 pub fn list_preview_servers(state: State<'_, Arc<PreviewManager>>) -> Result<Vec<PreviewServerInfo>, String> {
-    let servers = state.servers.lock().unwrap();
+    let servers = state.servers.lock().expect("PreviewManager servers mutex poisoned");
 
     let server_list: Vec<PreviewServerInfo> = servers
         .iter()

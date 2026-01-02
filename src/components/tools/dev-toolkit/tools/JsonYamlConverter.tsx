@@ -22,8 +22,8 @@ export function JsonYamlConverter() {
         setOutput(JSON.stringify(parsed, null, 2));
       }
       setError(null);
-    } catch (e) {
-      setError(`Conversion error: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Conversion error: ${(error as Error).message}`);
       setOutput("");
     }
   };

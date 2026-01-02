@@ -100,7 +100,7 @@ export function McpManagerPopup() {
 
             {/* Actions */}
             <Tooltip content="Refresh">
-              <IconButton size="sm" onClick={handleRefresh} disabled={isLoading}>
+              <IconButton size="sm" onClick={handleRefresh} disabled={isLoading} aria-label="Refresh MCP servers">
                 <RefreshCw
                   className={cn("w-4 h-4", isLoading && "animate-spin")}
                 />
@@ -111,6 +111,7 @@ export function McpManagerPopup() {
               <IconButton
                 size="sm"
                 onClick={() => openForm()}
+                aria-label="Add new MCP server"
                 className="text-accent hover:bg-accent/10"
               >
                 <Plus className="w-4 h-4" />

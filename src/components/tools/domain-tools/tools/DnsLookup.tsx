@@ -43,8 +43,8 @@ export function DnsLookup({ url, onUrlChange }: DnsLookupProps) {
       // Parse dig output
       const parsed = parseDnsOutput(result, recordType);
       setRecords(parsed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to perform DNS lookup");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to perform DNS lookup");
     } finally {
       setLoading(false);
     }

@@ -500,7 +500,7 @@ export function ClaudeCodeStatsPopup({
               </span>
             )}
             <Tooltip content="Refresh">
-              <IconButton size="sm" onClick={fetchStats} disabled={loading}>
+              <IconButton size="sm" onClick={fetchStats} disabled={loading} aria-label="Refresh stats">
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               </IconButton>
             </Tooltip>

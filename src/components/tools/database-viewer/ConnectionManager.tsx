@@ -84,7 +84,7 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-medium">Connections</h3>
           <Tooltip content="Detect Local Databases">
-            <IconButton size="sm" onClick={detectServices} disabled={detectingServices}>
+            <IconButton size="sm" onClick={detectServices} disabled={detectingServices} aria-label="Detect local databases">
               {detectingServices ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
@@ -128,6 +128,7 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                           size="sm"
                           className="p-1"
                           onClick={() => createConnectionFromService(service)}
+                          aria-label="Add connection from detected service"
                         >
                           <Plus className="w-3.5 h-3.5" />
                         </IconButton>
@@ -186,7 +187,7 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                     </div>
                     <div className="flex items-center gap-1">
                       <Tooltip content="Edit">
-                        <IconButton size="sm" onClick={() => handleEdit(connection)} className="p-1">
+                        <IconButton size="sm" onClick={() => handleEdit(connection)} className="p-1" aria-label="Edit connection">
                           <Edit2 className="w-3.5 h-3.5" />
                         </IconButton>
                       </Tooltip>
@@ -196,6 +197,7 @@ export function ConnectionManager({ isVisible }: ConnectionManagerProps) {
                           onClick={() => handleDelete(connection.id)}
                           disabled={connected}
                           className="p-1"
+                          aria-label="Delete connection"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </IconButton>

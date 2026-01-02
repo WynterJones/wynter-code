@@ -11,8 +11,8 @@ export function JsonFormatter() {
       const parsed = JSON.parse(input);
       setOutput(JSON.stringify(parsed, null, 2));
       setError(null);
-    } catch (e) {
-      setError(`Invalid JSON: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Invalid JSON: ${(error as Error).message}`);
       setOutput("");
     }
   };
@@ -22,8 +22,8 @@ export function JsonFormatter() {
       const parsed = JSON.parse(input);
       setOutput(JSON.stringify(parsed));
       setError(null);
-    } catch (e) {
-      setError(`Invalid JSON: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Invalid JSON: ${(error as Error).message}`);
       setOutput("");
     }
   };
@@ -33,8 +33,8 @@ export function JsonFormatter() {
       JSON.parse(input);
       setOutput("Valid JSON");
       setError(null);
-    } catch (e) {
-      setError(`Invalid JSON: ${(e as Error).message}`);
+    } catch (error) {
+      setError(`Invalid JSON: ${(error as Error).message}`);
       setOutput("");
     }
   };

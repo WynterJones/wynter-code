@@ -258,7 +258,7 @@ export function AudioPlayerWithVisualizer({
     if (!ctx) return;
 
     const { width, height } = canvas;
-    let frequencyData = getFrequencyData();
+    const frequencyData = getFrequencyData();
 
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = "rgba(10, 10, 16, 0.2)";

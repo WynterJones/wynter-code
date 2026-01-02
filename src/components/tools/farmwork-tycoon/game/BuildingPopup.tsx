@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import {
   Shield,
   TestTube2,
@@ -148,7 +148,24 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
     onOpenAuditFile(building.type);
   }, [building, onOpenAuditFile]);
 
-  if (!isAnimating || !building || !info) return null;
+  // Memoize color-based styles to avoid recreation on every render
+  const colorStyles = useMemo(() => {
+    if (!info) return null;
+    return {
+      color: { color: info.color },
+      bgLight: { backgroundColor: `${info.color}20` },
+      segmentBase: {
+        backgroundColor: `${info.color}15`,
+        boxShadow: "inset 0 1px 2px rgba(0,0,0,0.3)",
+      },
+      segmentFilled: {
+        backgroundColor: info.color,
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)",
+      },
+    };
+  }, [info?.color]);
+
+  if (!isAnimating || !building || !info || !colorStyles) return null;
 
   const Icon = info.icon;
   const auditKey = AUDIT_KEY_MAP[building.type];
@@ -223,9 +240,9 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
           <div className="flex items-center gap-3 pr-16">
             <div
               className="p-2.5 rounded-lg shrink-0"
-              style={{ backgroundColor: `${info.color}20` }}
+              style={colorStyles.bgLight}
             >
-              <Icon className="w-6 h-6" style={{ color: info.color }} />
+              <Icon className="w-6 h-6" style={colorStyles.color} />
             </div>
             <div className="min-w-0">
               <h3 className="text-sm font-semibold text-text-primary truncate">
@@ -233,7 +250,7 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
               </h3>
               <span
                 className="text-xs font-mono"
-                style={{ color: info.color }}
+                style={colorStyles.color}
               >
                 {info.type === "audit" && metadata
                   ? `${metadata.score % 1 === 0 ? metadata.score : metadata.score.toFixed(1)}/10`
@@ -250,7 +267,7 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[10px]">
                 <span className="text-text-tertiary uppercase tracking-wider">Score</span>
-                <span className="font-mono font-bold" style={{ color: info.color }}>
+                <span className="font-mono font-bold" style={colorStyles.color}>
                   {metadata.score % 1 === 0 ? metadata.score : metadata.score.toFixed(1)}/10
                 </span>
               </div>
@@ -264,27 +281,20 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
                     <div
                       key={i}
                       className="flex-1 rounded-[4px] relative overflow-hidden"
-                      style={{
-                        backgroundColor: `${info.color}15`,
-                        boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
-                      }}
+                      style={colorStyles.segmentBase}
                     >
                       {isFilled && (
                         <div
                           className="absolute inset-0 rounded-[4px]"
-                          style={{
-                            backgroundColor: info.color,
-                            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
-                          }}
+                          style={colorStyles.segmentFilled}
                         />
                       )}
                       {isPartial && (
                         <div
                           className="absolute inset-y-0 left-0 rounded-[4px]"
                           style={{
-                            backgroundColor: info.color,
+                            ...colorStyles.segmentFilled,
                             width: `${partialFill}%`,
-                            boxShadow: `inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 1px rgba(0,0,0,0.2)`,
                           }}
                         />
                       )}
@@ -353,7 +363,7 @@ export function BuildingPopup({ buildingId, onClose, onOpenAuditFile }: Building
                 </span>
                 <span
                   className="text-2xl font-mono font-bold"
-                  style={{ color: info.color }}
+                  style={colorStyles.color}
                 >
                   {getCountValue()}
                 </span>

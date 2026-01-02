@@ -367,7 +367,7 @@ export function SessionTabBar({
               setCloseConfirmSessionId(sessionId);
               return;
             }
-          } catch {
+          } catch (error) {
             // If check fails, just close
           }
         }

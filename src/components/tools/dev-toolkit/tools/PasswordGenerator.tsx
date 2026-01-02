@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { cn } from "@/lib/utils";
+import { useCopyWithFeedback } from "@/hooks/useCopyWithFeedback";
 
 interface PasswordOptions {
   length: number;
@@ -77,7 +78,7 @@ export function PasswordGenerator() {
     symbols: true,
     excludeAmbiguous: false,
   });
-  const [copied, setCopied] = useState<number | null>(null);
+  const { copy, isCopied } = useCopyWithFeedback();
 
   const handleGenerate = useCallback(() => {
     const newPasswords: string[] = [];
@@ -86,12 +87,6 @@ export function PasswordGenerator() {
     }
     setPasswords(newPasswords);
   }, [options, count]);
-
-  const handleCopy = async (password: string, index: number) => {
-    await navigator.clipboard.writeText(password);
-    setCopied(index);
-    setTimeout(() => setCopied(null), 2000);
-  };
 
   const strength = passwords[0] ? calculateStrength(passwords[0], options) : null;
 
@@ -216,13 +211,14 @@ export function PasswordGenerator() {
               <code className="flex-1 font-mono text-sm text-text-primary select-all break-all">
                 {password}
               </code>
-              <Tooltip content={copied === i ? "Copied!" : "Copy"}>
+              <Tooltip content={isCopied(String(i)) ? "Copied!" : "Copy"}>
                 <IconButton
                   size="sm"
-                  onClick={() => handleCopy(password, i)}
+                  onClick={() => copy(password, String(i))}
                   className="opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                  aria-label="Copy password"
                 >
-                  {copied === i ? (
+                  {isCopied(String(i)) ? (
                     <Check className="w-3.5 h-3.5 text-green-400" />
                   ) : (
                     <Copy className="w-3.5 h-3.5" />

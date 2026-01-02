@@ -49,7 +49,7 @@ function encodeHtmlEntities(text: string, encodeAll: boolean = false): string {
       .join("");
   }
 
-  return text.replace(/[&<>"'`=\/]/g, (char) => HTML_ENTITIES[char] || char);
+  return text.replace(/[&<>"'`=/]/g, (char) => HTML_ENTITIES[char] || char);
 }
 
 function decodeHtmlEntities(text: string): string {
@@ -63,7 +63,7 @@ function encodeToNumericEntities(text: string): string {
     .split("")
     .map((char) => {
       const code = char.charCodeAt(0);
-      if (code > 127 || /[&<>"'`=\/]/.test(char)) {
+      if (code > 127 || /[&<>"'`=/]/.test(char)) {
         return `&#${code};`;
       }
       return char;
@@ -76,7 +76,7 @@ function encodeToHexEntities(text: string): string {
     .split("")
     .map((char) => {
       const code = char.charCodeAt(0);
-      if (code > 127 || /[&<>"'`=\/]/.test(char)) {
+      if (code > 127 || /[&<>"'`=/]/.test(char)) {
         return `&#x${code.toString(16).toUpperCase()};`;
       }
       return char;

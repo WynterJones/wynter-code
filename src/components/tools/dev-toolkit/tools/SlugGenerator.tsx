@@ -15,7 +15,7 @@ function removeAccents(text: string): string {
 }
 
 function toSlug(text: string, separator: string = "-", lowercase: boolean = true): string {
-  let slug = removeAccents(text)
+  const slug = removeAccents(text)
     .replace(/[^\w\s-]/g, "")
     .trim()
     .replace(/[\s_]+/g, separator)
@@ -88,7 +88,7 @@ export function SlugGenerator() {
           <label className="text-sm font-medium text-text-secondary">Input Text</label>
           {input && (
             <Tooltip content="Clear">
-              <IconButton size="sm" onClick={handleClear}>
+              <IconButton size="sm" onClick={handleClear} aria-label="Clear input">
                 <Trash2 className="w-3.5 h-3.5" />
               </IconButton>
             </Tooltip>
@@ -142,6 +142,7 @@ export function SlugGenerator() {
                   size="sm"
                   onClick={() => handleCopy(option.slug, option.id)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  aria-label={`Copy ${option.name} slug`}
                 >
                   {copied === option.id ? (
                     <Check className="w-3.5 h-3.5 text-green-400" />

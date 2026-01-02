@@ -14,6 +14,7 @@ import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { IconButton, Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useBeadsStore } from "@/stores/beadsStore";
+import { IssueDetailPopup } from "./IssueDetailPopup";
 import type {
   BeadsIssue,
   BeadsStatus,
@@ -70,6 +71,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
   const [closingId, setClosingId] = useState<string | null>(null);
   const [closeReason, setCloseReason] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<BeadsIssue | null>(null);
 
   const handleCopyId = async (id: string) => {
     await navigator.clipboard.writeText(id);
@@ -172,12 +174,12 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
 
         {/* Actions */}
         <Tooltip content="Refresh">
-          <IconButton size="sm" onClick={() => fetchIssues()} disabled={loading}>
+          <IconButton size="sm" onClick={() => fetchIssues()} disabled={loading} aria-label="Refresh issues">
             <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
           </IconButton>
         </Tooltip>
         <Tooltip content="Create Issue">
-          <IconButton size="sm" onClick={onCreateIssue}>
+          <IconButton size="sm" onClick={onCreateIssue} aria-label="Create new issue">
             <Plus className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -211,7 +213,8 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
               filteredIssues.map((issue) => (
                 <tr
                   key={issue.id}
-                  className="border-b border-border/50 hover:bg-bg-tertiary/30 transition-colors"
+                  className="border-b border-border/50 hover:bg-bg-tertiary/30 transition-colors cursor-pointer"
+                  onClick={() => setSelectedIssue(issue)}
                 >
                   <td className="px-4 py-3">
                     <span className="font-mono text-xs text-text-secondary">
@@ -231,7 +234,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                   <td className="px-4 py-3">
                     <span className="text-sm text-text-primary">{issue.title}</span>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     {closingId === issue.id ? (
                       <div className="flex items-center gap-1">
                         <input
@@ -252,6 +255,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                         <IconButton
                           size="sm"
                           onClick={() => handleClose(issue.id)}
+                          aria-label="Confirm close issue"
                           className="text-green-400"
                         >
                           <Check className="w-3 h-3" />
@@ -262,6 +266,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                             setClosingId(null);
                             setCloseReason("");
                           }}
+                          aria-label="Cancel close issue"
                         >
                           <X className="w-3 h-3" />
                         </IconButton>
@@ -284,7 +289,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                       </select>
                     )}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <PhaseSelector
                       value={issue.phase}
                       onChange={(phase) => updateIssue(issue.id, { phase })}
@@ -298,12 +303,13 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                       </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
                       <Tooltip content={copiedId === issue.id ? "Copied!" : "Copy ID"}>
                         <IconButton
                           size="sm"
                           onClick={() => handleCopyId(issue.id)}
+                          aria-label="Copy issue ID"
                           className={cn(
                             "transition-colors",
                             copiedId === issue.id
@@ -323,6 +329,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                           <IconButton
                             size="sm"
                             onClick={() => handleReopen(issue.id)}
+                            aria-label="Reopen issue"
                             className="text-amber-400 hover:bg-amber-500/10"
                           >
                             <RotateCcw className="w-3 h-3" />
@@ -345,6 +352,15 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
           ? ` (filtered from ${issues.length})`
           : ""}
       </div>
+
+      {/* Issue Detail Popup */}
+      {selectedIssue && (
+        <IssueDetailPopup
+          issue={selectedIssue}
+          isOpen={!!selectedIssue}
+          onClose={() => setSelectedIssue(null)}
+        />
+      )}
     </div>
   );
 }

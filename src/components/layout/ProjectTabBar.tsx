@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, lazy, Suspense } from "react";
 import {
   Plus,
   X,
@@ -53,29 +53,32 @@ import {
   SystemHealthPopup,
   LivePreviewPopup,
   EnvManagerPopup,
-  ApiTesterPopup,
   ProjectTemplatesPopup,
   TestRunnerPopup,
   StorybookViewerPopup,
   BackgroundServicesPopup,
-  DatabaseViewerPopup,
   OverwatchPopup,
   BeadsTrackerPopup,
   FaviconGeneratorPopup,
   DesignerToolPopup,
   FarmworkTycoonPopup,
   MiniGamePlayer,
-  HomebrewManagerPopup,
   GitHubManagerPopup,
   ScratchpadPopup,
 } from "@/components/tools";
+
+// Lazy-loaded tool popups for code-splitting (large components loaded on-demand)
+const DatabaseViewerPopup = lazy(() => import("@/components/tools/database-viewer/DatabaseViewerPopup").then(m => ({ default: m.DatabaseViewerPopup })));
+const HomebrewManagerPopup = lazy(() => import("@/components/tools/homebrew-manager/HomebrewManagerPopup").then(m => ({ default: m.HomebrewManagerPopup })));
+const ApiTesterPopup = lazy(() => import("@/components/tools/api-tester/ApiTesterPopup").then(m => ({ default: m.ApiTesterPopup })));
+const SeoToolsPopup = lazy(() => import("@/components/tools/seo-tools/SeoToolsPopup").then(m => ({ default: m.SeoToolsPopup })));
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { McpManagerPopup } from "@/components/tools/mcp-manager";
 import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
 import { ClaudeCodeStatsPopup } from "@/components/tools/claude-code-stats";
 import { LimitsMonitorPopup } from "@/components/tools/limits-monitor";
 import { DomainToolsPopup } from "@/components/tools/domain-tools";
-import { SeoToolsPopup } from "@/components/tools/seo-tools";
+// SeoToolsPopup is lazy-loaded above
 import { NetlifyFtpPopup } from "@/components/tools/netlify-ftp";
 import { BookmarksPopup } from "@/components/tools/bookmarks";
 import { ProjectSearchPopup } from "@/components/tools/project-search";
@@ -696,7 +699,7 @@ export function ProjectTabBar({
       try {
         const homeDir = await invoke<string>("get_home_dir");
         setFileBrowserInitialPath(homeDir);
-      } catch {
+      } catch (error) {
         setFileBrowserInitialPath(undefined);
       }
     }
@@ -713,7 +716,7 @@ export function ProjectTabBar({
       try {
         const homeDir = await invoke<string>("get_home_dir");
         setFileBrowserInitialPath(homeDir);
-      } catch {
+      } catch (error) {
         setFileBrowserInitialPath(undefined);
       }
     }
@@ -770,6 +773,7 @@ export function ProjectTabBar({
               }
             }}
             className="text-[8px] text-text-secondary/50 font-mono hover:text-text-secondary transition-colors"
+            aria-label="Check for application updates"
           >
             {appVersion ? `v${appVersion}` : ""}
           </button>
@@ -872,7 +876,7 @@ export function ProjectTabBar({
       {/* Project Templates (New Project) */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="New Project">
-          <IconButton size="sm" onClick={() => setShowProjectTemplates(true)}>
+          <IconButton size="sm" onClick={() => setShowProjectTemplates(true)} aria-label="Create new project">
             <FolderPlus className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -885,6 +889,7 @@ export function ProjectTabBar({
             size="sm"
             onClick={() => setMeditationActive(!isMeditating)}
             className={cn(isMeditating && "text-accent")}
+            aria-label={isMeditating ? "Exit meditation mode" : "Enter meditation mode"}
           >
             <Music className="w-4 h-4" />
           </IconButton>
@@ -894,7 +899,7 @@ export function ProjectTabBar({
       {/* Workspace Board (Kanban) */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Workspace Board">
-          <IconButton size="sm" onClick={() => setShowKanbanBoard(true)}>
+          <IconButton size="sm" onClick={() => setShowKanbanBoard(true)} aria-label="Open workspace kanban board">
             <CheckSquare className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -903,7 +908,7 @@ export function ProjectTabBar({
       {/* Overwatch */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Overwatch">
-          <IconButton size="sm" onClick={() => setShowOverwatch(true)}>
+          <IconButton size="sm" onClick={() => setShowOverwatch(true)} aria-label="Open Overwatch service monitor">
             <Eye className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -912,7 +917,7 @@ export function ProjectTabBar({
       {/* Bookmarks */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Bookmarks">
-          <IconButton size="sm" onClick={() => setShowBookmarks(true)}>
+          <IconButton size="sm" onClick={() => setShowBookmarks(true)} aria-label="Open bookmarks manager">
             <Bookmark className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -921,7 +926,7 @@ export function ProjectTabBar({
       {/* Database Viewer */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Database Viewer">
-          <IconButton size="sm" onClick={() => setShowDatabaseViewer(true)}>
+          <IconButton size="sm" onClick={() => setShowDatabaseViewer(true)} aria-label="Open database viewer">
             <Database className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -930,7 +935,7 @@ export function ProjectTabBar({
       {/* Netlify FTP */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <Tooltip content="Netlify FTP">
-          <IconButton size="sm" onClick={() => setShowNetlifyFtp(true)}>
+          <IconButton size="sm" onClick={() => setShowNetlifyFtp(true)} aria-label="Open Netlify FTP manager">
             <CloudUpload className="w-4 h-4" />
           </IconButton>
         </Tooltip>
@@ -1010,7 +1015,7 @@ export function ProjectTabBar({
           </Tooltip>
         ) : (
           <Tooltip content="Settings" side="bottom">
-            <IconButton size="sm" onClick={onOpenSettings}>
+            <IconButton size="sm" onClick={onOpenSettings} aria-label="Open settings">
               <Settings className="w-4 h-4" />
             </IconButton>
           </Tooltip>
@@ -1078,11 +1083,15 @@ export function ProjectTabBar({
         onClose={() => setShowSystemHealth(false)}
       />
 
-      {/* Homebrew Manager Popup */}
-      <HomebrewManagerPopup
-        isOpen={showHomebrewManager}
-        onClose={() => setShowHomebrewManager(false)}
-      />
+      {/* Homebrew Manager Popup (lazy-loaded) */}
+      {showHomebrewManager && (
+        <Suspense fallback={null}>
+          <HomebrewManagerPopup
+            isOpen={showHomebrewManager}
+            onClose={() => setShowHomebrewManager(false)}
+          />
+        </Suspense>
+      )}
 
       {/* GitHub Manager Popup */}
       <GitHubManagerPopup
@@ -1121,11 +1130,15 @@ export function ProjectTabBar({
         onClose={() => setShowEnvManager(false)}
       />
 
-      {/* API Tester */}
-      <ApiTesterPopup
-        isOpen={showApiTester}
-        onClose={() => setShowApiTester(false)}
-      />
+      {/* API Tester (lazy-loaded) */}
+      {showApiTester && (
+        <Suspense fallback={null}>
+          <ApiTesterPopup
+            isOpen={showApiTester}
+            onClose={() => setShowApiTester(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Project Templates */}
       <ProjectTemplatesPopup
@@ -1155,11 +1168,15 @@ export function ProjectTabBar({
         onClose={() => setShowBackgroundServices(false)}
       />
 
-      {/* Database Viewer */}
-      <DatabaseViewerPopup
-        isOpen={showDatabaseViewer}
-        onClose={() => setShowDatabaseViewer(false)}
-      />
+      {/* Database Viewer (lazy-loaded) */}
+      {showDatabaseViewer && (
+        <Suspense fallback={null}>
+          <DatabaseViewerPopup
+            isOpen={showDatabaseViewer}
+            onClose={() => setShowDatabaseViewer(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Beads Tracker */}
       <BeadsTrackerPopup
@@ -1234,15 +1251,19 @@ export function ProjectTabBar({
         initialTool={domainToolsInitialTool}
       />
 
-      {/* SEO Tools */}
-      <SeoToolsPopup
-        isOpen={showSeoTools}
-        onClose={() => {
-          setShowSeoTools(false);
-          setSeoToolsInitialTool(undefined);
-        }}
-        initialTool={seoToolsInitialTool}
-      />
+      {/* SEO Tools (lazy-loaded) */}
+      {showSeoTools && (
+        <Suspense fallback={null}>
+          <SeoToolsPopup
+            isOpen={showSeoTools}
+            onClose={() => {
+              setShowSeoTools(false);
+              setSeoToolsInitialTool(undefined);
+            }}
+            initialTool={seoToolsInitialTool}
+          />
+        </Suspense>
+      )}
 
       {/* Netlify FTP */}
       <NetlifyFtpPopup

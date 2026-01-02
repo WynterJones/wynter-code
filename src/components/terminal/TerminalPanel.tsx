@@ -115,7 +115,7 @@ export function TerminalPanel({ projectId, projectPath }: TerminalPanelProps) {
           setShowCloseConfirm(true);
           return;
         }
-      } catch {
+      } catch (error) {
         // If check fails, just close
       }
     }

@@ -799,6 +799,7 @@ export function EnhancedPromptInput({
                 onClick={() => onRequestImageBrowser?.()}
                 className="text-text-secondary hover:text-accent"
                 disabled={isStreaming}
+                aria-label="Add image attachment"
               >
                 <ImagePlus className="w-4 h-4" />
               </IconButton>
@@ -808,6 +809,7 @@ export function EnhancedPromptInput({
                   size="sm"
                   onClick={handleStop}
                   className="text-accent-red hover:text-accent-red"
+                  aria-label="Stop response generation"
                 >
                   <StopCircle className="w-4 h-4" />
                 </IconButton>
@@ -821,6 +823,7 @@ export function EnhancedPromptInput({
                       ? "text-accent hover:text-accent"
                       : "text-text-secondary",
                   )}
+                  aria-label="Send prompt"
                 >
                   <Send className="w-4 h-4" />
                 </IconButton>

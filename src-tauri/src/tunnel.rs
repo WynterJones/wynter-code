@@ -9,9 +9,8 @@ use uuid::Uuid;
 
 use crate::process_registry::ProcessRegistry;
 
-/// Valid port range for tunnels (non-privileged ports only)
+/// Minimum port for tunnels (non-privileged ports only)
 const MIN_TUNNEL_PORT: u16 = 1024;
-const MAX_TUNNEL_PORT: u16 = 65535;
 
 /// Validate that a port is in a safe range for tunneling
 fn validate_tunnel_port(port: u16) -> Result<(), String> {
@@ -21,12 +20,7 @@ fn validate_tunnel_port(port: u16) -> Result<(), String> {
             port, MIN_TUNNEL_PORT, MIN_TUNNEL_PORT
         ));
     }
-    if port > MAX_TUNNEL_PORT {
-        return Err(format!(
-            "Security: Port {} is invalid. Maximum port is {}",
-            port, MAX_TUNNEL_PORT
-        ));
-    }
+    // Note: No upper bound check needed - u16 max is 65535, which is the valid port max
     Ok(())
 }
 
@@ -84,7 +78,7 @@ impl TunnelManager {
     /// Get info for a specific tunnel by ID
     #[allow(dead_code)]
     pub fn get_tunnel_info(&self, tunnel_id: &str) -> Option<TunnelInfo> {
-        let tunnels = self.tunnels.lock().unwrap();
+        let tunnels = self.tunnels.lock().expect("Tunnel manager mutex poisoned");
         tunnels.get(tunnel_id).map(|instance| TunnelInfo {
             tunnel_id: tunnel_id.to_string(),
             port: instance.port,
@@ -97,7 +91,7 @@ impl TunnelManager {
 
     /// List all tunnels
     pub fn list_all_tunnels(&self) -> Vec<TunnelInfo> {
-        let tunnels = self.tunnels.lock().unwrap();
+        let tunnels = self.tunnels.lock().expect("Tunnel manager mutex poisoned");
         tunnels.iter().map(|(id, instance)| TunnelInfo {
             tunnel_id: id.clone(),
             port: instance.port,
@@ -111,7 +105,7 @@ impl TunnelManager {
     /// Get tunnel URL and status for immediate response
     #[allow(dead_code)]
     pub fn get_tunnel_status(&self, tunnel_id: &str) -> Option<(Option<String>, TunnelStatus)> {
-        let tunnels = self.tunnels.lock().unwrap();
+        let tunnels = self.tunnels.lock().expect("Tunnel manager mutex poisoned");
         tunnels.get(tunnel_id).map(|t| (t.url.clone(), t.status.clone()))
     }
 }
@@ -150,7 +144,7 @@ pub async fn start_tunnel(
 
     // Create initial tunnel instance
     {
-        let mut tunnels = state.tunnels.lock().unwrap();
+        let mut tunnels = state.tunnels.lock().expect("Tunnel manager mutex poisoned");
         tunnels.insert(
             tunnel_id.clone(),
             TunnelInstance {
@@ -164,6 +158,20 @@ pub async fn start_tunnel(
     }
 
     // Emit starting event
+    #[cfg(debug_assertions)]
+    if let Err(e) = window.emit(
+        "tunnel-event",
+        TunnelEvent {
+            tunnel_id: tunnel_id.clone(),
+            event_type: "status_change".to_string(),
+            url: None,
+            status: Some(TunnelStatus::Starting),
+            message: Some("Starting tunnel...".to_string()),
+        },
+    ) {
+        eprintln!("[DEBUG] Failed to emit 'tunnel-event': {}", e);
+    }
+    #[cfg(not(debug_assertions))]
     let _ = window.emit(
         "tunnel-event",
         TunnelEvent {
@@ -182,7 +190,7 @@ pub async fn start_tunnel(
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| {
-            let mut tunnels = state.tunnels.lock().unwrap();
+            let mut tunnels = state.tunnels.lock().expect("Tunnel manager mutex poisoned");
             tunnels.remove(&tunnel_id);
             format!("Failed to start cloudflared: {}", e)
         })?;
@@ -194,7 +202,7 @@ pub async fn start_tunnel(
 
     // Update with PID
     {
-        let mut tunnels = state.tunnels.lock().unwrap();
+        let mut tunnels = state.tunnels.lock().expect("Tunnel manager mutex poisoned");
         if let Some(tunnel) = tunnels.get_mut(&tunnel_id) {
             tunnel.child_pid = Some(child_pid);
         }
@@ -219,7 +227,7 @@ pub async fn start_tunnel(
 
                         // Update tunnel with URL
                         {
-                            let mut tunnels = state_clone.tunnels.lock().unwrap();
+                            let mut tunnels = state_clone.tunnels.lock().expect("Tunnel manager mutex poisoned");
                             if let Some(tunnel) = tunnels.get_mut(&tunnel_id_clone) {
                                 tunnel.url = Some(url.clone());
                                 tunnel.status = TunnelStatus::Connected;
@@ -227,6 +235,20 @@ pub async fn start_tunnel(
                         }
 
                         // Emit URL ready event
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window_clone.emit(
+                            "tunnel-event",
+                            TunnelEvent {
+                                tunnel_id: tunnel_id_clone.clone(),
+                                event_type: "url_ready".to_string(),
+                                url: Some(url.clone()),
+                                status: Some(TunnelStatus::Connected),
+                                message: Some("Tunnel connected!".to_string()),
+                            },
+                        ) {
+                            eprintln!("[DEBUG] Failed to emit 'tunnel-event': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window_clone.emit(
                             "tunnel-event",
                             TunnelEvent {
@@ -242,12 +264,26 @@ pub async fn start_tunnel(
                     // Check for reconnection messages
                     if line.contains("Retrying") || line.contains("reconnect") {
                         {
-                            let mut tunnels = state_clone.tunnels.lock().unwrap();
+                            let mut tunnels = state_clone.tunnels.lock().expect("Tunnel manager mutex poisoned");
                             if let Some(tunnel) = tunnels.get_mut(&tunnel_id_clone) {
                                 tunnel.status = TunnelStatus::Reconnecting;
                             }
                         }
 
+                        #[cfg(debug_assertions)]
+                        if let Err(e) = window_clone.emit(
+                            "tunnel-event",
+                            TunnelEvent {
+                                tunnel_id: tunnel_id_clone.clone(),
+                                event_type: "status_change".to_string(),
+                                url: None,
+                                status: Some(TunnelStatus::Reconnecting),
+                                message: Some("Reconnecting...".to_string()),
+                            },
+                        ) {
+                            eprintln!("[DEBUG] Failed to emit 'tunnel-event': {}", e);
+                        }
+                        #[cfg(not(debug_assertions))]
                         let _ = window_clone.emit(
                             "tunnel-event",
                             TunnelEvent {
@@ -261,6 +297,20 @@ pub async fn start_tunnel(
                     }
 
                     // Emit output for debugging
+                    #[cfg(debug_assertions)]
+                    if let Err(e) = window_clone.emit(
+                        "tunnel-event",
+                        TunnelEvent {
+                            tunnel_id: tunnel_id_clone.clone(),
+                            event_type: "output".to_string(),
+                            url: None,
+                            status: None,
+                            message: Some(line.clone()),
+                        },
+                    ) {
+                        eprintln!("[DEBUG] Failed to emit 'tunnel-event': {}", e);
+                    }
+                    #[cfg(not(debug_assertions))]
                     let _ = window_clone.emit(
                         "tunnel-event",
                         TunnelEvent {
@@ -284,12 +334,26 @@ pub async fn start_tunnel(
         };
 
         {
-            let mut tunnels = state_clone.tunnels.lock().unwrap();
+            let mut tunnels = state_clone.tunnels.lock().expect("Tunnel manager mutex poisoned");
             if let Some(tunnel) = tunnels.get_mut(&tunnel_id_clone) {
                 tunnel.status = TunnelStatus::Stopped;
             }
         }
 
+        #[cfg(debug_assertions)]
+        if let Err(e) = window_clone.emit(
+            "tunnel-event",
+            TunnelEvent {
+                tunnel_id: tunnel_id_clone.clone(),
+                event_type: "status_change".to_string(),
+                url: None,
+                status: Some(TunnelStatus::Stopped),
+                message: error_msg.clone(),
+            },
+        ) {
+            eprintln!("[DEBUG] Failed to emit 'tunnel-event': {}", e);
+        }
+        #[cfg(not(debug_assertions))]
         let _ = window_clone.emit(
             "tunnel-event",
             TunnelEvent {
@@ -312,7 +376,7 @@ pub async fn stop_tunnel(
     tunnel_id: String,
 ) -> Result<(), String> {
     let child_pid = {
-        let tunnels = state.tunnels.lock().unwrap();
+        let tunnels = state.tunnels.lock().expect("Tunnel manager mutex poisoned");
         tunnels
             .get(&tunnel_id)
             .and_then(|t| t.child_pid)
@@ -328,7 +392,7 @@ pub async fn stop_tunnel(
     }
 
     // Remove from manager
-    let mut tunnels = state.tunnels.lock().unwrap();
+    let mut tunnels = state.tunnels.lock().expect("Tunnel manager mutex poisoned");
     tunnels.remove(&tunnel_id);
 
     Ok(())
@@ -336,7 +400,7 @@ pub async fn stop_tunnel(
 
 #[tauri::command]
 pub fn list_tunnels(state: State<'_, Arc<TunnelManager>>) -> Result<Vec<TunnelInfo>, String> {
-    let tunnels = state.tunnels.lock().unwrap();
+    let tunnels = state.tunnels.lock().expect("Tunnel manager mutex poisoned");
 
     let tunnel_list: Vec<TunnelInfo> = tunnels
         .iter()

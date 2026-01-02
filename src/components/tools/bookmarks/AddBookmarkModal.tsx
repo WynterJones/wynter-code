@@ -53,7 +53,7 @@ export function AddBookmarkModal({
 
     try {
       new URL(cleanUrl); // Validate URL
-    } catch {
+    } catch (error) {
       return; // Invalid URL, don't fetch
     }
 
@@ -83,7 +83,7 @@ export function AddBookmarkModal({
           .replace(/&nbsp;/g, " ");
         setTitle(decoded);
       }
-    } catch {
+    } catch (error) {
       // Silently fail - user can enter title manually
     } finally {
       setIsFetchingTitle(false);

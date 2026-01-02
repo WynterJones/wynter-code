@@ -82,7 +82,7 @@ export function AutoBuildNewIssuePopup({ onClose }: AutoBuildNewIssuePopupProps)
           className="flex items-center justify-between border-b border-border px-5 py-4 cursor-grab active:cursor-grabbing"
         >
           <h3 className="text-lg font-semibold" data-tauri-drag-region>New Issue</h3>
-          <IconButton size="sm" onClick={onClose}>
+          <IconButton size="sm" onClick={onClose} aria-label="Close dialog">
             <X className="h-4 w-4" />
           </IconButton>
         </div>

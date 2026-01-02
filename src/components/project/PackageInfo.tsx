@@ -79,7 +79,7 @@ export function PackageInfo({ projectPath }: PackageInfoProps) {
         path: `${projectPath}/package.json`,
       });
       setPackageJson(JSON.parse(content));
-    } catch {
+    } catch (error) {
       setPackageJson(null);
     } finally {
       setLoading(false);

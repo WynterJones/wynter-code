@@ -31,6 +31,7 @@ function ImageThumbnail({ image, onRemove }: ImageThumbnailProps) {
       <button
         type="button"
         onClick={() => onRemove(image.id)}
+        aria-label="Remove image"
         className={cn(
           "absolute top-0.5 right-0.5",
           "w-5 h-5 rounded-full",

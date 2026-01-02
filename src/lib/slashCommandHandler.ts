@@ -68,7 +68,7 @@ export function parseCommandResponse(
       default:
         return null;
     }
-  } catch {
+  } catch (error) {
     return null;
   }
 }
