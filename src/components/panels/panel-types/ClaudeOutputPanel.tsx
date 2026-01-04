@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import { GripHorizontal, Plus, Play, Square, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { GripHorizontal, Plus, Play, Square, Loader2, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { v4 as uuid } from "uuid";
 import { ResponseCarousel } from "@/components/output/ResponseCarousel";
 import { ActivityFeed } from "@/components/output/ActivityFeed";
@@ -68,9 +68,10 @@ export function ClaudeOutputPanel({
     setPendingQuestionSet,
     updateSessionPermissionMode,
     clearMessages,
+    clearContextStats,
     setLastCommand,
   } = useSessionStore();
-  const { claudeSafeMode, defaultModel } = useSettingsStore();
+  const { claudeSafeMode, defaultModel, streamingEnabled } = useSettingsStore();
   const { getFiles, loadIndex } = useFileIndexStore();
   const projectFiles = getFiles(projectPath);
 
@@ -112,14 +113,11 @@ export function ClaudeOutputPanel({
     }
   }, [panel.sessionId, sessionId, onPanelUpdate]);
 
-  // Cleanup on unmount - stop session
-  useEffect(() => {
-    return () => {
-      if (sessionId && claudeService.isSessionActive(sessionId)) {
-        claudeService.stopSession(sessionId).catch(console.error);
-      }
-    };
-  }, [sessionId]);
+  // Note: We intentionally do NOT stop the session on unmount here.
+  // The session should persist across panel mode switches (single <-> multi-panel).
+  // Sessions are stopped explicitly via:
+  // 1. User clicking the "Stop" button
+  // 2. User closing the session tab in SessionTabBar
 
   const allToolCalls = [
     ...messages.flatMap((m) => m.toolCalls || []),
@@ -577,6 +575,12 @@ export function ClaudeOutputPanel({
     }
   }, [projectId, createSession, onPanelUpdate]);
 
+  const handleClearContext = useCallback(() => {
+    if (!sessionId) return;
+    clearMessages(sessionId);
+    clearContextStats(sessionId);
+  }, [sessionId, clearMessages, clearContextStats]);
+
   if (!sessionId || !currentSession) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center gap-3 text-text-secondary p-4 blueprint-grid">
@@ -643,6 +647,14 @@ export function ClaudeOutputPanel({
                 <span>Execute</span>
               </button>
             )}
+            <button
+              onClick={handleClearContext}
+              className="flex items-center gap-2 px-3 h-7 rounded-md text-xs bg-bg-tertiary border border-border hover:border-text-secondary hover:bg-bg-hover text-text-secondary transition-colors"
+              title="Clear context and chat history"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear</span>
+            </button>
           </>
         )}
       </div>
@@ -669,8 +681,8 @@ export function ClaudeOutputPanel({
         <div className="flex-1 min-h-0 overflow-hidden rounded border border-border/50 bg-bg-tertiary/30">
           <ResponseCarousel
             messages={messages}
-            streamingText={streamingState?.streamingText || ""}
-            thinkingText={streamingState?.thinkingText || ""}
+            streamingText={streamingEnabled ? (streamingState?.streamingText || "") : (isStreaming ? "" : (streamingState?.streamingText || ""))}
+            thinkingText={streamingEnabled ? (streamingState?.thinkingText || "") : (isStreaming ? "" : (streamingState?.thinkingText || ""))}
             pendingToolCalls={streamingState?.pendingToolCalls || []}
             isStreaming={isStreaming}
             streamingStats={streamingState?.stats}

@@ -67,6 +67,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     terminalShell,
     terminalFontSize,
     terminalCursorBlink,
+    terminalAnsiFilter,
     setEditorTheme,
     setEditorFontSize,
     setEditorWordWrap,
@@ -81,6 +82,7 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
     setTerminalShell,
     setTerminalFontSize,
     setTerminalCursorBlink,
+    setTerminalAnsiFilter,
     claudeSafeMode,
     setClaudeSafeMode,
     autoOpenFarmworkMiniPlayer,
@@ -198,9 +200,11 @@ export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopup
                   terminalShell={terminalShell}
                   terminalFontSize={terminalFontSize}
                   terminalCursorBlink={terminalCursorBlink}
+                  terminalAnsiFilter={terminalAnsiFilter}
                   onTerminalShellChange={setTerminalShell}
                   onTerminalFontSizeChange={setTerminalFontSize}
                   onTerminalCursorBlinkChange={setTerminalCursorBlink}
+                  onTerminalAnsiFilterChange={setTerminalAnsiFilter}
                 />
               )}
               {activeTab === "keyboard" && <KeyboardShortcutsSection />}
@@ -903,18 +907,22 @@ interface TerminalSettingsProps {
   terminalShell: TerminalShell;
   terminalFontSize: number;
   terminalCursorBlink: boolean;
+  terminalAnsiFilter: boolean;
   onTerminalShellChange: (shell: TerminalShell) => void;
   onTerminalFontSizeChange: (size: number) => void;
   onTerminalCursorBlinkChange: (blink: boolean) => void;
+  onTerminalAnsiFilterChange: (filter: boolean) => void;
 }
 
 function TerminalSettings({
   terminalShell,
   terminalFontSize,
   terminalCursorBlink,
+  terminalAnsiFilter,
   onTerminalShellChange,
   onTerminalFontSizeChange,
   onTerminalCursorBlinkChange,
+  onTerminalAnsiFilterChange,
 }: TerminalSettingsProps) {
   return (
     <div className="space-y-6">
@@ -999,6 +1007,35 @@ function TerminalSettings({
             className={cn(
               "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
               terminalCursorBlink ? "translate-x-6" : "translate-x-1"
+            )}
+          />
+        </button>
+      </div>
+
+      {/* ANSI Filter (Claude Code fix) */}
+      <div className="flex items-center justify-between">
+        <div>
+          <label htmlFor="terminal-ansi-filter" className="text-sm font-medium text-text-primary">
+            ANSI Sequence Filter
+          </label>
+          <p className="text-xs text-text-secondary">
+            Filter problematic escape sequences that cause blank lines (fixes Claude Code CLI display issues)
+          </p>
+        </div>
+        <button
+          id="terminal-ansi-filter"
+          role="switch"
+          aria-checked={terminalAnsiFilter}
+          onClick={() => onTerminalAnsiFilterChange(!terminalAnsiFilter)}
+          className={cn(
+            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+            terminalAnsiFilter ? "bg-accent" : "bg-bg-tertiary border border-border"
+          )}
+        >
+          <span
+            className={cn(
+              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+              terminalAnsiFilter ? "translate-x-6" : "translate-x-1"
             )}
           />
         </button>

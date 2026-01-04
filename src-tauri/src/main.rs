@@ -364,6 +364,8 @@ fn main() {
             commands::read_file_head,
             // Codex image support
             commands::save_temp_image,
+            // Git Worktree Support
+            commands::create_symlink,
             // Claude Code Limits Monitor
             limits_monitor::calculate_usage_summary,
             // Netlify API
@@ -483,6 +485,7 @@ fn main() {
             launcher::disable_autostart,
             launcher::is_autostart_enabled,
             launcher::open_tool_in_main_window,
+            launcher::warm_app_cache,
             // Window Vibrancy
             vibrancy::get_vibrancy_support,
             vibrancy::apply_window_vibrancy,

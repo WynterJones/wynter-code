@@ -12,6 +12,7 @@ interface WorkspaceAvatarEditorProps {
   color: string;
   onAvatarChange: (avatar: Partial<WorkspaceAvatar>) => void;
   onColorChange: (color: string) => void;
+  onFileBrowserOpenChange?: (isOpen: boolean) => void;
 }
 
 const CURATED_ICONS = [
@@ -60,10 +61,17 @@ export function WorkspaceAvatarEditor({
   color,
   onAvatarChange,
   onColorChange,
+  onFileBrowserOpenChange,
 }: WorkspaceAvatarEditorProps) {
   const [activeTab, setActiveTab] = useState<"icon" | "image">(avatar.type);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [initialPath, setInitialPath] = useState<string | undefined>(undefined);
+
+  // Notify parent when file browser open state changes
+  const setFileBrowserOpen = (isOpen: boolean) => {
+    setShowFileBrowser(isOpen);
+    onFileBrowserOpenChange?.(isOpen);
+  };
 
   const handleOpenFileBrowser = async () => {
     try {
@@ -72,7 +80,7 @@ export function WorkspaceAvatarEditor({
     } catch (error) {
       setInitialPath(undefined);
     }
-    setShowFileBrowser(true);
+    setFileBrowserOpen(true);
   };
 
   const handleImageSelected = (image: ImageAttachment) => {
@@ -102,7 +110,7 @@ export function WorkspaceAvatarEditor({
       setActiveTab("image");
     };
     img.src = image.data;
-    setShowFileBrowser(false);
+    setFileBrowserOpen(false);
   };
 
   const handleRemoveImage = () => {
@@ -233,7 +241,7 @@ export function WorkspaceAvatarEditor({
 
           <FileBrowserPopup
             isOpen={showFileBrowser}
-            onClose={() => setShowFileBrowser(false)}
+            onClose={() => setFileBrowserOpen(false)}
             initialPath={initialPath}
             mode="browse"
             sendToPromptLabel="Select Image"

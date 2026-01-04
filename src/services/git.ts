@@ -14,6 +14,7 @@ export interface GitStatus {
   staged: GitFile[];
   modified: GitFile[];
   untracked: GitFile[];
+  hasRemote: boolean;
 }
 
 export interface GitFile {
@@ -32,6 +33,13 @@ export interface GitBranch {
   name: string;
   isCurrent: boolean;
   isRemote: boolean;
+}
+
+export interface WorktreeInfo {
+  path: string;
+  branch: string;
+  issueId: string | null;
+  isMain: boolean;
 }
 
 async function runGit(args: string[], cwd: string): Promise<CommandOutput> {
@@ -57,8 +65,12 @@ class GitService {
       // Format: ## branch...origin/branch [ahead N, behind M]
       // or: ## branch...origin/branch [ahead N]
       // or: ## branch...origin/branch [behind M]
+      // or: ## branch (no remote tracking)
       const branchMatch = branchLine.match(/## ([^\s.]+)/);
       const branch = branchMatch?.[1] || "main";
+
+      // Detect if there's a remote tracking branch (contains "...")
+      const hasRemote = branchLine.includes("...");
 
       // Parse ahead/behind counts
       let ahead = 0;
@@ -93,6 +105,7 @@ class GitService {
         staged,
         modified,
         untracked,
+        hasRemote,
       };
     } catch (err) {
       return {
@@ -102,6 +115,7 @@ class GitService {
         staged: [],
         modified: [],
         untracked: [],
+        hasRemote: false,
       };
     }
   }
@@ -212,11 +226,9 @@ class GitService {
     try {
       // Check if origin remote exists (separate from upstream tracking)
       const remoteOutput = await runGit(["remote", "get-url", "origin"], cwd);
-      console.log("[GitService] remote get-url result:", remoteOutput);
       const hasRemote = remoteOutput.code === 0;
 
       if (!hasRemote) {
-        console.log("[GitService] No remote detected, code:", remoteOutput.code);
         return { ahead: 0, behind: 0, hasRemote: false };
       }
 
@@ -435,6 +447,216 @@ class GitService {
       return { owner: httpsMatch[1], repo: httpsMatch[2].replace(/\.git$/, "") };
     }
     return null;
+  }
+
+  // === WORKTREE METHODS ===
+
+  /**
+   * Create a worktree for a specific issue in a sibling directory.
+   * The worktree will be created at: ../projectName-autobuild-{sanitizedIssueId}/
+   */
+  async createWorktreeForIssue(cwd: string, issueId: string): Promise<{ success: boolean; path?: string; error?: string }> {
+    try {
+      // Sanitize issue ID for use in path and branch name
+      const sanitizedId = issueId.replace(/[^a-zA-Z0-9-]/g, '-');
+
+      // Get the parent directory and project name
+      const projectName = cwd.split('/').pop() || 'project';
+      const parentDir = cwd.substring(0, cwd.lastIndexOf('/'));
+      const worktreePath = `${parentDir}/${projectName}-autobuild-${sanitizedId}`;
+      const branch = `autobuild/${sanitizedId}`;
+
+      // Create the worktree with a new branch
+      const output = await runGit(['worktree', 'add', worktreePath, '-b', branch], cwd);
+
+      if (output.code === 0) {
+        return { success: true, path: worktreePath };
+      }
+
+      // Check if branch already exists - try without -b flag
+      if (output.stderr.includes('already exists')) {
+        const retryOutput = await runGit(['worktree', 'add', worktreePath, branch], cwd);
+        if (retryOutput.code === 0) {
+          return { success: true, path: worktreePath };
+        }
+        return { success: false, error: retryOutput.stderr };
+      }
+
+      return { success: false, error: output.stderr };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  }
+
+  /**
+   * Remove a worktree and optionally delete its branch
+   */
+  async removeWorktree(cwd: string, worktreePath: string, deleteBranch: boolean = false): Promise<GitOperationResult> {
+    try {
+      // Get the branch name before removing
+      let branchName: string | null = null;
+      if (deleteBranch) {
+        const listOutput = await runGit(['worktree', 'list', '--porcelain'], cwd);
+        const lines = listOutput.stdout.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i] === `worktree ${worktreePath}`) {
+            // Find the branch line after this worktree
+            for (let j = i + 1; j < lines.length && !lines[j].startsWith('worktree '); j++) {
+              if (lines[j].startsWith('branch ')) {
+                branchName = lines[j].replace('branch refs/heads/', '');
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      // Remove the worktree
+      const output = await runGit(['worktree', 'remove', '--force', worktreePath], cwd);
+
+      if (output.code !== 0) {
+        return { success: false, error: output.stderr };
+      }
+
+      // Prune worktree info
+      await runGit(['worktree', 'prune'], cwd);
+
+      // Delete the branch if requested
+      if (deleteBranch && branchName) {
+        await runGit(['branch', '-D', branchName], cwd);
+      }
+
+      return { success: true };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  }
+
+  /**
+   * List all worktrees, filtering for autobuild ones
+   */
+  async listAutobuildWorktrees(cwd: string): Promise<WorktreeInfo[]> {
+    try {
+      const output = await runGit(['worktree', 'list', '--porcelain'], cwd);
+      if (output.code !== 0) {
+        return [];
+      }
+
+      const worktrees: WorktreeInfo[] = [];
+      const lines = output.stdout.split('\n');
+
+      let currentPath = '';
+      let currentBranch = '';
+
+      for (const line of lines) {
+        if (line.startsWith('worktree ')) {
+          currentPath = line.replace('worktree ', '');
+        } else if (line.startsWith('branch ')) {
+          currentBranch = line.replace('branch refs/heads/', '');
+        } else if (line === '') {
+          // End of worktree entry
+          if (currentPath && currentBranch) {
+            const isAutobuild = currentPath.includes('-autobuild-') || currentBranch.startsWith('autobuild/');
+            const isMain = !isAutobuild && !currentPath.includes('-autobuild-');
+
+            // Extract issue ID from path or branch
+            let issueId: string | null = null;
+            if (isAutobuild) {
+              const pathMatch = currentPath.match(/-autobuild-([^/]+)$/);
+              const branchMatch = currentBranch.match(/^autobuild\/(.+)$/);
+              issueId = pathMatch?.[1] || branchMatch?.[1] || null;
+            }
+
+            worktrees.push({
+              path: currentPath,
+              branch: currentBranch,
+              issueId,
+              isMain,
+            });
+          }
+          currentPath = '';
+          currentBranch = '';
+        }
+      }
+
+      return worktrees;
+    } catch (err) {
+      console.error('[GitService] listAutobuildWorktrees error:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Cleanup orphaned autobuild worktrees (e.g., after crash)
+   */
+  async cleanupOrphanedWorktrees(cwd: string): Promise<{ cleaned: number; errors: string[] }> {
+    const errors: string[] = [];
+    let cleaned = 0;
+
+    try {
+      const worktrees = await this.listAutobuildWorktrees(cwd);
+
+      for (const wt of worktrees) {
+        if (!wt.isMain && (wt.path.includes('-autobuild-') || wt.branch.startsWith('autobuild/'))) {
+          const result = await this.removeWorktree(cwd, wt.path, true);
+          if (result.success) {
+            cleaned++;
+          } else if (result.error) {
+            errors.push(`Failed to remove ${wt.path}: ${result.error}`);
+          }
+        }
+      }
+
+      return { cleaned, errors };
+    } catch (err) {
+      errors.push(getErrorMessage(err));
+      return { cleaned, errors };
+    }
+  }
+
+  /**
+   * Create a symlink from source to target
+   */
+  async createSymlink(source: string, target: string): Promise<GitOperationResult> {
+    try {
+      const result = await invoke<{ success: boolean; error?: string }>('create_symlink', {
+        source,
+        target,
+      });
+
+      return { success: result.success, error: result.error };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  }
+
+  /**
+   * Setup worktree dependencies by symlinking node_modules
+   */
+  async setupWorktreeDeps(mainProjectPath: string, worktreePath: string): Promise<GitOperationResult> {
+    const sourceModules = `${mainProjectPath}/node_modules`;
+    const targetModules = `${worktreePath}/node_modules`;
+
+    return this.createSymlink(sourceModules, targetModules);
+  }
+
+  /**
+   * Merge a branch into the current branch using fast-forward
+   */
+  async mergeBranch(cwd: string, branch: string, fastForwardOnly: boolean = true): Promise<GitOperationResult> {
+    try {
+      const args = ['merge'];
+      if (fastForwardOnly) {
+        args.push('--ff-only');
+      }
+      args.push(branch);
+
+      const output = await runGit(args, cwd);
+      return { success: output.code === 0, error: output.stderr };
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
   }
 }
 

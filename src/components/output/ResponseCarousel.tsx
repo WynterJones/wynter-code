@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback, memo } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import { OverlayScrollbarsComponent, type OverlayScrollbarsComponentRef } from "overlayscrollbars-react";
 import { IconButton } from "@/components/ui";
@@ -18,13 +18,16 @@ interface ResponseCarouselProps {
   streamingText?: string;
   thinkingText?: string;
   pendingToolCalls?: ToolCall[];
+  toolPositions?: Map<string, number>;
   isStreaming?: boolean;
   streamingStats?: StreamingStats;
   lastCommand?: CustomHandledCommand;
+  onApprove?: (toolId: string) => void;
+  onReject?: (toolId: string) => void;
 }
 
 // Collapsible user message status bar
-function UserMessageBar({ content }: { content: string }) {
+const UserMessageBar = memo(function UserMessageBar({ content }: { content: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -95,16 +98,19 @@ function UserMessageBar({ content }: { content: string }) {
       )}
     </div>
   );
-}
+});
 
-export function ResponseCarousel({
+export const ResponseCarousel = memo(function ResponseCarousel({
   messages,
   streamingText = "",
   thinkingText = "",
   pendingToolCalls = [],
+  toolPositions = new Map(),
   isStreaming = false,
   streamingStats,
   lastCommand,
+  onApprove,
+  onReject,
 }: ResponseCarouselProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -303,7 +309,12 @@ export function ResponseCarousel({
               >
                 <UserMessageBar content={pair.user.content} />
                 {pair.assistant && (
-                  <ClaudeResponseCard content={pair.assistant.content} />
+                  <ClaudeResponseCard
+                    content={pair.assistant.content}
+                    toolCalls={pair.assistant.toolCalls}
+                    onApprove={onApprove}
+                    onReject={onReject}
+                  />
                 )}
               </OverlayScrollbarsComponent>
             </div>
@@ -332,9 +343,13 @@ export function ResponseCarousel({
                 <ClaudeResponseCard
                   content={streamingText}
                   thinkingText={thinkingText}
+                  toolCalls={pendingToolCalls}
+                  toolPositions={toolPositions}
                   isStreaming={isStreaming}
                   streamingStats={streamingStats}
                   lastCommand={lastCommand}
+                  onApprove={onApprove}
+                  onReject={onReject}
                 />
               </OverlayScrollbarsComponent>
             </div>
@@ -395,4 +410,4 @@ export function ResponseCarousel({
       )}
     </div>
   );
-}
+});

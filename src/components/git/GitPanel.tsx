@@ -25,7 +25,9 @@ export function GitPanel({ projectPath }: GitPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadGitData = useCallback(async (isRefresh = false) => {
+  const loadGitData = useCallback(async (options: { isRefresh?: boolean; fetchRemote?: boolean } = {}) => {
+    const { isRefresh = false, fetchRemote = false } = options;
+
     if (!isRefresh) {
       setLoading(true);
     }
@@ -45,20 +47,30 @@ export function GitPanel({ projectPath }: GitPanelProps) {
       setCommits(commitsData);
       setBranches(branchesData);
 
-      // Get remote status (includes fetch)
-      const remote = await gitService.getRemoteStatus(projectPath);
-      setRemoteStatus(remote);
+      // Use local ahead/behind and hasRemote from git status (doesn't require fetch)
+      setRemoteStatus(prev => ({
+        ...prev,
+        ahead: statusData.ahead,
+        behind: statusData.behind,
+        hasRemote: statusData.hasRemote,
+      }));
 
-      // Check for rate limit error
-      if (remote.error) {
-        setError(remote.error);
-      }
+      // Only fetch remote status when explicitly requested (reduces git commands from 5 to 0 on load)
+      if (fetchRemote) {
+        const remote = await gitService.getRemoteStatus(projectPath);
+        setRemoteStatus(remote);
 
-      // Update status with remote counts if different
-      if (remote.ahead !== statusData.ahead || remote.behind !== statusData.behind) {
-        setStatus((prev) =>
-          prev ? { ...prev, ahead: remote.ahead, behind: remote.behind } : prev
-        );
+        // Check for rate limit error
+        if (remote.error) {
+          setError(remote.error);
+        }
+
+        // Update status with remote counts if different
+        if (remote.ahead !== statusData.ahead || remote.behind !== statusData.behind) {
+          setStatus((prev) =>
+            prev ? { ...prev, ahead: remote.ahead, behind: remote.behind } : prev
+          );
+        }
       }
     }
 
@@ -70,7 +82,7 @@ export function GitPanel({ projectPath }: GitPanelProps) {
   }, [loadGitData]);
 
   const handleRefresh = useCallback(() => {
-    loadGitData(true);
+    loadGitData({ isRefresh: true, fetchRemote: true });
   }, [loadGitData]);
 
   if (loading) {

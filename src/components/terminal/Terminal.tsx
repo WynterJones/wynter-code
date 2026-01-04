@@ -11,6 +11,7 @@ import { ClipboardAddon } from "@xterm/addon-clipboard";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { useSettingsStore, TERMINAL_SHELLS, type TerminalShell } from "@/stores/settingsStore";
+import { filterAnsiSequences } from "@/lib/ansiFilter";
 import { terminalTheme } from "@/lib/terminalTheme";
 import "@xterm/xterm/css/xterm.css";
 
@@ -107,6 +108,7 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
   const terminalShell = useSettingsStore((s) => s.terminalShell);
   const terminalFontSize = useSettingsStore((s) => s.terminalFontSize);
   const terminalCursorBlink = useSettingsStore((s) => s.terminalCursorBlink);
+  const terminalAnsiFilter = useSettingsStore((s) => s.terminalAnsiFilter);
 
   // Stable refs to capture initial values - effect only runs once on mount
   const initialPtyId = useRef(ptyId);
@@ -117,11 +119,14 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
   const onPtyCreatedRef = useRef(onPtyCreated);
   const onPtyClosedRef = useRef(onPtyClosed);
   const onSearchAddonReadyRef = useRef(onSearchAddonReady);
+  // Ref for ANSI filter - updated dynamically so listener always uses current value
+  const ansiFilterRef = useRef(terminalAnsiFilter);
 
   // Keep callback refs updated
   onPtyCreatedRef.current = onPtyCreated;
   onPtyClosedRef.current = onPtyClosed;
   onSearchAddonReadyRef.current = onSearchAddonReady;
+  ansiFilterRef.current = terminalAnsiFilter;
 
   // Handle WebGL context loss gracefully
   const handleWebGLContextLoss = useCallback((term: XTerm) => {
@@ -283,7 +288,11 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
         // Listen for PTY output
         unlisten = await listen<{ ptyId: string; data: string }>("pty-output", (event) => {
           if (isActiveRef.current && event.payload.ptyId === id && xtermRef.current) {
-            xtermRef.current.write(event.payload.data);
+            // Apply ANSI filter if enabled (fixes Claude Code CLI blank lines issue)
+            const data = ansiFilterRef.current
+              ? filterAnsiSequences(event.payload.data)
+              : event.payload.data;
+            xtermRef.current.write(data);
           }
         });
 
@@ -437,6 +446,9 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
           fontVariantLigatures: "none",
           fontFeatureSettings: '"liga" 0, "calt" 0',
           textRendering: "auto",
+          // Critical: Reset line-height to prevent inherited values (body has 1.5)
+          // from affecting xterm's character measurement and cell height calculations
+          lineHeight: 1,
           // Fade in after fit is complete, dim when unfocused
           opacity: isReady ? (isFocused ? 1 : 0.6) : 0,
           transition: "opacity 150ms ease-out, filter 150ms ease-out",

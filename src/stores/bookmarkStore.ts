@@ -121,7 +121,6 @@ export const useBookmarkStore = create<BookmarkStore>()(
         // Check if bookmark with this ID already exists (prevent duplicates)
         const existing = get().bookmarks.find(b => b.id === id);
         if (existing) {
-          console.log(`[bookmarkStore] Bookmark ${id} already exists, skipping duplicate`);
           return;
         }
 
@@ -224,7 +223,6 @@ export const useBookmarkStore = create<BookmarkStore>()(
         // Check if collection with this ID already exists (prevent duplicates)
         const existing = get().collections.find(c => c.id === id);
         if (existing) {
-          console.log(`[bookmarkStore] Collection ${id} already exists, skipping duplicate`);
           return;
         }
 

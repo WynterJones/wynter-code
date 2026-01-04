@@ -10,7 +10,7 @@ interface ProjectStore {
   addProject: (path: string) => void;
   addProjectWithId: (id: string, path: string, name: string, color?: string) => void; // For mobile API
   removeProject: (id: string) => void;
-  setActiveProject: (id: string) => void;
+  setActiveProject: (id: string | null) => void;
   updateProjectName: (id: string, name: string) => void;
   updateProjectColor: (id: string, color: string) => void;
   updateProjectIcon: (id: string, icon: string) => void;
@@ -82,12 +82,14 @@ export const useProjectStore = create<ProjectStore>()(
         });
       },
 
-      setActiveProject: (id: string) => {
+      setActiveProject: (id: string | null) => {
         set((state) => ({
           activeProjectId: id,
-          projects: state.projects.map((p) =>
-            p.id === id ? { ...p, lastOpenedAt: new Date() } : p
-          ),
+          projects: id
+            ? state.projects.map((p) =>
+                p.id === id ? { ...p, lastOpenedAt: new Date() } : p
+              )
+            : state.projects,
         }));
       },
 

@@ -290,12 +290,41 @@ pub async fn search_files(query: String, project_path: Option<String>) -> Result
     Ok(files)
 }
 
+/// Pre-warm the app cache so lightcast opens faster
 #[tauri::command]
-pub async fn open_application(path: String) -> Result<(), String> {
+pub async fn warm_app_cache() -> Result<(), String> {
+    // Run in background thread to avoid blocking
+    tokio::task::spawn_blocking(|| {
+        let _ = get_cached_apps();
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_application(path: String, deactivate: Option<bool>) -> Result<(), String> {
     Command::new("open")
         .arg(&path)
         .spawn()
         .map_err(|e| e.to_string())?;
+
+    // Deactivate the app (hide it) so main window doesn't pop up
+    if deactivate.unwrap_or(false) {
+        #[cfg(target_os = "macos")]
+        {
+            use objc2_app_kit::NSApplication;
+            use objc2_foundation::MainThreadMarker;
+
+            // SAFETY: This is a Tauri command which runs on the main thread.
+            // sharedApplication returns the shared application instance which is always valid.
+            // hide is a standard NSApplication method that hides all windows.
+            unsafe {
+                let mtm = MainThreadMarker::new_unchecked();
+                let app = NSApplication::sharedApplication(mtm);
+                app.hide(None);
+            }
+        }
+    }
+
     Ok(())
 }
 

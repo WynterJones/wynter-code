@@ -41,24 +41,27 @@ export function LauncherWindow() {
     reset();
   }, []);
 
-  // Handle blur to close
+  // Handle focus/blur for reset and close
   useEffect(() => {
     const appWindow = getCurrentWindow();
 
-    const setupBlurListener = async () => {
+    const setupFocusListener = async () => {
       const unlisten = await appWindow.onFocusChanged(({ payload: focused }) => {
-        if (!focused) {
+        if (focused) {
+          // Clear input when window gains focus (reopened)
+          reset();
+        } else {
           invoke("hide_launcher_window");
         }
       });
       return unlisten;
     };
 
-    const unlistenPromise = setupBlurListener();
+    const unlistenPromise = setupFocusListener();
     return () => {
       unlistenPromise.then((unlisten) => unlisten());
     };
-  }, []);
+  }, [reset]);
 
   // Execute item's default action
   const executeItem = useCallback(

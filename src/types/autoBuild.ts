@@ -38,6 +38,8 @@ export interface AutoBuildSettings {
   // Branch Management
   useFeatureBranches: boolean;    // default: false - create per-epic/issue branches
   autoCreatePR: boolean;          // default: false - create PR on epic/issue completion
+  // Worktree Mode (overrides useFeatureBranches when enabled)
+  useWorktrees: boolean;          // default: false - use per-issue git worktrees for isolation
 }
 
 // Worker state for concurrent issue processing
@@ -49,6 +51,16 @@ export interface AutoBuildWorker {
   retryCount: number;
   filesModified: string[];  // For test attribution
   startTime: number | null;
+  worktreePath: string | null;  // Worktree path when using worktree mode
+}
+
+// Active worktree tracking for per-issue worktree mode
+export interface ActiveWorktree {
+  issueId: string;         // Issue being processed
+  path: string;            // Worktree directory path
+  branch: string;          // Branch name (autobuild/{issueId})
+  workerId: number;        // Worker processing this issue
+  createdAt: number;       // Timestamp for cleanup tracking
 }
 
 // Streaming state for real-time status display
@@ -136,5 +148,8 @@ export interface AutoBuildState {
   currentBranch: string | null;     // The autobuild branch we're working on
   originalBranch: string | null;    // Branch we started from (to return to)
   epicBranches: Map<string, string>; // epicId → branch name
+
+  // Worktree Mode
+  activeWorktrees: ActiveWorktree[]; // Active worktrees for per-issue mode
 }
 

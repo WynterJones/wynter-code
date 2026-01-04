@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import type { StreamChunk, ClaudeModel, StreamingStats, PermissionMode, McpPermissionRequest, StructuredPrompt } from "@/types";
+import { streamingBuffer } from "./streamingBuffer";
 
 interface McpPermissionEvent {
   request: McpPermissionRequest;
@@ -146,6 +147,16 @@ class ClaudeService {
     this._callbacksMap.set(sessionId, callbacks);
     this._currentToolIdMap.set(sessionId, null);
 
+    // Set up streaming buffer callbacks for batched text updates
+    streamingBuffer.onTextBatch = (sid, text) => {
+      const cb = this._callbacksMap.get(sid);
+      if (cb) cb.onText(text);
+    };
+    streamingBuffer.onThinkingBatch = (sid, text) => {
+      const cb = this._callbacksMap.get(sid);
+      if (cb) cb.onThinking(text);
+    };
+
     // Set up event listener
     const unlisten = await listen<StreamChunk>("claude-stream", (event) => {
       const chunk = event.payload;
@@ -212,13 +223,15 @@ class ClaudeService {
 
         case "text":
           if (chunk.content) {
-            cb.onText(chunk.content);
+            // Buffer text for batching to reduce state update frequency
+            streamingBuffer.appendText(sessionId, chunk.content);
           }
           break;
 
         case "thinking":
           if (chunk.content) {
-            cb.onThinking(chunk.content);
+            // Buffer thinking text for batching
+            streamingBuffer.appendThinking(sessionId, chunk.content);
           }
           break;
 
@@ -229,6 +242,9 @@ class ClaudeService {
         case "tool_start":
         case "tool_use":
           if (chunk.tool_id) {
+            // Flush any pending text BEFORE showing the tool card
+            streamingBuffer.flushAll(sessionId);
+
             // Use tool name if available, otherwise extract from input or use placeholder
             const toolName = chunk.tool_name || "unknown_tool";
             this._currentToolIdMap.set(sessionId, chunk.tool_id);
@@ -289,6 +305,9 @@ class ClaudeService {
           break;
 
         case "result":
+          // Flush any pending text before result
+          streamingBuffer.flushAll(sessionId);
+
           if (chunk.content) {
             cb.onResult(chunk.content);
           }
@@ -404,6 +423,9 @@ class ClaudeService {
   }
 
   private cleanupSession(sessionId: string) {
+    // Clear streaming buffer for this session
+    streamingBuffer.clear(sessionId);
+
     this._currentToolIdMap.delete(sessionId);
     this._currentToolNameMap.delete(sessionId);
     this._toolInputAccumulator.delete(sessionId);

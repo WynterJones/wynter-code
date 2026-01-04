@@ -5,7 +5,15 @@ import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudePopup } from "@/components/claude";
 import { CodespaceEditor } from "@/components/codespace";
 import { PanelLayoutContainer } from "@/components/panels";
-import { useSessionStore } from "@/stores/sessionStore";
+import {
+  useActiveSession,
+  useActiveSessionId,
+  useProjectSessions,
+  useMessages,
+  useStreamingState,
+  useClaudeSessionState,
+  useSessionActions,
+} from "@/stores/sessionSelectors";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useFileIndexStore } from "@/stores/fileIndexStore";
@@ -17,6 +25,8 @@ import { useToolApproval, createMcpHandlers } from "./useToolApproval";
 import { MainContentHeader } from "./MainContentHeader";
 import { MainContentBody } from "./MainContentBody";
 import { MainContentModals } from "./MainContentModals";
+import { SessionConflictPopup } from "./SessionConflictPopup";
+import { claudeService } from "@/services/claude";
 
 interface MainContentProps {
   project: Project;
@@ -26,33 +36,24 @@ interface MainContentProps {
 }
 
 export function MainContent({ project, pendingImage, onImageConsumed, onRequestImageBrowser }: MainContentProps) {
-  const {
-    activeSessionId,
-    getSessionsForProject,
-    getMessages,
-    getStreamingState,
-    getClaudeSessionState,
-  } = useSessionStore();
+  // Use granular selectors to avoid re-renders on unrelated state changes
+  const currentSessionId = useActiveSessionId(project.id);
+  const currentSession = useActiveSession(project.id);
+  const sessions = useProjectSessions(project.id);
+  const messages = useMessages(currentSessionId);
+  const streamingState = useStreamingState(currentSessionId);
+  const claudeSessionState = useClaudeSessionState(currentSessionId);
+
+  // Get stable action references (these don't cause re-renders)
+  const { clearMessages, clearContextStats } = useSessionActions();
+
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
   const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, installedProviders } = useSettingsStore();
   const { getFiles, loadIndex } = useFileIndexStore();
   const projectFiles = getFiles(project.path);
 
-  // Use selector to get current session with proper reactivity
-  const currentSession = useSessionStore((state) => {
-    const currentSessionId = state.activeSessionId.get(project.id);
-    if (!currentSessionId) return undefined;
-    const projectSessions = state.sessions.get(project.id);
-    return projectSessions?.find(s => s.id === currentSessionId);
-  });
+  const terminalSessions = useMemo(() => sessions.filter((s) => s.type === "terminal"), [sessions]);
 
-  const sessions = getSessionsForProject(project.id);
-  const currentSessionId = activeSessionId.get(project.id);
-  const terminalSessions = sessions.filter((s) => s.type === "terminal");
-
-  const messages = currentSessionId ? getMessages(currentSessionId) : [];
-  const streamingState = currentSessionId ? getStreamingState(currentSessionId) : null;
-  const claudeSessionState = currentSessionId ? getClaudeSessionState(currentSessionId) : undefined;
   const pendingQuestionSet = streamingState?.pendingQuestionSet || null;
   const isSessionActive = claudeSessionState?.status === "ready";
   const isSessionStarting = claudeSessionState?.status === "starting";
@@ -60,6 +61,8 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const [pendingMcpRequest, setPendingMcpRequest] = useState<McpPermissionRequest | null>(null);
   const [autoApprovedTools, setAutoApprovedTools] = useState<Set<string>>(new Set());
   const autoApprovedToolsRef = useRef<Set<string>>(new Set());
+  const [sessionConflict, setSessionConflict] = useState<{ sessionId: string } | null>(null);
+  const [isClosingConflict, setIsClosingConflict] = useState(false);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -96,6 +99,9 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     projectPath: project.path,
     autoApprovedToolsRef,
     setPendingMcpRequest,
+    onSessionConflict: useCallback((sessionId: string) => {
+      setSessionConflict({ sessionId });
+    }, []),
   });
 
   // Tool approval handlers
@@ -146,6 +152,30 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     setUseMultiPanelLayout(!useMultiPanelLayout);
   }, [setUseMultiPanelLayout, useMultiPanelLayout]);
 
+  const handleClearContext = useCallback(() => {
+    if (!currentSessionId) return;
+    clearMessages(currentSessionId);
+    clearContextStats(currentSessionId);
+  }, [currentSessionId, clearMessages, clearContextStats]);
+
+  const handleCloseConflictSession = useCallback(async () => {
+    if (!sessionConflict) return;
+
+    setIsClosingConflict(true);
+    try {
+      await claudeService.stopSession(sessionConflict.sessionId);
+      setSessionConflict(null);
+      // After closing, try to start the session again
+      setTimeout(() => {
+        handleStartSession();
+      }, 100);
+    } catch (error) {
+      console.error("[MainContent] Failed to close conflicting session:", error);
+    } finally {
+      setIsClosingConflict(false);
+    }
+  }, [sessionConflict, handleStartSession]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
       <MainContentHeader
@@ -165,6 +195,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         onModeChange={handleModeChange}
         onToggleTerminal={handleToggleTerminal}
         onTogglePanelLayout={handleTogglePanelLayout}
+        onClearContext={handleClearContext}
       />
 
       {/* Persistent Terminal Sessions - always mounted, hidden when not active */}
@@ -241,6 +272,14 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         onMcpApprove={handleMcpApprove}
         onMcpReject={handleMcpReject}
         onQuestionSubmit={handleQuestionSubmit}
+      />
+
+      <SessionConflictPopup
+        isOpen={sessionConflict !== null}
+        sessionId={sessionConflict?.sessionId || ""}
+        onClose={() => setSessionConflict(null)}
+        onCloseSession={handleCloseConflictSession}
+        isClosing={isClosingConflict}
       />
     </div>
   );

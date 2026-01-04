@@ -162,6 +162,14 @@ export const DATA_CATEGORIES: DataCategory[] = [
     canClear: true,
   },
   {
+    id: "connectivity",
+    name: "Mobile & Connectivity",
+    description: "Mobile API settings, WiFi/relay connection preferences",
+    keys: ["wynter-code-mobile-api"],
+    canExport: true,
+    canClear: true,
+  },
+  {
     id: "settings",
     name: "App Settings",
     description: "Theme, fonts, editor preferences (protected)",

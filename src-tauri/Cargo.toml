@@ -85,6 +85,9 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres", "my
 # macOS color picker (NSColorSampler)
 [target.'cfg(target_os = "macos")'.dependencies]
 objc = "0.2"
+objc2 = "0.5"
+objc2-app-kit = { version = "0.2", features = ["NSApplication", "NSRunningApplication"] }
+objc2-foundation = "0.2"
 cocoa = "0.26"
 core-graphics = "0.24"
 block = "0.1"

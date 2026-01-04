@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useMemo } from "react";
+import { useRef, useEffect, useState, useMemo, memo } from "react";
 import {
   Terminal,
   FileEdit,
@@ -249,13 +249,13 @@ function TaskToolDisplay({ input, output, subagentInfo }: TaskToolDisplayProps) 
   );
 }
 
-interface CompactActivityItemProps {
+export interface CompactActivityItemProps {
   toolCall: ToolCall;
   onApprove: (toolId: string) => void;
   onReject: (toolId: string) => void;
 }
 
-function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityItemProps) {
+export const CompactActivityItem = memo(function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const isPending = toolCall.status === "pending";
@@ -447,9 +447,9 @@ function CompactActivityItem({ toolCall, onApprove, onReject }: CompactActivityI
       )}
     </div>
   );
-}
+});
 
-export function ActivityFeed({ toolCalls, onApprove, onReject }: ActivityFeedProps) {
+export const ActivityFeed = memo(function ActivityFeed({ toolCalls, onApprove, onReject }: ActivityFeedProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -482,4 +482,4 @@ export function ActivityFeed({ toolCalls, onApprove, onReject }: ActivityFeedPro
       </div>
     </ScrollArea>
   );
-}
+});

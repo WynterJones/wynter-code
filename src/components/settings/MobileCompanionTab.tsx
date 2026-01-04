@@ -52,6 +52,7 @@ export function MobileCompanionTab() {
     disconnectRelay,
     generateRelayPairingCode,
     loadRelayConfig,
+    refreshRelayStatus,
   } = useMobileApiStore();
 
   const [copied, setCopied] = useState(false);
@@ -94,6 +95,14 @@ export function MobileCompanionTab() {
     const interval = setInterval(() => refreshDevices(), 30000);
     return () => clearInterval(interval);
   }, [serverInfo, refreshDevices]);
+
+  // Poll relay status when connected to detect mobile device connection
+  useEffect(() => {
+    if (!relayStatus?.connected) return;
+    // Poll every 5 seconds to detect peer status changes
+    const interval = setInterval(() => refreshRelayStatus(), 5000);
+    return () => clearInterval(interval);
+  }, [relayStatus?.connected, refreshRelayStatus]);
 
   const handleCopyCode = () => {
     if (currentPairingCode) {
@@ -279,15 +288,17 @@ export function MobileCompanionTab() {
         </div>
       </div>
 
-      {/* Auto-start Toggle */}
+      {/* Auto-start/Auto-connect Toggle */}
       <div className="p-4 rounded-lg bg-bg-secondary border border-border">
         <div className="flex items-center justify-between">
           <div>
             <label htmlFor="auto-start" className="text-sm font-medium text-text-primary">
-              Auto-start Server
+              {connectionMode === "wifi" ? "Auto-start Server" : "Auto-connect"}
             </label>
             <p className="text-xs text-text-secondary">
-              Start API server when app launches
+              {connectionMode === "wifi"
+                ? "Start WiFi server when app launches"
+                : "Connect to relay server when app launches"}
             </p>
           </div>
           <button

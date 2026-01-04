@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Pencil, Trash2, Check } from "lucide-react";
+import { Pencil, Trash2, Check, GripVertical } from "lucide-react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import type { Workspace, WorkspaceAvatar as WorkspaceAvatarType } from "@/types/workspace";
 import { WorkspaceAvatar } from "./WorkspaceAvatar";
@@ -10,11 +12,13 @@ interface WorkspaceListItemProps {
   isActive: boolean;
   projectCount: number;
   isEditing: boolean;
+  isDragging?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<Workspace>) => void;
   onDelete: () => void;
   onStartEdit: () => void;
   onStopEdit: () => void;
+  onFileBrowserOpenChange?: (isOpen: boolean) => void;
 }
 
 export function WorkspaceListItem({
@@ -22,13 +26,29 @@ export function WorkspaceListItem({
   isActive,
   projectCount,
   isEditing,
+  isDragging,
   onSelect,
   onUpdate,
   onDelete,
   onStartEdit,
   onStopEdit,
+  onFileBrowserOpenChange,
 }: WorkspaceListItemProps) {
   const [editName, setEditName] = useState(workspace.name);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging: isSortableDragging,
+  } = useSortable({ id: workspace.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   const handleStartEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -101,6 +121,7 @@ export function WorkspaceListItem({
           color={workspace.color}
           onAvatarChange={handleAvatarChange}
           onColorChange={handleColorChange}
+          onFileBrowserOpenChange={onFileBrowserOpenChange}
         />
 
         {/* Done button */}
@@ -118,12 +139,15 @@ export function WorkspaceListItem({
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
       onClick={onSelect}
       className={cn(
         "group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors",
         isActive
           ? "bg-accent/10 border border-accent/30"
-          : "hover:bg-bg-hover border border-transparent"
+          : "hover:bg-bg-hover border border-transparent",
+        (isDragging || isSortableDragging) && "opacity-50"
       )}
     >
       <WorkspaceAvatar avatar={workspace.avatar} color={workspace.color} size="md" />
@@ -136,7 +160,7 @@ export function WorkspaceListItem({
       </div>
 
       {/* Hover actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={handleStartEdit}
           className="p-1.5 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
@@ -151,6 +175,16 @@ export function WorkspaceListItem({
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
+        {/* Drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="p-1.5 text-text-secondary/50 hover:text-text-secondary cursor-grab active:cursor-grabbing transition-colors"
+          onClick={(e) => e.stopPropagation()}
+          title="Drag to reorder"
+        >
+          <GripVertical className="w-3.5 h-3.5" />
+        </div>
       </div>
     </div>
   );

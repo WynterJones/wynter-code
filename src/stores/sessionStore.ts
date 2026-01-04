@@ -51,6 +51,7 @@ export interface StreamingState {
   streamingText: string;
   thinkingText: string;
   pendingToolCalls: ToolCall[];
+  toolPositions: Map<string, number>; // toolId → text length at tool start (for inline view)
   stats: StreamingStats;
   pendingQuestion: PendingQuestion | null;
   pendingQuestionSet: PendingQuestionSet | null;
@@ -142,6 +143,7 @@ const defaultStreamingState: StreamingState = {
   streamingText: "",
   thinkingText: "",
   pendingToolCalls: [],
+  toolPositions: new Map(),
   stats: { ...defaultStats },
   pendingQuestion: null,
   pendingQuestionSet: null,
@@ -392,6 +394,7 @@ export const useSessionStore = create<SessionStore>()(
             streamingText: "",
             thinkingText: "",
             pendingToolCalls: [],
+            toolPositions: new Map(),
             stats: { ...defaultStats, startTime: Date.now() },
             pendingQuestion: null,
             pendingQuestionSet: null,
@@ -465,7 +468,16 @@ export const useSessionStore = create<SessionStore>()(
       addPendingToolCall: (sessionId: string, toolCall: ToolCall) => {
         set((state) => ({
           streamingState: mapUpdate(state.streamingState, sessionId,
-            (current) => ({ ...current, pendingToolCalls: [...current.pendingToolCalls, toolCall] }),
+            (current) => {
+              // Record the text position where this tool call started (for inline view)
+              const newToolPositions = new Map(current.toolPositions);
+              newToolPositions.set(toolCall.id, current.streamingText.length);
+              return {
+                ...current,
+                pendingToolCalls: [...current.pendingToolCalls, toolCall],
+                toolPositions: newToolPositions,
+              };
+            },
             { ...defaultStreamingState }),
         }));
       },

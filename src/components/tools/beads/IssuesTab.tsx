@@ -66,8 +66,10 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
   const { issues, loading, fetchIssues, updateIssue, closeIssue, reopenIssue } =
     useBeadsStore();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<BeadsStatus | "all">("open");
+  const [statusFilter, setStatusFilter] = useState<BeadsStatus | "all">("all");
   const [typeFilter, setTypeFilter] = useState<BeadsIssueType | "all">("all");
+  const [hideClosed, setHideClosed] = useState(true);
+  const [hideTombstones, setHideTombstones] = useState(true);
   const [closingId, setClosingId] = useState<string | null>(null);
   const [closeReason, setCloseReason] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -81,6 +83,10 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
 
   const filteredIssues = useMemo(() => {
     return issues.filter((issue) => {
+      // Hide closed filter - hides closed issues WITHOUT a close_reason (soft closed)
+      if (hideClosed && issue.status === "closed" && !issue.close_reason) return false;
+      // Hide tombstones filter - hides closed issues WITH a close_reason (permanently resolved)
+      if (hideTombstones && issue.status === "closed" && issue.close_reason) return false;
       if (statusFilter !== "all" && issue.status !== statusFilter) return false;
       if (typeFilter !== "all" && issue.issue_type !== typeFilter) return false;
       if (
@@ -91,7 +97,7 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
         return false;
       return true;
     });
-  }, [issues, statusFilter, typeFilter, search]);
+  }, [issues, statusFilter, typeFilter, search, hideClosed, hideTombstones]);
 
   const handleClose = async (id: string) => {
     if (!closeReason.trim()) return;
@@ -271,6 +277,13 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
                           <X className="w-3 h-3" />
                         </IconButton>
                       </div>
+                    ) : issue.status === "closed" && issue.close_reason ? (
+                      // Tombstone - show non-editable badge
+                      <span
+                        className="px-2 py-0.5 text-xs rounded border bg-neutral-600/30 text-neutral-300 border-neutral-500/40"
+                      >
+                        Tombstone
+                      </span>
                     ) : (
                       <select
                         value={issue.status}
@@ -346,11 +359,33 @@ export function IssuesTab({ onCreateIssue }: IssuesTabProps) {
       </OverlayScrollbarsComponent>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t border-border text-xs text-text-secondary">
-        {filteredIssues.length} issue{filteredIssues.length !== 1 ? "s" : ""}
-        {statusFilter !== "all" || typeFilter !== "all" || search
-          ? ` (filtered from ${issues.length})`
-          : ""}
+      <div className="px-4 py-2 border-t border-border text-xs text-text-secondary flex items-center justify-between">
+        <span>
+          {filteredIssues.length} issue{filteredIssues.length !== 1 ? "s" : ""}
+          {filteredIssues.length !== issues.length
+            ? ` (filtered from ${issues.length})`
+            : ""}
+        </span>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideClosed}
+              onChange={(e) => setHideClosed(e.target.checked)}
+              className="w-3 h-3 rounded border-border bg-bg-tertiary accent-accent cursor-pointer"
+            />
+            <span>Hide closed</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideTombstones}
+              onChange={(e) => setHideTombstones(e.target.checked)}
+              className="w-3 h-3 rounded border-border bg-bg-tertiary accent-accent cursor-pointer"
+            />
+            <span>Hide tombstones</span>
+          </label>
+        </div>
       </div>
 
       {/* Issue Detail Popup */}

@@ -92,7 +92,6 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         // Check if subscription with this ID already exists (prevent duplicates)
         const existing = get().subscriptions.find(s => s.id === id);
         if (existing) {
-          console.log(`[subscriptionStore] Subscription ${id} already exists, skipping duplicate`);
           return existing;
         }
 
@@ -176,7 +175,6 @@ export const useSubscriptionStore = create<SubscriptionStore>()(
         // Check if category with this ID already exists (prevent duplicates)
         const existing = get().categories.find(c => c.id === id);
         if (existing) {
-          console.log(`[subscriptionStore] Category ${id} already exists, skipping duplicate`);
           return existing;
         }
 

@@ -335,13 +335,7 @@ pub async fn start_claude_session(
     let session_for_reader = session_id.clone();
 
     std::thread::spawn(move || {
-        eprintln!(
-            "[Claude] Stdout reader thread started for session: {}",
-            session_for_reader
-        );
-        eprintln!("[Claude] About to create BufReader...");
         let reader = BufReader::new(stdout);
-        eprintln!("[Claude] BufReader created, starting to read lines...");
         let mut captured_claude_session_id: Option<String> = resume_session_id.clone();
         let mut line_count = 0;
         let mut session_ready = false;
@@ -349,11 +343,8 @@ pub async fn start_claude_session(
         // Dev mode only: Create JSONL log file for debugging stream-json output
         let mut log_file = if cfg!(debug_assertions) {
             let log_dir = std::env::temp_dir().join("wynter-code");
-            if let Err(e) = std::fs::create_dir_all(&log_dir) {
-                eprintln!("[Claude] Failed to create log dir: {}", e);
-            }
+            let _ = std::fs::create_dir_all(&log_dir);
             let log_path = log_dir.join(format!("claude-{}.jsonl", session_for_reader));
-            eprintln!("[Claude] JSONL log enabled: {:?}", log_path);
             std::fs::OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -365,13 +356,9 @@ pub async fn start_claude_session(
         };
 
         for line in reader.lines() {
-            eprintln!("[Claude] Got a line from reader...");
             match line {
                 Ok(line) if !line.is_empty() => {
                     line_count += 1;
-                    // Safely truncate at char boundary for logging
-                    let log_preview: String = line.chars().take(200).collect();
-                    eprintln!("[Claude STDOUT #{}] {}", line_count, log_preview);
 
                     // Dev mode: Write raw JSON line to log file
                     if let Some(ref mut file) = log_file {

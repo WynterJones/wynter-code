@@ -651,10 +651,20 @@ pre,
   font-variant-ligatures: none !important;
   font-feature-settings: "liga" 0, "calt" 0 !important;
   text-rendering: optimizeLegibility !important;
+  /* Critical: Override inherited line-height from body (1.5) to prevent
+     extra spacing in TUI apps like btop and claude-cli */
+  line-height: 1 !important;
 }
 
 .xterm-screen {
   letter-spacing: normal !important;
+  line-height: 1 !important;
+}
+
+/* Ensure all xterm internal elements use 1.0 line-height for TUI apps */
+.xterm *,
+.xterm-char-measure-element {
+  line-height: 1 !important;
 }
 
 /* Ensure canvas elements don't have any transforms affecting rendering */

@@ -56,6 +56,7 @@ interface ContextMenuState {
 interface SessionTabBarProps {
   projectId: string;
   hasBeads?: boolean;
+  isGitRepo?: boolean;
   onOpenFarmwork?: () => void;
   onOpenBeads?: () => void;
   onBrowseFiles?: () => void;
@@ -207,6 +208,7 @@ function SortableSessionTab({
 export function SessionTabBar({
   projectId,
   hasBeads,
+  isGitRepo,
   onOpenFarmwork,
   onOpenBeads,
   onBrowseFiles,
@@ -579,10 +581,14 @@ export function SessionTabBar({
             onClick={() => openAutoBuildPopup()}
             className={cn(
               "p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors",
-              isAutoBuildRunning && "bg-yellow-500/10"
+              isAutoBuildRunning && "bg-orange-500/10"
             )}
           >
-            <Bot className={cn("w-4 h-4 text-yellow-500", isAutoBuildRunning && "animate-pulse")} />
+            <Bot className={cn(
+              "w-4 h-4",
+              hasBeads ? "text-orange-500" : "text-text-secondary",
+              isAutoBuildRunning && "animate-pulse"
+            )} />
           </button>
         </Tooltip>
 
@@ -602,7 +608,7 @@ export function SessionTabBar({
             onClick={onOpenGitHubManager}
             className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
           >
-            <Github className="w-4 h-4" />
+            <Github className={cn("w-4 h-4", isGitRepo && "text-green-500")} />
           </button>
         </Tooltip>
 

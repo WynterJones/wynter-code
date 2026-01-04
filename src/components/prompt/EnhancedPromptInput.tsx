@@ -778,7 +778,7 @@ export function EnhancedPromptInput({
               onFocus={handleFocus}
               onPaste={handlePaste}
               placeholder={placeholder}
-              disabled={isStreaming || disabled}
+              disabled={disabled}
               className={cn(
                 "flex-1 bg-transparent text-text-primary placeholder:text-text-secondary",
                 "font-mono resize-none outline-none",
@@ -817,7 +817,7 @@ export function EnhancedPromptInput({
                 <IconButton
                   size="sm"
                   onClick={handleSubmit}
-                  disabled={!prompt.trim() && !hasAttachments}
+                  disabled={isStreaming || disabled || (!prompt.trim() && !hasAttachments)}
                   className={cn(
                     prompt.trim() || hasAttachments
                       ? "text-accent hover:text-accent"

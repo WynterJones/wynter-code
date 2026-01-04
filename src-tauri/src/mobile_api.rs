@@ -130,10 +130,7 @@ fn load_paired_devices() -> HashMap<String, PairedDevice> {
     match fs::read_to_string(&path) {
         Ok(content) => {
             match serde_json::from_str::<HashMap<String, PairedDevice>>(&content) {
-                Ok(devices) => {
-                    println!("[mobile_api] Loaded {} paired devices from disk", devices.len());
-                    devices
-                }
+                Ok(devices) => devices,
                 Err(e) => {
                     eprintln!("[mobile_api] Failed to parse paired devices file: {}", e);
                     HashMap::new()
@@ -192,8 +189,6 @@ fn save_paired_devices(devices: &HashMap<String, PairedDevice>) {
         {
             let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
         }
-
-        println!("[mobile_api] Saved {} paired devices to disk", devices.len());
     } else {
         eprintln!("[mobile_api] Failed to create paired devices file");
     }
@@ -1093,7 +1088,6 @@ async fn validate_token(
         );
         // Persist the restored device
         save_paired_devices(&devices);
-        println!("[mobile_api] Auto-registered device from valid token: {}", token_data.claims.sub);
     }
 
     Ok(token_data.claims.sub)
@@ -1127,9 +1121,6 @@ async fn list_workspaces(
     validate_token(&state, auth).await?;
 
     let synced = state.get_synced_data().await;
-
-    println!("[mobile_api] list_workspaces called - synced data has {} workspaces, {} projects",
-        synced.workspaces.len(), synced.projects.len());
 
     // Build workspace responses with embedded projects
     let workspaces: Vec<WorkspaceWithProjects> = synced
@@ -1653,17 +1644,12 @@ async fn list_beads(
 ) -> Result<Json<Vec<BeadsIssue>>, (StatusCode, String)> {
     validate_token(&state, auth).await?;
 
-    println!("[mobile_api] list_beads: project_path='{}'", query.project_path);
-
     // Call the beads module directly
     crate::beads::beads_list(query.project_path.clone())
         .await
-        .map(|issues| {
-            println!("[mobile_api] list_beads: returning {} issues", issues.len());
-            Json(issues)
-        })
+        .map(|issues| Json(issues))
         .map_err(|e| {
-            println!("[mobile_api] list_beads: error - {}", e);
+            eprintln!("[mobile_api] list_beads error: {}", e);
             (StatusCode::INTERNAL_SERVER_ERROR, e)
         })
 }
@@ -1850,11 +1836,6 @@ async fn autobuild_status(
     // Get project path from synced data
     let synced = state.get_synced_data().await;
 
-    println!("[mobile_api] autobuild_status: Looking for project_id='{}', synced projects: {:?}",
-        project_id,
-        synced.projects.iter().map(|p| (&p.id, &p.name)).collect::<Vec<_>>()
-    );
-
     let project_path = synced
         .projects
         .iter()
@@ -1862,7 +1843,6 @@ async fn autobuild_status(
         .map(|p| p.path.clone());
 
     let Some(project_path) = project_path else {
-        println!("[mobile_api] autobuild_status: Project '{}' not found in synced data, returning idle state", project_id);
         return Ok(Json(serde_json::json!({
             "status": "idle",
             "workers": [],
@@ -2160,8 +2140,6 @@ async fn autobuild_get_backlog(
     // Get project path from synced data
     let synced = state.get_synced_data().await;
 
-    println!("[mobile_api] autobuild_get_backlog: Looking for project_id='{}'", project_id);
-
     let project_path = synced
         .projects
         .iter()
@@ -2169,7 +2147,6 @@ async fn autobuild_get_backlog(
         .map(|p| p.path.clone());
 
     let Some(project_path) = project_path else {
-        println!("[mobile_api] autobuild_get_backlog: Project '{}' not found in synced data", project_id);
         return Ok(Json(serde_json::json!({
             "issues": [],
             "completed": [],
@@ -4417,17 +4394,6 @@ pub async fn mobile_api_sync_all_data(
     bookmark_collections: Vec<SyncedBookmarkCollection>,
     kanban_boards: Vec<SyncedKanbanBoard>,
 ) -> Result<(), String> {
-    println!("[mobile_api] sync_all_data called with {} workspaces, {} projects, {} kanban boards",
-        workspaces.len(), projects.len(), kanban_boards.len());
-    for ws in &workspaces {
-        println!("[mobile_api]   workspace: {} ({}) with {} project_ids", ws.name, ws.id, ws.project_ids.len());
-    }
-    for p in &projects {
-        println!("[mobile_api]   project: {} at {}", p.name, p.path);
-    }
-    for kb in &kanban_boards {
-        println!("[mobile_api]   kanban board: {} with {} tasks", kb.workspace_id, kb.tasks.len());
-    }
     manager.sync_workspace_data(SyncedData {
         workspaces,
         projects,

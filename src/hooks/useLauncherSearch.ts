@@ -119,7 +119,8 @@ function createAppActions(app: MacOSApp): LauncherAction[] {
       shortcut: "Enter",
       icon: React.createElement(Play, { className: "w-4 h-4" }),
       onExecute: async () => {
-        await invoke("open_application", { path: app.path });
+        // Deactivate the app so main window doesn't show when opening external apps
+        await invoke("open_application", { path: app.path, deactivate: true });
       },
     },
     {

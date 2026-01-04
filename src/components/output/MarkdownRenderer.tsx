@@ -1,4 +1,4 @@
-import { Children, isValidElement, ReactNode, useMemo } from "react";
+import { Children, isValidElement, ReactNode, memo, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -9,6 +9,7 @@ import { splitContentWithDiffs } from "@/lib/parseCliDiff";
 
 interface MarkdownRendererProps {
   content: string;
+  isStreaming?: boolean;
 }
 
 // Recursively extract text from React children (handles nested elements)
@@ -126,8 +127,28 @@ const markdownComponents = {
   ),
 };
 
-export function MarkdownRenderer({ content }: MarkdownRendererProps) {
-  const segments = useMemo(() => splitContentWithDiffs(content), [content]);
+export const MarkdownRenderer = memo(function MarkdownRenderer({
+  content,
+  isStreaming = false,
+}: MarkdownRendererProps) {
+  // Memoize the segments computation (expensive diff parsing)
+  const segments = useMemo(
+    () => (isStreaming ? [] : splitContentWithDiffs(content)),
+    [content, isStreaming]
+  );
+
+  // Wait until streaming is complete before rendering anything
+  // This prevents constant re-renders during streaming and shows the full response at once
+  if (isStreaming) {
+    return (
+      <div className="prose prose-invert prose-sm max-w-none">
+        <div className="flex items-center gap-2 text-text-secondary text-sm">
+          <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
+          <span>Generating response...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="prose prose-invert prose-sm max-w-none">
@@ -147,4 +168,4 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
       )}
     </div>
   );
-}
+});

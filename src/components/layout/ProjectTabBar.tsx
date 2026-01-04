@@ -350,7 +350,17 @@ export function ProjectTabBar({
 
   // Restore last active project when switching workspaces
   useEffect(() => {
-    if (activeWorkspace?.lastActiveProjectId) {
+    if (!activeWorkspace) return;
+
+    // If workspace has no projects, clear active project
+    if (activeWorkspace.projectIds.length === 0) {
+      if (activeProjectId) {
+        setActiveProject(null);
+      }
+      return;
+    }
+
+    if (activeWorkspace.lastActiveProjectId) {
       // Only restore if the project exists and is in this workspace
       const projectExists = projects.some(
         (p) => p.id === activeWorkspace.lastActiveProjectId
@@ -358,7 +368,7 @@ export function ProjectTabBar({
       if (projectExists && activeProjectId !== activeWorkspace.lastActiveProjectId) {
         setActiveProject(activeWorkspace.lastActiveProjectId);
       }
-    } else if (activeWorkspace && activeWorkspace.projectIds.length > 0) {
+    } else if (activeWorkspace.projectIds.length > 0) {
       // If no last active, select first project in workspace
       const firstProjectId = activeWorkspace.projectIds[0];
       if (firstProjectId && activeProjectId !== firstProjectId) {

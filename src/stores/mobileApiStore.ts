@@ -85,7 +85,6 @@ function setupStoreSubscriptions(syncFn: () => Promise<void>): void {
       const current = JSON.stringify(state.workspaces);
       if (current !== prevWorkspaces) {
         prevWorkspaces = current;
-        console.log("[mobileApiStore] Workspaces changed, syncing...");
         debouncedSync();
       }
     })
@@ -97,7 +96,6 @@ function setupStoreSubscriptions(syncFn: () => Promise<void>): void {
       const current = JSON.stringify(state.projects);
       if (current !== prevProjects) {
         prevProjects = current;
-        console.log("[mobileApiStore] Projects changed, syncing...");
         debouncedSync();
       }
     })
@@ -112,7 +110,6 @@ function setupStoreSubscriptions(syncFn: () => Promise<void>): void {
       });
       if (current !== prevOverwatch) {
         prevOverwatch = current;
-        console.log("[mobileApiStore] Overwatch changed, syncing...");
         debouncedSync();
       }
     })
@@ -127,7 +124,6 @@ function setupStoreSubscriptions(syncFn: () => Promise<void>): void {
       });
       if (current !== prevSubscriptions) {
         prevSubscriptions = current;
-        console.log("[mobileApiStore] Subscriptions changed, syncing...");
         debouncedSync();
       }
     })
@@ -142,7 +138,6 @@ function setupStoreSubscriptions(syncFn: () => Promise<void>): void {
       });
       if (current !== prevBookmarks) {
         prevBookmarks = current;
-        console.log("[mobileApiStore] Bookmarks changed, syncing...");
         debouncedSync();
       }
     })
@@ -156,13 +151,10 @@ function setupStoreSubscriptions(syncFn: () => Promise<void>): void {
       });
       if (current !== prevKanban) {
         prevKanban = current;
-        console.log("[mobileApiStore] Kanban changed, syncing...");
         debouncedSync();
       }
     })
   );
-
-  console.log("[mobileApiStore] Store subscriptions setup complete");
 }
 
 // Cleanup store subscriptions
@@ -286,18 +278,14 @@ export const useMobileApiStore = create<MobileApiStore>()(
             port: actualPort,
           });
           set({ serverInfo: info, loading: false });
-          console.log("[mobileApiStore] Server started, refreshing devices...");
           // Inform relay client of the mobile API port for HTTP tunneling
           await invoke("relay_set_mobile_api_port", { port: actualPort });
           // Refresh devices list after starting
           await get().refreshDevices();
           // Wait for all stores to rehydrate before syncing
-          console.log("[mobileApiStore] Waiting for store rehydration...");
           await waitForStoreRehydration();
-          console.log("[mobileApiStore] Store rehydration complete, syncing workspaces...");
           // Sync workspace data to make it available via mobile API
           await get().syncWorkspaces();
-          console.log("[mobileApiStore] Initial sync complete, setting up subscriptions...");
           // Subscribe to store changes to keep mobile API in sync
           setupStoreSubscriptions(get().syncWorkspaces);
         } catch (error) {
@@ -396,20 +384,6 @@ export const useMobileApiStore = create<MobileApiStore>()(
 
       syncWorkspaces: async () => {
         try {
-          // Debug: Check raw localStorage
-          const rawWorkspaces = localStorage.getItem("wynter-code-workspaces");
-          const rawProjects = localStorage.getItem("wynter-code-projects");
-          console.log("[mobileApiStore] Raw localStorage:", {
-            workspaces: rawWorkspaces ? JSON.parse(rawWorkspaces) : null,
-            projects: rawProjects ? JSON.parse(rawProjects) : null,
-          });
-
-          // Debug: Check hydration state
-          console.log("[mobileApiStore] Hydration state:", {
-            workspaceHydrated: useWorkspaceStore.persist.hasHydrated(),
-            projectHydrated: useProjectStore.persist.hasHydrated(),
-          });
-
           // Get workspace and project data from their stores
           const workspaceState = useWorkspaceStore.getState();
           const projectState = useProjectStore.getState();
@@ -424,7 +398,6 @@ export const useMobileApiStore = create<MobileApiStore>()(
             (s) => s.provider !== "link" && s.enabled && !overwatchState.serviceData.has(s.id)
           );
           if (servicesWithoutData.length > 0) {
-            console.log(`[mobileApiStore] Refreshing ${servicesWithoutData.length} overwatch services...`);
             await Promise.all(
               servicesWithoutData.map((s) => overwatchState.refreshService(s.id))
             );
@@ -432,13 +405,6 @@ export const useMobileApiStore = create<MobileApiStore>()(
             const refreshedOverwatchState = useOverwatchStore.getState();
             Object.assign(overwatchState, { serviceData: refreshedOverwatchState.serviceData });
           }
-
-          console.log("[mobileApiStore] syncWorkspaces called, store states:", {
-            workspaces: workspaceState.workspaces.length,
-            projects: projectState.projects.length,
-            workspaceData: workspaceState.workspaces,
-            projectData: projectState.projects,
-          });
 
           // Transform workspaces to the format expected by Rust
           const workspaces = workspaceState.workspaces.map((w) => ({
@@ -549,11 +515,6 @@ export const useMobileApiStore = create<MobileApiStore>()(
             bookmarkCollections: bookmark_collections,
             kanbanBoards: kanban_boards,
           });
-          console.log(
-            `[mobileApiStore] Synced ${workspaces.length} workspaces, ${projects.length} projects, ` +
-            `${overwatch_services.length} services, ${subscriptions.length} subscriptions, ${bookmarks.length} bookmarks, ` +
-            `${kanban_boards.length} kanban boards`
-          );
         } catch (error) {
           console.error("[mobileApiStore] Failed to sync data:", error);
         }
@@ -593,6 +554,22 @@ export const useMobileApiStore = create<MobileApiStore>()(
       connectRelay: async () => {
         set({ loading: true, error: null });
         try {
+          // Ensure the local API server is running - relay tunnels HTTP requests to it
+          const currentServerInfo = get().serverInfo;
+          const actualPort = currentServerInfo?.port ?? get().preferredPort;
+
+          if (!currentServerInfo?.running) {
+            const info = await invoke<MobileApiInfo>("mobile_api_start", {
+              port: actualPort,
+            });
+            set({ serverInfo: info });
+            await get().refreshDevices();
+          }
+
+          // ALWAYS inform relay client of the mobile API port for HTTP tunneling
+          // This is needed even if server was already running
+          await invoke("relay_set_mobile_api_port", { port: actualPort });
+
           await invoke("relay_connect");
           // Wait briefly for WebSocket handshake to complete before querying status
           await new Promise(resolve => setTimeout(resolve, 500));
@@ -600,12 +577,10 @@ export const useMobileApiStore = create<MobileApiStore>()(
           set({ relayStatus: status, loading: false });
 
           // Sync workspace data to make it available via relay requests
-          // This is needed because relay mode bypasses the normal server start flow
           await waitForStoreRehydration();
           await get().syncWorkspaces();
           // Set up store subscriptions to keep data synced while relay is connected
           setupStoreSubscriptions(get().syncWorkspaces);
-          console.log("[mobileApiStore] Synced workspace data for relay mode");
         } catch (error) {
           set({ error: String(error), loading: false });
         }
@@ -872,12 +847,9 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Clean up existing listeners
   await cleanupMobileCrudListeners();
 
-  console.log("[mobileApiStore] Setting up mobile CRUD event listeners...");
-
   // Workspace create
   mobileEventUnlisteners.push(
     await listen<MobileCreateWorkspaceEvent>("mobile-workspace-create", (event) => {
-      console.log("[mobileApiStore] Received mobile-workspace-create:", event.payload);
       const workspaceStore = useWorkspaceStore.getState();
       // Use the store's addWorkspace but with the provided ID
       workspaceStore.addWorkspaceWithId(event.payload.id, event.payload.name, event.payload.color);
@@ -887,7 +859,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Workspace update
   mobileEventUnlisteners.push(
     await listen<MobileUpdateWorkspaceEvent>("mobile-workspace-update", (event) => {
-      console.log("[mobileApiStore] Received mobile-workspace-update:", event.payload);
       const workspaceStore = useWorkspaceStore.getState();
       const updates: { name?: string; color?: string } = {};
       if (event.payload.name) updates.name = event.payload.name;
@@ -899,7 +870,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Workspace delete
   mobileEventUnlisteners.push(
     await listen<MobileDeleteWorkspaceEvent>("mobile-workspace-delete", (event) => {
-      console.log("[mobileApiStore] Received mobile-workspace-delete:", event.payload);
       const workspaceStore = useWorkspaceStore.getState();
       workspaceStore.removeWorkspace(event.payload.id);
     })
@@ -908,7 +878,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Project create
   mobileEventUnlisteners.push(
     await listen<MobileCreateProjectEvent>("mobile-project-create", (event) => {
-      console.log("[mobileApiStore] Received mobile-project-create:", event.payload);
       const projectStore = useProjectStore.getState();
       const workspaceStore = useWorkspaceStore.getState();
 
@@ -923,7 +892,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Project update
   mobileEventUnlisteners.push(
     await listen<MobileUpdateProjectEvent>("mobile-project-update", (event) => {
-      console.log("[mobileApiStore] Received mobile-project-update:", event.payload);
       const projectStore = useProjectStore.getState();
       if (event.payload.name) {
         projectStore.updateProjectName(event.payload.id, event.payload.name);
@@ -937,7 +905,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Project delete
   mobileEventUnlisteners.push(
     await listen<MobileDeleteProjectEvent>("mobile-project-delete", (event) => {
-      console.log("[mobileApiStore] Received mobile-project-delete:", event.payload);
       const projectStore = useProjectStore.getState();
       projectStore.removeProject(event.payload.id);
     })
@@ -946,7 +913,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Subscription create
   mobileEventUnlisteners.push(
     await listen<MobileCreateSubscriptionEvent>("mobile-subscription-create", (event) => {
-      console.log("[mobileApiStore] Received mobile-subscription-create:", event.payload);
       const subscriptionStore = useSubscriptionStore.getState();
       subscriptionStore.addSubscriptionWithId(event.payload.id, {
         workspaceId: event.payload.workspace_id,
@@ -967,7 +933,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Subscription update
   mobileEventUnlisteners.push(
     await listen<MobileUpdateSubscriptionEvent>("mobile-subscription-update", (event) => {
-      console.log("[mobileApiStore] Received mobile-subscription-update:", event.payload);
       const subscriptionStore = useSubscriptionStore.getState();
       const updates: Partial<{
         name: string;
@@ -998,7 +963,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Subscription delete
   mobileEventUnlisteners.push(
     await listen<MobileDeleteSubscriptionEvent>("mobile-subscription-delete", (event) => {
-      console.log("[mobileApiStore] Received mobile-subscription-delete:", event.payload);
       const subscriptionStore = useSubscriptionStore.getState();
       subscriptionStore.deleteSubscription(event.payload.id);
     })
@@ -1007,7 +971,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Subscription category create
   mobileEventUnlisteners.push(
     await listen<MobileCreateSubscriptionCategoryEvent>("mobile-subscription-category-create", (event) => {
-      console.log("[mobileApiStore] Received mobile-subscription-category-create:", event.payload);
       const subscriptionStore = useSubscriptionStore.getState();
       subscriptionStore.addCategoryWithId(event.payload.id, {
         workspaceId: event.payload.workspace_id,
@@ -1021,7 +984,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Subscription category update
   mobileEventUnlisteners.push(
     await listen<MobileUpdateSubscriptionCategoryEvent>("mobile-subscription-category-update", (event) => {
-      console.log("[mobileApiStore] Received mobile-subscription-category-update:", event.payload);
       const subscriptionStore = useSubscriptionStore.getState();
       const updates: Partial<{ name: string; color: string | null; sortOrder: number }> = {};
       if (event.payload.name !== undefined) updates.name = event.payload.name;
@@ -1034,7 +996,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Subscription category delete
   mobileEventUnlisteners.push(
     await listen<MobileDeleteSubscriptionCategoryEvent>("mobile-subscription-category-delete", (event) => {
-      console.log("[mobileApiStore] Received mobile-subscription-category-delete:", event.payload);
       const subscriptionStore = useSubscriptionStore.getState();
       subscriptionStore.deleteCategory(event.payload.id);
     })
@@ -1043,7 +1004,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Kanban create
   mobileEventUnlisteners.push(
     await listen<MobileKanbanCreateEvent>("mobile-kanban-create", (event) => {
-      console.log("[mobileApiStore] Received mobile-kanban-create:", event.payload);
       const kanbanStore = useKanbanStore.getState();
       kanbanStore.createTaskWithId(
         event.payload.workspace_id,
@@ -1058,7 +1018,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Kanban update
   mobileEventUnlisteners.push(
     await listen<MobileKanbanUpdateEvent>("mobile-kanban-update", (event) => {
-      console.log("[mobileApiStore] Received mobile-kanban-update:", event.payload);
       const kanbanStore = useKanbanStore.getState();
       const updates: Partial<{ title: string; description: string; priority: KanbanPriority; locked: boolean }> = {};
       if (event.payload.title !== undefined) updates.title = event.payload.title;
@@ -1072,7 +1031,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Kanban delete
   mobileEventUnlisteners.push(
     await listen<MobileKanbanDeleteEvent>("mobile-kanban-delete", (event) => {
-      console.log("[mobileApiStore] Received mobile-kanban-delete:", event.payload);
       const kanbanStore = useKanbanStore.getState();
       kanbanStore.deleteTask(event.payload.workspace_id, event.payload.task_id);
     })
@@ -1081,7 +1039,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Kanban move
   mobileEventUnlisteners.push(
     await listen<MobileKanbanMoveEvent>("mobile-kanban-move", (event) => {
-      console.log("[mobileApiStore] Received mobile-kanban-move:", event.payload);
       const kanbanStore = useKanbanStore.getState();
       kanbanStore.moveTask(
         event.payload.workspace_id,
@@ -1095,7 +1052,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Bookmark create
   mobileEventUnlisteners.push(
     await listen<MobileBookmarkCreateEvent>("mobile-bookmark-create", (event) => {
-      console.log("[mobileApiStore] Received mobile-bookmark-create:", event.payload);
       const bookmarkStore = useBookmarkStore.getState();
       bookmarkStore.addBookmarkWithId(event.payload.id, {
         url: event.payload.url,
@@ -1111,7 +1067,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Bookmark update
   mobileEventUnlisteners.push(
     await listen<MobileBookmarkUpdateEvent>("mobile-bookmark-update", (event) => {
-      console.log("[mobileApiStore] Received mobile-bookmark-update:", event.payload);
       const bookmarkStore = useBookmarkStore.getState();
       const updates: Partial<{
         url: string;
@@ -1134,7 +1089,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Bookmark delete
   mobileEventUnlisteners.push(
     await listen<MobileBookmarkDeleteEvent>("mobile-bookmark-delete", (event) => {
-      console.log("[mobileApiStore] Received mobile-bookmark-delete:", event.payload);
       const bookmarkStore = useBookmarkStore.getState();
       bookmarkStore.deleteBookmark(event.payload.id);
     })
@@ -1143,7 +1097,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Bookmark collection create
   mobileEventUnlisteners.push(
     await listen<MobileBookmarkCollectionCreateEvent>("mobile-bookmark-collection-create", (event) => {
-      console.log("[mobileApiStore] Received mobile-bookmark-collection-create:", event.payload);
       const bookmarkStore = useBookmarkStore.getState();
       bookmarkStore.addCollectionWithId(event.payload.id, {
         name: event.payload.name,
@@ -1157,7 +1110,6 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Bookmark collection update
   mobileEventUnlisteners.push(
     await listen<MobileBookmarkCollectionUpdateEvent>("mobile-bookmark-collection-update", (event) => {
-      console.log("[mobileApiStore] Received mobile-bookmark-collection-update:", event.payload);
       const bookmarkStore = useBookmarkStore.getState();
       const updates: Partial<{ name: string; icon: string; color: string; order: number }> = {};
       if (event.payload.name !== undefined) updates.name = event.payload.name;
@@ -1171,13 +1123,10 @@ async function setupMobileCrudListeners(): Promise<void> {
   // Bookmark collection delete
   mobileEventUnlisteners.push(
     await listen<MobileBookmarkCollectionDeleteEvent>("mobile-bookmark-collection-delete", (event) => {
-      console.log("[mobileApiStore] Received mobile-bookmark-collection-delete:", event.payload);
       const bookmarkStore = useBookmarkStore.getState();
       bookmarkStore.deleteCollection(event.payload.id);
     })
   );
-
-  console.log("[mobileApiStore] Mobile CRUD event listeners setup complete");
 }
 
 // Cleanup mobile CRUD event listeners
@@ -1189,32 +1138,48 @@ async function cleanupMobileCrudListeners(): Promise<void> {
 }
 
 // Initialize mobile API on app startup
-// This handles auto-start and re-syncing if server was already running
+// This handles auto-start/auto-connect and re-syncing if already running
 export async function initializeMobileApi(): Promise<void> {
   const store = useMobileApiStore.getState();
-
-  console.log("[mobileApiStore] Initializing mobile API...");
-
-  // First check if server is already running
-  await store.refreshServerInfo();
-
-  const { serverInfo, autoStartServer } = useMobileApiStore.getState();
-  console.log("[mobileApiStore] Server status:", { serverInfo, autoStartServer });
 
   // Always set up mobile CRUD listeners when initializing
   await setupMobileCrudListeners();
 
+  // Load relay config from disk to check if it's configured
+  await store.loadRelayConfig();
+
+  // Check current status of both WiFi server and relay
+  await store.refreshServerInfo();
+  await store.refreshRelayStatus();
+
+  const { serverInfo, autoStartServer, connectionMode, relayConfig, relayStatus } = useMobileApiStore.getState();
+
+  // ALWAYS sync if server is already running, regardless of connection mode
+  // This ensures data is available if user manually started the server
   if (serverInfo?.running) {
-    // Server is already running, make sure data is synced
-    console.log("[mobileApiStore] Server already running, syncing data...");
     await waitForStoreRehydration();
     await store.syncWorkspaces();
     setupStoreSubscriptions(store.syncWorkspaces);
-  } else if (autoStartServer) {
-    // Auto-start is enabled, start the server
-    console.log("[mobileApiStore] Auto-starting server...");
-    await store.startServer();
-  } else {
-    console.log("[mobileApiStore] Server not running and auto-start disabled, skipping sync");
+  }
+
+  // Handle auto-start based on connection mode
+  if (connectionMode === "wifi") {
+    if (!serverInfo?.running && autoStartServer) {
+      // Auto-start WiFi server
+      await store.startServer();
+    }
+  } else if (connectionMode === "relay") {
+    if (relayStatus?.connected) {
+      // Relay already connected, data was synced above if server running
+      // If server wasn't running but relay is connected, sync now
+      if (!serverInfo?.running) {
+        await waitForStoreRehydration();
+        await store.syncWorkspaces();
+        setupStoreSubscriptions(store.syncWorkspaces);
+      }
+    } else if (autoStartServer && relayConfig?.url) {
+      // Auto-connect to relay (this will also start server if needed)
+      await store.connectRelay();
+    }
   }
 }

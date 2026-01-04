@@ -106,7 +106,6 @@ export const useKanbanStore = create<KanbanStore>()(
 
         // Check if task with this ID already exists to prevent duplicates
         if (board.tasks.some((t) => t.id === id)) {
-          console.log(`[kanbanStore] Task ${id} already exists, skipping`);
           return;
         }
 

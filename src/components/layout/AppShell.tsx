@@ -3,6 +3,7 @@ import { PanelRightClose, PanelLeftClose } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { ProjectTabBar } from "./ProjectTabBar";
 import { SessionTabBar } from "./SessionTabBar";
+import { gitService } from "@/services/git";
 import { Sidebar } from "./Sidebar";
 import { MainContent } from "./MainContent";
 import { MinimizedPopupTabs } from "./MinimizedPopupTabs";
@@ -50,6 +51,7 @@ export function AppShell() {
   const [pendingImage, setPendingImage] = useState<ImageAttachment | null>(null);
   const [requestImageBrowser, setRequestImageBrowser] = useState(false);
   const [hasBeads, setHasBeads] = useState(false);
+  const [isGitRepo, setIsGitRepo] = useState(false);
   const [showProjectFileBrowser, setShowProjectFileBrowser] = useState(false);
   const [projectBrowserInitialPath, setProjectBrowserInitialPath] = useState<string | undefined>();
 
@@ -79,23 +81,33 @@ export function AppShell() {
     },
   });
 
-  // Check for beads directory when project changes
+  // Check for beads directory and git repo when project changes
   useEffect(() => {
-    const checkBeads = async () => {
+    const checkProjectState = async () => {
       if (activeProject?.path) {
+        // Check for beads
         try {
           const hasInit = await invoke<boolean>("beads_has_init", {
             projectPath: activeProject.path,
           });
           setHasBeads(hasInit);
-        } catch (error) {
+        } catch {
           setHasBeads(false);
+        }
+
+        // Check for git repo
+        try {
+          const isGit = await gitService.isGitRepo(activeProject.path);
+          setIsGitRepo(isGit);
+        } catch {
+          setIsGitRepo(false);
         }
       } else {
         setHasBeads(false);
+        setIsGitRepo(false);
       }
     };
-    checkBeads();
+    checkProjectState();
   }, [activeProject?.path]);
 
   const handleOpenFarmwork = useCallback(() => {
@@ -307,6 +319,7 @@ export function AppShell() {
           <SessionTabBar
             projectId={activeProject.id}
             hasBeads={hasBeads}
+            isGitRepo={isGitRepo}
             onOpenFarmwork={handleOpenFarmwork}
             onOpenBeads={handleOpenBeads}
             onBrowseFiles={handleBrowseFiles}
@@ -366,9 +379,6 @@ export function AppShell() {
       ) : (
         <div className="flex-1 flex items-center justify-center blueprint-grid">
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-text-primary mb-2">
-              Welcome to Wynter Code
-            </h2>
             <p className="text-text-secondary mb-4">
               Open a project folder to get started
             </p>

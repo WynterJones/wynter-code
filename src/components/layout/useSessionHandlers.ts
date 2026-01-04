@@ -23,6 +23,7 @@ interface UseSessionHandlersProps {
   projectPath: string;
   autoApprovedToolsRef: React.RefObject<Set<string>>;
   setPendingMcpRequest: React.Dispatch<React.SetStateAction<McpPermissionRequest | null>>;
+  onSessionConflict?: (sessionId: string) => void;
 }
 
 export function useSessionHandlers({
@@ -30,6 +31,7 @@ export function useSessionHandlers({
   projectPath,
   autoApprovedToolsRef,
   setPendingMcpRequest,
+  onSessionConflict,
 }: UseSessionHandlersProps) {
   const {
     getMessages,
@@ -215,6 +217,14 @@ export function useSessionHandlers({
       }
     } catch (error) {
       console.error("[MainContent] Failed to start session:", error);
+
+      // Check if this is a "Session already running" error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes("Session already running") && onSessionConflict) {
+        onSessionConflict(currentSessionId);
+        return;
+      }
+
       setClaudeSessionEnded(currentSessionId);
     }
   }, [
@@ -240,6 +250,7 @@ export function useSessionHandlers({
     defaultGeminiModel,
     autoApprovedToolsRef,
     getMessages,
+    onSessionConflict,
   ]);
 
   // Stop the AI session (Claude or Codex based on provider)

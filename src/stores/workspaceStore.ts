@@ -20,6 +20,9 @@ interface WorkspaceStore {
   setActiveWorkspace: (id: string) => void;
   updateWorkspaceAvatar: (id: string, avatar: Partial<WorkspaceAvatar>) => void;
 
+  // Workspace reordering
+  reorderWorkspaces: (fromIndex: number, toIndex: number) => void;
+
   // Project management within workspaces
   addProjectToWorkspace: (workspaceId: string, projectId: string) => void;
   removeProjectFromWorkspace: (workspaceId: string, projectId: string) => void;
@@ -64,7 +67,6 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
         // Check if workspace with this ID already exists to prevent duplicates
         const existing = get().workspaces.find((w) => w.id === id);
         if (existing) {
-          console.log(`[workspaceStore] Workspace ${id} already exists, skipping add`);
           return;
         }
         const workspace = createWorkspaceWithId(id, name, color);
@@ -116,6 +118,15 @@ export const useWorkspaceStore = create<WorkspaceStore>()(
               : w
           ),
         }));
+      },
+
+      reorderWorkspaces: (fromIndex: number, toIndex: number) => {
+        set((state) => {
+          const newWorkspaces = [...state.workspaces];
+          const [removed] = newWorkspaces.splice(fromIndex, 1);
+          newWorkspaces.splice(toIndex, 0, removed);
+          return { workspaces: newWorkspaces };
+        });
       },
 
       addProjectToWorkspace: (workspaceId: string, projectId: string) => {

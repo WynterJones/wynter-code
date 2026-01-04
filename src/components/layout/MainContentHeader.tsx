@@ -1,9 +1,10 @@
-import { FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns } from "lucide-react";
+import { FolderOpen, Terminal as TerminalIcon, LayoutGrid, Columns, Trash2, Zap, ListTree } from "lucide-react";
 import { ProviderDropdown } from "@/components/provider/ProviderDropdown";
 import { ModelSelector } from "@/components/model/ModelSelector";
 import { PermissionModeToggle, StartButton } from "@/components/session";
 import { Tooltip } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { useSettingsStore } from "@/stores/settingsStore";
 import type { AIProvider, PermissionMode, Session } from "@/types";
 
 interface MainContentHeaderProps {
@@ -23,6 +24,7 @@ interface MainContentHeaderProps {
   onModeChange: (mode: PermissionMode) => void;
   onToggleTerminal: () => void;
   onTogglePanelLayout: () => void;
+  onClearContext?: () => void;
 }
 
 export function MainContentHeader({
@@ -42,7 +44,9 @@ export function MainContentHeader({
   onModeChange,
   onToggleTerminal,
   onTogglePanelLayout,
+  onClearContext,
 }: MainContentHeaderProps) {
+  const { streamingEnabled, setStreamingEnabled, inlineToolView, setInlineToolView } = useSettingsStore();
   return (
     <div className="h-[45px] px-4 flex items-center justify-between border-b border-border bg-bg-secondary" data-tauri-drag-region>
       <div
@@ -77,16 +81,54 @@ export function MainContentHeader({
           />
         )}
         <div className="w-px h-5 bg-border" />
+        <Tooltip content={streamingEnabled ? "Stream responses (click to batch)" : "Batch responses (click to stream)"} side="bottom">
+          <button
+            onClick={() => setStreamingEnabled(!streamingEnabled)}
+            className={cn(
+              "p-1.5 rounded transition-colors",
+              streamingEnabled
+                ? "text-accent hover:bg-accent/10"
+                : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+            )}
+          >
+            <Zap className={cn("w-4 h-4", !streamingEnabled && "opacity-50")} />
+          </button>
+        </Tooltip>
+        <Tooltip content={inlineToolView ? "Inline tools (click for panel)" : "Panel tools (click for inline)"} side="bottom">
+          <button
+            onClick={() => setInlineToolView(!inlineToolView)}
+            className={cn(
+              "p-1.5 rounded transition-colors",
+              inlineToolView
+                ? "text-accent hover:bg-accent/10"
+                : "text-text-secondary hover:bg-bg-tertiary hover:text-text-primary"
+            )}
+          >
+            <ListTree className={cn("w-4 h-4", !inlineToolView && "opacity-50")} />
+          </button>
+        </Tooltip>
         <ProviderDropdown provider={currentSession?.provider || "claude"} projectPath={projectPath} />
         {!isTerminalSession && !useMultiPanelLayout && (
-          <Tooltip content="Quick Terminal" side="bottom">
-            <button
-              onClick={onToggleTerminal}
-              className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-            >
-              <TerminalIcon className="w-4 h-4" />
-            </button>
-          </Tooltip>
+          <>
+            <Tooltip content="Quick Terminal" side="bottom">
+              <button
+                onClick={onToggleTerminal}
+                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+              >
+                <TerminalIcon className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            {onClearContext && (
+              <Tooltip content="Clear Context" side="bottom">
+                <button
+                  onClick={onClearContext}
+                  className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </Tooltip>
+            )}
+          </>
         )}
         <Tooltip content={useMultiPanelLayout ? "Exit Panel Mode" : "Panel Layout"} side="bottom">
           <button

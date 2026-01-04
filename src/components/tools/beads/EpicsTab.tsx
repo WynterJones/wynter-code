@@ -27,6 +27,7 @@ export function EpicsTab() {
   const { issues } = useBeadsStore();
   const [expandedEpics, setExpandedEpics] = useState<Set<string>>(new Set());
   const [hideClosed, setHideClosed] = useState(true);
+  const [hideTombstones, setHideTombstones] = useState(true);
   const [search, setSearch] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<BeadsIssue | null>(null);
@@ -76,7 +77,10 @@ export function EpicsTab() {
 
   const filteredEpics = useMemo(() => {
     return epics.filter((e) => {
-      if (hideClosed && e.epic.status === "closed") return false;
+      // Hide closed filter - hides closed epics WITHOUT a close_reason (soft closed)
+      if (hideClosed && e.epic.status === "closed" && !e.epic.close_reason) return false;
+      // Hide tombstones filter - hides closed epics WITH a close_reason (permanently resolved)
+      if (hideTombstones && e.epic.status === "closed" && e.epic.close_reason) return false;
       if (
         search &&
         !e.epic.title.toLowerCase().includes(search.toLowerCase()) &&
@@ -84,7 +88,7 @@ export function EpicsTab() {
       ) return false;
       return true;
     });
-  }, [epics, hideClosed, search]);
+  }, [epics, hideClosed, hideTombstones, search]);
 
   const toggleExpanded = (epicId: string) => {
     setExpandedEpics((prev) => {
@@ -163,14 +167,18 @@ export function EpicsTab() {
                         {epic.title}
                       </span>
 
-                      {/* Status Badge */}
+                      {/* Status Badge - show Tombstone for closed with close_reason */}
                       <span
                         className={cn(
                           "flex-shrink-0 px-2 py-0.5 text-xs rounded border capitalize",
-                          STATUS_COLORS[epic.status]
+                          epic.status === "closed" && epic.close_reason
+                            ? "bg-neutral-600/30 text-neutral-300 border-neutral-500/40"
+                            : STATUS_COLORS[epic.status]
                         )}
                       >
-                        {epic.status.replace("_", " ")}
+                        {epic.status === "closed" && epic.close_reason
+                          ? "Tombstone"
+                          : epic.status.replace("_", " ")}
                       </span>
 
                       {/* Progress Bar */}
@@ -298,15 +306,26 @@ export function EpicsTab() {
             ? ` (filtered from ${epics.length})`
             : ""}
         </span>
-        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={hideClosed}
-            onChange={(e) => setHideClosed(e.target.checked)}
-            className="w-3 h-3 rounded border-border bg-bg-tertiary accent-accent cursor-pointer"
-          />
-          <span>Hide closed</span>
-        </label>
+        <div className="flex items-center gap-4">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideClosed}
+              onChange={(e) => setHideClosed(e.target.checked)}
+              className="w-3 h-3 rounded border-border bg-bg-tertiary accent-accent cursor-pointer"
+            />
+            <span>Hide closed</span>
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={hideTombstones}
+              onChange={(e) => setHideTombstones(e.target.checked)}
+              className="w-3 h-3 rounded border-border bg-bg-tertiary accent-accent cursor-pointer"
+            />
+            <span>Hide tombstones</span>
+          </label>
+        </div>
       </div>
 
       {/* Issue Detail Popup */}

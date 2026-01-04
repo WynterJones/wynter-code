@@ -1043,7 +1043,6 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
     let original_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
     let json = if original_type == "stream_event" {
         if let Some(inner_event) = json.get("event") {
-            eprintln!("[RUST] Unwrapped stream_event, inner type: {:?}", inner_event.get("type"));
             inner_event
         } else {
             json
@@ -1099,13 +1098,11 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
                     }
                     "signature_delta" => {
                         // Signature deltas are metadata for thinking block verification
-                        // Not visible content - just log and continue
-                        eprintln!("[RUST] Received signature_delta (thinking verification)");
+                        // Not visible content - skip silently
                         return None;
                     }
                     _ => {
-                        // Log unknown delta types for debugging
-                        eprintln!("[RUST] Unknown delta type: {}", delta_type);
+                        // Unknown delta types - skip silently
                     }
                 }
             }
@@ -1218,12 +1215,7 @@ pub fn parse_claude_chunk(json: &serde_json::Value, session_id: &str) -> Option<
             // We only extract tool_use blocks here since those aren't streamed via deltas
             // (tool_use is handled via content_block_start)
             // Text is intentionally NOT emitted to avoid doubling
-            if let Some(message) = json.get("message") {
-                if let Some(_content) = message.get("content").and_then(|c| c.as_array()) {
-                    // Log for debugging but don't emit text
-                    eprintln!("[RUST] Assistant message received (text already streamed via deltas)");
-                }
-            }
+            // Text already streamed via deltas, no action needed
             None
         }
 
@@ -4725,7 +4717,66 @@ pub async fn save_temp_image(base64_data: String, media_type: String) -> Result<
     file.write_all(&bytes)
         .map_err(|e| format!("Failed to write temp file: {}", e))?;
 
-    eprintln!("[save_temp_image] Saved {} bytes to {:?}", bytes.len(), path);
-
     Ok(path.to_string_lossy().to_string())
+}
+
+/// Create a symbolic link from source to target
+/// Used for symlinking node_modules in git worktrees
+#[tauri::command]
+pub async fn create_symlink(source: String, target: String) -> Result<CreateSymlinkResult, String> {
+    use std::path::Path;
+
+    let source_path = Path::new(&source);
+    let target_path = Path::new(&target);
+
+    // Check if source exists
+    if !source_path.exists() {
+        return Ok(CreateSymlinkResult {
+            success: false,
+            error: Some(format!("Source path does not exist: {}", source)),
+        });
+    }
+
+    // Remove target if it already exists
+    if target_path.exists() || target_path.is_symlink() {
+        if target_path.is_symlink() {
+            std::fs::remove_file(&target_path)
+                .map_err(|e| format!("Failed to remove existing symlink: {}", e))?;
+        } else if target_path.is_dir() {
+            std::fs::remove_dir_all(&target_path)
+                .map_err(|e| format!("Failed to remove existing directory: {}", e))?;
+        } else {
+            std::fs::remove_file(&target_path)
+                .map_err(|e| format!("Failed to remove existing file: {}", e))?;
+        }
+    }
+
+    // Create the symlink
+    #[cfg(unix)]
+    {
+        std::os::unix::fs::symlink(&source_path, &target_path)
+            .map_err(|e| format!("Failed to create symlink: {}", e))?;
+    }
+
+    #[cfg(windows)]
+    {
+        if source_path.is_dir() {
+            std::os::windows::fs::symlink_dir(&source_path, &target_path)
+                .map_err(|e| format!("Failed to create directory symlink: {}", e))?;
+        } else {
+            std::os::windows::fs::symlink_file(&source_path, &target_path)
+                .map_err(|e| format!("Failed to create file symlink: {}", e))?;
+        }
+    }
+
+    Ok(CreateSymlinkResult {
+        success: true,
+        error: None,
+    })
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CreateSymlinkResult {
+    pub success: bool,
+    pub error: Option<String>,
 }

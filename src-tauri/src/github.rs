@@ -157,21 +157,21 @@ pub async fn gh_list_my_repos(limit: Option<i32>) -> Result<Vec<GhRepo>, String>
 
 #[tauri::command]
 pub async fn gh_list_starred_repos(limit: Option<i32>) -> Result<Vec<GhRepo>, String> {
-    let limit_str = limit.unwrap_or(100).to_string();
+    let limit_val = limit.unwrap_or(100);
+
+    // Use GitHub API to get starred repos (gh repo list doesn't support --starred)
     let output = run_gh_command(
         &[
-            "repo",
-            "list",
-            "--starred",
-            "--json",
-            "name,description,url,isPrivate,updatedAt,stargazerCount,primaryLanguage,owner",
-            "--limit",
-            &limit_str,
+            "api",
+            "user/starred",
+            "--paginate",
+            "-q",
+            &format!(".[:{}] | map({{name: .name, description: .description, url: .html_url, isPrivate: .private, updatedAt: .updated_at, stargazerCount: .stargazers_count, primaryLanguage: (if .language then {{name: .language}} else null end), owner: {{login: .owner.login}}, fullName: .full_name}})", limit_val),
         ],
         None,
     )?;
 
-    if output.trim().is_empty() {
+    if output.trim().is_empty() || output.trim() == "[]" {
         return Ok(Vec::new());
     }
 
@@ -473,7 +473,7 @@ pub struct GhRepoContent {
 #[tauri::command]
 pub async fn gh_view_repo(owner: String, repo: String) -> Result<GhRepoDetails, String> {
     let repo_path = format!("{}/{}", owner, repo);
-    let output = run_gh_command(
+    let output = match run_gh_command(
         &[
             "repo",
             "view",
@@ -482,7 +482,16 @@ pub async fn gh_view_repo(owner: String, repo: String) -> Result<GhRepoDetails, 
             "name,nameWithOwner,description,url,homepageUrl,isPrivate,isFork,isArchived,defaultBranchRef,createdAt,updatedAt,stargazerCount,forkCount,primaryLanguage,owner,parent",
         ],
         None,
-    )?;
+    ) {
+        Ok(out) => out,
+        Err(e) => {
+            // Handle empty repository errors more gracefully
+            if e.contains("404") || e.contains("This repository is empty") {
+                return Err(format!("Repository {}/{} is empty or not found", owner, repo));
+            }
+            return Err(e);
+        }
+    };
 
     // Parse the raw JSON and transform field names
     let raw: serde_json::Value =
@@ -534,7 +543,16 @@ pub async fn gh_get_repo_contents(
         _ => format!("repos/{}/{}/contents", owner, repo),
     };
 
-    let output = run_gh_command(&["api", &api_path], None)?;
+    let output = match run_gh_command(&["api", &api_path], None) {
+        Ok(out) => out,
+        Err(e) => {
+            // Empty repos return 404 - return empty array instead of error
+            if e.contains("404") || e.contains("This repository is empty") {
+                return Ok(Vec::new());
+            }
+            return Err(e);
+        }
+    };
 
     // The API returns either an array (directory) or a single object (file)
     let raw: serde_json::Value =
@@ -649,9 +667,22 @@ pub async fn gh_delete_repo(owner: String, repo: String) -> Result<DeleteRepoRes
             success: true,
             error: None,
         }),
-        Err(e) => Ok(DeleteRepoResult {
-            success: false,
-            error: Some(e),
-        }),
+        Err(e) => {
+            // Provide clearer error messages
+            let error_msg = if e.contains("403") || e.contains("admin rights") {
+                format!(
+                    "You don't have permission to delete {}/{}. Only repository owners or admins can delete repositories.",
+                    owner, repo
+                )
+            } else if e.contains("404") {
+                format!("Repository {}/{} not found.", owner, repo)
+            } else {
+                e
+            };
+            Ok(DeleteRepoResult {
+                success: false,
+                error: Some(error_msg),
+            })
+        }
     }
 }

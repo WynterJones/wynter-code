@@ -104,6 +104,7 @@ interface SettingsStore {
   terminalShell: TerminalShell;
   terminalFontSize: number;
   terminalCursorBlink: boolean;
+  terminalAnsiFilter: boolean; // Filter problematic ANSI sequences (fixes Claude Code blank lines)
   useMultiPanelLayout: boolean;
 
   // Claude safety settings
@@ -145,6 +146,12 @@ interface SettingsStore {
   // SEO Tools settings
   lighthouseApiKey: string;
 
+  // Response streaming settings
+  streamingEnabled: boolean;
+
+  // Tool activity view mode
+  inlineToolView: boolean;
+
   setDefaultModel: (model: ClaudeModel) => void;
   setSidebarWidth: (width: number) => void;
   setSidebarPosition: (position: SidebarPosition) => void;
@@ -168,6 +175,7 @@ interface SettingsStore {
   setTerminalShell: (shell: TerminalShell) => void;
   setTerminalFontSize: (size: number) => void;
   setTerminalCursorBlink: (blink: boolean) => void;
+  setTerminalAnsiFilter: (filter: boolean) => void;
   setUseMultiPanelLayout: (use: boolean) => void;
   setUserAvatar: (avatar: string | null) => void;
   setClaudeSafeMode: (enabled: boolean) => void;
@@ -207,6 +215,12 @@ interface SettingsStore {
 
   // SEO Tools setters
   setLighthouseApiKey: (key: string) => void;
+
+  // Response streaming setters
+  setStreamingEnabled: (enabled: boolean) => void;
+
+  // Tool activity view setters
+  setInlineToolView: (inline: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -236,6 +250,7 @@ export const useSettingsStore = create<SettingsStore>()(
       terminalShell: "system",
       terminalFontSize: 13,
       terminalCursorBlink: true,
+      terminalAnsiFilter: false, // Disabled by default, enable for Claude Code
       useMultiPanelLayout: false,
       userAvatar: null,
       claudeSafeMode: true, // Enabled by default for safety
@@ -272,6 +287,12 @@ export const useSettingsStore = create<SettingsStore>()(
 
       // SEO Tools defaults
       lighthouseApiKey: "",
+
+      // Response streaming defaults
+      streamingEnabled: true,
+
+      // Tool activity view defaults
+      inlineToolView: true, // true = inline view (default), false = panel view
 
       setDefaultModel: (model: ClaudeModel) => {
         set({ defaultModel: model });
@@ -363,6 +384,10 @@ export const useSettingsStore = create<SettingsStore>()(
 
       setTerminalCursorBlink: (terminalCursorBlink: boolean) => {
         set({ terminalCursorBlink });
+      },
+
+      setTerminalAnsiFilter: (terminalAnsiFilter: boolean) => {
+        set({ terminalAnsiFilter });
       },
 
       setUseMultiPanelLayout: (useMultiPanelLayout: boolean) => {
@@ -483,6 +508,16 @@ export const useSettingsStore = create<SettingsStore>()(
       // SEO Tools setters
       setLighthouseApiKey: (lighthouseApiKey: string) => {
         set({ lighthouseApiKey });
+      },
+
+      // Response streaming setters
+      setStreamingEnabled: (streamingEnabled: boolean) => {
+        set({ streamingEnabled });
+      },
+
+      // Tool activity view setters
+      setInlineToolView: (inlineToolView: boolean) => {
+        set({ inlineToolView });
       },
     }),
     {

@@ -205,9 +205,8 @@ export function App() {
 
     // Connect WebSocket for real-time updates
     try {
-      const ws = farmworkApi.connectWebSocket((data) => {
+      const ws = farmworkApi.connectWebSocket(() => {
         // Handle real-time updates
-        console.log("WebSocket update:", data);
       });
 
       return () => {

@@ -2,12 +2,27 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Search, Plus, AlertTriangle, ArrowLeft } from "lucide-react";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useProjectStore } from "@/stores/projectStore";
 import type { Workspace, WorkspaceAvatar as WorkspaceAvatarType } from "@/types/workspace";
 import { WORKSPACE_COLORS, createDefaultAvatar } from "@/types/workspace";
 import { WorkspacePill } from "./WorkspacePill";
 import { WorkspaceListItem } from "./WorkspaceListItem";
+import { WorkspaceAvatar } from "./WorkspaceAvatar";
 import { WorkspaceAvatarEditor } from "./WorkspaceAvatarEditor";
 import { Modal } from "@/components/ui";
 
@@ -25,6 +40,7 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
   const [newAvatar, setNewAvatar] = useState<WorkspaceAvatarType>(createDefaultAvatar());
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(null);
+  const [isChildPopupOpen, setIsChildPopupOpen] = useState(false);
 
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -37,7 +53,39 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
     removeWorkspace,
     updateWorkspace,
     setActiveWorkspace,
+    reorderWorkspaces,
   } = useWorkspaceStore();
+
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (over && active.id !== over.id) {
+      const oldIndex = workspaces.findIndex((w) => w.id === active.id);
+      const newIndex = workspaces.findIndex((w) => w.id === over.id);
+      if (oldIndex !== -1 && newIndex !== -1) {
+        reorderWorkspaces(oldIndex, newIndex);
+      }
+    }
+  };
+
+  const draggedWorkspace = activeId
+    ? workspaces.find((w) => w.id === activeId)
+    : null;
 
   const { projects } = useProjectStore();
 
@@ -72,6 +120,9 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
     if (!isOpen) return;
 
     const handleClickOutside = (e: MouseEvent) => {
+      // Don't close if a child popup (like FileBrowserPopup) is open
+      if (isChildPopupOpen) return;
+
       if (
         dropdownRef.current &&
         !dropdownRef.current.contains(e.target as Node) &&
@@ -101,7 +152,7 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [isOpen, isCreating, editingWorkspaceId]);
+  }, [isOpen, isCreating, editingWorkspaceId, isChildPopupOpen]);
 
   const handleToggle = () => {
     if (!isOpen && buttonRef.current) {
@@ -203,6 +254,7 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
                     setNewAvatar((prev) => ({ ...prev, ...updates }))
                   }
                   onColorChange={setNewColor}
+                  onFileBrowserOpenChange={setIsChildPopupOpen}
                 />
 
                 <div className="flex justify-end gap-2 pt-2 border-t border-border">
@@ -238,6 +290,7 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
                       onDelete={() => handleDeleteWorkspace(workspace.id)}
                       onStartEdit={() => {}}
                       onStopEdit={() => setEditingWorkspaceId(null)}
+                      onFileBrowserOpenChange={setIsChildPopupOpen}
                     />
                   ))}
               </div>
@@ -265,28 +318,56 @@ export function WorkspaceSelectorPopup({ compact }: WorkspaceSelectorPopupProps)
                   }}
                   className="max-h-[350px] os-theme-custom"
                 >
-                  <div className="p-2 space-y-1">
-                    {filteredWorkspaces.length === 0 ? (
-                      <div className="px-3 py-4 text-sm text-text-secondary text-center">
-                        {searchQuery ? "No workspaces found" : "No workspaces yet"}
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext
+                      items={filteredWorkspaces.map((w) => w.id)}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="p-2 space-y-1">
+                        {filteredWorkspaces.length === 0 ? (
+                          <div className="px-3 py-4 text-sm text-text-secondary text-center">
+                            {searchQuery ? "No workspaces found" : "No workspaces yet"}
+                          </div>
+                        ) : (
+                          filteredWorkspaces.map((workspace) => (
+                            <WorkspaceListItem
+                              key={workspace.id}
+                              workspace={workspace}
+                              isActive={workspace.id === activeWorkspaceId}
+                              projectCount={getProjectCount(workspace)}
+                              isEditing={false}
+                              isDragging={workspace.id === activeId}
+                              onSelect={() => handleSelectWorkspace(workspace.id)}
+                              onUpdate={(updates) => updateWorkspace(workspace.id, updates)}
+                              onDelete={() => handleDeleteWorkspace(workspace.id)}
+                              onStartEdit={() => setEditingWorkspaceId(workspace.id)}
+                              onStopEdit={() => setEditingWorkspaceId(null)}
+                              onFileBrowserOpenChange={setIsChildPopupOpen}
+                            />
+                          ))
+                        )}
                       </div>
-                    ) : (
-                      filteredWorkspaces.map((workspace) => (
-                        <WorkspaceListItem
-                          key={workspace.id}
-                          workspace={workspace}
-                          isActive={workspace.id === activeWorkspaceId}
-                          projectCount={getProjectCount(workspace)}
-                          isEditing={false}
-                          onSelect={() => handleSelectWorkspace(workspace.id)}
-                          onUpdate={(updates) => updateWorkspace(workspace.id, updates)}
-                          onDelete={() => handleDeleteWorkspace(workspace.id)}
-                          onStartEdit={() => setEditingWorkspaceId(workspace.id)}
-                          onStopEdit={() => setEditingWorkspaceId(null)}
-                        />
-                      ))
-                    )}
-                  </div>
+                    </SortableContext>
+                    <DragOverlay>
+                      {draggedWorkspace && (
+                        <div className="px-3 py-2 rounded-lg border border-accent bg-bg-secondary shadow-xl">
+                          <div className="flex items-center gap-3">
+                            <WorkspaceAvatar
+                              avatar={draggedWorkspace.avatar}
+                              color={draggedWorkspace.color}
+                              size="md"
+                            />
+                            <div className="text-sm text-text-primary">{draggedWorkspace.name}</div>
+                          </div>
+                        </div>
+                      )}
+                    </DragOverlay>
+                  </DndContext>
                 </OverlayScrollbarsComponent>
 
                 {/* New Workspace Button */}

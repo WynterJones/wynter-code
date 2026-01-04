@@ -52,7 +52,6 @@ struct HttpStreamChunk {
 /// Outbound message types (for internal channel)
 #[derive(Debug, Clone)]
 enum OutboundMessage {
-    State(StateUpdate),
     Http(HttpResponse),
     HttpStream(HttpStreamChunk),
 }
@@ -266,8 +265,22 @@ impl RelayClient {
         let encryption_key_for_loop = encryption_key.clone();
 
         tokio::spawn(async move {
+            // Ping interval to keep WebSocket alive through NAT/mobile networks
+            let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(30));
+            ping_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
             loop {
                 tokio::select! {
+                    // Periodic ping to keep connection alive
+                    _ = ping_interval.tick() => {
+                        let ping_msg = ClientMessage::Ping;
+                        if let Ok(json) = serde_json::to_string(&ping_msg) {
+                            if write.send(Message::Text(json)).await.is_err() {
+                                eprintln!("[relay] Failed to send ping, connection may be dead");
+                                break;
+                            }
+                        }
+                    }
                     msg = read.next() => {
                         match msg {
                             Some(Ok(Message::Text(text))) => {
@@ -376,11 +389,21 @@ impl RelayClient {
                     }
                     update = outbound_rx.recv() => {
                         if let Some(outbound_msg) = update {
+                            // Check if peer is online before sending (especially important for streaming)
+                            let is_peer_online = status.read().await.peer_online;
+                            if !is_peer_online {
+                                // Skip sending if peer is offline - don't waste resources
+                                // For stream chunks, this prevents queueing up messages for disconnected peers
+                                if matches!(outbound_msg, OutboundMessage::HttpStream(_)) {
+                                    println!("[relay] Skipping stream chunk - peer is offline");
+                                    continue;
+                                }
+                            }
+
                             let key_guard = encryption_key_for_loop.read().await;
                             let peer_id_guard = peer_device_id.read().await;
                             if let (Some(ref key), Some(ref recipient_id)) = (*key_guard, peer_id_guard.as_ref()) {
                                 let plaintext = match &outbound_msg {
-                                    OutboundMessage::State(state_update) => serde_json::to_vec(state_update),
                                     OutboundMessage::Http(http_response) => serde_json::to_vec(http_response),
                                     OutboundMessage::HttpStream(stream_chunk) => serde_json::to_vec(stream_chunk),
                                 };
@@ -435,18 +458,6 @@ impl RelayClient {
 
     pub async fn get_status(&self) -> RelayStatus {
         self.status.read().await.clone()
-    }
-
-    pub async fn send(&self, update: StateUpdate) -> Result<(), String> {
-        let sender = self.sender_tx.read().await;
-        if let Some(tx) = sender.as_ref() {
-            tx.send(OutboundMessage::State(update))
-                .await
-                .map_err(|e| format!("Failed to send update: {}", e))?;
-            Ok(())
-        } else {
-            Err("Not connected to relay".to_string())
-        }
     }
 
     pub async fn generate_pairing_data(&self) -> Result<RelayPairingData, String> {
@@ -794,8 +805,13 @@ async fn handle_http_request_streaming(
 
     println!("[relay] Forwarding streaming HTTP {} {} to local API", req.method, req.endpoint);
 
+    // No total timeout for streaming - sessions can last hours
+    // Use connect_timeout for fast failure if API server is down
+    // Use read_timeout to detect stalled streams (5 minutes of no data)
     let client = match reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(120)) // Long timeout for streaming
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .read_timeout(std::time::Duration::from_secs(300))
+        .tcp_keepalive(std::time::Duration::from_secs(60))
         .build()
     {
         Ok(c) => c,

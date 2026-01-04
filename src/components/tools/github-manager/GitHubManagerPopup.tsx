@@ -140,9 +140,8 @@ export function GitHubManagerPopup({
         // Mark as auto-opened and view the repo
         hasAutoOpenedRef.current = true;
         viewRepo(parsed.owner, parsed.repo);
-      } catch (error) {
+      } catch {
         // Silently fail - just don't auto-open
-        console.debug("Failed to auto-open project repo:", error);
       }
     };
 

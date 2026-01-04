@@ -14,6 +14,7 @@ import type {
   AutoBuildWorker,
   SiloProgress,
   AuditFileResults,
+  ActiveWorktree,
 } from "@/types/autoBuild";
 import type { StreamChunk, AIProvider } from "@/types";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -133,9 +134,9 @@ interface AutoBuildActions {
   processIssue: (workerId: number, issueId: string) => Promise<boolean>;
   executeWork: (issueId: string) => Promise<AutoBuildResult>;
   executeStreamingWork: (issueId: string, fixMode?: boolean, errors?: string, workerId?: number) => Promise<boolean>;
-  runVerification: (issueId?: string, filesModified?: string[]) => Promise<VerificationResult>;
+  runVerification: (issueId?: string, filesModified?: string[], workerId?: number) => Promise<VerificationResult>;
   runFixLoop: (issueId: string, errors: string, workerId?: number) => Promise<boolean>;
-  commitChanges: (issueId: string) => Promise<void>;
+  commitChanges: (issueId: string, workerId?: number) => Promise<void>;
   closeIssue: (issueId: string, reason: string) => Promise<void>;
   markBlocked: (issueId: string) => Promise<void>;
 
@@ -149,6 +150,12 @@ interface AutoBuildActions {
   returnToOriginalBranch: () => Promise<void>;
   getBranchNameForIssue: (issueId: string) => string;
   createPullRequest: () => Promise<boolean>;
+
+  // Worktree Management
+  createWorktreeForIssue: (workerId: number, issueId: string) => Promise<string | null>;
+  cleanupWorktreeForIssue: (issueId: string, merge: boolean) => Promise<void>;
+  cleanupAllWorktrees: () => Promise<void>;
+  getWorkerWorktree: (workerId: number) => string | null;
 }
 
 const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
@@ -169,6 +176,8 @@ const DEFAULT_SETTINGS_VALUE: AutoBuildSettings = {
   // Branch Management - disabled by default
   useFeatureBranches: false,
   autoCreatePR: false,
+  // Worktree Mode - disabled by default (overrides useFeatureBranches when enabled)
+  useWorktrees: false,
 };
 
 // Create empty worker (used in concurrent mode)
@@ -181,6 +190,7 @@ function createWorker(id: number): AutoBuildWorker {
     retryCount: 0,
     filesModified: [],
     startTime: null,
+    worktreePath: null,
   };
 }
 
@@ -229,6 +239,8 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
   currentBranch: null,
   originalBranch: null,
   epicBranches: new Map(),
+  // Worktree Mode
+  activeWorktrees: [],
 
   // UI Actions
   openPopup: () => set({ isPopupOpen: true }),
@@ -268,23 +280,29 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
 
   // Agent Control
   start: async () => {
-    const { status, queue, settings, runAgentLoop, addLog, saveSession, initializeWorkers, startFileCoordinator, setupBranchForSession } = get();
+    const { status, queue, settings, runAgentLoop, addLog, saveSession, initializeWorkers, startFileCoordinator, setupBranchForSession, cleanupAllWorktrees, projectPath } = get();
     if (status === "running") return;
     if (queue.length === 0) {
       addLog("warning", "No issues in queue");
       return;
     }
 
-    // Start file coordinator for concurrent mode
-    if (settings.maxConcurrentIssues > 1) {
+    // Cleanup any orphaned worktrees from previous sessions (if worktree mode enabled)
+    if (settings.useWorktrees && projectPath) {
+      addLog("info", "Cleaning up any orphaned worktrees from previous sessions");
+      await cleanupAllWorktrees();
+    }
+
+    // Start file coordinator for concurrent mode (not needed in worktree mode)
+    if (settings.maxConcurrentIssues > 1 && !settings.useWorktrees) {
       await startFileCoordinator();
     }
 
     // Initialize worker pool
     initializeWorkers();
 
-    // Set up feature branch if enabled
-    if (settings.useFeatureBranches) {
+    // Set up feature branch if enabled (not used in worktree mode)
+    if (settings.useFeatureBranches && !settings.useWorktrees) {
       const branchSetupSuccess = await setupBranchForSession();
       if (!branchSetupSuccess) {
         addLog("error", "Failed to set up feature branch, aborting");
@@ -294,7 +312,8 @@ export const useAutoBuildStore = create<AutoBuildState & AutoBuildActions>((set,
     }
 
     set({ status: "running", retryCount: 0 });
-    addLog("info", `Starting Auto Build with ${queue.length} issues (${settings.maxConcurrentIssues} concurrent workers)`);
+    const modeInfo = settings.useWorktrees ? "(worktree mode)" : settings.useFeatureBranches ? "(feature branch mode)" : "";
+    addLog("info", `Starting Auto Build with ${queue.length} issues (${settings.maxConcurrentIssues} concurrent workers) ${modeInfo}`);
     await saveSession();
     await runAgentLoop();
   },
@@ -815,7 +834,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
         addLog("info", `Queue complete. ${humanReview.length} issue(s) awaiting review`);
       } else {
         // All issues completed - handle branch cleanup
-        if (settings.useFeatureBranches) {
+        if (settings.useFeatureBranches && !settings.useWorktrees) {
           // Create PR if enabled
           if (settings.autoCreatePR) {
             await createPullRequest();
@@ -824,7 +843,12 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
           await returnToOriginalBranch();
         }
 
-        set({ status: "idle", currentIssueId: null, currentPhase: null, workers: [] });
+        // Cleanup any remaining worktrees (if worktree mode)
+        if (settings.useWorktrees) {
+          await get().cleanupAllWorktrees();
+        }
+
+        set({ status: "idle", currentIssueId: null, currentPhase: null, workers: [], activeWorktrees: [] });
         addLog("success", "All issues completed");
         get().clearSession();
       }
@@ -881,9 +905,12 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
       runSelfReview,
       runSubagentAudits,
       runAuditFixLoop,
+      createWorktreeForIssue,
+      cleanupWorktreeForIssue,
     } = get();
 
     const issue = getCachedIssue(issueId);
+    let worktreePath: string | null = null;
 
     // Update worker state
     updateWorker(workerId, {
@@ -893,6 +920,14 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
       retryCount: 0,
       filesModified: [],
     });
+
+    // Create worktree if enabled
+    if (settings.useWorktrees) {
+      worktreePath = await createWorktreeForIssue(workerId, issueId);
+      if (!worktreePath) {
+        addLog("error", "Failed to create worktree, falling back to main directory", issueId);
+      }
+    }
 
     // Also update legacy single-worker state for UI compatibility
     set({ currentIssueId: issueId, currentPhase: "working", progress: 10 });
@@ -908,6 +943,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
         addLog("error", "Work phase failed", issueId);
         await markBlocked(issueId);
         set({ queue: get().queue.filter((id) => id !== issueId) });
+        if (worktreePath) await cleanupWorktreeForIssue(issueId, false);
         return false;
       }
 
@@ -935,6 +971,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
         addLog("error", "Self-review failed", issueId);
         await markBlocked(issueId);
         set({ queue: get().queue.filter((id) => id !== issueId) });
+        if (worktreePath) await cleanupWorktreeForIssue(issueId, false);
         return false;
       }
 
@@ -957,6 +994,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
             addLog("error", "Failed to fix audit issues", issueId);
             await markBlocked(issueId);
             set({ queue: get().queue.filter((id) => id !== issueId) });
+            if (worktreePath) await cleanupWorktreeForIssue(issueId, false);
             return false;
           }
         } else {
@@ -975,7 +1013,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
       let fixAttempts = 0;
 
       while (!testsPass && fixAttempts <= settings.maxRetries) {
-        const verification = await runVerification(issueId, filesModified);
+        const verification = await runVerification(issueId, filesModified, workerId);
 
         if (verification.success) {
           testsPass = true;
@@ -1014,6 +1052,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
       if (!testsPass) {
         await markBlocked(issueId);
         set({ queue: get().queue.filter((id) => id !== issueId) });
+        if (worktreePath) await cleanupWorktreeForIssue(issueId, false);
         return false;
       }
 
@@ -1024,7 +1063,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
         updateWorker(workerId, { phase: "committing" });
         set({ currentPhase: "committing" });
         addLog("info", "Committing changes", issueId);
-        await commitChanges(issueId);
+        await commitChanges(issueId, workerId);
       }
 
       set({ progress: 90 });
@@ -1034,6 +1073,7 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
         updateWorker(workerId, { phase: "reviewing" });
         moveToReview(issueId);
         addLog("info", `Awaiting human review: ${issue?.title || issueId}`, issueId);
+        // Don't cleanup worktree yet - human reviewer may need to inspect
       } else {
         // Auto-complete
         await closeIssue(issueId, "Completed by Auto Build");
@@ -1044,6 +1084,11 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
           completed: [...get().completed.slice(-9), issueId],
           progress: 100,
         });
+
+        // Cleanup worktree with merge on success
+        if (worktreePath) {
+          await cleanupWorktreeForIssue(issueId, true);
+        }
       }
 
       await saveSession();
@@ -1052,6 +1097,12 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
       addLog("error", `Error: ${err}`, issueId);
       await markBlocked(issueId);
       set({ queue: get().queue.filter((id) => id !== issueId) });
+
+      // Cleanup worktree without merge on failure
+      if (worktreePath) {
+        await cleanupWorktreeForIssue(issueId, false);
+      }
+
       return false;
     }
   },
@@ -1090,12 +1141,16 @@ ${progress.notes ? `\n## Notes\n${progress.notes}` : ""}
 
   // Streaming work execution using Claude CLI stream-json mode
   executeStreamingWork: async (issueId, fixMode = false, errors, workerId) => {
-    const { projectPath, getCachedIssue, addLog, setStreamingState, updateStreamingAction, loadSiloContext, fileCoordinatorPort, settings, updateWorker } = get();
+    const { projectPath, getCachedIssue, addLog, setStreamingState, updateStreamingAction, loadSiloContext, fileCoordinatorPort, settings, updateWorker, workers } = get();
 
     if (!projectPath) {
       addLog("error", "No project path", issueId);
       return false;
     }
+
+    // Use worktree path if available (for isolated per-issue worktree mode)
+    const worker = workerId !== undefined ? workers.find(w => w.id === workerId) : undefined;
+    const effectiveCwd = worker?.worktreePath || projectPath;
 
     const issue = getCachedIssue(issueId);
     if (!issue) {
@@ -1246,7 +1301,7 @@ When done, briefly confirm what was completed.`;
 
       // Start the AI session
       invoke(startSessionCommand, {
-        cwd: projectPath,
+        cwd: effectiveCwd,
         sessionId,
         permissionMode: "acceptEdits",
         safeMode: true,
@@ -1284,8 +1339,8 @@ When done, briefly confirm what was completed.`;
     return executeStreamingWork(issueId, true, errors, workerId);
   },
 
-  runVerification: async (issueId, filesModified) => {
-    const { projectPath, settings, addLog } = get();
+  runVerification: async (issueId, filesModified, workerId) => {
+    const { projectPath, settings, addLog, workers } = get();
     if (!projectPath) {
       return {
         success: false,
@@ -1295,9 +1350,13 @@ When done, briefly confirm what was completed.`;
       };
     }
 
+    // Use worktree path if available
+    const worker = workerId !== undefined ? workers.find(w => w.id === workerId) : undefined;
+    const effectiveCwd = worker?.worktreePath || projectPath;
+
     try {
       const result = await invoke<VerificationResult>("auto_build_run_verification", {
-        projectPath,
+        projectPath: effectiveCwd,
         runLint: settings.runLint,
         runTests: settings.runTests,
         runBuild: settings.runBuild,
@@ -1368,16 +1427,20 @@ When done, briefly confirm what was completed.`;
     }
   },
 
-  commitChanges: async (issueId) => {
-    const { projectPath, getCachedIssue } = get();
+  commitChanges: async (issueId, workerId) => {
+    const { projectPath, getCachedIssue, workers } = get();
     if (!projectPath) return;
+
+    // Use worktree path if available
+    const worker = workerId !== undefined ? workers.find(w => w.id === workerId) : undefined;
+    const effectiveCwd = worker?.worktreePath || projectPath;
 
     const issue = getCachedIssue(issueId);
     const message = issue ? `${issue.issue_type}: ${issue.title}` : `Completed ${issueId}`;
 
     try {
       await invoke("auto_build_commit", {
-        projectPath,
+        projectPath: effectiveCwd,
         message,
         issueId,
       });
@@ -1422,12 +1485,16 @@ When done, briefly confirm what was completed.`;
 
   // Self-review: Claude reviews its own code
   runSelfReview: async (issueId, workerId) => {
-    const { projectPath, getCachedIssue, addLog, setStreamingState, updateStreamingAction, updateWorker, loadSiloContext } = get();
+    const { projectPath, getCachedIssue, addLog, setStreamingState, updateStreamingAction, updateWorker, loadSiloContext, workers } = get();
 
     if (!projectPath) {
       addLog("error", "No project path for self-review", issueId);
       return false;
     }
+
+    // Use worktree path if available
+    const worker = workerId !== undefined ? workers.find(w => w.id === workerId) : undefined;
+    const effectiveCwd = worker?.worktreePath || projectPath;
 
     const issue = getCachedIssue(issueId);
     if (!issue) {
@@ -1536,7 +1603,7 @@ Fix any issues found. Do NOT commit.`;
 
       // Start the AI session
       invoke(startSessionCommand, {
-        cwd: projectPath,
+        cwd: effectiveCwd,
         sessionId,
         permissionMode: "acceptEdits",
         safeMode: true,
@@ -1571,11 +1638,15 @@ Fix any issues found. Do NOT commit.`;
 
   // Run all enabled subagent audits using orchestrator pattern
   runSubagentAudits: async (issueId, filesModified, workerId) => {
-    const { settings, projectPath, addLog, updateWorker, setStreamingState, updateStreamingAction } = get();
+    const { settings, projectPath, addLog, updateWorker, setStreamingState, updateStreamingAction, workers } = get();
 
     // Set phase to auditing
     updateWorker(workerId, { phase: "auditing" });
     set({ currentPhase: "auditing" });
+
+    // Use worktree path if available
+    const worker = workerId !== undefined ? workers.find(w => w.id === workerId) : undefined;
+    const effectiveCwd = worker?.worktreePath || projectPath;
 
     // Helper to check if files include UI files
     const hasUIFiles = (files: string[]): boolean => {
@@ -1670,7 +1741,7 @@ When all audits complete, summarize which audits passed and which found issues.`
 
       // Start the AI session
       invoke(startSessionCommand, {
-        cwd: projectPath,
+        cwd: effectiveCwd,
         sessionId,
         permissionMode: "default",
         safeMode: true,
@@ -1915,6 +1986,147 @@ When all audits complete, summarize which audits passed and which found issues.`
       addLog("error", `PR creation failed: ${err}`);
       return false;
     }
+  },
+
+  // === WORKTREE MANAGEMENT ===
+
+  createWorktreeForIssue: async (workerId: number, issueId: string) => {
+    const { projectPath, settings, addLog, activeWorktrees } = get();
+
+    if (!projectPath || !settings.useWorktrees) {
+      return null;
+    }
+
+    try {
+      addLog("info", `Creating worktree for issue ${issueId}`, issueId);
+
+      // Create the worktree
+      const result = await gitService.createWorktreeForIssue(projectPath, issueId);
+
+      if (!result.success || !result.path) {
+        addLog("error", `Failed to create worktree: ${result.error}`, issueId);
+        return null;
+      }
+
+      // Setup dependencies (symlink node_modules)
+      const depsResult = await gitService.setupWorktreeDeps(projectPath, result.path);
+      if (!depsResult.success) {
+        addLog("warning", `Failed to symlink node_modules: ${depsResult.error}`, issueId);
+        // Continue anyway - the worktree might still work
+      }
+
+      // Track the active worktree
+      const sanitizedId = issueId.replace(/[^a-zA-Z0-9-]/g, '-');
+      const worktree: ActiveWorktree = {
+        issueId,
+        path: result.path,
+        branch: `autobuild/${sanitizedId}`,
+        workerId,
+        createdAt: Date.now(),
+      };
+
+      set({
+        activeWorktrees: [...activeWorktrees, worktree],
+        workers: get().workers.map(w =>
+          w.id === workerId ? { ...w, worktreePath: result.path ?? null } : w
+        ),
+      });
+
+      addLog("success", `Worktree created at ${result.path}`, issueId);
+      return result.path;
+    } catch (err) {
+      addLog("error", `Worktree creation failed: ${err}`, issueId);
+      return null;
+    }
+  },
+
+  cleanupWorktreeForIssue: async (issueId: string, merge: boolean) => {
+    const { projectPath, activeWorktrees, addLog } = get();
+
+    if (!projectPath) return;
+
+    const worktree = activeWorktrees.find(w => w.issueId === issueId);
+    if (!worktree) {
+      addLog("warning", `No active worktree found for issue ${issueId}`, issueId);
+      return;
+    }
+
+    try {
+      if (merge) {
+        // Merge the worktree branch back to main
+        addLog("info", `Merging ${worktree.branch} to main`, issueId);
+        const mergeResult = await gitService.mergeBranch(projectPath, worktree.branch, true);
+        if (!mergeResult.success) {
+          addLog("warning", `Merge failed (non-ff?): ${mergeResult.error}`, issueId);
+          // Try without fast-forward
+          const mergeRetry = await gitService.mergeBranch(projectPath, worktree.branch, false);
+          if (!mergeRetry.success) {
+            addLog("error", `Merge failed: ${mergeRetry.error}`, issueId);
+          }
+        }
+      }
+
+      // Remove the worktree and branch
+      addLog("info", `Removing worktree at ${worktree.path}`, issueId);
+      const removeResult = await gitService.removeWorktree(projectPath, worktree.path, true);
+      if (!removeResult.success) {
+        addLog("warning", `Failed to remove worktree: ${removeResult.error}`, issueId);
+      }
+
+      // Update state
+      set({
+        activeWorktrees: activeWorktrees.filter(w => w.issueId !== issueId),
+        workers: get().workers.map(w =>
+          w.worktreePath === worktree.path ? { ...w, worktreePath: null } : w
+        ),
+      });
+
+      addLog("success", `Worktree cleaned up for ${issueId}`, issueId);
+    } catch (err) {
+      addLog("error", `Worktree cleanup failed: ${err}`, issueId);
+    }
+  },
+
+  cleanupAllWorktrees: async () => {
+    const { projectPath, activeWorktrees, addLog } = get();
+
+    if (!projectPath) return;
+
+    try {
+      // First, cleanup any orphaned worktrees from git
+      addLog("info", "Cleaning up orphaned worktrees");
+      const cleanupResult = await gitService.cleanupOrphanedWorktrees(projectPath);
+      if (cleanupResult.cleaned > 0) {
+        addLog("success", `Cleaned up ${cleanupResult.cleaned} orphaned worktrees`);
+      }
+      if (cleanupResult.errors.length > 0) {
+        cleanupResult.errors.forEach(e => addLog("warning", e));
+      }
+
+      // Then cleanup tracked worktrees without merging
+      for (const worktree of activeWorktrees) {
+        try {
+          await gitService.removeWorktree(projectPath, worktree.path, true);
+        } catch (err) {
+          addLog("warning", `Failed to remove ${worktree.path}: ${err}`);
+        }
+      }
+
+      // Clear state
+      set({
+        activeWorktrees: [],
+        workers: get().workers.map(w => ({ ...w, worktreePath: null })),
+      });
+
+      addLog("info", "All worktrees cleaned up");
+    } catch (err) {
+      addLog("error", `Failed to cleanup worktrees: ${err}`);
+    }
+  },
+
+  getWorkerWorktree: (workerId: number) => {
+    const worker = get().workers.find(w => w.id === workerId);
+    return worker?.worktreePath || null;
   },
 }));
 

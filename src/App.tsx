@@ -1,6 +1,5 @@
-import { AppShell } from "@/components/layout/AppShell";
 import { LauncherWindow } from "@/components/launcher";
-import { useEffect, useState } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppFont } from "@/hooks/useAppFont";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -8,24 +7,39 @@ import { useEnvStore } from "@/stores/envStore";
 import { initializeMobileApi } from "@/stores/mobileApiStore";
 import { ScreenReaderAnnouncerProvider } from "@/components/ui";
 
+// Lazy load AppShell so it doesn't load when on /launcher route
+const AppShell = lazy(() =>
+  import("@/components/layout/AppShell").then((m) => ({ default: m.AppShell }))
+);
+
 type WindowType = "main" | "launcher";
+
+// Determine window type synchronously to avoid flash
+const getWindowType = (): WindowType => {
+  return window.location.pathname === "/launcher" ? "launcher" : "main";
+};
 
 function App() {
   useAppFont();
-  const [windowType, setWindowType] = useState<WindowType>("main");
+  // Determine window type immediately (no state change = no flash)
+  const windowType = getWindowType();
 
   useEffect(() => {
     document.documentElement.classList.add("dark");
-    // Check window type based on path
-    const path = window.location.pathname;
-    if (path === "/launcher") {
-      setWindowType("launcher");
-    } else {
-      setWindowType("main");
+
+    // Only run main window initialization if we're on main
+    if (windowType === "main") {
 
       // Initialize Lightcast with saved settings (only on main window)
       const initLightcast = async () => {
         const { lightcastHotkey, lightcastEnabled } = useSettingsStore.getState();
+
+        // Pre-warm app cache so lightcast opens faster
+        try {
+          await invoke("warm_app_cache");
+        } catch (error) {
+          console.error("Failed to warm app cache:", error);
+        }
 
         // Apply saved hotkey (Rust defaults to alt-space, so update if different)
         if (lightcastHotkey !== "alt-space") {
@@ -89,9 +103,9 @@ function App() {
       initEnvVars();
       initMobileApi();
     }
-  }, []);
+  }, [windowType]);
 
-  // Render appropriate window based on type
+  // Render launcher window (lightweight, no lazy loading needed)
   if (windowType === "launcher") {
     return (
       <ScreenReaderAnnouncerProvider>
@@ -100,9 +114,12 @@ function App() {
     );
   }
 
+  // Render main app with lazy-loaded AppShell
   return (
     <ScreenReaderAnnouncerProvider>
-      <AppShell />
+      <Suspense fallback={null}>
+        <AppShell />
+      </Suspense>
     </ScreenReaderAnnouncerProvider>
   );
 }

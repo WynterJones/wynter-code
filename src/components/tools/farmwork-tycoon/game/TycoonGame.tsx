@@ -273,7 +273,6 @@ export function TycoonGame({
       const tickerWatchdog = setInterval(() => {
         if (cancelled || !app.ticker) return;
         if (!app.ticker.started) {
-          console.log("[TycoonGame] Restarting paused ticker");
           app.ticker.start();
         }
       }, 1000);
