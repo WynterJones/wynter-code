@@ -21,12 +21,15 @@ import {
   FileCode,
   HelpCircle,
   Eye,
+  Folder,
+  X,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-shell";
-import { IconButton, Tooltip, Popup, Checkbox } from "@/components/ui";
+import { IconButton, Tooltip, Popup, Checkbox, Button } from "@/components/ui";
 import { QRCodeDisplay } from "@/components/tools/QRCodeDisplay";
+import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
 import { useLivePreviewStore } from "@/stores/livePreviewStore";
 import { useProjectStore } from "@/stores";
 import { cn } from "@/lib/utils";
@@ -84,6 +87,8 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
     setPreferredPort,
     setAutoOpenBrowser,
     setExpandedServerId,
+    previewFolders,
+    setPreviewFolder,
   } = useLivePreviewStore();
 
   const { activeProjectId, projects } = useProjectStore();
@@ -97,6 +102,23 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
   const [portInput, setPortInput] = useState(preferredPort.toString());
   const [portStatus, setPortStatus] = useState<PortCheckResult | null>(null);
   const [checkingPort, setCheckingPort] = useState(false);
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+
+  // Get preview folder for current project
+  const currentPreviewFolder = activeProjectId
+    ? previewFolders[activeProjectId] ?? null
+    : null;
+
+  // Calculate relative path for display
+  const previewFolderDisplay =
+    currentPreviewFolder && activeProject?.path
+      ? currentPreviewFolder.startsWith(activeProject.path)
+        ? currentPreviewFolder.slice(activeProject.path.length).replace(/^\//, "")
+        : currentPreviewFolder
+      : null;
+
+  // Effective path for detection and server start
+  const effectivePath = currentPreviewFolder || activeProject?.path;
 
   const checkPortStatus = useCallback(async (port: number) => {
     setCheckingPort(true);
@@ -112,13 +134,13 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
   }, []);
 
   const detectProject = useCallback(async () => {
-    if (!activeProject?.path) return;
+    if (!effectivePath) return;
 
     setDetecting(true);
     setError(null);
     try {
       const result = await invoke<ProjectDetectionResult>("detect_project_type", {
-        projectPath: activeProject.path,
+        projectPath: effectivePath,
       });
       setDetectionResult(result);
       setPortInput(result.suggestedPort.toString());
@@ -133,7 +155,7 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
     } finally {
       setDetecting(false);
     }
-  }, [activeProject?.path, setDetectionResult]);
+  }, [effectivePath, setDetectionResult]);
 
   const fetchServers = useCallback(async () => {
     setLoading(true);
@@ -195,7 +217,7 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
   }, [isOpen, autoOpenBrowser, updateServer]);
 
   const handleStartServer = async () => {
-    if (!activeProject?.path || !detectionResult) return;
+    if (!effectivePath || !detectionResult) return;
 
     const port = parseInt(portInput, 10);
     if (isNaN(port) || port < 1 || port > 65535) {
@@ -207,7 +229,7 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
     setError(null);
     try {
       await invoke<string>("start_preview_server", {
-        projectPath: activeProject.path,
+        projectPath: effectivePath,
         port,
         useFrameworkServer: detectionResult.hasDevScript,
       });
@@ -326,6 +348,48 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
               <p className="text-xs text-yellow-400/80 mt-1">
                 Open a project to start a preview server
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Preview Folder Picker */}
+        {activeProject && (
+          <div className="mb-3 p-3 rounded-lg bg-bg-tertiary/50 border border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <Folder className="w-4 h-4 text-text-secondary shrink-0" />
+                <span className="text-xs text-text-secondary">Preview Folder:</span>
+                <span className="text-xs text-text-primary font-mono truncate">
+                  {previewFolderDisplay || "Project Root"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {currentPreviewFolder && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      if (activeProjectId) {
+                        setPreviewFolder(activeProjectId, null);
+                        // Re-detect project with new path
+                        setTimeout(() => detectProject(), 0);
+                      }
+                    }}
+                    title="Reset to project root"
+                    className="!p-1 !h-6"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFolderPicker(true)}
+                  className="text-xs"
+                >
+                  Change...
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -639,6 +703,30 @@ export function LivePreviewPopup({ isOpen, onClose }: LivePreviewPopupProps) {
           </span>
         }
       />
+
+      {/* Folder Picker */}
+      {activeProject?.path && (
+        <FileBrowserPopup
+          isOpen={showFolderPicker}
+          onClose={() => setShowFolderPicker(false)}
+          initialPath={currentPreviewFolder || activeProject.path}
+          mode="selectProject"
+          selectButtonLabel="Select Folder"
+          onSelectProject={(path) => {
+            if (activeProjectId) {
+              // Only set if different from project root
+              if (path === activeProject.path) {
+                setPreviewFolder(activeProjectId, null);
+              } else {
+                setPreviewFolder(activeProjectId, path);
+              }
+              // Re-detect project with new path
+              setTimeout(() => detectProject(), 0);
+            }
+            setShowFolderPicker(false);
+          }}
+        />
+      )}
     </Popup>
   );
 }

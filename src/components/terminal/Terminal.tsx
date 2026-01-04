@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { Loader2 } from "lucide-react";
-import { Terminal as XTerm } from "@xterm/xterm";
+import { Terminal as XTerm, type IDisposable } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
@@ -98,6 +98,31 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
   const searchAddonRef = useRef<SearchAddon | null>(null);
   const webglAddonRef = useRef<WebglAddon | null>(null);
 
+  // Additional addon refs for proper disposal (Issue #1)
+  const webLinksAddonRef = useRef<WebLinksAddon | null>(null);
+  const unicode11AddonRef = useRef<Unicode11Addon | null>(null);
+  const clipboardAddonRef = useRef<ClipboardAddon | null>(null);
+  const canvasAddonRef = useRef<CanvasAddon | null>(null);
+
+  // Event disposable refs for cleanup (Issue #2)
+  const onDataDisposableRef = useRef<IDisposable | null>(null);
+  const onResizeDisposableRef = useRef<IDisposable | null>(null);
+
+  // Debounce and timing refs (Issues #3, #7)
+  const debouncedFitRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastOutputTimeRef = useRef<number>(0);
+  const resizeQuietPeriodMs = 500;
+
+  // PTY health monitoring (Issue #5)
+  const healthCheckIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const currentPtyIdRef = useRef<string | null>(null);
+  const [isPtyHealthy, setIsPtyHealthy] = useState(true);
+
+  // Output buffering for reconnection (Issue #6)
+  const outputBufferRef = useRef<string[]>([]);
+  const isBufferingRef = useRef(false);
+  const bufferFlushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Track if terminal is ready to be shown (after fit is complete)
   const [isReady, setIsReady] = useState(false);
   // Track transition overlay to hide flash when returning to terminal
@@ -135,10 +160,11 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       webglAddonRef.current.dispose();
       webglAddonRef.current = null;
     }
-    // Fall back to canvas renderer
+    // Fall back to canvas renderer - track for disposal (Issue #8)
     try {
       const canvasAddon = new CanvasAddon();
       term.loadAddon(canvasAddon);
+      canvasAddonRef.current = canvasAddon;
     } catch (error) {
       console.warn("Canvas fallback also failed, using default renderer:", error);
     }
@@ -206,9 +232,13 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     // Enable Unicode 11 for proper character width handling
     term.unicode.activeVersion = "11";
 
+    // Store refs for all addons (Issue #1, #3 - track for disposal)
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
     searchAddonRef.current = searchAddon;
+    webLinksAddonRef.current = webLinksAddon;
+    unicode11AddonRef.current = unicodeAddon;
+    clipboardAddonRef.current = clipboardAddon;
 
     // Notify parent that search addon is ready
     if (onSearchAddonReadyRef.current) {
@@ -240,8 +270,12 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
           webglAddonRef.current = webglAddon;
         });
 
+        // Track canvas addon for disposal (Issue #8)
         if (!webglLoaded && isActive) {
-          tryLoadAddon(currentTerm, new CanvasAddon(), "Canvas");
+          const canvas = new CanvasAddon();
+          tryLoadAddon(currentTerm, canvas, "Canvas", () => {
+            canvasAddonRef.current = canvas;
+          });
         }
 
         // Final fit and focus
@@ -285,14 +319,41 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
 
         if (!isActiveRef.current) return;
 
+        // Track PTY ID for health monitoring (Issue #5)
+        currentPtyIdRef.current = id;
+
+        // Enable buffering for reconnection (Issue #6)
+        const isReconnecting = !!initialPtyId.current;
+        if (isReconnecting) {
+          isBufferingRef.current = true;
+          bufferFlushTimeoutRef.current = setTimeout(() => {
+            // Flush buffered output
+            if (xtermRef.current && outputBufferRef.current.length > 0) {
+              const buffered = outputBufferRef.current.join("");
+              outputBufferRef.current = [];
+              xtermRef.current.write(buffered);
+            }
+            isBufferingRef.current = false;
+          }, 100);
+        }
+
         // Listen for PTY output
         unlisten = await listen<{ ptyId: string; data: string }>("pty-output", (event) => {
           if (isActiveRef.current && event.payload.ptyId === id && xtermRef.current) {
+            // Track output time for resize quiet period (Issue #7)
+            lastOutputTimeRef.current = Date.now();
+
             // Apply ANSI filter if enabled (fixes Claude Code CLI blank lines issue)
             const data = ansiFilterRef.current
               ? filterAnsiSequences(event.payload.data)
               : event.payload.data;
-            xtermRef.current.write(data);
+
+            // Buffer output on reconnection (Issue #6)
+            if (isBufferingRef.current) {
+              outputBufferRef.current.push(data);
+            } else {
+              xtermRef.current.write(data);
+            }
           }
         });
 
@@ -302,12 +363,12 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
           return;
         }
 
-        // Wire up input and resize handlers
-        term.onData((data) => {
+        // Wire up input and resize handlers - store disposables (Issue #2)
+        onDataDisposableRef.current = term.onData((data) => {
           if (isActiveRef.current && id) invoke("write_pty", { ptyId: id, data });
         });
 
-        term.onResize(({ cols, rows }) => {
+        onResizeDisposableRef.current = term.onResize(({ cols, rows }) => {
           if (isActiveRef.current && id) invoke("resize_pty", { ptyId: id, cols, rows });
         });
 
@@ -334,6 +395,39 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
         initRafId = null;
       }
 
+      // Cancel pending debounce timer (Issue #3)
+      if (debouncedFitRef.current) {
+        clearTimeout(debouncedFitRef.current);
+        debouncedFitRef.current = null;
+      }
+
+      // Cancel buffer flush timeout (Issue #6)
+      if (bufferFlushTimeoutRef.current) {
+        clearTimeout(bufferFlushTimeoutRef.current);
+        bufferFlushTimeoutRef.current = null;
+      }
+      outputBufferRef.current = [];
+      isBufferingRef.current = false;
+
+      // Dispose event disposables FIRST (Issue #2)
+      if (onDataDisposableRef.current) {
+        try {
+          onDataDisposableRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        onDataDisposableRef.current = null;
+      }
+
+      if (onResizeDisposableRef.current) {
+        try {
+          onResizeDisposableRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        onResizeDisposableRef.current = null;
+      }
+
       // Clean up the event listener
       if (unlisten) {
         unlisten();
@@ -346,31 +440,96 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       // 1. The process exits naturally
       // 2. The panel is explicitly closed (handled by Panel.tsx)
 
-      // Dispose WebGL addon first (before terminal)
+      // Clear PTY ID ref
+      currentPtyIdRef.current = null;
+
+      // Dispose addons in reverse order of loading (Issues #1, #8)
+      // GPU renderers first
       if (webglAddonRef.current) {
         try {
           webglAddonRef.current.dispose();
-        } catch (error) {
+        } catch {
           // Ignore disposal errors
         }
         webglAddonRef.current = null;
       }
 
-      // Dispose xterm
+      if (canvasAddonRef.current) {
+        try {
+          canvasAddonRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        canvasAddonRef.current = null;
+      }
+
+      // Then other addons
+      if (clipboardAddonRef.current) {
+        try {
+          clipboardAddonRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        clipboardAddonRef.current = null;
+      }
+
+      if (unicode11AddonRef.current) {
+        try {
+          unicode11AddonRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        unicode11AddonRef.current = null;
+      }
+
+      if (searchAddonRef.current) {
+        try {
+          searchAddonRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        searchAddonRef.current = null;
+      }
+
+      if (webLinksAddonRef.current) {
+        try {
+          webLinksAddonRef.current.dispose();
+        } catch {
+          // Ignore disposal errors
+        }
+        webLinksAddonRef.current = null;
+      }
+
+      // FitAddon disposal (technically not needed but good practice)
+      fitAddonRef.current = null;
+
+      // Finally dispose xterm instance
       try {
         term.dispose();
-      } catch (error) {
+      } catch {
         // Ignore disposal errors
       }
       xtermRef.current = null;
-      fitAddonRef.current = null;
-      searchAddonRef.current = null;
     };
   }, [handleWebGLContextLoss]);
 
+  // Debounced resize handler with quiet period respect (Issues #3, #7)
   useEffect(() => {
     const handleResize = () => {
-      fitAddonRef.current?.fit();
+      // Cancel any pending debounced fit
+      if (debouncedFitRef.current) {
+        clearTimeout(debouncedFitRef.current);
+      }
+
+      // Check quiet period - defer if output is active (Issue #7)
+      const timeSinceOutput = Date.now() - lastOutputTimeRef.current;
+      const delay = timeSinceOutput < resizeQuietPeriodMs ? resizeQuietPeriodMs : 150;
+
+      // Debounce the fit call (Issue #3)
+      debouncedFitRef.current = setTimeout(() => {
+        debouncedFitRef.current = null;
+        fitAddonRef.current?.fit();
+      }, delay);
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
@@ -383,6 +542,11 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     return () => {
       resizeObserver.disconnect();
       window.removeEventListener("resize", handleResize);
+      // Cleanup debounce timer
+      if (debouncedFitRef.current) {
+        clearTimeout(debouncedFitRef.current);
+        debouncedFitRef.current = null;
+      }
     };
   }, []);
 
@@ -420,6 +584,46 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     }
   }, [isFocused, isReady]);
 
+  // PTY health monitoring (Issue #5)
+  useEffect(() => {
+    // Only monitor when terminal is visible and we have a PTY
+    if (!isVisible || !currentPtyIdRef.current) {
+      return;
+    }
+
+    const checkHealth = async () => {
+      const ptyId = currentPtyIdRef.current;
+      if (!ptyId) return;
+
+      try {
+        const isActive = await invoke<boolean>("is_pty_active", { ptyId });
+        setIsPtyHealthy(isActive);
+
+        // If PTY died, notify parent
+        if (!isActive && onPtyClosedRef.current) {
+          onPtyClosedRef.current();
+        }
+      } catch {
+        // If check fails, assume unhealthy
+        setIsPtyHealthy(false);
+      }
+    };
+
+    // Check every 30 seconds
+    healthCheckIntervalRef.current = setInterval(checkHealth, 30000);
+
+    // Initial check after a short delay
+    const initialCheck = setTimeout(checkHealth, 1000);
+
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+        healthCheckIntervalRef.current = null;
+      }
+      clearTimeout(initialCheck);
+    };
+  }, [isVisible]);
+
   const handleClick = () => {
     // Focus the terminal when clicked to ensure it receives keyboard input
     xtermRef.current?.focus();
@@ -431,6 +635,13 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       {isVisible && !isReady && (
         <div className="absolute inset-0 flex items-center justify-center">
           <Loader2 className="w-5 h-5 text-text-secondary animate-spin" />
+        </div>
+      )}
+
+      {/* PTY health indicator (Issue #5) */}
+      {isReady && !isPtyHealthy && (
+        <div className="absolute top-2 right-2 z-10 px-2 py-1 rounded bg-accent-red/20 text-accent-red text-xs">
+          Process ended
         </div>
       )}
 

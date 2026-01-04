@@ -1,4 +1,5 @@
 import { LauncherWindow } from "@/components/launcher";
+import { BrowserToolbar } from "@/components/browser-dock";
 import { useEffect, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppFont } from "@/hooks/useAppFont";
@@ -12,11 +13,14 @@ const AppShell = lazy(() =>
   import("@/components/layout/AppShell").then((m) => ({ default: m.AppShell }))
 );
 
-type WindowType = "main" | "launcher";
+type WindowType = "main" | "launcher" | "browser-toolbar";
 
 // Determine window type synchronously to avoid flash
 const getWindowType = (): WindowType => {
-  return window.location.pathname === "/launcher" ? "launcher" : "main";
+  const pathname = window.location.pathname;
+  if (pathname === "/launcher") return "launcher";
+  if (pathname === "/browser-toolbar") return "browser-toolbar";
+  return "main";
 };
 
 function App() {
@@ -110,6 +114,15 @@ function App() {
     return (
       <ScreenReaderAnnouncerProvider>
         <LauncherWindow />
+      </ScreenReaderAnnouncerProvider>
+    );
+  }
+
+  // Render browser toolbar window (embedded in browser window)
+  if (windowType === "browser-toolbar") {
+    return (
+      <ScreenReaderAnnouncerProvider>
+        <BrowserToolbar />
       </ScreenReaderAnnouncerProvider>
     );
   }

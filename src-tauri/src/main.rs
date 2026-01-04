@@ -33,6 +33,7 @@ mod camera_permission;
 mod process_registry;
 mod rate_limiter;
 mod relay_client;
+mod browser_dock;
 
 use std::sync::Arc;
 use tauri::{
@@ -531,6 +532,13 @@ fn main() {
             relay_client::relay_get_config,
             relay_client::relay_load_config,
             relay_client::relay_set_mobile_api_port,
+            // Browser (dual webview: toolbar + content)
+            browser_dock::create_browser_window,
+            browser_dock::navigate_browser_content,
+            browser_dock::get_current_url,
+            browser_dock::close_browser_window,
+            browser_dock::is_browser_open,
+            browser_dock::get_browser_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

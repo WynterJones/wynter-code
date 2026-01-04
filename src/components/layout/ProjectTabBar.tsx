@@ -14,6 +14,7 @@ import {
   Bookmark,
   CloudUpload,
   CheckSquare,
+  Globe,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -427,6 +428,7 @@ export function ProjectTabBar({
   const [showJustCommandManager, setShowJustCommandManager] = useState(false);
   const [showUniversalViewer, setShowUniversalViewer] = useState(false);
   const [showKanbanBoard, setShowKanbanBoard] = useState(false);
+  const [isBrowserDockOpen, setIsBrowserDockOpen] = useState(false);
   const [appVersion, setAppVersion] = useState<string>("");
 
   // Fetch app version on mount
@@ -902,6 +904,38 @@ export function ProjectTabBar({
             aria-label={isMeditating ? "Exit meditation mode" : "Enter meditation mode"}
           >
             <Music className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
+      {/* Browser */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content={isBrowserDockOpen ? "Close Browser" : "Open Browser"}>
+          <IconButton
+            size="sm"
+            onClick={async () => {
+              try {
+                if (isBrowserDockOpen) {
+                  await invoke("close_browser_window");
+                  setIsBrowserDockOpen(false);
+                } else {
+                  await invoke("create_browser_window", {
+                    url: "https://google.com",
+                    width: 1200,
+                    height: 800,
+                    customCss: null,
+                    customJs: null,
+                  });
+                  setIsBrowserDockOpen(true);
+                }
+              } catch (error) {
+                console.error("Browser error:", error);
+              }
+            }}
+            className={cn(isBrowserDockOpen && "text-accent")}
+            aria-label={isBrowserDockOpen ? "Close browser" : "Open browser"}
+          >
+            <Globe className="w-4 h-4" />
           </IconButton>
         </Tooltip>
       </div>

@@ -8,6 +8,8 @@ import {
   Upload,
   ExternalLink,
   FolderPlus,
+  Folder,
+  X,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-shell";
 import { invoke } from "@tauri-apps/api/core";
@@ -19,6 +21,7 @@ import { DropZone } from "./DropZone";
 import { SiteList } from "./SiteList";
 import { DeployHistory } from "./DeployHistory";
 import { TokenSetup } from "./TokenSetup";
+import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
 
 interface DeployZipResult {
   base64: string;
@@ -45,6 +48,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
   const [showNewGroupDialog, setShowNewGroupDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [showDeployConfirm, setShowDeployConfirm] = useState(false);
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
   const resizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   // Get active project
@@ -86,6 +90,8 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     reorderGroups,
     addSiteToGroup,
     removeSiteFromGroup,
+    siteConfigs,
+    setSiteDeployFolder,
   } = useNetlifyFtpStore();
 
   const currentSite = useMemo(
@@ -97,6 +103,23 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     () => (currentSiteId ? deploys[currentSiteId] || [] : []),
     [deploys, currentSiteId],
   );
+
+  // Get deploy folder for current site (relative path from project root)
+  const currentDeployFolder = useMemo(
+    () => (currentSiteId ? siteConfigs[currentSiteId]?.deployFolder ?? null : null),
+    [currentSiteId, siteConfigs],
+  );
+
+  // Calculate relative path for display
+  const deployFolderDisplay = useMemo(() => {
+    if (!currentDeployFolder || !activeProject?.path) return null;
+    // If the folder starts with the project path, show relative path
+    if (currentDeployFolder.startsWith(activeProject.path)) {
+      const relative = currentDeployFolder.slice(activeProject.path.length);
+      return relative.startsWith("/") ? relative.slice(1) : relative;
+    }
+    return currentDeployFolder;
+  }, [currentDeployFolder, activeProject?.path]);
 
   // Auto-connect on mount if token exists
   useEffect(() => {
@@ -215,10 +238,13 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     setDeployProjectMessage("Preparing project...");
 
     try {
+      // Use the configured deploy folder or fall back to project root
+      const deployPath = currentDeployFolder || activeProject.path;
+
       // Call Tauri command to zip the project
       setDeployProjectMessage("Detecting build folder...");
       const result = await invoke<DeployZipResult>("zip_folder_for_deploy", {
-        projectPath: activeProject.path,
+        projectPath: deployPath,
       });
 
       const folderLabel = result.is_build_folder
@@ -250,7 +276,7 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
     } finally {
       setIsDeployingProject(false);
     }
-  }, [currentSiteId, activeProject?.path, deployZip]);
+  }, [currentSiteId, activeProject?.path, deployZip, currentDeployFolder]);
 
   const handleOpenSite = useCallback(async () => {
     if (currentSite) {
@@ -444,6 +470,42 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                       </div>
                     </div>
 
+                    {/* Deploy Folder Picker */}
+                    {activeProject?.path && (
+                      <div className="px-4 py-3 border-b border-border bg-bg-primary/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Folder className="w-4 h-4 text-text-secondary shrink-0" />
+                            <span className="text-xs text-text-secondary">Deploy Folder:</span>
+                            <span className="text-xs text-text-primary font-mono truncate">
+                              {deployFolderDisplay || "Project Root"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            {currentDeployFolder && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => currentSiteId && setSiteDeployFolder(currentSiteId, null)}
+                                title="Reset to project root"
+                                className="!p-1 !h-6"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowFolderPicker(true)}
+                              className="text-xs"
+                            >
+                              Change...
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Drop Zone */}
                     <div className="p-4 border-b border-border">
                       <DropZone
@@ -453,7 +515,11 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
                         message={deployMessage}
                         disabled={!currentSite}
                         projectPath={activeProject?.path}
-                        projectName={activeProject?.name}
+                        projectName={
+                          deployFolderDisplay
+                            ? deployFolderDisplay.split("/").pop() || deployFolderDisplay
+                            : activeProject?.name
+                        }
                         onDeployProject={handleDeployProjectClick}
                         isDeployingProject={isDeployingProject}
                         deployProjectMessage={deployProjectMessage}
@@ -566,13 +632,19 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
             <div className="bg-bg-secondary border border-border rounded-lg p-4 w-96">
               <h3 className="text-sm font-semibold mb-3">Deploy to Netlify</h3>
               <p className="text-xs text-text-secondary mb-4">
-                Deploy <span className="text-text-primary font-medium">{activeProject.name}</span> to{" "}
+                Deploy{" "}
+                <span className="text-text-primary font-medium">
+                  {deployFolderDisplay || activeProject.name}
+                </span>{" "}
+                to{" "}
                 <span className="text-accent font-medium">
                   {currentSite.custom_domain || currentSite.url.replace(/https?:\/\//, "")}
                 </span>?
               </p>
               <p className="text-xs text-text-secondary mb-4">
-                The build folder (if detected) or full project will be uploaded.
+                {deployFolderDisplay
+                  ? `Deploying from: ${deployFolderDisplay}`
+                  : "The build folder (if detected) or full project will be uploaded."}
               </p>
               <div className="flex gap-2">
                 <Button
@@ -591,6 +663,28 @@ export function NetlifyFtpPopup({ isOpen, onClose }: NetlifyFtpPopupProps) {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Folder Picker */}
+        {activeProject?.path && (
+          <FileBrowserPopup
+            isOpen={showFolderPicker}
+            onClose={() => setShowFolderPicker(false)}
+            initialPath={currentDeployFolder || activeProject.path}
+            mode="selectProject"
+            selectButtonLabel="Select Folder"
+            onSelectProject={(path) => {
+              if (currentSiteId) {
+                // Only set if different from project root
+                if (path === activeProject.path) {
+                  setSiteDeployFolder(currentSiteId, null);
+                } else {
+                  setSiteDeployFolder(currentSiteId, path);
+                }
+              }
+              setShowFolderPicker(false);
+            }}
+          />
         )}
       </Popup.Content>
     </Popup>

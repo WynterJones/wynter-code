@@ -683,7 +683,8 @@ export function ClaudeOutputPanel({
             messages={messages}
             streamingText={streamingEnabled ? (streamingState?.streamingText || "") : (isStreaming ? "" : (streamingState?.streamingText || ""))}
             thinkingText={streamingEnabled ? (streamingState?.thinkingText || "") : (isStreaming ? "" : (streamingState?.thinkingText || ""))}
-            pendingToolCalls={streamingState?.pendingToolCalls || []}
+            pendingToolCalls={streamingEnabled ? (streamingState?.pendingToolCalls || []) : (isStreaming ? [] : (streamingState?.pendingToolCalls || []))}
+            toolPositions={streamingEnabled ? (streamingState?.toolPositions || new Map()) : (isStreaming ? new Map() : (streamingState?.toolPositions || new Map()))}
             isStreaming={isStreaming}
             streamingStats={streamingState?.stats}
             lastCommand={streamingState?.lastCommand}

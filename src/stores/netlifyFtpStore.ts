@@ -9,6 +9,10 @@ import type {
   SiteGroup,
 } from "@/types/netlifyFtp";
 
+interface SiteConfig {
+  deployFolder?: string;
+}
+
 interface NetlifyFtpStore {
   // Auth
   apiToken: string | null;
@@ -19,6 +23,9 @@ interface NetlifyFtpStore {
   sites: NetlifySite[];
   currentSiteId: string | null;
   isLoadingSites: boolean;
+
+  // Site configs (per-site settings like deploy folder)
+  siteConfigs: Record<string, SiteConfig>;
 
   // Deploys
   deploys: Record<string, NetlifyDeploy[]>;
@@ -65,6 +72,10 @@ interface NetlifyFtpStore {
   reorderGroups: (groupIds: string[]) => void;
   addSiteToGroup: (siteId: string, groupId: string) => void;
   removeSiteFromGroup: (siteId: string) => void;
+
+  // Actions - Site Config
+  setSiteDeployFolder: (siteId: string, folder: string | null) => void;
+  getSiteDeployFolder: (siteId: string) => string | null;
 }
 
 export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
@@ -77,6 +88,7 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
       sites: [],
       currentSiteId: null,
       isLoadingSites: false,
+      siteConfigs: {},
       deploys: {},
       isLoadingDeploys: false,
       pollingIntervalId: null,
@@ -443,6 +455,30 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
           })),
         }));
       },
+
+      // Site config actions
+      setSiteDeployFolder: (siteId, folder) => {
+        set((state) => {
+          const newConfigs = { ...state.siteConfigs };
+          if (folder) {
+            newConfigs[siteId] = { ...newConfigs[siteId], deployFolder: folder };
+          } else {
+            // Remove deploy folder if null
+            if (newConfigs[siteId]) {
+              delete newConfigs[siteId].deployFolder;
+              // Clean up empty config objects
+              if (Object.keys(newConfigs[siteId]).length === 0) {
+                delete newConfigs[siteId];
+              }
+            }
+          }
+          return { siteConfigs: newConfigs };
+        });
+      },
+
+      getSiteDeployFolder: (siteId) => {
+        return get().siteConfigs[siteId]?.deployFolder ?? null;
+      },
     }),
     {
       name: "netlify-ftp-store",
@@ -451,6 +487,7 @@ export const useNetlifyFtpStore = create<NetlifyFtpStore>()(
         apiToken: state.apiToken,
         groups: state.groups,
         ungroupedCollapsed: state.ungroupedCollapsed,
+        siteConfigs: state.siteConfigs,
       }),
       onRehydrateStorage: () => (state) => {
         // Sync Netlify token to mobile API when store is hydrated from localStorage

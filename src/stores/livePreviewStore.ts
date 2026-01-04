@@ -13,6 +13,7 @@ interface LivePreviewStore {
   autoOpenBrowser: boolean;
   showQRByDefault: boolean;
   expandedServerId: string | null;
+  previewFolders: Record<string, string>; // projectId -> folder path
 
   setServers: (servers: PreviewServerInfo[]) => void;
   addServer: (server: PreviewServerInfo) => void;
@@ -26,6 +27,8 @@ interface LivePreviewStore {
   setAutoOpenBrowser: (value: boolean) => void;
   setShowQRByDefault: (value: boolean) => void;
   setExpandedServerId: (serverId: string | null) => void;
+  setPreviewFolder: (projectId: string, folder: string | null) => void;
+  getPreviewFolder: (projectId: string) => string | null;
 
   // Reset
   reset: () => void;
@@ -33,13 +36,14 @@ interface LivePreviewStore {
 
 export const useLivePreviewStore = create<LivePreviewStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       servers: [],
       detectionResult: null,
       preferredPort: LIVE_PREVIEW_DEFAULT_PORT,
       autoOpenBrowser: true,
       showQRByDefault: false,
       expandedServerId: null,
+      previewFolders: {},
 
       setServers: (servers: PreviewServerInfo[]) => {
         set({ servers });
@@ -92,6 +96,22 @@ export const useLivePreviewStore = create<LivePreviewStore>()(
         set({ expandedServerId: serverId });
       },
 
+      setPreviewFolder: (projectId: string, folder: string | null) => {
+        set((state) => {
+          const newFolders = { ...state.previewFolders };
+          if (folder) {
+            newFolders[projectId] = folder;
+          } else {
+            delete newFolders[projectId];
+          }
+          return { previewFolders: newFolders };
+        });
+      },
+
+      getPreviewFolder: (projectId: string) => {
+        return get().previewFolders[projectId] ?? null;
+      },
+
       reset: () => {
         set({
           servers: [],
@@ -100,6 +120,7 @@ export const useLivePreviewStore = create<LivePreviewStore>()(
           autoOpenBrowser: true,
           showQRByDefault: false,
           expandedServerId: null,
+          previewFolders: {},
         });
       },
     }),
@@ -109,6 +130,7 @@ export const useLivePreviewStore = create<LivePreviewStore>()(
         preferredPort: state.preferredPort,
         autoOpenBrowser: state.autoOpenBrowser,
         showQRByDefault: state.showQRByDefault,
+        previewFolders: state.previewFolders,
       }),
     }
   )

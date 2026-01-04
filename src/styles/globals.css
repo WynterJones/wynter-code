@@ -677,22 +677,45 @@ pre,
   overflow-y: auto;
 }
 
-/* Custom scrollbar for terminal */
-.xterm-viewport::-webkit-scrollbar {
-  width: 8px;
+/* Custom scrollbar for terminal - must override global hide */
+.xterm .xterm-viewport::-webkit-scrollbar {
+  display: block !important;
+  width: 10px !important;
+  height: 10px !important;
 }
 
-.xterm-viewport::-webkit-scrollbar-track {
-  background: var(--bg-tertiary);
+.xterm .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 5px;
 }
 
-.xterm-viewport::-webkit-scrollbar-thumb {
-  background: rgba(161, 161, 170, 0.3);
-  border-radius: 4px;
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, 0.4);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
-  background: rgba(161, 161, 170, 0.5);
+.xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.6);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar-thumb:active {
+  background: var(--accent);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox scrollbar for terminal */
+.xterm .xterm-viewport {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(161, 161, 170, 0.4) transparent;
 }
 
 /* ============================================
