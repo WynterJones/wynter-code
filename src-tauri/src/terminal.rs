@@ -174,6 +174,18 @@ pub async fn create_pty(
                 Ok(0) => break,
                 Ok(n) => {
                     let data = String::from_utf8_lossy(&buf[..n]).to_string();
+
+                    // Debug logging for newline investigation
+                    // Shows \r, \n, and escape sequences with visible markers
+                    #[cfg(debug_assertions)]
+                    {
+                        let escaped = data
+                            .replace('\r', "⏎\\r")
+                            .replace('\n', "↵\\n")
+                            .replace('\x1b', "␛");
+                        eprintln!("[PTY {}] {} bytes: {}", pty_id_clone, n, escaped);
+                    }
+
                     #[cfg(debug_assertions)]
                     if let Err(e) = window_clone.emit(
                         "pty-output",

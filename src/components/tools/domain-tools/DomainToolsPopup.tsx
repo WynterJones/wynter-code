@@ -27,6 +27,7 @@ import { DnsPropagation } from "./tools/DnsPropagation";
 import { DeadLinkChecker } from "./tools/DeadLinkChecker";
 import { LighthouseAuditor } from "./tools/LighthouseAuditor";
 import { FaviconGrabber } from "./tools/FaviconGrabber";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import type { DomainTool } from "./types";
 
 interface DomainToolsPopupProps {
@@ -142,6 +143,9 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
 export function DomainToolsPopup({ isOpen, onClose, initialTool }: DomainToolsPopupProps) {
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(isOpen);
+
   const [activeTool, setActiveTool] = useState("whois");
   const [sharedUrl, setSharedUrl] = useState("");
 

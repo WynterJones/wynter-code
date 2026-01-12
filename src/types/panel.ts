@@ -15,7 +15,9 @@ export type PanelType =
   | "markdown-viewer"
   | "farmwork-stats"
   | "browser-preview"
-  | "youtube-embed";
+  | "youtube-embed"
+  | "kanban-board"
+  | "beads-board";
 
 /** YouTube video reference */
 export interface YouTubeVideo {

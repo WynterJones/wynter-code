@@ -33,28 +33,33 @@ export function useSessionHandlers({
   setPendingMcpRequest,
   onSessionConflict,
 }: UseSessionHandlersProps) {
-  const {
-    getMessages,
-    setClaudeSessionStarting,
-    setClaudeSessionReady,
-    setClaudeSessionEnded,
-    appendStreamingText,
-    appendThinkingText,
-    setThinking,
-    addPendingToolCall,
-    appendToolInput,
-    updateToolCallStatus,
-    updateStats,
-    finishStreaming,
-    startStreaming,
-    updateProviderSessionId,
-    updateSessionProvider,
-    updateSessionModel,
-    getSession,
-    setPendingQuestionSet,
-    updateSessionPermissionMode,
-    getClaudeSessionState,
-  } = useSessionStore();
+  // Use getState() for one-time reads instead of subscribing to entire store
+  const store = useSessionStore;
+
+  // These getter functions don't subscribe to state - they read on demand
+  const getMessages = store.getState().getMessages;
+  const getSession = store.getState().getSession;
+  const getClaudeSessionState = store.getState().getClaudeSessionState;
+
+  // These action functions are stable - they don't change
+  const setClaudeSessionStarting = store.getState().setClaudeSessionStarting;
+  const setClaudeSessionReady = store.getState().setClaudeSessionReady;
+  const setClaudeSessionEnded = store.getState().setClaudeSessionEnded;
+  const appendStreamingText = store.getState().appendStreamingText;
+  const appendThinkingText = store.getState().appendThinkingText;
+  const setThinking = store.getState().setThinking;
+  const addPendingToolCall = store.getState().addPendingToolCall;
+  const appendToolInput = store.getState().appendToolInput;
+  const updateToolCallStatus = store.getState().updateToolCallStatus;
+  const updateStats = store.getState().updateStats;
+  const finishStreaming = store.getState().finishStreaming;
+  const startStreaming = store.getState().startStreaming;
+  const updateProviderSessionId = store.getState().updateProviderSessionId;
+  const updateSessionProvider = store.getState().updateSessionProvider;
+  const updateSessionModel = store.getState().updateSessionModel;
+  const setPendingQuestionSet = store.getState().setPendingQuestionSet;
+  const updateSessionPermissionMode = store.getState().updateSessionPermissionMode;
+
   const { claudeSafeMode, defaultModel, defaultCodexModel, defaultGeminiModel } = useSettingsStore();
 
   // Start a persistent AI session (Claude or Codex based on provider)
@@ -227,29 +232,15 @@ export function useSessionHandlers({
 
       setClaudeSessionEnded(currentSessionId);
     }
+   
   }, [
     currentSessionId,
     projectPath,
-    getSession,
-    setClaudeSessionStarting,
-    setClaudeSessionReady,
-    setClaudeSessionEnded,
-    updateProviderSessionId,
-    appendStreamingText,
-    appendThinkingText,
-    setThinking,
-    addPendingToolCall,
-    appendToolInput,
-    updateToolCallStatus,
-    updateStats,
-    finishStreaming,
-    setPendingQuestionSet,
     claudeSafeMode,
     defaultModel,
     defaultCodexModel,
     defaultGeminiModel,
     autoApprovedToolsRef,
-    getMessages,
     onSessionConflict,
   ]);
 
@@ -272,7 +263,8 @@ export function useSessionHandlers({
     } catch (error) {
       console.error("[MainContent] Failed to stop session:", error);
     }
-  }, [currentSessionId, getSession, setClaudeSessionEnded, finishStreaming]);
+   
+  }, [currentSessionId]);
 
   // Change the AI provider for the current session
   const handleProviderChange = useCallback((provider: AIProvider) => {
@@ -286,7 +278,8 @@ export function useSessionHandlers({
         ? defaultGeminiModel
         : defaultModel;
     updateSessionModel(currentSessionId, newModel);
-  }, [currentSessionId, updateSessionProvider, updateSessionModel, defaultModel, defaultCodexModel, defaultGeminiModel]);
+   
+  }, [currentSessionId, defaultModel, defaultCodexModel, defaultGeminiModel]);
 
   // Send prompt to active session (Claude or Codex based on provider)
   const handleSendPrompt = useCallback(
@@ -312,7 +305,8 @@ export function useSessionHandlers({
         finishStreaming(currentSessionId);
       }
     },
-    [currentSessionId, getSession, startStreaming, appendStreamingText, finishStreaming]
+     
+    [currentSessionId]
   );
 
   // Send structured prompt with images/files to active session
@@ -352,7 +346,8 @@ export function useSessionHandlers({
         finishStreaming(currentSessionId);
       }
     },
-    [currentSessionId, getSession, startStreaming, appendStreamingText, finishStreaming]
+     
+    [currentSessionId]
   );
 
   const handleModeChange = useCallback(async (mode: PermissionMode) => {
@@ -381,7 +376,8 @@ export function useSessionHandlers({
         console.error("[MainContent] Failed to restart session for mode change:", error);
       }
     }
-  }, [currentSessionId, getSession, getClaudeSessionState, updateSessionPermissionMode, setClaudeSessionEnded]);
+   
+  }, [currentSessionId]);
 
   return {
     handleStartSession,

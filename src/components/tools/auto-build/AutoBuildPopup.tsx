@@ -3,6 +3,7 @@ import { X, Bot, Play, Pause, Square, SkipForward, Settings, HelpCircle, AlertTr
 import { createPortal } from "react-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import { useBeadsStore } from "@/stores/beadsStore";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
@@ -21,6 +22,9 @@ interface AutoBuildPopupProps {
 }
 
 export function AutoBuildPopup({ projectPath }: AutoBuildPopupProps) {
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(true);
+
   const {
     closePopup,
     setProjectPath,

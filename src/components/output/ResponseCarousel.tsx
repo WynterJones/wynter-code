@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo, useCallback, memo } from "react";
+import { useRef, useState, useEffect, useMemo, useCallback, memo, forwardRef } from "react";
 import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Check } from "lucide-react";
 import { OverlayScrollbarsComponent, type OverlayScrollbarsComponentRef } from "overlayscrollbars-react";
 import { IconButton } from "@/components/ui";
@@ -7,6 +7,34 @@ import { cn } from "@/lib/utils";
 import { SCROLLBAR_AUTO_HIDE_DELAY } from "@/lib/constants";
 import type { Message, ToolCall, StreamingStats } from "@/types";
 import type { CustomHandledCommand } from "@/types/slashCommandResponse";
+
+interface SlideScrollContainerProps {
+  children: React.ReactNode;
+  onRefReady?: (ref: OverlayScrollbarsComponentRef) => void;
+}
+
+const SlideScrollContainer = forwardRef<OverlayScrollbarsComponentRef, SlideScrollContainerProps>(
+  function SlideScrollContainer({ children }, ref) {
+    return (
+      <OverlayScrollbarsComponent
+        ref={ref}
+        className="os-theme-custom h-full"
+        options={{
+          scrollbars: {
+            theme: "os-theme-custom",
+            visibility: "auto",
+            autoHide: "leave",
+            autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
+          },
+          overflow: { x: "scroll", y: "scroll" },
+        }}
+        defer
+      >
+        {children}
+      </OverlayScrollbarsComponent>
+    );
+  }
+);
 
 interface MessagePair {
   user: Message;
@@ -96,6 +124,48 @@ const UserMessageBar = memo(function UserMessageBar({ content }: { content: stri
           </p>
         </div>
       )}
+    </div>
+  );
+});
+
+// Memoized slide component to avoid inline ref callbacks causing infinite loops
+interface MessagePairSlideProps {
+  pair: MessagePair;
+  onRefChange: (id: string, ref: OverlayScrollbarsComponentRef | null) => void;
+  onApprove?: (toolId: string) => void;
+  onReject?: (toolId: string) => void;
+}
+
+const MessagePairSlide = memo(function MessagePairSlide({
+  pair,
+  onRefChange,
+  onApprove,
+  onReject,
+}: MessagePairSlideProps) {
+  const scrollRef = useRef<OverlayScrollbarsComponentRef>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      onRefChange(pair.user.id, scrollRef.current);
+    }
+    return () => {
+      onRefChange(pair.user.id, null);
+    };
+  }, [pair.user.id, onRefChange]);
+
+  return (
+    <div className="flex-shrink-0 w-full h-full snap-center p-4">
+      <SlideScrollContainer ref={scrollRef}>
+        <UserMessageBar content={pair.user.content} />
+        {pair.assistant && (
+          <ClaudeResponseCard
+            content={pair.assistant.content}
+            toolCalls={pair.assistant.toolCalls}
+            onApprove={onApprove}
+            onReject={onReject}
+          />
+        )}
+      </SlideScrollContainer>
     </div>
   );
 });
@@ -223,6 +293,15 @@ export const ResponseCarousel = memo(function ResponseCarousel({
     return () => clearTimeout(timer);
   }, [currentIndex, messagePairs, hasStreamingContent, scrollSlideToBottom]);
 
+  // Stable callback for slide refs - avoids inline function in map
+  const handleSlideRefChange = useCallback((id: string, ref: OverlayScrollbarsComponentRef | null) => {
+    if (ref) {
+      slideScrollRefs.current.set(id, ref);
+    } else {
+      slideScrollRefs.current.delete(id);
+    }
+  }, []);
+
   const goToPrevious = useCallback(() => {
     setCurrentIndex((i) => Math.max(0, i - 1));
   }, []);
@@ -283,60 +362,19 @@ export const ResponseCarousel = memo(function ResponseCarousel({
         >
           {/* Completed message pairs */}
           {messagePairs.map((pair) => (
-            <div
+            <MessagePairSlide
               key={pair.user.id}
-              className="flex-shrink-0 w-full h-full snap-center p-4"
-            >
-              <OverlayScrollbarsComponent
-                ref={(ref) => {
-                  if (ref) {
-                    slideScrollRefs.current.set(pair.user.id, ref);
-                  } else {
-                    slideScrollRefs.current.delete(pair.user.id);
-                  }
-                }}
-                className="os-theme-custom h-full"
-                options={{
-                  scrollbars: {
-                    theme: "os-theme-custom",
-                    visibility: "auto",
-                    autoHide: "leave",
-                    autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
-                  },
-                  overflow: { x: "scroll", y: "scroll" },
-                }}
-                defer
-              >
-                <UserMessageBar content={pair.user.content} />
-                {pair.assistant && (
-                  <ClaudeResponseCard
-                    content={pair.assistant.content}
-                    toolCalls={pair.assistant.toolCalls}
-                    onApprove={onApprove}
-                    onReject={onReject}
-                  />
-                )}
-              </OverlayScrollbarsComponent>
-            </div>
+              pair={pair}
+              onRefChange={handleSlideRefChange}
+              onApprove={onApprove}
+              onReject={onReject}
+            />
           ))}
 
           {/* Streaming slide */}
           {hasStreamingContent && (
             <div className="flex-shrink-0 w-full h-full snap-center p-4">
-              <OverlayScrollbarsComponent
-                ref={streamingScrollRef}
-                className="os-theme-custom h-full"
-                options={{
-                  scrollbars: {
-                    theme: "os-theme-custom",
-                    visibility: "auto",
-                    autoHide: "leave",
-                    autoHideDelay: SCROLLBAR_AUTO_HIDE_DELAY,
-                  },
-                  overflow: { x: "scroll", y: "scroll" },
-                }}
-                defer
-              >
+              <SlideScrollContainer ref={streamingScrollRef}>
                 {lastUserMessage && (
                   <UserMessageBar content={lastUserMessage.content} />
                 )}
@@ -351,7 +389,7 @@ export const ResponseCarousel = memo(function ResponseCarousel({
                   onApprove={onApprove}
                   onReject={onReject}
                 />
-              </OverlayScrollbarsComponent>
+              </SlideScrollContainer>
             </div>
           )}
         </div>

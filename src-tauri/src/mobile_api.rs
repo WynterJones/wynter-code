@@ -4627,6 +4627,7 @@ struct ProjectTemplate {
     color: String,
     category: String,
     icon: String,
+    url: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -4670,6 +4671,7 @@ async fn templates_list(
             color: "purple".to_string(),
             category: "ai".to_string(),
             icon: "Brain".to_string(),
+            url: "https://github.com/run-llama/create-llama".to_string(),
         },
         ProjectTemplate {
             id: "mastra".to_string(),
@@ -4680,6 +4682,7 @@ async fn templates_list(
             color: "blue".to_string(),
             category: "ai".to_string(),
             icon: "Bot".to_string(),
+            url: "https://github.com/mastra-ai/mastra".to_string(),
         },
         ProjectTemplate {
             id: "vercel-ai".to_string(),
@@ -4690,6 +4693,7 @@ async fn templates_list(
             color: "white".to_string(),
             category: "ai".to_string(),
             icon: "MessageSquare".to_string(),
+            url: "https://github.com/vercel/ai-chatbot".to_string(),
         },
         ProjectTemplate {
             id: "agent-chat".to_string(),
@@ -4700,6 +4704,7 @@ async fn templates_list(
             color: "yellow".to_string(),
             category: "ai".to_string(),
             icon: "Sparkles".to_string(),
+            url: "https://github.com/langchain-ai/create-agent-chat-app".to_string(),
         },
         ProjectTemplate {
             id: "copilotkit".to_string(),
@@ -4710,6 +4715,18 @@ async fn templates_list(
             color: "green".to_string(),
             category: "ai".to_string(),
             icon: "Cpu".to_string(),
+            url: "https://docs.copilotkit.ai/".to_string(),
+        },
+        ProjectTemplate {
+            id: "ag-ui".to_string(),
+            name: "AG-UI Protocol".to_string(),
+            description: "Event-based protocol for agent ↔ UI apps".to_string(),
+            command: "npx create-ag-ui-app@latest".to_string(),
+            project_name_placeholder: "my-ag-ui-app".to_string(),
+            color: "emerald".to_string(),
+            category: "ai".to_string(),
+            icon: "Cpu".to_string(),
+            url: "https://github.com/ag-ui-protocol/ag-ui".to_string(),
         },
         ProjectTemplate {
             id: "langchain-next".to_string(),
@@ -4720,6 +4737,7 @@ async fn templates_list(
             color: "emerald".to_string(),
             category: "ai".to_string(),
             icon: "Brain".to_string(),
+            url: "https://github.com/langchain-ai/langchain-nextjs-template".to_string(),
         },
         // Browser Extensions
         ProjectTemplate {
@@ -4731,6 +4749,7 @@ async fn templates_list(
             color: "emerald".to_string(),
             category: "extensions".to_string(),
             icon: "Chrome".to_string(),
+            url: "https://wxt.dev/".to_string(),
         },
         ProjectTemplate {
             id: "plasmo".to_string(),
@@ -4741,26 +4760,29 @@ async fn templates_list(
             color: "violet".to_string(),
             category: "extensions".to_string(),
             icon: "Puzzle".to_string(),
+            url: "https://plasmo.com/".to_string(),
         },
         ProjectTemplate {
             id: "crxjs".to_string(),
             name: "CRXJS Vite".to_string(),
-            description: "Chrome extension with Vite HMR".to_string(),
+            description: "Chrome extension with Vite HMR (CRXJS plugin)".to_string(),
             command: "npm create vite@latest".to_string(),
             project_name_placeholder: "my-crxjs-ext".to_string(),
             color: "yellow".to_string(),
             category: "extensions".to_string(),
             icon: "Zap".to_string(),
+            url: "https://crxjs.dev/".to_string(),
         },
         ProjectTemplate {
             id: "chrome-ext-cli".to_string(),
             name: "Chrome Extension CLI".to_string(),
-            description: "Official Chrome extension starter".to_string(),
+            description: "CLI to scaffold extension UIs (popup/devtools/sidepanel)".to_string(),
             command: "npx chrome-extension-cli".to_string(),
             project_name_placeholder: "my-chrome-ext".to_string(),
             color: "blue".to_string(),
             category: "extensions".to_string(),
             icon: "Chrome".to_string(),
+            url: "https://github.com/dutiyesh/chrome-extension-cli".to_string(),
         },
         ProjectTemplate {
             id: "webext".to_string(),
@@ -4771,6 +4793,7 @@ async fn templates_list(
             color: "orange".to_string(),
             category: "extensions".to_string(),
             icon: "Globe".to_string(),
+            url: "https://github.com/AXeL-dev/browser-extension-boilerplate".to_string(),
         },
         ProjectTemplate {
             id: "bedframe".to_string(),
@@ -4781,6 +4804,29 @@ async fn templates_list(
             color: "pink".to_string(),
             category: "extensions".to_string(),
             icon: "Layers".to_string(),
+            url: "https://www.bedframe.dev/".to_string(),
+        },
+        ProjectTemplate {
+            id: "create-chrome-ext".to_string(),
+            name: "Create Chrome Ext".to_string(),
+            description: "Scaffold MV3 extensions (React/Vue/Svelte/Solid/etc)".to_string(),
+            command: "npm create chrome-ext".to_string(),
+            project_name_placeholder: "my-chrome-ext".to_string(),
+            color: "emerald".to_string(),
+            category: "extensions".to_string(),
+            icon: "Chrome".to_string(),
+            url: "https://github.com/guocaoyi/create-chrome-ext".to_string(),
+        },
+        ProjectTemplate {
+            id: "extensionjs".to_string(),
+            name: "Extension.js".to_string(),
+            description: "Templates + tooling for building browser extensions".to_string(),
+            command: "npx extension@latest create".to_string(),
+            project_name_placeholder: "my-extension".to_string(),
+            color: "indigo".to_string(),
+            category: "extensions".to_string(),
+            icon: "Puzzle".to_string(),
+            url: "https://extension.js.org/docs/welcome".to_string(),
         },
         // Mobile
         ProjectTemplate {
@@ -4792,6 +4838,7 @@ async fn templates_list(
             color: "violet".to_string(),
             category: "mobile".to_string(),
             icon: "Smartphone".to_string(),
+            url: "https://expo.dev/".to_string(),
         },
         ProjectTemplate {
             id: "react-native".to_string(),
@@ -4802,6 +4849,7 @@ async fn templates_list(
             color: "cyan".to_string(),
             category: "mobile".to_string(),
             icon: "Smartphone".to_string(),
+            url: "https://reactnative.dev/".to_string(),
         },
         ProjectTemplate {
             id: "flutter".to_string(),
@@ -4812,6 +4860,7 @@ async fn templates_list(
             color: "sky".to_string(),
             category: "mobile".to_string(),
             icon: "Feather".to_string(),
+            url: "https://flutter.dev/".to_string(),
         },
         ProjectTemplate {
             id: "ionic".to_string(),
@@ -4822,6 +4871,29 @@ async fn templates_list(
             color: "blue".to_string(),
             category: "mobile".to_string(),
             icon: "Zap".to_string(),
+            url: "https://ionicframework.com/".to_string(),
+        },
+        ProjectTemplate {
+            id: "capacitor".to_string(),
+            name: "Capacitor".to_string(),
+            description: "Native runtimes for web apps (iOS/Android)".to_string(),
+            command: "npx @capacitor/cli create".to_string(),
+            project_name_placeholder: "my-capacitor-app".to_string(),
+            color: "teal".to_string(),
+            category: "mobile".to_string(),
+            icon: "Smartphone".to_string(),
+            url: "https://capacitorjs.com/".to_string(),
+        },
+        ProjectTemplate {
+            id: "nativescript".to_string(),
+            name: "NativeScript".to_string(),
+            description: "Native mobile apps with JS/TS".to_string(),
+            command: "npx @nativescript/cli create".to_string(),
+            project_name_placeholder: "my-nativescript-app".to_string(),
+            color: "blue".to_string(),
+            category: "mobile".to_string(),
+            icon: "Smartphone".to_string(),
+            url: "https://nativescript.org/".to_string(),
         },
         // Frontend
         ProjectTemplate {
@@ -4833,6 +4905,7 @@ async fn templates_list(
             color: "white".to_string(),
             category: "frontend".to_string(),
             icon: "Globe".to_string(),
+            url: "https://nextjs.org/".to_string(),
         },
         ProjectTemplate {
             id: "vite-react".to_string(),
@@ -4843,6 +4916,7 @@ async fn templates_list(
             color: "cyan".to_string(),
             category: "frontend".to_string(),
             icon: "Atom".to_string(),
+            url: "https://vitejs.dev/".to_string(),
         },
         ProjectTemplate {
             id: "vue".to_string(),
@@ -4853,6 +4927,7 @@ async fn templates_list(
             color: "emerald".to_string(),
             category: "frontend".to_string(),
             icon: "Triangle".to_string(),
+            url: "https://vuejs.org/".to_string(),
         },
         ProjectTemplate {
             id: "nuxt".to_string(),
@@ -4863,6 +4938,7 @@ async fn templates_list(
             color: "green".to_string(),
             category: "frontend".to_string(),
             icon: "Triangle".to_string(),
+            url: "https://nuxt.com/".to_string(),
         },
         ProjectTemplate {
             id: "sveltekit".to_string(),
@@ -4873,6 +4949,7 @@ async fn templates_list(
             color: "orange".to_string(),
             category: "frontend".to_string(),
             icon: "Flame".to_string(),
+            url: "https://kit.svelte.dev/".to_string(),
         },
         ProjectTemplate {
             id: "astro".to_string(),
@@ -4883,6 +4960,7 @@ async fn templates_list(
             color: "purple".to_string(),
             category: "frontend".to_string(),
             icon: "Star".to_string(),
+            url: "https://astro.build/".to_string(),
         },
         ProjectTemplate {
             id: "remix".to_string(),
@@ -4893,6 +4971,7 @@ async fn templates_list(
             color: "yellow".to_string(),
             category: "frontend".to_string(),
             icon: "Disc".to_string(),
+            url: "https://remix.run/".to_string(),
         },
         ProjectTemplate {
             id: "solid".to_string(),
@@ -4903,6 +4982,7 @@ async fn templates_list(
             color: "blue".to_string(),
             category: "frontend".to_string(),
             icon: "Circle".to_string(),
+            url: "https://www.solidjs.com/".to_string(),
         },
         ProjectTemplate {
             id: "qwik".to_string(),
@@ -4913,6 +4993,7 @@ async fn templates_list(
             color: "indigo".to_string(),
             category: "frontend".to_string(),
             icon: "Zap".to_string(),
+            url: "https://qwik.dev/".to_string(),
         },
         ProjectTemplate {
             id: "angular".to_string(),
@@ -4923,6 +5004,7 @@ async fn templates_list(
             color: "red".to_string(),
             category: "frontend".to_string(),
             icon: "Shield".to_string(),
+            url: "https://angular.dev/".to_string(),
         },
         // Backend / Full-Stack
         ProjectTemplate {
@@ -4934,6 +5016,7 @@ async fn templates_list(
             color: "red".to_string(),
             category: "backend".to_string(),
             icon: "Train".to_string(),
+            url: "https://rubyonrails.org/".to_string(),
         },
         ProjectTemplate {
             id: "express".to_string(),
@@ -4944,6 +5027,7 @@ async fn templates_list(
             color: "yellow".to_string(),
             category: "backend".to_string(),
             icon: "Zap".to_string(),
+            url: "https://expressjs.com/".to_string(),
         },
         ProjectTemplate {
             id: "nestjs".to_string(),
@@ -4954,6 +5038,7 @@ async fn templates_list(
             color: "red".to_string(),
             category: "backend".to_string(),
             icon: "Server".to_string(),
+            url: "https://nestjs.com/".to_string(),
         },
         ProjectTemplate {
             id: "fastify".to_string(),
@@ -4964,6 +5049,7 @@ async fn templates_list(
             color: "white".to_string(),
             category: "backend".to_string(),
             icon: "Rocket".to_string(),
+            url: "https://fastify.dev/".to_string(),
         },
         ProjectTemplate {
             id: "hono".to_string(),
@@ -4974,6 +5060,7 @@ async fn templates_list(
             color: "orange".to_string(),
             category: "backend".to_string(),
             icon: "Flame".to_string(),
+            url: "https://hono.dev/".to_string(),
         },
         ProjectTemplate {
             id: "django".to_string(),
@@ -4984,6 +5071,7 @@ async fn templates_list(
             color: "green".to_string(),
             category: "backend".to_string(),
             icon: "Database".to_string(),
+            url: "https://www.djangoproject.com/".to_string(),
         },
         ProjectTemplate {
             id: "phoenix".to_string(),
@@ -4994,6 +5082,7 @@ async fn templates_list(
             color: "orange".to_string(),
             category: "backend".to_string(),
             icon: "Flame".to_string(),
+            url: "https://www.phoenixframework.org/".to_string(),
         },
         ProjectTemplate {
             id: "laravel".to_string(),
@@ -5004,6 +5093,7 @@ async fn templates_list(
             color: "red".to_string(),
             category: "backend".to_string(),
             icon: "Code".to_string(),
+            url: "https://laravel.com/".to_string(),
         },
         // Desktop
         ProjectTemplate {
@@ -5015,6 +5105,7 @@ async fn templates_list(
             color: "orange".to_string(),
             category: "desktop".to_string(),
             icon: "Box".to_string(),
+            url: "https://tauri.app/".to_string(),
         },
         ProjectTemplate {
             id: "electron".to_string(),
@@ -5025,6 +5116,18 @@ async fn templates_list(
             color: "sky".to_string(),
             category: "desktop".to_string(),
             icon: "MonitorSmartphone".to_string(),
+            url: "https://www.electronjs.org/".to_string(),
+        },
+        ProjectTemplate {
+            id: "neutralino".to_string(),
+            name: "Neutralinojs".to_string(),
+            description: "Lightweight desktop apps with web tech".to_string(),
+            command: "npx @neutralinojs/neu create".to_string(),
+            project_name_placeholder: "my-neutralino-app".to_string(),
+            color: "slate".to_string(),
+            category: "desktop".to_string(),
+            icon: "MonitorSmartphone".to_string(),
+            url: "https://neutralino.js.org/".to_string(),
         },
         // Tooling & Libraries
         ProjectTemplate {
@@ -5036,6 +5139,18 @@ async fn templates_list(
             color: "green".to_string(),
             category: "tooling".to_string(),
             icon: "Terminal".to_string(),
+            url: "https://oclif.io/".to_string(),
+        },
+        ProjectTemplate {
+            id: "bubbletea".to_string(),
+            name: "Bubble Tea".to_string(),
+            description: "Go TUI framework by Charm".to_string(),
+            command: "npx degit charmbracelet/bubbletea-app-template".to_string(),
+            project_name_placeholder: "my-tui-app".to_string(),
+            color: "pink".to_string(),
+            category: "tooling".to_string(),
+            icon: "Terminal".to_string(),
+            url: "https://github.com/charmbracelet/bubbletea".to_string(),
         },
         ProjectTemplate {
             id: "turborepo".to_string(),
@@ -5046,6 +5161,7 @@ async fn templates_list(
             color: "pink".to_string(),
             category: "tooling".to_string(),
             icon: "Boxes".to_string(),
+            url: "https://turbo.build/repo".to_string(),
         },
         ProjectTemplate {
             id: "t3".to_string(),
@@ -5056,6 +5172,7 @@ async fn templates_list(
             color: "violet".to_string(),
             category: "tooling".to_string(),
             icon: "Layers".to_string(),
+            url: "https://create.t3.gg/".to_string(),
         },
         ProjectTemplate {
             id: "payload".to_string(),
@@ -5066,6 +5183,7 @@ async fn templates_list(
             color: "blue".to_string(),
             category: "tooling".to_string(),
             icon: "Database".to_string(),
+            url: "https://payloadcms.com/".to_string(),
         },
         ProjectTemplate {
             id: "docusaurus".to_string(),
@@ -5076,6 +5194,7 @@ async fn templates_list(
             color: "green".to_string(),
             category: "tooling".to_string(),
             icon: "BookOpen".to_string(),
+            url: "https://docusaurus.io/".to_string(),
         },
         ProjectTemplate {
             id: "storybook".to_string(),
@@ -5086,6 +5205,86 @@ async fn templates_list(
             color: "pink".to_string(),
             category: "tooling".to_string(),
             icon: "Book".to_string(),
+            url: "https://storybook.js.org/".to_string(),
+        },
+        ProjectTemplate {
+            id: "nx".to_string(),
+            name: "Nx".to_string(),
+            description: "Monorepo + generators + task graph".to_string(),
+            command: "npx create-nx-workspace@latest".to_string(),
+            project_name_placeholder: "my-nx-workspace".to_string(),
+            color: "slate".to_string(),
+            category: "tooling".to_string(),
+            icon: "Boxes".to_string(),
+            url: "https://nx.dev/".to_string(),
+        },
+        ProjectTemplate {
+            id: "playwright".to_string(),
+            name: "Playwright".to_string(),
+            description: "End-to-end testing scaffolder".to_string(),
+            command: "npm init playwright@latest".to_string(),
+            project_name_placeholder: "my-playwright-tests".to_string(),
+            color: "emerald".to_string(),
+            category: "tooling".to_string(),
+            icon: "Terminal".to_string(),
+            url: "https://playwright.dev/".to_string(),
+        },
+        ProjectTemplate {
+            id: "shadcn".to_string(),
+            name: "shadcn/ui".to_string(),
+            description: "Add component system to your app".to_string(),
+            command: "npx shadcn@latest init".to_string(),
+            project_name_placeholder: "my-shadcn-app".to_string(),
+            color: "slate".to_string(),
+            category: "tooling".to_string(),
+            icon: "Book".to_string(),
+            url: "https://ui.shadcn.com/".to_string(),
+        },
+        // CMS / Content
+        ProjectTemplate {
+            id: "strapi".to_string(),
+            name: "Strapi".to_string(),
+            description: "Headless CMS with starters".to_string(),
+            command: "npx create-strapi-app@latest".to_string(),
+            project_name_placeholder: "my-strapi".to_string(),
+            color: "indigo".to_string(),
+            category: "tooling".to_string(),
+            icon: "Database".to_string(),
+            url: "https://strapi.io/".to_string(),
+        },
+        ProjectTemplate {
+            id: "sanity".to_string(),
+            name: "Sanity".to_string(),
+            description: "Content platform with schema-driven studio".to_string(),
+            command: "npm create sanity@latest".to_string(),
+            project_name_placeholder: "my-sanity-studio".to_string(),
+            color: "red".to_string(),
+            category: "tooling".to_string(),
+            icon: "Database".to_string(),
+            url: "https://www.sanity.io/".to_string(),
+        },
+        // Ecommerce
+        ProjectTemplate {
+            id: "hydrogen".to_string(),
+            name: "Shopify Hydrogen".to_string(),
+            description: "Headless Shopify storefront starter".to_string(),
+            command: "npm create @shopify/hydrogen@latest".to_string(),
+            project_name_placeholder: "my-hydrogen-storefront".to_string(),
+            color: "green".to_string(),
+            category: "tooling".to_string(),
+            icon: "Globe".to_string(),
+            url: "https://shopify.dev/docs/storefronts/headless/hydrogen".to_string(),
+        },
+        ProjectTemplate {
+            id: "medusa".to_string(),
+            name: "Medusa".to_string(),
+            description: "Open-source commerce engine with starters".to_string(),
+            command: "npx create-medusa-app@latest".to_string(),
+            project_name_placeholder: "my-medusa-store".to_string(),
+            color: "violet".to_string(),
+            category: "tooling".to_string(),
+            icon: "Database".to_string(),
+            url: "https://docs.medusajs.com/".to_string(),
         },
     ];
 

@@ -3,6 +3,7 @@ import { useEffect, useCallback } from "react";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { useSystemCleanerStore } from "@/stores/systemCleanerStore";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import { CleanerSidebar } from "./CleanerSidebar";
 import { LargeFilesView } from "./LargeFilesView";
 import { AppCachesView } from "./AppCachesView";
@@ -20,6 +21,9 @@ const CATEGORY_NAMES: Record<string, string> = {
 };
 
 export function SystemCleanerPopup({ isOpen, onClose }: SystemCleanerPopupProps) {
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(isOpen);
+
   const { activeCategory, reset } = useSystemCleanerStore();
 
   const handleKeyDown = useCallback(

@@ -15,6 +15,7 @@ import { arrayMove } from "@dnd-kit/sortable";
 import { CheckSquare, X, Plus, Bot } from "lucide-react";
 import { IconButton, Tooltip } from "@/components/ui";
 import { useKanbanStore } from "@/stores/kanbanStore";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import { KanbanColumn } from "./KanbanColumn";
 import { KanbanCardPreview } from "./KanbanCard";
 import { KanbanNewTaskPopup } from "./KanbanNewTaskPopup";
@@ -33,6 +34,9 @@ export function KanbanBoardPopup({
   onClose,
   workspaceId,
 }: KanbanBoardPopupProps) {
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(isOpen);
+
   const [showNewTaskPopup, setShowNewTaskPopup] = useState(false);
   const [showAIPopup, setShowAIPopup] = useState(false);
   const [editTask, setEditTask] = useState<KanbanTask | null>(null);

@@ -862,6 +862,7 @@ pub async fn run_claude(prompt: String, cwd: String) -> Result<CommandOutput, St
     let output = Command::new("claude")
         .args(["-p", &prompt, "--output-format", "json", "--permission-mode", "default"])
         .current_dir(&cwd)
+        .env("PATH", crate::path_utils::get_enhanced_path())
         .output()
         .map_err(|e| format!("Failed to execute Claude CLI: {}", e))?;
 
@@ -940,6 +941,7 @@ pub async fn run_claude_streaming(
     let mut child = Command::new("claude")
         .args(&args)
         .current_dir(&cwd)
+        .env("PATH", crate::path_utils::get_enhanced_path())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -4615,6 +4617,7 @@ pub fn validate_mcp_command(command: String) -> Result<bool, String> {
 
     let output = Command::new(check_cmd)
         .arg(&command)
+        .env("PATH", crate::path_utils::get_enhanced_path())
         .output()
         .map_err(|e| format!("Failed to check command: {}", e))?;
 

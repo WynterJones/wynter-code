@@ -8,6 +8,8 @@ import { MarkdownViewerPanel } from "./panel-types/MarkdownViewerPanel";
 import { FarmworkStatsPanel } from "./panel-types/FarmworkStatsPanel";
 import { BrowserPreviewPanel } from "./panel-types/BrowserPreviewPanel";
 import { YouTubeEmbedPanel } from "./panel-types/YouTubeEmbedPanel";
+import { KanbanBoardPanel } from "./panel-types/KanbanBoardPanel";
+import { BeadsBoardPanel } from "./panel-types/BeadsBoardPanel";
 
 export function PanelContent(props: PanelContentProps) {
   const { panel } = props;
@@ -31,6 +33,10 @@ export function PanelContent(props: PanelContentProps) {
       return <BrowserPreviewPanel {...props} />;
     case "youtube-embed":
       return <YouTubeEmbedPanel {...props} />;
+    case "kanban-board":
+      return <KanbanBoardPanel {...props} />;
+    case "beads-board":
+      return <BeadsBoardPanel {...props} />;
     default:
       return <EmptyPanel {...props} />;
   }

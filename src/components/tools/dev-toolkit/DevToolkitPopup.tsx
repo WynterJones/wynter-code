@@ -69,6 +69,7 @@ import { ListSorterDeduplicator } from "./tools/ListSorterDeduplicator";
 import { HtmlCssValidator } from "./tools/HtmlCssValidator";
 import { ExifDataRemover } from "./tools/ExifDataRemover";
 import { PlaceholderImageGenerator } from "./tools/PlaceholderImageGenerator";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import type { MiniTool } from "./types";
 
 interface DevToolkitPopupProps {
@@ -160,6 +161,9 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
 export function DevToolkitPopup({ isOpen, onClose, initialTool }: DevToolkitPopupProps) {
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(isOpen);
+
   const [activeTool, setActiveTool] = useState("json-formatter");
 
   // Set initial tool when provided

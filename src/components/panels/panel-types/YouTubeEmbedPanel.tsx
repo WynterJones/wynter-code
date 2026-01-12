@@ -818,9 +818,9 @@ export function YouTubeEmbedPanel({
       {activeTab === "player" ? (
         <div className="flex-1 overflow-hidden bg-black">
           <iframe
-            src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=1&rel=0`}
+            src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
             className="w-full h-full border-0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
             allowFullScreen
             title="YouTube Video"
           />

@@ -5,15 +5,7 @@ import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudePopup } from "@/components/claude";
 import { CodespaceEditor } from "@/components/codespace";
 import { PanelLayoutContainer } from "@/components/panels";
-import {
-  useActiveSession,
-  useActiveSessionId,
-  useProjectSessions,
-  useMessages,
-  useStreamingState,
-  useClaudeSessionState,
-  useSessionActions,
-} from "@/stores/sessionSelectors";
+import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useFileIndexStore } from "@/stores/fileIndexStore";
@@ -36,23 +28,36 @@ interface MainContentProps {
 }
 
 export function MainContent({ project, pendingImage, onImageConsumed, onRequestImageBrowser }: MainContentProps) {
-  // Use granular selectors to avoid re-renders on unrelated state changes
-  const currentSessionId = useActiveSessionId(project.id);
-  const currentSession = useActiveSession(project.id);
-  const sessions = useProjectSessions(project.id);
-  const messages = useMessages(currentSessionId);
-  const streamingState = useStreamingState(currentSessionId);
-  const claudeSessionState = useClaudeSessionState(currentSessionId);
-
-  // Get stable action references (these don't cause re-renders)
-  const { clearMessages, clearContextStats } = useSessionActions();
-
+  // Use direct store access pattern to avoid selector infinite loops
+  const {
+    activeSessionId,
+    getSessionsForProject,
+    getMessages,
+    getStreamingState,
+    getClaudeSessionState,
+    clearMessages,
+    clearContextStats,
+  } = useSessionStore();
   const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
   const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, installedProviders } = useSettingsStore();
   const { getFiles, loadIndex } = useFileIndexStore();
   const projectFiles = getFiles(project.path);
 
+  // Use selector to get current session with proper reactivity
+  const currentSession = useSessionStore((state) => {
+    const currentSessionId = state.activeSessionId.get(project.id);
+    if (!currentSessionId) return undefined;
+    const projectSessions = state.sessions.get(project.id);
+    return projectSessions?.find(s => s.id === currentSessionId);
+  });
+
+  const sessions = getSessionsForProject(project.id);
+  const currentSessionId = activeSessionId.get(project.id);
   const terminalSessions = useMemo(() => sessions.filter((s) => s.type === "terminal"), [sessions]);
+
+  const messages = currentSessionId ? getMessages(currentSessionId) : [];
+  const streamingState = currentSessionId ? getStreamingState(currentSessionId) : null;
+  const claudeSessionState = currentSessionId ? getClaudeSessionState(currentSessionId) : undefined;
 
   const pendingQuestionSet = streamingState?.pendingQuestionSet || null;
   const isSessionActive = claudeSessionState?.status === "ready";

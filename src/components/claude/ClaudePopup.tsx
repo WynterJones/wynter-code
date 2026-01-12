@@ -15,6 +15,7 @@ import {
 import Editor, { type Monaco } from "@monaco-editor/react";
 import { defineMonacoThemes } from "@/hooks/useMonacoTheme";
 import { useClaudeStore, useSettingsStore } from "@/stores";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import type { ClaudeFile, ClaudeFileType } from "@/types";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui";
@@ -50,6 +51,9 @@ export function ClaudePopup({ projectPath }: ClaudePopupProps) {
     saveSettings,
     isLoading,
   } = useClaudeStore();
+
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(isPopupOpen);
 
   const { editorTheme, editorFontSize } = useSettingsStore();
 

@@ -35,9 +35,11 @@ import {
   Sparkles,
   MessageSquare,
   Cpu,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-shell";
 import { Modal, IconButton } from "@/components/ui";
 import { Terminal } from "@/components/terminal/Terminal";
 import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
@@ -60,6 +62,7 @@ interface TemplateDefinition {
   projectNamePlaceholder: string;
   color: string;
   category: TemplateCategory;
+  url: string;
 }
 
 type TemplateCategory =
@@ -97,6 +100,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-llama-app",
     color: "text-purple-400",
     category: "ai",
+    url: "https://github.com/run-llama/create-llama",
   },
   {
     id: "mastra",
@@ -107,6 +111,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-mastra-agent",
     color: "text-blue-400",
     category: "ai",
+    url: "https://github.com/mastra-ai/mastra",
   },
   {
     id: "vercel-ai",
@@ -118,6 +123,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-ai-chatbot",
     color: "text-white",
     category: "ai",
+    url: "https://github.com/vercel/ai-chatbot",
   },
   {
     id: "agent-chat",
@@ -128,6 +134,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-agent-chat",
     color: "text-yellow-400",
     category: "ai",
+    url: "https://github.com/langchain-ai/create-agent-chat-app",
   },
   {
     id: "copilotkit",
@@ -138,6 +145,18 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-copilot",
     color: "text-green-400",
     category: "ai",
+    url: "https://docs.copilotkit.ai/",
+  },
+  {
+    id: "ag-ui",
+    name: "AG-UI Protocol",
+    description: "Event-based protocol for agent ↔ UI apps",
+    icon: Cpu,
+    command: "npx create-ag-ui-app@latest",
+    projectNamePlaceholder: "my-ag-ui-app",
+    color: "text-emerald-400",
+    category: "ai",
+    url: "https://github.com/ag-ui-protocol/ag-ui",
   },
   {
     id: "langchain-next",
@@ -149,6 +168,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-langchain-app",
     color: "text-emerald-400",
     category: "ai",
+    url: "https://github.com/langchain-ai/langchain-nextjs-template",
   },
 
   // Browser Extensions
@@ -161,6 +181,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-extension",
     color: "text-emerald-400",
     category: "extensions",
+    url: "https://wxt.dev/",
   },
   {
     id: "plasmo",
@@ -171,26 +192,29 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-plasmo-ext",
     color: "text-violet-400",
     category: "extensions",
+    url: "https://plasmo.com/",
   },
   {
     id: "crxjs",
     name: "CRXJS Vite",
-    description: "Chrome extension with Vite HMR",
+    description: "Chrome extension with Vite HMR (CRXJS plugin)",
     icon: Zap,
     command: "npm create vite@latest",
     projectNamePlaceholder: "my-crxjs-ext",
     color: "text-yellow-400",
     category: "extensions",
+    url: "https://crxjs.dev/",
   },
   {
     id: "chrome-ext-cli",
     name: "Chrome Extension CLI",
-    description: "Official Chrome extension starter",
+    description: "CLI to scaffold extension UIs (popup/devtools/sidepanel)",
     icon: Chrome,
     command: "npx chrome-extension-cli",
     projectNamePlaceholder: "my-chrome-ext",
     color: "text-blue-400",
     category: "extensions",
+    url: "https://github.com/dutiyesh/chrome-extension-cli",
   },
   {
     id: "webext",
@@ -201,6 +225,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-webext",
     color: "text-orange-400",
     category: "extensions",
+    url: "https://github.com/AXeL-dev/browser-extension-boilerplate",
   },
   {
     id: "bedframe",
@@ -211,6 +236,29 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-bedframe-ext",
     color: "text-pink-400",
     category: "extensions",
+    url: "https://www.bedframe.dev/",
+  },
+  {
+    id: "create-chrome-ext",
+    name: "Create Chrome Ext",
+    description: "Scaffold MV3 extensions (React/Vue/Svelte/Solid/etc)",
+    icon: Chrome,
+    command: "npm create chrome-ext",
+    projectNamePlaceholder: "my-chrome-ext",
+    color: "text-emerald-300",
+    category: "extensions",
+    url: "https://github.com/guocaoyi/create-chrome-ext",
+  },
+  {
+    id: "extensionjs",
+    name: "Extension.js",
+    description: "Templates + tooling for building browser extensions",
+    icon: Puzzle,
+    command: "npx extension@latest create",
+    projectNamePlaceholder: "my-extension",
+    color: "text-indigo-300",
+    category: "extensions",
+    url: "https://extension.js.org/docs/welcome",
   },
 
   // Mobile
@@ -223,6 +271,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-expo-app",
     color: "text-violet-400",
     category: "mobile",
+    url: "https://expo.dev/",
   },
   {
     id: "react-native",
@@ -233,6 +282,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "MyRNApp",
     color: "text-cyan-400",
     category: "mobile",
+    url: "https://reactnative.dev/",
   },
   {
     id: "flutter",
@@ -243,6 +293,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my_flutter_app",
     color: "text-sky-400",
     category: "mobile",
+    url: "https://flutter.dev/",
   },
   {
     id: "ionic",
@@ -253,6 +304,29 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-ionic-app",
     color: "text-blue-500",
     category: "mobile",
+    url: "https://ionicframework.com/",
+  },
+  {
+    id: "capacitor",
+    name: "Capacitor",
+    description: "Native runtimes for web apps (iOS/Android)",
+    icon: Smartphone,
+    command: "npx @capacitor/cli create",
+    projectNamePlaceholder: "my-capacitor-app",
+    color: "text-teal-400",
+    category: "mobile",
+    url: "https://capacitorjs.com/",
+  },
+  {
+    id: "nativescript",
+    name: "NativeScript",
+    description: "Native mobile apps with JS/TS",
+    icon: Smartphone,
+    command: "npx @nativescript/cli create",
+    projectNamePlaceholder: "my-nativescript-app",
+    color: "text-blue-300",
+    category: "mobile",
+    url: "https://nativescript.org/",
   },
 
   // Frontend
@@ -265,6 +339,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-next-app",
     color: "text-white",
     category: "frontend",
+    url: "https://nextjs.org/",
   },
   {
     id: "vite-react",
@@ -275,6 +350,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-react-app",
     color: "text-cyan-400",
     category: "frontend",
+    url: "https://vitejs.dev/",
   },
   {
     id: "vue",
@@ -285,6 +361,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-vue-app",
     color: "text-emerald-500",
     category: "frontend",
+    url: "https://vuejs.org/",
   },
   {
     id: "nuxt",
@@ -295,6 +372,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-nuxt-app",
     color: "text-green-400",
     category: "frontend",
+    url: "https://nuxt.com/",
   },
   {
     id: "sveltekit",
@@ -305,6 +383,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-svelte-app",
     color: "text-orange-500",
     category: "frontend",
+    url: "https://kit.svelte.dev/",
   },
   {
     id: "astro",
@@ -315,6 +394,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-astro-site",
     color: "text-purple-400",
     category: "frontend",
+    url: "https://astro.build/",
   },
   {
     id: "remix",
@@ -325,6 +405,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-remix-app",
     color: "text-yellow-400",
     category: "frontend",
+    url: "https://remix.run/",
   },
   {
     id: "solid",
@@ -335,6 +416,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-solid-app",
     color: "text-blue-400",
     category: "frontend",
+    url: "https://www.solidjs.com/",
   },
   {
     id: "qwik",
@@ -345,6 +427,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-qwik-app",
     color: "text-indigo-400",
     category: "frontend",
+    url: "https://qwik.dev/",
   },
   {
     id: "angular",
@@ -355,6 +438,141 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-angular-app",
     color: "text-red-500",
     category: "frontend",
+    url: "https://angular.dev/",
+  },
+
+  // More Frontend / SSG / UI starters
+  {
+    id: "gatsby",
+    name: "Gatsby",
+    description: "React SSG with plugin ecosystem",
+    icon: Star,
+    command: "npm init gatsby",
+    projectNamePlaceholder: "my-gatsby-site",
+    color: "text-purple-300",
+    category: "frontend",
+    url: "https://www.gatsbyjs.com/",
+  },
+  {
+    id: "react-router",
+    name: "React Router",
+    description: "Router + framework features (data APIs)",
+    icon: Disc,
+    command: "npx create-react-router@latest",
+    projectNamePlaceholder: "my-react-router-app",
+    color: "text-red-300",
+    category: "frontend",
+    url: "https://reactrouter.com/",
+  },
+  {
+    id: "vitepress",
+    name: "VitePress",
+    description: "Docs/SSG powered by Vite + Vue",
+    icon: BookOpen,
+    command: "npm add -D vitepress@latest && npx vitepress init",
+    projectNamePlaceholder: "my-vitepress-docs",
+    color: "text-emerald-300",
+    category: "frontend",
+    url: "https://vitepress.dev/",
+  },
+  {
+    id: "preact",
+    name: "Preact",
+    description: "Fast, lightweight React alternative",
+    icon: Atom,
+    command: "npm init preact",
+    projectNamePlaceholder: "my-preact-app",
+    color: "text-indigo-300",
+    category: "frontend",
+    url: "https://preactjs.com/",
+  },
+  {
+    id: "open-wc",
+    name: "Open Web Components",
+    description: "Generator for Web Components projects",
+    icon: Globe,
+    command: "npm init @open-wc",
+    projectNamePlaceholder: "my-web-components",
+    color: "text-sky-300",
+    category: "frontend",
+    url: "https://open-wc.org/",
+  },
+  {
+    id: "stencil",
+    name: "Stencil",
+    description: "Web components compiler + starters",
+    icon: Circle,
+    command: "npm init stencil",
+    projectNamePlaceholder: "my-stencil-project",
+    color: "text-blue-300",
+    category: "frontend",
+    url: "https://stenciljs.com/",
+  },
+  {
+    id: "eleventy",
+    name: "Eleventy Base Blog",
+    description: "SSG starter blog template",
+    icon: Star,
+    command: "npx degit 11ty/eleventy-base-blog",
+    projectNamePlaceholder: "my-11ty-blog",
+    color: "text-yellow-300",
+    category: "frontend",
+    url: "https://github.com/11ty/eleventy-base-blog",
+  },
+  {
+    id: "hugo",
+    name: "Hugo",
+    description: "Fast Go-based static site generator",
+    icon: Star,
+    command: "hugo new site",
+    projectNamePlaceholder: "my-hugo-site",
+    color: "text-pink-300",
+    category: "frontend",
+    url: "https://gohugo.io/",
+  },
+  {
+    id: "jekyll",
+    name: "Jekyll",
+    description: "Ruby static site generator",
+    icon: Star,
+    command: "jekyll new",
+    projectNamePlaceholder: "my-jekyll-site",
+    color: "text-red-300",
+    category: "frontend",
+    url: "https://jekyllrb.com/",
+  },
+  {
+    id: "hexo",
+    name: "Hexo",
+    description: "Node.js static blog framework",
+    icon: Star,
+    command: "npx hexo init",
+    projectNamePlaceholder: "my-hexo-site",
+    color: "text-orange-300",
+    category: "frontend",
+    url: "https://hexo.io/",
+  },
+  {
+    id: "zola",
+    name: "Zola",
+    description: "Rust SSG with a great DX",
+    icon: Star,
+    command: "zola init",
+    projectNamePlaceholder: "my-zola-site",
+    color: "text-amber-300",
+    category: "frontend",
+    url: "https://www.getzola.org/",
+  },
+  {
+    id: "slidev",
+    name: "Slidev",
+    description: "Markdown-based slides powered by Vite",
+    icon: BookOpen,
+    command: "npm init slidev",
+    projectNamePlaceholder: "my-slidev-deck",
+    color: "text-green-300",
+    category: "frontend",
+    url: "https://sli.dev/",
   },
 
   // Backend / Full-Stack
@@ -367,6 +585,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-rails-app",
     color: "text-red-500",
     category: "backend",
+    url: "https://rubyonrails.org/",
   },
   {
     id: "express",
@@ -377,6 +596,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-express-app",
     color: "text-yellow-400",
     category: "backend",
+    url: "https://expressjs.com/",
   },
   {
     id: "nestjs",
@@ -387,6 +607,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-nest-app",
     color: "text-red-600",
     category: "backend",
+    url: "https://nestjs.com/",
   },
   {
     id: "fastify",
@@ -397,6 +618,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-fastify-app",
     color: "text-white",
     category: "backend",
+    url: "https://fastify.dev/",
   },
   {
     id: "hono",
@@ -407,6 +629,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-hono-app",
     color: "text-orange-400",
     category: "backend",
+    url: "https://hono.dev/",
   },
   {
     id: "django",
@@ -417,6 +640,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my_django_project",
     color: "text-green-600",
     category: "backend",
+    url: "https://www.djangoproject.com/",
   },
   {
     id: "phoenix",
@@ -427,6 +651,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my_phoenix_app",
     color: "text-orange-500",
     category: "backend",
+    url: "https://www.phoenixframework.org/",
   },
   {
     id: "laravel",
@@ -437,6 +662,211 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-laravel-app",
     color: "text-red-400",
     category: "backend",
+    url: "https://laravel.com/",
+  },
+
+  // More Backend / Full-stack starters
+  {
+    id: "redwoodjs",
+    name: "RedwoodJS",
+    description: "Full-stack framework (React + GraphQL + Prisma)",
+    icon: Layers,
+    command: "yarn create redwood-app",
+    projectNamePlaceholder: "my-redwood-app",
+    color: "text-rose-300",
+    category: "backend",
+    url: "https://redwoodjs.com/",
+  },
+  {
+    id: "adonisjs",
+    name: "AdonisJS",
+    description: "Node.js full-stack framework",
+    icon: Server,
+    command: "npm init adonisjs@latest",
+    projectNamePlaceholder: "my-adonis-app",
+    color: "text-indigo-300",
+    category: "backend",
+    url: "https://adonisjs.com/",
+  },
+  {
+    id: "feathers",
+    name: "Feathers",
+    description: "Realtime APIs + services (Node.js)",
+    icon: Feather,
+    command: "npm create feathers@latest",
+    projectNamePlaceholder: "my-feathers-app",
+    color: "text-sky-300",
+    category: "backend",
+    url: "https://feathersjs.com/",
+  },
+  {
+    id: "loopback",
+    name: "LoopBack",
+    description: "TypeScript/Node.js API framework",
+    icon: Server,
+    command: "npm create loopback",
+    projectNamePlaceholder: "my-loopback-api",
+    color: "text-blue-300",
+    category: "backend",
+    url: "https://loopback.io/",
+  },
+  {
+    id: "sails",
+    name: "Sails",
+    description: "MVC framework for Node.js",
+    icon: Globe,
+    command: "npx sails new",
+    projectNamePlaceholder: "my-sails-app",
+    color: "text-cyan-300",
+    category: "backend",
+    url: "https://sailsjs.com/",
+  },
+  {
+    id: "meteor",
+    name: "Meteor",
+    description: "Full-stack JS platform",
+    icon: Star,
+    command: "meteor create",
+    projectNamePlaceholder: "my-meteor-app",
+    color: "text-orange-300",
+    category: "backend",
+    url: "https://www.meteor.com/",
+  },
+  {
+    id: "fresh",
+    name: "Deno Fresh",
+    description: "Edge-first full-stack web framework",
+    icon: Flame,
+    command: "deno run -A -r https://fresh.deno.dev",
+    projectNamePlaceholder: "my-fresh-app",
+    color: "text-green-300",
+    category: "backend",
+    url: "https://fresh.deno.dev/",
+  },
+  {
+    id: "cloudflare",
+    name: "Cloudflare (C3)",
+    description: "Scaffold Workers/Pages apps (create-cloudflare)",
+    icon: Zap,
+    command: "npm create cloudflare@latest",
+    projectNamePlaceholder: "my-cloudflare-app",
+    color: "text-amber-400",
+    category: "backend",
+    url: "https://developers.cloudflare.com/pages/get-started/c3/",
+  },
+  {
+    id: "sst",
+    name: "SST",
+    description: "Build serverless/edge apps with IaC + starters",
+    icon: Rocket,
+    command: "npx sst@latest init",
+    projectNamePlaceholder: "my-sst-app",
+    color: "text-purple-300",
+    category: "backend",
+    url: "https://sst.dev/",
+  },
+  {
+    id: "bun",
+    name: "Bun",
+    description: "JS runtime with fast project init",
+    icon: Zap,
+    command: "bun init",
+    projectNamePlaceholder: "my-bun-app",
+    color: "text-yellow-300",
+    category: "backend",
+    url: "https://bun.sh/",
+  },
+  {
+    id: "wasp",
+    name: "Wasp",
+    description: "Full-stack framework with its own CLI + templates",
+    icon: Layers,
+    command: "curl -sSL https://get.wasp.sh/installer.sh | sh && wasp new",
+    projectNamePlaceholder: "my-wasp-app",
+    color: "text-slate-300",
+    category: "backend",
+    url: "https://wasp.sh/",
+  },
+
+  // CMS / Content Platforms
+  {
+    id: "payload",
+    name: "Payload CMS",
+    description: "Headless CMS for Next.js",
+    icon: Database,
+    command: "npx create-payload-app@latest",
+    projectNamePlaceholder: "my-payload-app",
+    color: "text-blue-500",
+    category: "tooling",
+    url: "https://payloadcms.com/",
+  },
+  {
+    id: "strapi",
+    name: "Strapi",
+    description: "Headless CMS with starters",
+    icon: Database,
+    command: "npx create-strapi-app@latest",
+    projectNamePlaceholder: "my-strapi",
+    color: "text-indigo-400",
+    category: "tooling",
+    url: "https://strapi.io/",
+  },
+  {
+    id: "keystone",
+    name: "Keystone",
+    description: "Headless CMS / app framework",
+    icon: Database,
+    command: "npm create keystone-app@latest",
+    projectNamePlaceholder: "my-keystone",
+    color: "text-emerald-400",
+    category: "tooling",
+    url: "https://keystonejs.com/",
+  },
+  {
+    id: "sanity",
+    name: "Sanity",
+    description: "Content platform with schema-driven studio",
+    icon: Database,
+    command: "npm create sanity@latest",
+    projectNamePlaceholder: "my-sanity-studio",
+    color: "text-red-400",
+    category: "tooling",
+    url: "https://www.sanity.io/",
+  },
+  {
+    id: "directus",
+    name: "Directus (Extension)",
+    description: "Scaffold Directus extensions (hooks/interfaces/etc)",
+    icon: Database,
+    command: "npx create-directus-extension@latest",
+    projectNamePlaceholder: "directus-extension-my-extension",
+    color: "text-sky-400",
+    category: "tooling",
+    url: "https://directus.io/docs/guides/extensions/cli",
+  },
+
+  // Ecommerce
+  {
+    id: "hydrogen",
+    name: "Shopify Hydrogen",
+    description: "Headless Shopify storefront starter",
+    icon: Globe,
+    command: "npm create @shopify/hydrogen@latest",
+    projectNamePlaceholder: "my-hydrogen-storefront",
+    color: "text-green-400",
+    category: "tooling",
+    url: "https://shopify.dev/docs/storefronts/headless/hydrogen",
+  },
+  {
+    id: "medusa",
+    name: "Medusa",
+    description: "Open-source commerce engine with starters",
+    icon: Database,
+    command: "npx create-medusa-app@latest",
+    projectNamePlaceholder: "my-medusa-store",
+    color: "text-violet-400",
+    category: "tooling",
+    url: "https://docs.medusajs.com/",
   },
 
   // Desktop
@@ -449,6 +879,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-tauri-app",
     color: "text-orange-500",
     category: "desktop",
+    url: "https://tauri.app/",
   },
   {
     id: "electron",
@@ -459,6 +890,18 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-electron-app",
     color: "text-sky-400",
     category: "desktop",
+    url: "https://www.electronjs.org/",
+  },
+  {
+    id: "neutralino",
+    name: "Neutralinojs",
+    description: "Lightweight desktop apps with web tech",
+    icon: MonitorSmartphone,
+    command: "npx @neutralinojs/neu create",
+    projectNamePlaceholder: "my-neutralino-app",
+    color: "text-slate-300",
+    category: "desktop",
+    url: "https://neutralino.js.org/",
   },
 
   // Tooling & Libraries
@@ -471,6 +914,18 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-cli",
     color: "text-green-500",
     category: "tooling",
+    url: "https://oclif.io/",
+  },
+  {
+    id: "bubbletea",
+    name: "Bubble Tea",
+    description: "Go TUI framework by Charm",
+    icon: TerminalIcon,
+    command: "npx degit charmbracelet/bubbletea-app-template",
+    projectNamePlaceholder: "my-tui-app",
+    color: "text-pink-300",
+    category: "tooling",
+    url: "https://github.com/charmbracelet/bubbletea",
   },
   {
     id: "turborepo",
@@ -481,6 +936,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-turborepo",
     color: "text-pink-500",
     category: "tooling",
+    url: "https://turbo.build/repo",
   },
   {
     id: "t3",
@@ -491,16 +947,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-t3-app",
     color: "text-violet-500",
     category: "tooling",
-  },
-  {
-    id: "payload",
-    name: "Payload CMS",
-    description: "Headless CMS for Next.js",
-    icon: Database,
-    command: "npx create-payload-app@latest",
-    projectNamePlaceholder: "my-payload-app",
-    color: "text-blue-500",
-    category: "tooling",
+    url: "https://create.t3.gg/",
   },
   {
     id: "docusaurus",
@@ -511,6 +958,7 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-docs",
     color: "text-green-500",
     category: "tooling",
+    url: "https://docusaurus.io/",
   },
   {
     id: "storybook",
@@ -521,6 +969,40 @@ const TEMPLATES: TemplateDefinition[] = [
     projectNamePlaceholder: "my-storybook",
     color: "text-pink-400",
     category: "tooling",
+    url: "https://storybook.js.org/",
+  },
+  {
+    id: "nx",
+    name: "Nx",
+    description: "Monorepo + generators + task graph",
+    icon: Boxes,
+    command: "npx create-nx-workspace@latest",
+    projectNamePlaceholder: "my-nx-workspace",
+    color: "text-slate-200",
+    category: "tooling",
+    url: "https://nx.dev/",
+  },
+  {
+    id: "playwright",
+    name: "Playwright",
+    description: "End-to-end testing scaffolder",
+    icon: TerminalIcon,
+    command: "npm init playwright@latest",
+    projectNamePlaceholder: "my-playwright-tests",
+    color: "text-emerald-200",
+    category: "tooling",
+    url: "https://playwright.dev/",
+  },
+  {
+    id: "shadcn",
+    name: "shadcn/ui",
+    description: "Add component system to your app",
+    icon: Book,
+    command: "npx shadcn@latest init",
+    projectNamePlaceholder: "my-shadcn-app",
+    color: "text-slate-100",
+    category: "tooling",
+    url: "https://ui.shadcn.com/",
   },
 ];
 
@@ -723,17 +1205,29 @@ export function ProjectTemplatesPopup({
             {template.description}
           </div>
         </div>
-        <button
-          onClick={(e) => toggleFavorite(template.id, e)}
-          className={cn(
-            "absolute top-2 right-2 p-1 rounded transition-all",
-            isFavorite
-              ? "text-yellow-400 opacity-100"
-              : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-yellow-400",
-          )}
-        >
-          <Star className={cn("w-4 h-4", isFavorite && "fill-yellow-400")} />
-        </button>
+        <div className="absolute top-2 right-2 flex items-center gap-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              open(template.url);
+            }}
+            className="p-1 rounded text-text-secondary opacity-0 group-hover:opacity-100 hover:text-accent transition-all"
+            title="Open documentation"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => toggleFavorite(template.id, e)}
+            className={cn(
+              "p-1 rounded transition-all",
+              isFavorite
+                ? "text-yellow-400 opacity-100"
+                : "text-text-secondary opacity-0 group-hover:opacity-100 hover:text-yellow-400",
+            )}
+          >
+            <Star className={cn("w-4 h-4", isFavorite && "fill-yellow-400")} />
+          </button>
+        </div>
       </button>
     );
   };
@@ -813,23 +1307,38 @@ export function ProjectTemplatesPopup({
     return (
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-3 pb-3 border-b border-border">
-          <IconButton size="sm" onClick={handleBack} aria-label="Go back to template selection">
+          <IconButton
+            size="sm"
+            onClick={handleBack}
+            aria-label="Go back to template selection"
+          >
             <ArrowLeft className="w-4 h-4" />
           </IconButton>
           <div className={selectedTemplate.color}>
             <Icon className="w-5 h-5" />
           </div>
-          <div>
+          <div className="flex-1">
             <div className="font-medium">{selectedTemplate.name}</div>
             <div className="text-xs text-text-secondary">
               {selectedTemplate.description}
             </div>
           </div>
+          <button
+            onClick={() => open(selectedTemplate.url)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded text-xs text-text-secondary hover:text-accent hover:bg-bg-hover transition-colors"
+            title="View documentation"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Docs
+          </button>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label htmlFor="template-project-name" className="block text-sm font-medium text-text-secondary mb-1.5">
+            <label
+              htmlFor="template-project-name"
+              className="block text-sm font-medium text-text-secondary mb-1.5"
+            >
               Project Name
             </label>
             <input
@@ -986,7 +1495,11 @@ export function ProjectTemplatesPopup({
       <Modal
         isOpen={isOpen}
         onClose={onClose}
-        title={phase === "select" ? `Starter Template Library (${TEMPLATES.length})` : undefined}
+        title={
+          phase === "select"
+            ? `Starter Template Library (${TEMPLATES.length})`
+            : undefined
+        }
         size={phase === "running" ? "xl" : "lg"}
         showCloseButton={phase !== "running"}
       >

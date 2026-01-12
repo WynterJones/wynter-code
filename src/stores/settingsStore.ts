@@ -250,7 +250,7 @@ export const useSettingsStore = create<SettingsStore>()(
       terminalShell: "system",
       terminalFontSize: 13,
       terminalCursorBlink: true,
-      terminalAnsiFilter: false, // Disabled by default, enable for Claude Code
+      terminalAnsiFilter: true, // Enabled by default to fix Claude Code blank lines
       useMultiPanelLayout: false,
       userAvatar: null,
       claudeSafeMode: true, // Enabled by default for safety

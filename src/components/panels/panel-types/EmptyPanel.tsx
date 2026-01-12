@@ -1,4 +1,4 @@
-import { MessageSquare, Terminal, FolderOpen, FileCode, FileText, Tractor, Globe, Youtube } from "lucide-react";
+import { MessageSquare, Terminal, FolderOpen, FileCode, FileText, Tractor, Globe, Youtube, Kanban, CircleDot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PanelContentProps, PanelType } from "@/types/panel";
 
@@ -50,6 +50,18 @@ const PANEL_OPTIONS: { type: PanelType; name: string; icon: React.ComponentType<
     name: "YouTube",
     icon: Youtube,
     description: "Watch videos",
+  },
+  {
+    type: "kanban-board",
+    name: "Workspace Board",
+    icon: Kanban,
+    description: "Kanban tasks view",
+  },
+  {
+    type: "beads-board",
+    name: "Issues Board",
+    icon: CircleDot,
+    description: "Beads issues view",
   },
 ];
 

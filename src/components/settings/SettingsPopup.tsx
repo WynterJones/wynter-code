@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { cn } from "@/lib/utils";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import { IconButton, Tooltip, ScrollArea, Slider } from "@/components/ui";
 import {
   useSettingsStore,
@@ -36,6 +37,9 @@ interface SettingsPopupProps {
 }
 
 export function SettingsPopup({ onClose, initialTab = "general" }: SettingsPopupProps) {
+  // Register with popup registry so farmwork mini player hides when settings is open
+  usePopupVisibility(true);
+
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
 
   const handleKeyDown = useCallback(

@@ -11,6 +11,8 @@ import {
   Globe,
   Youtube,
   Plus,
+  Kanban,
+  CircleDot,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { PanelType, PanelState } from "@/types/panel";
@@ -26,6 +28,8 @@ const PANEL_ICONS: Record<PanelType, React.ComponentType<{ className?: string }>
   "farmwork-stats": Tractor,
   "browser-preview": Globe,
   "youtube-embed": Youtube,
+  "kanban-board": Kanban,
+  "beads-board": CircleDot,
 };
 
 interface PanelHeaderProps {

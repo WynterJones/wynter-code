@@ -1,11 +1,11 @@
 {
-  "version": "1.1.1",
-  "notes": "Release v1.1.1",
-  "pub_date": "2025-12-29T19:57:56Z",
+  "version": "1.1.7",
+  "notes": "Release v1.1.7",
+  "pub_date": "2026-01-10T15:40:52Z",
   "platforms": {
     "darwin-aarch64": {
-      "url": "https://github.com/WynterJones/wynter-code/releases/download/v1.1.1/Wynter.Code_1.1.1_aarch64.dmg",
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQlZFTmRJQnZyRnUxcm9EOE9NUEozRkdzVUhiL0QrTHBXN2V3alNQbFRHVVlYSnJtRnB1MHNUenBTS1JkMWF1ZmY3T09DWlJ2MDJ2L0tNZUc0aXoyVWtrcllVelFqb2d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY3MDM4Mjc2CWZpbGU6V3ludGVyIENvZGVfMS4xLjFfYWFyY2g2NC5kbWcKMWpLaEdzeVY2NW9XQ3lnZnlOT0ZjUkRpRTVVeCtNbnFxQjBucXZMbmJxRUpxWHlvbkFPRFVoUTNFSytHanVoUUdKWEd2TWFtbWRWZWVzNW02d09zRFE9PQo="
+      "url": "https://github.com/WynterJones/wynter-code/releases/download/v1.1.7/Wynter.Code_1.1.7_aarch64.app.tar.gz",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUQlZFTmRJQnZyRmw5Y0NhZ0pDRkN4SkRZSnM2L09mRzZJSEFkRzVmRkRqckVrUm1yWWNIWnNyMExIZ3ZwbHp6M3J4K1c0K0orYmcrRFVkc3BhZWo0UFIzL2ZjUUtxWEE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY4MDU5NjUyCWZpbGU6V3ludGVyLkNvZGVfMS4xLjdfYWFyY2g2NC5hcHAudGFyLmd6CmVXR0FqMUFBRGdpR3RYV21CamZrL2FGTzMxRlNxV0JQbjlhamZxTk9VRTlId3JZNEswaE84K1hFMXJXUFZibzdodWVaQ3c3ZnRrRW1WQ1pscnJZb0J3PT0K"
     }
   }
 }

@@ -13,6 +13,8 @@
 /// - ~/.local/bin (pip-installed tools, claude-code)
 /// - /usr/local/bin (Homebrew on Intel Macs)
 /// - /opt/homebrew/bin (Homebrew on Apple Silicon)
+/// - ~/.asdf/shims (asdf version manager)
+/// - ~/.local/share/pnpm (pnpm global bin)
 /// - ~/.nvm/versions/node/*/bin (dynamically detected nvm versions)
 /// - The current PATH
 pub fn get_enhanced_path() -> String {
@@ -25,6 +27,8 @@ pub fn get_enhanced_path() -> String {
 
     let mut paths = vec![
         format!("{}/.local/bin", home),
+        format!("{}/.asdf/shims", home),
+        format!("{}/.local/share/pnpm", home),
         "/usr/local/bin".to_string(),
         "/opt/homebrew/bin".to_string(),
     ];

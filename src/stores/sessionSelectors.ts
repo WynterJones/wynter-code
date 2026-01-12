@@ -12,10 +12,11 @@ import type { Message, Session } from '@/types';
 /**
  * Get streaming state for a specific session.
  * Only re-renders when this session's streaming state changes.
+ * Note: Removed useShallow to avoid infinite loop issues with conditional selectors.
  */
 export function useStreamingState(sessionId: string | undefined): StreamingState | null {
   return useSessionStore(
-    useShallow((state) => (sessionId ? state.streamingState.get(sessionId) ?? null : null))
+    (state) => (sessionId ? state.streamingState.get(sessionId) ?? null : null)
   );
 }
 
@@ -32,10 +33,11 @@ export function useMessages(sessionId: string | undefined): Message[] {
 /**
  * Get Claude session state (model, tools, etc).
  * Only re-renders when this session's Claude state changes.
+ * Note: Removed useShallow to avoid infinite loop issues with conditional selectors.
  */
 export function useClaudeSessionState(sessionId: string | undefined): ClaudeSessionInfo | undefined {
   return useSessionStore(
-    useShallow((state) => (sessionId ? state.claudeSessionState.get(sessionId) : undefined))
+    (state) => (sessionId ? state.claudeSessionState.get(sessionId) : undefined)
   );
 }
 
@@ -62,16 +64,15 @@ export function useProjectSessions(projectId: string): Session[] {
 /**
  * Get the current active session object.
  * Only re-renders when the active session changes.
+ * Note: Removed useShallow to avoid infinite loop issues with conditional selectors.
  */
 export function useActiveSession(projectId: string): Session | undefined {
-  return useSessionStore(
-    useShallow((state) => {
-      const activeId = state.activeSessionId.get(projectId);
-      if (!activeId) return undefined;
-      const sessions = state.sessions.get(projectId);
-      return sessions?.find(s => s.id === activeId);
-    })
-  );
+  return useSessionStore((state) => {
+    const activeId = state.activeSessionId.get(projectId);
+    if (!activeId) return undefined;
+    const sessions = state.sessions.get(projectId);
+    return sessions?.find(s => s.id === activeId);
+  });
 }
 
 /**
@@ -91,10 +92,11 @@ export function useIsStreaming(sessionId: string | undefined): boolean {
 /**
  * Get context stats for a session.
  * Only re-renders when stats change.
+ * Note: Removed useShallow to avoid infinite loop issues with conditional selectors.
  */
 export function useContextStats(sessionId: string | undefined) {
   return useSessionStore(
-    useShallow((state) => (sessionId ? state.sessionContextStats.get(sessionId) : undefined))
+    (state) => (sessionId ? state.sessionContextStats.get(sessionId) : undefined)
   );
 }
 

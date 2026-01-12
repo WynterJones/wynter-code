@@ -21,6 +21,7 @@ import { OutdatedPackagesView } from "./views/OutdatedPackagesView";
 import { TapsManagerView } from "./views/TapsManagerView";
 import { DoctorView } from "./views/DoctorView";
 import { PackageDetailPanel } from "./PackageDetailPanel";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import type { HomebrewTool } from "./types";
 
 interface HomebrewManagerPopupProps {
@@ -80,6 +81,9 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
 export function HomebrewManagerPopup({ isOpen, onClose, initialView }: HomebrewManagerPopupProps) {
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(isOpen);
+
   const [activeTool, setActiveTool] = useState("installed");
   const {
     isBrewInstalled,

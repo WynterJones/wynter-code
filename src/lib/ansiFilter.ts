@@ -26,6 +26,15 @@ const PROBLEMATIC_SEQUENCES = [
   `${ESC}[3;J`,
 ];
 
+// Regex to match CRLF (Windows-style line endings)
+// Claude Code CLI sends \r\n which causes extra blank lines in xterm.js
+const CRLF_REGEX = /\r\n/g;
+
+// Regex to match newline after cursor-to-column-1 (CSI G)
+// Claude Code sends \x1b[G\r\n which creates an extra blank line
+// After CRLF normalization, this becomes \x1b[G\n - remove the \n
+const CURSOR_HOME_NEWLINE_REGEX = /\x1b\[G\n/g;
+
 // Regex to match excessive consecutive newlines (3 or more)
 const EXCESSIVE_NEWLINES_REGEX = /\n{3,}/g;
 
@@ -45,16 +54,28 @@ export function filterAnsiSequences(
   options: {
     filterClearScrollback?: boolean;
     filterExcessiveNewlines?: boolean;
+    normalizeCRLF?: boolean;
     maxConsecutiveNewlines?: number;
   } = {}
 ): string {
   const {
     filterClearScrollback = true,
     filterExcessiveNewlines = true,
+    normalizeCRLF = true,
     maxConsecutiveNewlines = 2,
   } = options;
 
   let result = data;
+
+  // Normalize CRLF to LF first (before other processing)
+  // Claude Code CLI and other TUI apps send \r\n which causes
+  // extra blank lines when xterm.js processes both \r and \n
+  if (normalizeCRLF) {
+    result = result.replace(CRLF_REGEX, "\n");
+    // Also remove newlines after cursor-to-column-1 (ESC[G)
+    // This pattern creates blank lines at the top of status bar redraws
+    result = result.replace(CURSOR_HOME_NEWLINE_REGEX, "\x1b[G");
+  }
 
   // Filter clear scrollback sequences
   if (filterClearScrollback) {

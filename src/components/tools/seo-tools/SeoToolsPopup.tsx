@@ -24,6 +24,7 @@ import { LlmsTxtGenerator } from "./tools/LlmsTxtGenerator";
 import { SitemapGenerator } from "./tools/SitemapGenerator";
 import { HreflangGenerator } from "./tools/HreflangGenerator";
 import { CanonicalUrlHelper } from "./tools/CanonicalUrlHelper";
+import { usePopupVisibility } from "@/stores/popupRegistryStore";
 import type { SeoTool } from "./types";
 
 interface SeoToolsPopupProps {
@@ -72,6 +73,9 @@ const TOOL_CATEGORIES: ToolCategory[] = [
 const ALL_TOOLS = TOOL_CATEGORIES.flatMap((cat) => cat.tools);
 
 export function SeoToolsPopup({ isOpen, onClose, initialTool }: SeoToolsPopupProps) {
+  // Register with popup registry so farmwork mini player hides when popup is open
+  usePopupVisibility(isOpen);
+
   const [activeTool, setActiveTool] = useState("meta-tags");
 
   // Set initial tool when provided

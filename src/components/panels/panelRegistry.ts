@@ -88,6 +88,24 @@ const PANEL_TYPES: Record<PanelType, PanelTypeConfig> = {
     canHaveMultiple: true,
     requiresProtection: false,
   },
+
+  "kanban-board": {
+    id: "kanban-board",
+    name: "Workspace Board",
+    icon: "Kanban",
+    defaultTitle: "Workspace Board",
+    canHaveMultiple: true,
+    requiresProtection: false,
+  },
+
+  "beads-board": {
+    id: "beads-board",
+    name: "Issues Board",
+    icon: "CircleDot",
+    defaultTitle: "Issues Board",
+    canHaveMultiple: true,
+    requiresProtection: false,
+  },
 };
 
 /** Get all panel types as an array for UI rendering */

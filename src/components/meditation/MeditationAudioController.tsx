@@ -1,5 +1,5 @@
-import { useRef, useEffect, useCallback } from "react";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { useRef, useEffect, useCallback, useState } from "react";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useStreamMetadata } from "@/hooks/useStreamMetadata";
@@ -35,13 +35,16 @@ export function MeditationAudioController() {
   const { audioSourceType, nightrideStation, currentRadioBrowserStation } =
     useSettingsStore();
 
+  // State for proxied stream URL
+  const [proxiedStreamUrl, setProxiedStreamUrl] = useState<string | null>(null);
+
   // Determine audio source based on settings
-  const getAudioSource = useCallback((): { url: string; isStream: boolean } => {
+  const getAudioSource = useCallback((): { url: string; isStream: boolean; rawStreamUrl?: string } => {
     // Nightride.fm radio
     if (audioSourceType === "nightride") {
       const station = getNightrideStationBySlug(nightrideStation);
       const url = station?.streamUrl || NIGHTRIDE_STATIONS[0].streamUrl;
-      return { url, isStream: true };
+      return { url, isStream: true, rawStreamUrl: url };
     }
 
     // Radio Browser station
@@ -49,6 +52,7 @@ export function MeditationAudioController() {
       return {
         url: currentRadioBrowserStation.streamUrl,
         isStream: true,
+        rawStreamUrl: currentRadioBrowserStation.streamUrl,
       };
     }
 
@@ -66,7 +70,27 @@ export function MeditationAudioController() {
     return { url, isStream: false };
   }, [audioSourceType, nightrideStation, currentRadioBrowserStation, tracks, currentTrack]);
 
-  const { url: audioSrc, isStream } = getAudioSource();
+  const { url: directUrl, isStream, rawStreamUrl } = getAudioSource();
+
+  // Get proxied URL for streams (to bypass CSP in production)
+  useEffect(() => {
+    if (isStream && rawStreamUrl) {
+      invoke<string>("get_audio_proxy_url", { streamUrl: rawStreamUrl })
+        .then((proxiedUrl) => {
+          setProxiedStreamUrl(proxiedUrl);
+        })
+        .catch((err) => {
+          console.error("Failed to get proxied stream URL:", err);
+          // Fallback to direct URL (works in dev mode)
+          setProxiedStreamUrl(rawStreamUrl);
+        });
+    } else {
+      setProxiedStreamUrl(null);
+    }
+  }, [isStream, rawStreamUrl]);
+
+  // Use proxied URL for streams, direct URL for local files
+  const audioSrc = isStream ? (proxiedStreamUrl || "") : directUrl;
 
   // Update stream state in store and hide visualizer for streams
   useEffect(() => {
@@ -76,8 +100,8 @@ export function MeditationAudioController() {
     setShowVisualizer(!isStream);
   }, [isStream, setIsStream, setShowVisualizer]);
 
-  // Stream metadata polling (only for streams)
-  const metadata = useStreamMetadata(isStream ? audioSrc : null, isPlaying);
+  // Stream metadata polling (only for streams) - use raw URL for metadata detection
+  const metadata = useStreamMetadata(isStream ? (rawStreamUrl || null) : null, isPlaying);
 
   useEffect(() => {
     setStreamMetadata(metadata);

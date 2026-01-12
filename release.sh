@@ -34,24 +34,30 @@ if [ -z "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" ]; then
 fi
 
 # Step 1: Bump version
-echo -e "${GREEN}[1/5] Bumping version ($1)...${NC}"
+echo -e "${GREEN}[1/6] Bumping version ($1)...${NC}"
 pnpm version:$1
 NEW_VERSION=$(node -p "require('./package.json').version")
 echo -e "New version: ${GREEN}v${NEW_VERSION}${NC}\n"
 
 # Step 2: Build
-echo -e "${GREEN}[2/5] Building app...${NC}"
+echo -e "${GREEN}[2/6] Building app...${NC}"
 pnpm tauri build
 echo ""
 
-# Step 3: Sign DMG
-DMG_PATH="src-tauri/target/release/bundle/dmg/Wynter Code_${NEW_VERSION}_aarch64.dmg"
-echo -e "${GREEN}[3/5] Signing DMG...${NC}"
-SIGNATURE=$(pnpm tauri signer sign "$DMG_PATH" -k "$(cat ~/.tauri/wynter-code.key)" 2>&1 | grep "^dW50cnVzdGVk" || true)
+# Step 3: Create .app.tar.gz for updater (Tauri updater requires .tar.gz, not .dmg)
+APP_PATH="src-tauri/target/release/bundle/macos/Wynter Code.app"
+TARBALL_NAME="Wynter.Code_${NEW_VERSION}_aarch64.app.tar.gz"
+echo -e "${GREEN}[3/6] Creating tarball for updater...${NC}"
+tar -czf "$TARBALL_NAME" -C "src-tauri/target/release/bundle/macos" "Wynter Code.app"
+echo -e "Created ${TARBALL_NAME}\n"
+
+# Step 4: Sign the tarball (this is what the updater uses)
+echo -e "${GREEN}[4/6] Signing tarball for updater...${NC}"
+SIGNATURE=$(pnpm tauri signer sign "$TARBALL_NAME" -k "$(cat ~/.tauri/wynter-code.key)" 2>&1 | grep "^dW50cnVzdGVk" || true)
 
 if [ -z "$SIGNATURE" ]; then
   # Try reading from .sig file
-  SIG_FILE="${DMG_PATH}.sig"
+  SIG_FILE="${TARBALL_NAME}.sig"
   if [ -f "$SIG_FILE" ]; then
     SIGNATURE=$(cat "$SIG_FILE")
   else
@@ -61,8 +67,8 @@ if [ -z "$SIGNATURE" ]; then
 fi
 echo -e "Signature generated\n"
 
-# Step 4: Update latest.json
-echo -e "${GREEN}[4/5] Updating latest.json...${NC}"
+# Step 5: Update latest.json (points to .tar.gz for auto-updates)
+echo -e "${GREEN}[5/6] Updating latest.json...${NC}"
 cat > latest.json << EOF
 {
   "version": "${NEW_VERSION}",
@@ -70,7 +76,7 @@ cat > latest.json << EOF
   "pub_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
   "platforms": {
     "darwin-aarch64": {
-      "url": "https://github.com/WynterJones/wynter-code/releases/download/v${NEW_VERSION}/Wynter.Code_${NEW_VERSION}_aarch64.dmg",
+      "url": "https://github.com/WynterJones/wynter-code/releases/download/v${NEW_VERSION}/${TARBALL_NAME}",
       "signature": "${SIGNATURE}"
     }
   }
@@ -78,15 +84,17 @@ cat > latest.json << EOF
 EOF
 echo -e "latest.json updated\n"
 
-# Step 5: Copy DMG with proper name
-echo -e "${GREEN}[5/5] Preparing release files...${NC}"
+# Step 6: Copy DMG with proper name (for manual downloads)
+echo -e "${GREEN}[6/6] Preparing release files...${NC}"
+DMG_PATH="src-tauri/target/release/bundle/dmg/Wynter Code_${NEW_VERSION}_aarch64.dmg"
 RELEASE_DMG="Wynter.Code_${NEW_VERSION}_aarch64.dmg"
 cp "$DMG_PATH" "$RELEASE_DMG"
 echo ""
 
 echo -e "${GREEN}=== Build Complete ===${NC}\n"
 echo -e "Files ready for release:"
-echo -e "  - ${YELLOW}${RELEASE_DMG}${NC}"
+echo -e "  - ${YELLOW}${TARBALL_NAME}${NC} (for auto-updater)"
+echo -e "  - ${YELLOW}${RELEASE_DMG}${NC} (for manual download)"
 echo -e "  - ${YELLOW}latest.json${NC}"
 echo ""
 echo -e "Next steps:"
@@ -95,4 +103,4 @@ echo -e "  2. git commit -m \"v${NEW_VERSION} release\""
 echo -e "  3. git tag v${NEW_VERSION}"
 echo -e "  4. git push origin main --tags"
 echo -e "  5. Create release at: https://github.com/WynterJones/wynter-code/releases/new"
-echo -e "  6. Upload: ${YELLOW}${RELEASE_DMG}${NC} and ${YELLOW}latest.json${NC}"
+echo -e "  6. Upload: ${YELLOW}${TARBALL_NAME}${NC}, ${YELLOW}${RELEASE_DMG}${NC}, and ${YELLOW}latest.json${NC}"
