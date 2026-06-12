@@ -1,9 +1,8 @@
-export type ClaudeModel = "claude-opus-4-20250514" | "claude-sonnet-4-20250514" | "claude-3-5-haiku-20241022";
-export type CodexModel = "gpt-5.2-codex" | "gpt-5.1-codex-max" | "gpt-5.1-codex-mini";
-export type GeminiModel = "gemini-2.5-flash" | "gemini-2.5-pro" | "gemini-3-flash-preview" | "gemini-3-pro-preview";
+export type ClaudeModel = "claude-fable-5" | "claude-opus-4-8" | "claude-sonnet-4-6" | "claude-haiku-4-5";
+export type CodexModel = "gpt-5.5" | "gpt-5.4" | "gpt-5.4-mini" | "gpt-5.3-codex-spark";
 
-export type AIProvider = "claude" | "codex" | "gemini";
-export type AIModel = ClaudeModel | CodexModel | GeminiModel;
+export type AIProvider = "claude" | "codex";
+export type AIModel = ClaudeModel | CodexModel;
 
 export type SessionType = "claude" | "terminal" | "codespace";
 

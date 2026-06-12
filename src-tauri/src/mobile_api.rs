@@ -2328,7 +2328,6 @@ async fn mobile_chat(
         let result = match provider.as_str() {
             "claude" => run_claude_cli(&tx, &model, &mode, &message, &cwd, &history),
             "openai" => run_codex_cli(&tx, &model, &mode, &message, &cwd, &history),
-            "gemini" => run_gemini_cli(&tx, &model, &mode, &message, &cwd, &history),
             _ => {
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(send_error_chunk(&tx, &format!("Unknown provider: {}", provider)));
@@ -2483,6 +2482,8 @@ fn run_claude_cli(
         .env("HOME", &home)
         .env("PATH", &enhanced_path)
         .env("TERM", "xterm-256color")
+        // Subscription auth: don't let an inherited API key override the login
+        .env_remove("ANTHROPIC_API_KEY")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -2662,115 +2663,6 @@ fn process_codex_stream_json(
                             }
                         }
                     }
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-// Run Gemini CLI
-fn run_gemini_cli(
-    tx: &tokio::sync::mpsc::Sender<Result<axum::response::sse::Event, std::convert::Infallible>>,
-    _model: &str,
-    mode: &str,
-    message: &str,
-    cwd: &str,
-    history: &[MobileChatHistoryItem],
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let enhanced_path = get_enhanced_path();
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
-
-    // Build args for gemini CLI
-    let sandbox_mode = match mode {
-        "auto" => "off",
-        _ => "on",
-    };
-
-    // Format the full prompt with history context
-    let full_prompt = if history.is_empty() {
-        message.to_string()
-    } else {
-        format!("{}{}", format_history_context(history), message)
-    };
-
-    let args = vec![
-        full_prompt,
-        "--sandbox".to_string(),
-        sandbox_mode.to_string(),
-    ];
-
-    eprintln!("[MobileChat] Running Gemini CLI in {}: {:?}", cwd, args);
-
-    let mut child = Command::new("gemini")
-        .args(&args)
-        .current_dir(cwd)
-        .env("HOME", &home)
-        .env("PATH", &enhanced_path)
-        .env("TERM", "xterm-256color")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn Gemini CLI: {}. Make sure 'gemini' is installed.", e))?;
-
-    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
-    let reader = BufReader::new(stdout);
-
-    // Process JSONL output from Gemini
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            if line.is_empty() {
-                continue;
-            }
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                process_gemini_stream_json(tx, &json);
-            } else {
-                // Plain text output
-                send_content_chunk_sync(tx, &line);
-            }
-        }
-    }
-
-    let _ = child.wait();
-    Ok(())
-}
-
-// Process Gemini stream events
-fn process_gemini_stream_json(
-    tx: &tokio::sync::mpsc::Sender<Result<axum::response::sse::Event, std::convert::Infallible>>,
-    json: &serde_json::Value,
-) {
-    let event_type = json.get("type").and_then(|t| t.as_str()).unwrap_or("");
-
-    match event_type {
-        "message" | "text" => {
-            if let Some(content) = json.get("content").and_then(|c| c.as_str()) {
-                send_content_chunk_sync(tx, content);
-            } else if let Some(text) = json.get("text").and_then(|t| t.as_str()) {
-                send_content_chunk_sync(tx, text);
-            }
-        }
-        "tool_use" | "function_call" => {
-            let tool_name = json.get("tool_name").or(json.get("name")).and_then(|n| n.as_str()).unwrap_or("tool");
-            let tool_id = json.get("tool_id").or(json.get("id")).and_then(|i| i.as_str());
-            let tool_input = json.get("parameters").or(json.get("args")).cloned();
-            send_tool_chunk_sync(tx, tool_name, tool_id, tool_input);
-        }
-        "tool_result" => {
-            let tool_id = json.get("tool_id").and_then(|i| i.as_str()).unwrap_or("");
-            let output = json.get("content").or(json.get("output")).and_then(|o| o.as_str());
-            let is_error = json.get("success").and_then(|s| s.as_bool()) == Some(false);
-            send_tool_result_chunk_sync(tx, tool_id, output, is_error);
-        }
-        "item.completed" => {
-            if let Some(item) = json.get("item") {
-                let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                if item_type == "function_call" {
-                    let tool_name = item.get("name").and_then(|n| n.as_str()).unwrap_or("tool");
-                    let tool_id = item.get("id").and_then(|i| i.as_str());
-                    send_tool_chunk_sync(tx, tool_name, tool_id, item.get("args").cloned());
-                } else if let Some(output) = item.get("output").and_then(|o| o.as_str()) {
-                    send_content_chunk_sync(tx, output);
                 }
             }
         }

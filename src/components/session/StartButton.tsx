@@ -18,10 +18,6 @@ const providers: ProviderOption[] = [
     value: "codex",
     description: "Codex CLI by OpenAI",
   },
-  {
-    value: "gemini",
-    description: "Gemini CLI by Google",
-  },
 ];
 
 interface StartButtonProps {

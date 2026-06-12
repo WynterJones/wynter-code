@@ -40,7 +40,6 @@ export interface SystemCheckResults {
   // AI tools
   claude: string | null;
   codex: string | null;
-  gemini: string | null;
   // Ruby ecosystem
   ruby: string | null;
   rails: string | null;

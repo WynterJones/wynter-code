@@ -28,7 +28,7 @@ interface CodexSessionCallbacks {
 }
 
 class CodexService {
-  private _currentModel: CodexModel = "gpt-5.2-codex";
+  private _currentModel: CodexModel = "gpt-5.5";
 
   // Per-session state Maps
   private _unlistenMap = new Map<string, UnlistenFn>();

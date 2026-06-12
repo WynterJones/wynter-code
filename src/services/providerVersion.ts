@@ -6,7 +6,6 @@ interface SystemCheckResults {
   git: string | null;
   claude: string | null;
   codex: string | null;
-  gemini: string | null;
 }
 
 let cachedResults: SystemCheckResults | null = null;
@@ -31,7 +30,6 @@ async function getSystemVersions(): Promise<SystemCheckResults> {
       git: null,
       claude: null,
       codex: null,
-      gemini: null,
     };
   }
 }
@@ -40,9 +38,3 @@ export async function getCodexVersion(): Promise<string> {
   const results = await getSystemVersions();
   return results.codex || "unknown";
 }
-
-export async function getGeminiVersion(): Promise<string> {
-  const results = await getSystemVersions();
-  return results.gemini || "unknown";
-}
-

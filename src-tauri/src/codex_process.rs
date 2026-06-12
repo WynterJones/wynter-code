@@ -1,24 +1,43 @@
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, State};
 
 use crate::commands::{create_chunk, PermissionMode, StreamChunk};
 use crate::path_utils::get_enhanced_path;
 
-/// Represents a running Codex CLI process
-struct CodexProcessInstance {
-    child: Child,
-    stdin: Option<ChildStdin>,
-    #[allow(dead_code)]
-    session_id: String,
-    thread_id: Option<String>,
-    cwd: String,
-    permission_mode: PermissionMode,
+/// What kind of JSON-RPC request we issued, so responses can be routed.
+#[derive(Clone, Debug, PartialEq)]
+enum PendingKind {
+    Initialize,
+    ThreadStart,
+    TurnStart,
 }
 
-/// Manages multiple Codex CLI processes across sessions
+/// Mutable per-session protocol state shared with the reader thread.
+struct CodexSessionState {
+    thread_id: Option<String>,
+    current_turn_id: Option<String>,
+    pending_requests: HashMap<i64, PendingKind>,
+    /// Item IDs for which we received streaming deltas (avoid duplicating
+    /// the full text when the item completes).
+    items_with_deltas: std::collections::HashSet<String>,
+    /// Prompt (text, image paths) queued before the thread is ready.
+    pending_prompt: Option<(String, Vec<String>)>,
+}
+
+/// Represents a running `codex app-server` process for one session
+struct CodexProcessInstance {
+    child: Child,
+    stdin: Arc<Mutex<Option<ChildStdin>>>,
+    state: Arc<Mutex<CodexSessionState>>,
+    next_request_id: Arc<AtomicI64>,
+    model: Option<String>,
+}
+
+/// Manages multiple Codex app-server processes across sessions
 pub struct CodexProcessManager {
     instances: Mutex<HashMap<String, CodexProcessInstance>>,
 }
@@ -37,180 +56,350 @@ impl Default for CodexProcessManager {
     }
 }
 
-/// Parse Codex JSONL event into our StreamChunk format
-fn parse_codex_chunk(json: &serde_json::Value, session_id: &str) -> Option<StreamChunk> {
-    let event_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
+fn emit_chunk(window: &tauri::Window, chunk: &StreamChunk) {
+    #[cfg(debug_assertions)]
+    if let Err(e) = window.emit("codex-stream", chunk) {
+        eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+    }
+    #[cfg(not(debug_assertions))]
+    let _ = window.emit("codex-stream", chunk);
+}
 
-    match event_type {
-        "thread.started" => {
-            let mut chunk = create_chunk("init", session_id);
-            chunk.thread_id = json
-                .get("thread_id")
+/// Write one newline-delimited JSON message to the app-server's stdin.
+fn write_message(
+    stdin: &Arc<Mutex<Option<ChildStdin>>>,
+    value: &serde_json::Value,
+) -> Result<(), String> {
+    let mut guard = stdin.lock().expect("Codex stdin mutex poisoned");
+    let writer = guard.as_mut().ok_or("Codex stdin closed")?;
+    writeln!(writer, "{}", value).map_err(|e| format!("Failed to write to Codex: {}", e))?;
+    writer
+        .flush()
+        .map_err(|e| format!("Failed to flush Codex stdin: {}", e))
+}
+
+/// Map our permission mode to app-server approval policy + sandbox mode.
+/// Mirrors the old `codex exec` flags: full-auto = workspace-write sandbox,
+/// plan/manual = read-only, bypass = no sandbox at all.
+fn mode_to_policies(mode: &PermissionMode) -> (&'static str, &'static str) {
+    match mode {
+        PermissionMode::Default | PermissionMode::AcceptEdits => ("on-request", "workspace-write"),
+        PermissionMode::Plan | PermissionMode::Manual => ("never", "read-only"),
+        PermissionMode::BypassPermissions => ("never", "danger-full-access"),
+    }
+}
+
+/// Whether server-side approval requests should be auto-accepted in this mode.
+fn mode_auto_approves(mode: &PermissionMode) -> bool {
+    !matches!(mode, PermissionMode::Plan | PermissionMode::Manual)
+}
+
+/// Build and send a `turn/start` request for the given prompt.
+fn send_turn_start(
+    stdin: &Arc<Mutex<Option<ChildStdin>>>,
+    state: &Arc<Mutex<CodexSessionState>>,
+    next_request_id: &Arc<AtomicI64>,
+    thread_id: &str,
+    text: &str,
+    images: &[String],
+    model: Option<&str>,
+) -> Result<(), String> {
+    let mut input = vec![serde_json::json!({
+        "type": "text",
+        "text": text,
+        "text_elements": [],
+    })];
+    for path in images {
+        input.push(serde_json::json!({ "type": "localImage", "path": path }));
+    }
+
+    let id = next_request_id.fetch_add(1, Ordering::SeqCst);
+    let mut params = serde_json::json!({
+        "threadId": thread_id,
+        "input": input,
+    });
+    if let Some(m) = model {
+        params["model"] = serde_json::json!(m);
+    }
+
+    {
+        let mut st = state.lock().expect("Codex state mutex poisoned");
+        st.pending_requests.insert(id, PendingKind::TurnStart);
+    }
+
+    write_message(
+        stdin,
+        &serde_json::json!({ "id": id, "method": "turn/start", "params": params }),
+    )
+}
+
+/// Handle a JSON-RPC server notification, translating it to StreamChunks.
+fn handle_notification(
+    window: &tauri::Window,
+    session_id: &str,
+    state: &Arc<Mutex<CodexSessionState>>,
+    method: &str,
+    params: &serde_json::Value,
+) {
+    let thread_id = {
+        let st = state.lock().expect("Codex state mutex poisoned");
+        st.thread_id.clone()
+    };
+
+    match method {
+        "turn/started" => {
+            if let Some(turn_id) = params
+                .pointer("/turn/id")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string());
-            chunk.subtype = Some("init".to_string());
-            Some(chunk)
-        }
-
-        "turn.started" => {
+            {
+                let mut st = state.lock().expect("Codex state mutex poisoned");
+                st.current_turn_id = Some(turn_id.to_string());
+            }
             let mut chunk = create_chunk("turn_start", session_id);
             chunk.content = Some("Turn started".to_string());
-            Some(chunk)
+            chunk.thread_id = thread_id;
+            emit_chunk(window, &chunk);
         }
 
-        "turn.completed" => {
-            let mut chunk = create_chunk("usage", session_id);
-            // Extract usage from turn events
-            if let Some(usage) = json.get("usage") {
-                chunk.input_tokens = usage.get("input_tokens").and_then(|v| v.as_u64());
-                chunk.output_tokens = usage.get("output_tokens").and_then(|v| v.as_u64());
-                chunk.cache_read_tokens = usage.get("cached_input_tokens").and_then(|v| v.as_u64());
-            }
-            Some(chunk)
-        }
-
-        "turn.failed" => {
-            let mut chunk = create_chunk("error", session_id);
-            chunk.is_error = Some(true);
-            chunk.content = json
-                .get("error")
-                .and_then(|e| e.get("message"))
-                .and_then(|m| m.as_str())
-                .map(|s| s.to_string())
-                .or_else(|| Some("Turn failed".to_string()));
-            Some(chunk)
-        }
-
-        "item.started" => {
-            if let Some(item) = json.get("item") {
-                let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                match item_type {
-                    "command_execution" => {
-                        let mut chunk = create_chunk("tool_start", session_id);
-                        chunk.tool_name = Some("Bash".to_string());
-                        chunk.tool_id = item
-                            .get("id")
-                            .and_then(|i| i.as_str())
-                            .map(|s| s.to_string());
-                        // Use serde_json to properly escape the command string
-                        chunk.tool_input = item
-                            .get("command")
-                            .and_then(|c| c.as_str())
-                            .map(|s| {
-                                serde_json::json!({"command": s}).to_string()
-                            });
-                        return Some(chunk);
-                    }
-                    "file_change" | "file_read" | "file_write" => {
-                        let mut chunk = create_chunk("tool_start", session_id);
-                        chunk.tool_name = Some(match item_type {
-                            "file_read" => "Read",
-                            "file_write" => "Write",
-                            _ => "Edit",
-                        }.to_string());
-                        chunk.tool_id = item
-                            .get("id")
-                            .and_then(|i| i.as_str())
-                            .map(|s| s.to_string());
-                        // Use serde_json to properly escape the file path
-                        chunk.tool_input = item
-                            .get("path")
-                            .and_then(|p| p.as_str())
-                            .map(|s| {
-                                serde_json::json!({"file_path": s}).to_string()
-                            });
-                        return Some(chunk);
-                    }
-                    "agent_message" | "message" => {
-                        let mut chunk = create_chunk("text", session_id);
-                        chunk.content = item
-                            .get("content")
-                            .and_then(|c| c.as_str())
-                            .map(|s| s.to_string());
-                        return Some(chunk);
-                    }
-                    "reasoning" => {
-                        let mut chunk = create_chunk("thinking", session_id);
-                        chunk.content = item
-                            .get("content")
-                            .and_then(|c| c.as_str())
-                            .map(|s| s.to_string());
-                        return Some(chunk);
-                    }
-                    _ => {}
+        "item/agentMessage/delta" => {
+            if let (Some(item_id), Some(delta)) = (
+                params.get("itemId").and_then(|v| v.as_str()),
+                params.get("delta").and_then(|v| v.as_str()),
+            ) {
+                {
+                    let mut st = state.lock().expect("Codex state mutex poisoned");
+                    st.items_with_deltas.insert(item_id.to_string());
                 }
+                let mut chunk = create_chunk("text", session_id);
+                chunk.content = Some(delta.to_string());
+                chunk.thread_id = thread_id;
+                emit_chunk(window, &chunk);
             }
-            None
         }
 
-        "item.completed" => {
-            if let Some(item) = json.get("item") {
-                let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
+        "item/started" => {
+            let Some(item) = params.get("item") else { return };
+            let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
+            let item_id = item.get("id").and_then(|i| i.as_str()).map(String::from);
 
-                // Handle different item types
-                match item_type {
-                    "agent_message" | "message" => {
-                        // Text response - use "text" field from Codex
+            match item_type {
+                "commandExecution" => {
+                    let mut chunk = create_chunk("tool_start", session_id);
+                    chunk.tool_name = Some("Bash".to_string());
+                    chunk.tool_id = item_id;
+                    chunk.tool_input = item
+                        .get("command")
+                        .and_then(|c| c.as_str())
+                        .map(|s| serde_json::json!({ "command": s }).to_string());
+                    chunk.thread_id = thread_id;
+                    emit_chunk(window, &chunk);
+                }
+                "fileChange" => {
+                    let mut chunk = create_chunk("tool_start", session_id);
+                    chunk.tool_name = Some("Edit".to_string());
+                    chunk.tool_id = item_id;
+                    chunk.tool_input = item
+                        .pointer("/changes/0/path")
+                        .and_then(|p| p.as_str())
+                        .map(|s| serde_json::json!({ "file_path": s }).to_string());
+                    chunk.thread_id = thread_id;
+                    emit_chunk(window, &chunk);
+                }
+                "mcpToolCall" => {
+                    let mut chunk = create_chunk("tool_start", session_id);
+                    let tool = item.get("tool").and_then(|t| t.as_str()).unwrap_or("MCP");
+                    chunk.tool_name = Some(tool.to_string());
+                    chunk.tool_id = item_id;
+                    chunk.tool_input = item.get("arguments").map(|a| a.to_string());
+                    chunk.thread_id = thread_id;
+                    emit_chunk(window, &chunk);
+                }
+                _ => {}
+            }
+        }
+
+        "item/completed" => {
+            let Some(item) = params.get("item") else { return };
+            let item_type = item.get("type").and_then(|t| t.as_str()).unwrap_or("");
+            let item_id = item.get("id").and_then(|i| i.as_str()).unwrap_or("");
+
+            match item_type {
+                "agentMessage" => {
+                    // Only emit the full text if it wasn't already streamed via deltas
+                    let already_streamed = {
+                        let st = state.lock().expect("Codex state mutex poisoned");
+                        st.items_with_deltas.contains(item_id)
+                    };
+                    if !already_streamed {
                         let mut chunk = create_chunk("text", session_id);
                         chunk.content = item
                             .get("text")
                             .and_then(|t| t.as_str())
-                            .map(|s| s.to_string());
-                        return Some(chunk);
-                    }
-                    "reasoning" => {
-                        // Thinking/reasoning - use "text" field
-                        let mut chunk = create_chunk("thinking", session_id);
-                        chunk.content = item
-                            .get("text")
-                            .and_then(|t| t.as_str())
-                            .map(|s| s.to_string());
-                        return Some(chunk);
-                    }
-                    _ => {
-                        // Tool result or other
-                        let mut chunk = create_chunk("tool_result", session_id);
-                        chunk.tool_id = item
-                            .get("id")
-                            .and_then(|i| i.as_str())
-                            .map(|s| s.to_string());
-                        let status = item
-                            .get("status")
-                            .and_then(|s| s.as_str())
-                            .unwrap_or("");
-                        chunk.tool_is_error = Some(status == "failed" || status == "error");
-                        chunk.content = item
-                            .get("output")
-                            .and_then(|o| o.as_str())
-                            .map(|s| s.to_string());
-                        return Some(chunk);
+                            .map(String::from);
+                        chunk.thread_id = thread_id;
+                        emit_chunk(window, &chunk);
                     }
                 }
+                "reasoning" => {
+                    // Each summary entry is a discrete thought; the frontend
+                    // renders one bullet per chunk
+                    let parts = item
+                        .get("summary")
+                        .and_then(|s| s.as_array())
+                        .filter(|a| !a.is_empty())
+                        .or_else(|| item.get("content").and_then(|c| c.as_array()));
+                    if let Some(parts) = parts {
+                        for part in parts {
+                            if let Some(text) = part.as_str() {
+                                if text.is_empty() {
+                                    continue;
+                                }
+                                let mut chunk = create_chunk("thinking", session_id);
+                                chunk.content = Some(text.to_string());
+                                chunk.thread_id = thread_id.clone();
+                                emit_chunk(window, &chunk);
+                            }
+                        }
+                    }
+                }
+                "commandExecution" => {
+                    let mut chunk = create_chunk("tool_result", session_id);
+                    chunk.tool_id = Some(item_id.to_string());
+                    let exit_code = item.get("exitCode").and_then(|c| c.as_i64());
+                    let status = item.get("status").and_then(|s| s.as_str()).unwrap_or("");
+                    chunk.tool_is_error =
+                        Some(matches!(exit_code, Some(c) if c != 0) || status == "failed");
+                    chunk.content = item
+                        .get("aggregatedOutput")
+                        .and_then(|o| o.as_str())
+                        .map(String::from);
+                    chunk.thread_id = thread_id;
+                    emit_chunk(window, &chunk);
+                }
+                "fileChange" => {
+                    let mut chunk = create_chunk("tool_result", session_id);
+                    chunk.tool_id = Some(item_id.to_string());
+                    let status = item.get("status").and_then(|s| s.as_str()).unwrap_or("");
+                    chunk.tool_is_error = Some(status == "failed");
+                    let paths: Vec<String> = item
+                        .get("changes")
+                        .and_then(|c| c.as_array())
+                        .map(|changes| {
+                            changes
+                                .iter()
+                                .filter_map(|ch| ch.get("path").and_then(|p| p.as_str()))
+                                .map(String::from)
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    chunk.content = Some(paths.join("\n"));
+                    chunk.thread_id = thread_id;
+                    emit_chunk(window, &chunk);
+                }
+                "mcpToolCall" | "dynamicToolCall" => {
+                    let mut chunk = create_chunk("tool_result", session_id);
+                    chunk.tool_id = Some(item_id.to_string());
+                    chunk.tool_is_error = Some(item.get("error").map_or(false, |e| !e.is_null()));
+                    chunk.content = item.get("result").map(|r| r.to_string());
+                    chunk.thread_id = thread_id;
+                    emit_chunk(window, &chunk);
+                }
+                _ => {}
             }
-            None
+        }
+
+        "thread/tokenUsage/updated" => {
+            if let Some(total) = params.pointer("/tokenUsage/total") {
+                let mut chunk = create_chunk("usage", session_id);
+                chunk.input_tokens = total.get("inputTokens").and_then(|v| v.as_u64());
+                chunk.output_tokens = total.get("outputTokens").and_then(|v| v.as_u64());
+                chunk.cache_read_tokens = total.get("cachedInputTokens").and_then(|v| v.as_u64());
+                chunk.thread_id = thread_id;
+                emit_chunk(window, &chunk);
+            }
+        }
+
+        "turn/completed" => {
+            {
+                let mut st = state.lock().expect("Codex state mutex poisoned");
+                st.current_turn_id = None;
+                st.items_with_deltas.clear();
+            }
+            let status = params
+                .pointer("/turn/status")
+                .and_then(|s| s.as_str())
+                .unwrap_or("");
+            if status == "failed" {
+                let mut err_chunk = create_chunk("error", session_id);
+                err_chunk.is_error = Some(true);
+                err_chunk.content = params
+                    .pointer("/turn/error/message")
+                    .and_then(|m| m.as_str())
+                    .map(String::from)
+                    .or_else(|| Some("Turn failed".to_string()));
+                err_chunk.thread_id = thread_id.clone();
+                emit_chunk(window, &err_chunk);
+            }
+            let mut chunk = create_chunk("result", session_id);
+            chunk.content = Some("Turn completed".to_string());
+            chunk.thread_id = thread_id;
+            emit_chunk(window, &chunk);
         }
 
         "error" => {
             let mut chunk = create_chunk("error", session_id);
             chunk.is_error = Some(true);
-            chunk.content = json
-                .get("message")
+            chunk.content = params
+                .pointer("/error/message")
                 .and_then(|m| m.as_str())
-                .map(|s| s.to_string())
-                .or_else(|| {
-                    json.get("error")
-                        .and_then(|e| e.as_str())
-                        .map(|s| s.to_string())
-                });
-            Some(chunk)
+                .map(String::from)
+                .or_else(|| Some("Codex error".to_string()));
+            chunk.thread_id = thread_id;
+            emit_chunk(window, &chunk);
         }
 
-        _ => None,
+        _ => {}
     }
 }
 
-/// Start a persistent Codex CLI session
-/// User sends prompts via send_codex_input, receives responses via events
+/// Respond to a server-initiated request (approvals etc.) based on the
+/// session's permission mode.
+fn handle_server_request(
+    stdin: &Arc<Mutex<Option<ChildStdin>>>,
+    permission_mode: &PermissionMode,
+    id: &serde_json::Value,
+    method: &str,
+) {
+    let approve = mode_auto_approves(permission_mode);
+    let result = match method {
+        // Legacy approval requests use ReviewDecision values
+        "execCommandApproval" | "applyPatchApproval" => Some(serde_json::json!({
+            "decision": if approve { "approved" } else { "denied" }
+        })),
+        // v2 item approval requests use accept/decline
+        "item/commandExecution/requestApproval"
+        | "item/fileChange/requestApproval"
+        | "item/permissions/requestApproval" => Some(serde_json::json!({
+            "decision": if approve { "accept" } else { "decline" }
+        })),
+        _ => None,
+    };
+
+    let response = match result {
+        Some(result) => serde_json::json!({ "id": id, "result": result }),
+        None => serde_json::json!({
+            "id": id,
+            "error": { "code": -32601, "message": format!("Unsupported request: {}", method) }
+        }),
+    };
+
+    if let Err(e) = write_message(stdin, &response) {
+        eprintln!("[Codex] Failed to respond to server request {}: {}", method, e);
+    }
+}
+
+/// Start a persistent Codex session backed by `codex app-server` (JSON-RPC).
+/// User sends prompts via send_codex_input, receives responses via events.
 #[tauri::command]
 pub async fn start_codex_session(
     window: tauri::Window,
@@ -235,90 +424,44 @@ pub async fn start_codex_session(
     let mut mode = permission_mode.unwrap_or_default();
     let is_safe_mode = safe_mode.unwrap_or(true);
 
-    // Safe mode: prevent bypassPermissions (--yolo) for safety
+    // Safe mode: prevent bypassPermissions for safety
     if is_safe_mode && mode == PermissionMode::BypassPermissions {
-        eprintln!("[Codex] Safe mode enabled: downgrading bypassPermissions to acceptEdits (--full-auto)");
+        eprintln!("[Codex] Safe mode enabled: downgrading bypassPermissions to acceptEdits");
         mode = PermissionMode::AcceptEdits;
     }
 
-    // Build args for Codex exec mode with JSON output
-    let mut args = vec![
-        "exec".to_string(),
-        "--json".to_string(),
-        "--skip-git-repo-check".to_string(),
-    ];
-
-    // Map permission modes to Codex CLI flags
-    match mode {
-        PermissionMode::Default => {
-            // Default behavior: use --full-auto for sandboxed execution with approvals
-            args.push("--full-auto".to_string());
-        }
-        PermissionMode::Plan => {
-            args.push("--sandbox".to_string());
-            args.push("read-only".to_string());
-        }
-        PermissionMode::AcceptEdits => {
-            args.push("--full-auto".to_string());
-        }
-        PermissionMode::BypassPermissions => {
-            args.push("--dangerously-bypass-approvals-and-sandbox".to_string());
-        }
-        PermissionMode::Manual => {
-            // Manual mode: use read-only sandbox for maximum safety
-            eprintln!("[Codex] Manual mode: using read-only sandbox");
-            args.push("--sandbox".to_string());
-            args.push("read-only".to_string());
-        }
-    }
-
-    // Add model flag if specified
-    if let Some(ref model_name) = model {
-        args.push("--model".to_string());
-        args.push(model_name.clone());
-    }
-
-    // Resume with thread_id if provided
-    if let Some(ref tid) = resume_thread_id {
-        args.push("resume".to_string());
-        args.push(tid.clone());
-        eprintln!("[Codex] Resuming thread: {}", tid);
-    }
-
-    // Add initial prompt (required for exec mode)
-    if let Some(ref prompt) = initial_prompt {
-        args.push(prompt.clone());
-    } else {
-        // Codex exec needs a prompt - we'll send the real prompt via stdin
-        // Using a minimal placeholder that will be replaced
-        args.push("Hello, ready for instructions.".to_string());
-    }
-
-    // Build enhanced environment for Codex CLI
     let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
     let enhanced_path = get_enhanced_path();
 
-    eprintln!("[Codex] Starting session with args: {:?}", args);
-    eprintln!("[Codex] Working directory: {}", cwd);
-    if let Some(ref m) = model {
-        eprintln!("[Codex] Model: {}", m);
-    }
+    eprintln!("[Codex] Starting app-server session in {}", cwd);
 
     let mut child = Command::new("codex")
-        .args(&args)
+        .arg("app-server")
         .current_dir(&cwd)
         .env("HOME", &home)
         .env("PATH", &enhanced_path)
-        .env("TERM", "xterm-256color")
+        // Subscription auth: inherited API keys would override the user's
+        // ChatGPT login from ~/.codex/auth.json
+        .env_remove("OPENAI_API_KEY")
+        .env_remove("CODEX_API_KEY")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to spawn Codex CLI: {} (PATH={})", e, enhanced_path))?;
+        .map_err(|e| format!("Failed to spawn codex app-server: {} (PATH={})", e, enhanced_path))?;
 
     let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
     let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
-    let stdin = child.stdin.take();
+    let stdin = Arc::new(Mutex::new(child.stdin.take()));
+
+    let session_state = Arc::new(Mutex::new(CodexSessionState {
+        thread_id: None,
+        current_turn_id: None,
+        pending_requests: HashMap::new(),
+        items_with_deltas: std::collections::HashSet::new(),
+        pending_prompt: initial_prompt.map(|p| (p, Vec::new())),
+    }));
+    let next_request_id = Arc::new(AtomicI64::new(1));
 
     // Store the process instance
     {
@@ -327,11 +470,10 @@ pub async fn start_codex_session(
             session_id.clone(),
             CodexProcessInstance {
                 child,
-                stdin,
-                session_id: session_id.clone(),
-                thread_id: resume_thread_id.clone(),
-                cwd: cwd.clone(),
-                permission_mode: mode,
+                stdin: stdin.clone(),
+                state: session_state.clone(),
+                next_request_id: next_request_id.clone(),
+                model: model.clone(),
             },
         );
     }
@@ -340,12 +482,33 @@ pub async fn start_codex_session(
     {
         let mut chunk = create_chunk("session_starting", &session_id);
         chunk.content = Some(format!("Starting Codex session in {}", cwd));
-        #[cfg(debug_assertions)]
-        if let Err(e) = window.emit("codex-stream", &chunk) {
-            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-        }
-        #[cfg(not(debug_assertions))]
-        let _ = window.emit("codex-stream", &chunk);
+        emit_chunk(&window, &chunk);
+    }
+
+    // Send the initialize request; the reader thread drives the rest of
+    // the handshake (initialized -> thread/start -> session_ready).
+    {
+        let id = next_request_id.fetch_add(1, Ordering::SeqCst);
+        session_state
+            .lock()
+            .expect("Codex state mutex poisoned")
+            .pending_requests
+            .insert(id, PendingKind::Initialize);
+        write_message(
+            &stdin,
+            &serde_json::json!({
+                "id": id,
+                "method": "initialize",
+                "params": {
+                    "clientInfo": {
+                        "name": "wynter_code",
+                        "title": "WynterCode",
+                        "version": env!("CARGO_PKG_VERSION"),
+                    },
+                    "capabilities": null,
+                }
+            }),
+        )?;
     }
 
     // Spawn stderr reader thread
@@ -353,43 +516,36 @@ pub async fn start_codex_session(
     let session_for_stderr = session_id.clone();
     std::thread::spawn(move || {
         let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                eprintln!("[Codex STDERR] {}", line);
-                if !line.is_empty() {
-                    let mut chunk = create_chunk("stderr", &session_for_stderr);
-                    chunk.content = Some(line);
-                    #[cfg(debug_assertions)]
-                    if let Err(e) = window_for_stderr.emit("codex-stream", &chunk) {
-                        eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-                    }
-                    #[cfg(not(debug_assertions))]
-                    let _ = window_for_stderr.emit("codex-stream", &chunk);
-                }
+        for line in reader.lines().map_while(Result::ok) {
+            eprintln!("[Codex STDERR] {}", line);
+            if !line.is_empty() {
+                let mut chunk = create_chunk("stderr", &session_for_stderr);
+                chunk.content = Some(line);
+                emit_chunk(&window_for_stderr, &chunk);
             }
         }
     });
 
-    // Spawn stdout reader thread
+    // Spawn stdout reader thread - drives the JSON-RPC protocol
     let window_clone = window.clone();
     let session_for_reader = session_id.clone();
+    let manager = state.inner().clone();
+    let stdin_for_reader = stdin.clone();
+    let state_for_reader = session_state.clone();
+    let ids_for_reader = next_request_id.clone();
+    let mode_for_reader = mode.clone();
+    let model_for_reader = model.clone();
+    let cwd_for_reader = cwd.clone();
+    let resume_for_reader = resume_thread_id.clone();
 
     std::thread::spawn(move || {
-        eprintln!(
-            "[Codex] Stdout reader thread started for session: {}",
-            session_for_reader
-        );
+        eprintln!("[Codex] Reader thread started for session: {}", session_for_reader);
         let reader = BufReader::new(stdout);
-        let mut captured_thread_id: Option<String> = resume_thread_id;
-        let mut line_count = 0;
-        let mut session_ready = false;
 
-        // Dev mode only: Create JSONL log file for debugging stream output
+        // Dev mode only: JSONL log of the raw protocol for debugging
         let mut log_file = if cfg!(debug_assertions) {
             let log_dir = std::env::temp_dir().join("wynter-code");
-            if let Err(e) = std::fs::create_dir_all(&log_dir) {
-                eprintln!("[Codex] Failed to create log dir: {}", e);
-            }
+            let _ = std::fs::create_dir_all(&log_dir);
             let log_path = log_dir.join(format!("codex-{}.jsonl", session_for_reader));
             eprintln!("[Codex] JSONL log enabled: {:?}", log_path);
             std::fs::OpenOptions::new()
@@ -402,298 +558,247 @@ pub async fn start_codex_session(
             None
         };
 
-        for line in reader.lines() {
-            match line {
-                Ok(line) if !line.is_empty() => {
-                    line_count += 1;
-                    // Safely truncate at char boundary for logging
-                    let log_preview: String = line.chars().take(200).collect();
-                    eprintln!("[Codex STDOUT #{}] {}", line_count, log_preview);
+        for line in reader.lines().map_while(Result::ok) {
+            if line.is_empty() {
+                continue;
+            }
+            if let Some(ref mut file) = log_file {
+                let _ = writeln!(file, "{}", line);
+            }
 
-                    // Write raw line to JSONL log file
-                    if let Some(ref mut file) = log_file {
-                        use std::io::Write as IoWrite;
-                        let _ = writeln!(file, "{}", line);
+            let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) else {
+                continue;
+            };
+
+            let has_id = json.get("id").is_some();
+            let method = json.get("method").and_then(|m| m.as_str());
+
+            match (has_id, method) {
+                // Server-initiated request (approvals etc.)
+                (true, Some(method)) => {
+                    handle_server_request(
+                        &stdin_for_reader,
+                        &mode_for_reader,
+                        &json["id"],
+                        method,
+                    );
+                }
+
+                // Notification
+                (false, Some(method)) => {
+                    handle_notification(
+                        &window_clone,
+                        &session_for_reader,
+                        &state_for_reader,
+                        method,
+                        json.get("params").unwrap_or(&serde_json::Value::Null),
+                    );
+                }
+
+                // Response to one of our requests
+                (true, None) => {
+                    let req_id = json.get("id").and_then(|v| v.as_i64()).unwrap_or(-1);
+                    let kind = {
+                        let mut st = state_for_reader.lock().expect("Codex state mutex poisoned");
+                        st.pending_requests.remove(&req_id)
+                    };
+
+                    if let Some(error) = json.get("error").filter(|e| !e.is_null()) {
+                        let mut chunk = create_chunk("error", &session_for_reader);
+                        chunk.is_error = Some(true);
+                        chunk.content = error
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .map(String::from)
+                            .or_else(|| Some(error.to_string()));
+                        emit_chunk(&window_clone, &chunk);
+                        continue;
                     }
 
-                    // Try to parse as JSON
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                        // Capture thread ID from thread.started message
-                        let event_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                        if event_type == "thread.started" {
-                            if let Some(tid) = json.get("thread_id").and_then(|v| v.as_str()) {
-                                captured_thread_id = Some(tid.to_string());
-                                eprintln!("[Codex] Thread started! Thread ID: {}", tid);
+                    let result = json.get("result").cloned().unwrap_or(serde_json::Value::Null);
 
-                                // Emit session_ready event
-                                let mut chunk = create_chunk("session_ready", &session_for_reader);
-                                chunk.thread_id = Some(tid.to_string());
-                                chunk.content = Some(line.clone());
-                                #[cfg(debug_assertions)]
-                                if let Err(e) = window_clone.emit("codex-stream", &chunk) {
-                                    eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                    match kind {
+                        Some(PendingKind::Initialize) => {
+                            // Complete the handshake, then open the thread
+                            let _ = write_message(
+                                &stdin_for_reader,
+                                &serde_json::json!({ "method": "initialized" }),
+                            );
+
+                            let (approval, sandbox) = mode_to_policies(&mode_for_reader);
+                            let id = ids_for_reader.fetch_add(1, Ordering::SeqCst);
+                            let (method, mut params) = match resume_for_reader {
+                                Some(ref tid) => (
+                                    "thread/resume",
+                                    serde_json::json!({ "threadId": tid }),
+                                ),
+                                None => ("thread/start", serde_json::json!({})),
+                            };
+                            params["cwd"] = serde_json::json!(cwd_for_reader);
+                            params["approvalPolicy"] = serde_json::json!(approval);
+                            params["sandbox"] = serde_json::json!(sandbox);
+                            if let Some(ref m) = model_for_reader {
+                                params["model"] = serde_json::json!(m);
+                            }
+
+                            state_for_reader
+                                .lock()
+                                .expect("Codex state mutex poisoned")
+                                .pending_requests
+                                .insert(id, PendingKind::ThreadStart);
+                            let _ = write_message(
+                                &stdin_for_reader,
+                                &serde_json::json!({ "id": id, "method": method, "params": params }),
+                            );
+                        }
+
+                        Some(PendingKind::ThreadStart) => {
+                            let thread_id = result
+                                .pointer("/thread/id")
+                                .and_then(|v| v.as_str())
+                                .map(String::from);
+                            let model_name = result
+                                .get("model")
+                                .and_then(|v| v.as_str())
+                                .map(String::from);
+
+                            if let Some(ref tid) = thread_id {
+                                eprintln!("[Codex] Thread ready: {}", tid);
+                                let pending = {
+                                    let mut st = state_for_reader
+                                        .lock()
+                                        .expect("Codex state mutex poisoned");
+                                    st.thread_id = Some(tid.clone());
+                                    st.pending_prompt.take()
+                                };
+
+                                let mut chunk =
+                                    create_chunk("session_ready", &session_for_reader);
+                                chunk.thread_id = Some(tid.clone());
+                                chunk.model = model_name.clone();
+                                emit_chunk(&window_clone, &chunk);
+
+                                let mut init_chunk = create_chunk("init", &session_for_reader);
+                                init_chunk.thread_id = Some(tid.clone());
+                                init_chunk.model = model_name;
+                                init_chunk.subtype = Some("init".to_string());
+                                emit_chunk(&window_clone, &init_chunk);
+
+                                if let Some((text, images)) = pending {
+                                    let _ = send_turn_start(
+                                        &stdin_for_reader,
+                                        &state_for_reader,
+                                        &ids_for_reader,
+                                        tid,
+                                        &text,
+                                        &images,
+                                        model_for_reader.as_deref(),
+                                    );
                                 }
-                                #[cfg(not(debug_assertions))]
-                                let _ = window_clone.emit("codex-stream", &chunk);
-                                session_ready = true;
+                            } else {
+                                let mut chunk = create_chunk("error", &session_for_reader);
+                                chunk.is_error = Some(true);
+                                chunk.content =
+                                    Some("Codex thread start returned no thread id".to_string());
+                                emit_chunk(&window_clone, &chunk);
                             }
                         }
 
-                        // Parse and emit the chunk
-                        if let Some(mut chunk) = parse_codex_chunk(&json, &session_for_reader) {
-                            chunk.thread_id = captured_thread_id.clone();
-                            #[cfg(debug_assertions)]
-                            if let Err(e) = window_clone.emit("codex-stream", &chunk) {
-                                eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+                        Some(PendingKind::TurnStart) => {
+                            if let Some(turn_id) =
+                                result.pointer("/turn/id").and_then(|v| v.as_str())
+                            {
+                                let mut st = state_for_reader
+                                    .lock()
+                                    .expect("Codex state mutex poisoned");
+                                st.current_turn_id = Some(turn_id.to_string());
                             }
-                            #[cfg(not(debug_assertions))]
-                            let _ = window_clone.emit("codex-stream", &chunk);
                         }
-                    } else {
-                        // Non-JSON line - emit as raw
-                        let mut raw_chunk = create_chunk("raw", &session_for_reader);
-                        raw_chunk.content = Some(line);
-                        #[cfg(debug_assertions)]
-                        if let Err(e) = window_clone.emit("codex-stream", &raw_chunk) {
-                            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-                        }
-                        #[cfg(not(debug_assertions))]
-                        let _ = window_clone.emit("codex-stream", &raw_chunk);
+
+                        None => {}
                     }
                 }
-                Err(e) => {
-                    eprintln!("[Codex] Read error: {}", e);
-                    let mut chunk = create_chunk("error", &session_for_reader);
-                    chunk.content = Some(format!("Read error: {}", e));
-                    #[cfg(debug_assertions)]
-                    if let Err(e) = window_clone.emit("codex-stream", &chunk) {
-                        eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-                    }
-                    #[cfg(not(debug_assertions))]
-                    let _ = window_clone.emit("codex-stream", &chunk);
-                }
+
                 _ => {}
             }
         }
 
-        // Process has ended - but for Codex this is normal (each prompt is a new process)
-        // Don't emit session_ended or clean up - session stays active for more prompts
+        // stdout EOF: the app-server process exited. If the instance is still
+        // registered this was unexpected (stop_codex_session removes it first).
+        let was_registered = {
+            let mut instances = manager.instances.lock().expect("Process instances mutex poisoned");
+            instances.remove(&session_for_reader).is_some()
+        };
         eprintln!(
-            "[Codex] Stdout reader finished. Total lines: {}. Session ready: {}",
-            line_count, session_ready
+            "[Codex] app-server exited for session {} (registered: {})",
+            session_for_reader, was_registered
         );
-
-        // Emit turn_completed instead of session_ended
-        let mut chunk = create_chunk("result", &session_for_reader);
-        chunk.content = Some("Turn completed".to_string());
-        chunk.thread_id = captured_thread_id;
-        #[cfg(debug_assertions)]
-        if let Err(e) = window_clone.emit("codex-stream", &chunk) {
-            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
+        if was_registered {
+            let mut chunk = create_chunk("session_ended", &session_for_reader);
+            chunk.content = Some("Codex app-server exited".to_string());
+            emit_chunk(&window_clone, &chunk);
         }
-        #[cfg(not(debug_assertions))]
-        let _ = window_clone.emit("codex-stream", &chunk);
-
-        // DON'T remove the instance - we need it for thread_id on next prompt
     });
 
     Ok(session_id)
 }
 
-/// Send input to a Codex session
-/// Since Codex exec is single-shot, we spawn a NEW process for each prompt
-/// using the thread_id to maintain conversation context
+/// Send input to a Codex session as a new turn on the persistent thread
 #[tauri::command]
 pub async fn send_codex_input(
-    window: tauri::Window,
     state: State<'_, Arc<CodexProcessManager>>,
     session_id: String,
     input: String,
     model: Option<String>,
     images: Option<Vec<String>>,
 ) -> Result<(), String> {
-    // Get the thread_id, cwd, and permission_mode from the existing session
-    let (thread_id, cwd, permission_mode) = {
+    let (stdin, session_state, next_request_id, instance_model) = {
         let instances = state.instances.lock().expect("Process instances mutex poisoned");
         match instances.get(&session_id) {
-            Some(instance) => (instance.thread_id.clone(), instance.cwd.clone(), instance.permission_mode.clone()),
+            Some(instance) => (
+                instance.stdin.clone(),
+                instance.state.clone(),
+                instance.next_request_id.clone(),
+                instance.model.clone(),
+            ),
             None => return Err("Session not found".to_string()),
         }
     };
 
+    let text = input.trim().to_string();
+    let images = images.unwrap_or_default();
+    let model = model.or(instance_model);
+
     eprintln!(
-        "[Codex] send_codex_input: session={}, thread_id={:?}, cwd={}, input={}",
+        "[Codex] send_codex_input: session={}, input={}",
         session_id,
-        thread_id,
-        cwd,
-        &input[..std::cmp::min(100, input.len())]
+        &text[..std::cmp::min(100, text.len())]
     );
 
-    // Build args for new exec process
-    let mut args = vec![
-        "exec".to_string(),
-        "--json".to_string(),
-        "--skip-git-repo-check".to_string(),
-    ];
-
-    // Add permission mode flags (same as start_codex_session)
-    match permission_mode {
-        PermissionMode::Default | PermissionMode::AcceptEdits => {
-            args.push("--full-auto".to_string());
-        }
-        PermissionMode::Plan | PermissionMode::Manual => {
-            args.push("--sandbox".to_string());
-            args.push("read-only".to_string());
-        }
-        PermissionMode::BypassPermissions => {
-            args.push("--dangerously-bypass-approvals-and-sandbox".to_string());
-        }
-    }
-
-    // Add model if specified
-    if let Some(ref model_name) = model {
-        args.push("--model".to_string());
-        args.push(model_name.clone());
-    }
-
-    // Add images with -i flag
-    if let Some(ref image_paths) = images {
-        for path in image_paths {
-            args.push("-i".to_string());
-            args.push(path.clone());
-        }
-    }
-
-    // If we have a thread_id, use resume to continue the conversation
-    if let Some(ref tid) = thread_id {
-        args.push("resume".to_string());
-        args.push(tid.clone());
-    }
-
-    // Add the prompt
-    args.push(input.trim().to_string());
-
-    // Build environment
-    let home = std::env::var("HOME").unwrap_or_else(|_| "/Users".to_string());
-    let enhanced_path = get_enhanced_path();
-
-    eprintln!("[Codex] Starting new exec process with args: {:?}", args);
-
-    let mut child = std::process::Command::new("codex")
-        .args(&args)
-        .current_dir(&cwd)
-        .env("HOME", &home)
-        .env("PATH", &enhanced_path)
-        .env("TERM", "xterm-256color")
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to spawn Codex CLI: {}", e))?;
-
-    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
-    let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
-
-    // Update instance with new child process
-    {
-        let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
-        if let Some(instance) = instances.get_mut(&session_id) {
-            // Kill old process if still running
-            let _ = instance.child.kill();
-            instance.child = child;
-            instance.stdin = None; // exec mode doesn't use stdin for follow-up
-        }
-    }
-
-    // Spawn stderr reader
-    let window_for_stderr = window.clone();
-    let session_for_stderr = session_id.clone();
-    std::thread::spawn(move || {
-        let reader = std::io::BufReader::new(stderr);
-        use std::io::BufRead;
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                eprintln!("[Codex STDERR] {}", line);
-                if !line.is_empty() {
-                    let mut chunk = create_chunk("stderr", &session_for_stderr);
-                    chunk.content = Some(line);
-                    #[cfg(debug_assertions)]
-                    if let Err(e) = window_for_stderr.emit("codex-stream", &chunk) {
-                        eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-                    }
-                    #[cfg(not(debug_assertions))]
-                    let _ = window_for_stderr.emit("codex-stream", &chunk);
-                }
+    let thread_id = {
+        let mut st = session_state.lock().expect("Codex state mutex poisoned");
+        match st.thread_id.clone() {
+            Some(tid) => Some(tid),
+            None => {
+                // Thread not ready yet - queue the prompt; it fires once
+                // thread/start completes
+                st.pending_prompt = Some((text.clone(), images.clone()));
+                None
             }
         }
-    });
+    };
 
-    // Spawn stdout reader
-    let window_clone = window.clone();
-    let state_clone = state.inner().clone();
-    let session_for_reader = session_id.clone();
-    let existing_thread_id = thread_id.clone();
-
-    std::thread::spawn(move || {
-        let reader = std::io::BufReader::new(stdout);
-        use std::io::BufRead;
-        let mut captured_thread_id = existing_thread_id;
-        let mut line_count = 0;
-
-        for line in reader.lines() {
-            match line {
-                Ok(line) if !line.is_empty() => {
-                    line_count += 1;
-                    let log_preview: String = line.chars().take(200).collect();
-                    eprintln!("[Codex STDOUT #{}] {}", line_count, log_preview);
-
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(&line) {
-                        let event_type = json.get("type").and_then(|v| v.as_str()).unwrap_or("");
-
-                        // Capture thread_id
-                        if event_type == "thread.started" {
-                            if let Some(tid) = json.get("thread_id").and_then(|v| v.as_str()) {
-                                captured_thread_id = Some(tid.to_string());
-                                eprintln!("[Codex] Thread ID: {}", tid);
-
-                                // Update stored thread_id
-                                let mut instances = state_clone.instances.lock().expect("Process instances mutex poisoned");
-                                if let Some(instance) = instances.get_mut(&session_for_reader) {
-                                    instance.thread_id = Some(tid.to_string());
-                                }
-                            }
-                        }
-
-                        if let Some(mut chunk) = parse_codex_chunk(&json, &session_for_reader) {
-                            chunk.thread_id = captured_thread_id.clone();
-                            #[cfg(debug_assertions)]
-                            if let Err(e) = window_clone.emit("codex-stream", &chunk) {
-                                eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-                            }
-                            #[cfg(not(debug_assertions))]
-                            let _ = window_clone.emit("codex-stream", &chunk);
-                        }
-                    }
-                }
-                Err(e) => {
-                    eprintln!("[Codex] Read error: {}", e);
-                }
-                _ => {}
-            }
-        }
-
-        eprintln!("[Codex] Prompt completed. Lines: {}", line_count);
-
-        // Emit turn completed
-        let mut chunk = create_chunk("result", &session_for_reader);
-        chunk.content = Some("Turn completed".to_string());
-        chunk.thread_id = captured_thread_id;
-        #[cfg(debug_assertions)]
-        if let Err(e) = window_clone.emit("codex-stream", &chunk) {
-            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-        }
-        #[cfg(not(debug_assertions))]
-        let _ = window_clone.emit("codex-stream", &chunk);
-    });
+    if let Some(tid) = thread_id {
+        send_turn_start(
+            &stdin,
+            &session_state,
+            &next_request_id,
+            &tid,
+            &text,
+            &images,
+            model.as_deref(),
+        )?;
+    }
 
     Ok(())
 }
@@ -705,32 +810,46 @@ pub async fn stop_codex_session(
     state: State<'_, Arc<CodexProcessManager>>,
     session_id: String,
 ) -> Result<(), String> {
-    let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
+    let instance = {
+        let mut instances = state.instances.lock().expect("Process instances mutex poisoned");
+        instances.remove(&session_id)
+    };
 
-    if let Some(mut instance) = instances.remove(&session_id) {
-        // Drop stdin to close it
-        drop(instance.stdin.take());
+    if let Some(mut instance) = instance {
+        // Try to interrupt an in-flight turn before killing the process
+        let (thread_id, turn_id) = {
+            let st = instance.state.lock().expect("Codex state mutex poisoned");
+            (st.thread_id.clone(), st.current_turn_id.clone())
+        };
+        if let (Some(tid), Some(turn)) = (&thread_id, &turn_id) {
+            let id = instance.next_request_id.fetch_add(1, Ordering::SeqCst);
+            let _ = write_message(
+                &instance.stdin,
+                &serde_json::json!({
+                    "id": id,
+                    "method": "turn/interrupt",
+                    "params": { "threadId": tid, "turnId": turn }
+                }),
+            );
+            std::thread::sleep(std::time::Duration::from_millis(200));
+        }
 
-        // Give it a moment to exit gracefully, then force kill
-        std::thread::sleep(std::time::Duration::from_millis(200));
+        // Close stdin and kill the app-server
+        {
+            let mut guard = instance.stdin.lock().expect("Codex stdin mutex poisoned");
+            drop(guard.take());
+        }
         let _ = instance.child.kill();
+        let _ = instance.child.wait();
 
         // Emit session_ended event
         let mut chunk = create_chunk("session_ended", &session_id);
         chunk.content = Some("Session stopped by user".to_string());
-        chunk.thread_id = instance.thread_id;
-        #[cfg(debug_assertions)]
-        if let Err(e) = window.emit("codex-stream", &chunk) {
-            eprintln!("[DEBUG] Failed to emit 'codex-stream': {}", e);
-        }
-        #[cfg(not(debug_assertions))]
-        let _ = window.emit("codex-stream", &chunk);
-
-        Ok(())
-    } else {
-        // Session might have already ended
-        Ok(())
+        chunk.thread_id = thread_id;
+        emit_chunk(&window, &chunk);
     }
+
+    Ok(())
 }
 
 /// Check if a Codex session is actively running

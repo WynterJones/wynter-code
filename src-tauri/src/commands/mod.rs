@@ -863,6 +863,7 @@ pub async fn run_claude(prompt: String, cwd: String) -> Result<CommandOutput, St
         .args(["-p", &prompt, "--output-format", "json", "--permission-mode", "default"])
         .current_dir(&cwd)
         .env("PATH", crate::path_utils::get_enhanced_path())
+        .env_remove("ANTHROPIC_API_KEY")
         .output()
         .map_err(|e| format!("Failed to execute Claude CLI: {}", e))?;
 
@@ -942,6 +943,7 @@ pub async fn run_claude_streaming(
         .args(&args)
         .current_dir(&cwd)
         .env("PATH", crate::path_utils::get_enhanced_path())
+        .env_remove("ANTHROPIC_API_KEY")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -1961,7 +1963,6 @@ pub struct SystemCheckResults {
     // AI tools
     pub claude: Option<String>,
     pub codex: Option<String>,
-    pub gemini: Option<String>,
     // Ruby ecosystem
     pub ruby: Option<String>,
     pub rails: Option<String>,
@@ -2035,7 +2036,6 @@ pub fn check_system_requirements() -> SystemCheckResults {
         // AI tools
         claude: get_command_version("claude", &["--version"]),
         codex: get_command_version("codex", &["--version"]),
-        gemini: get_command_version("gemini", &["--version"]),
         // Ruby ecosystem
         ruby: get_command_version("ruby", &["--version"]),
         rails: get_command_version("rails", &["--version"]),

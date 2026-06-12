@@ -51,7 +51,7 @@ export interface ClaudeSessionCallbacks {
 }
 
 class ClaudeService {
-  private _currentModel: ClaudeModel = "claude-sonnet-4-20250514";
+  private _currentModel: ClaudeModel = "claude-fable-5";
 
   // Per-session state Maps
   private _unlistenMap = new Map<string, UnlistenFn>();

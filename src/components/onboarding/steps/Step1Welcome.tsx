@@ -22,7 +22,7 @@ export function Step1Welcome({ onNext }: Step1WelcomeProps) {
       </p>
 
       <p className="text-sm text-text-secondary opacity-60 max-w-md mb-8">
-        Supports: Claude Code / Codex / Gemini
+        Supports: Claude Code / Codex
       </p>
 
       <Button variant="primary" size="lg" onClick={onNext} className="gap-2">

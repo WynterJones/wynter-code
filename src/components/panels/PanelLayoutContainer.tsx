@@ -16,7 +16,7 @@ interface PanelLayoutContainerProps {
 export function PanelLayoutContainer({ projectId, projectPath, sessionId }: PanelLayoutContainerProps) {
   const layoutState = usePanelStore((s) => s.getLayoutForProject(projectId, sessionId));
   const { getSession, updateSessionProvider, updateSessionModel } = useSessionStore();
-  const { installedProviders, defaultModel, defaultCodexModel, defaultGeminiModel } = useSettingsStore();
+  const { installedProviders, defaultModel, defaultCodexModel } = useSettingsStore();
 
   const currentSession = sessionId ? getSession(sessionId) : null;
   const currentProvider = currentSession?.provider || "claude";
@@ -26,14 +26,10 @@ export function PanelLayoutContainer({ projectId, projectPath, sessionId }: Pane
       updateSessionProvider(sessionId, provider);
 
       // Also update the model to the default for the new provider
-      const newModel = provider === "codex"
-        ? defaultCodexModel
-        : provider === "gemini"
-          ? defaultGeminiModel
-          : defaultModel;
+      const newModel = provider === "codex" ? defaultCodexModel : defaultModel;
       updateSessionModel(sessionId, newModel);
     }
-  }, [sessionId, updateSessionProvider, updateSessionModel, defaultModel, defaultCodexModel, defaultGeminiModel]);
+  }, [sessionId, updateSessionProvider, updateSessionModel, defaultModel, defaultCodexModel]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">

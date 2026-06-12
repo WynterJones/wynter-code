@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from "react";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
+import { createClaudeTuiSession } from "@/lib/cliTuiSession";
 import type { PermissionMode } from "@/types";
 
 // Mode cycle order: Manual -> Auto -> Bypass -> Plan -> Manual...
@@ -101,7 +102,7 @@ export function useKeyboardShortcuts({
   onOpenOverwatch,
 }: UseKeyboardShortcutsOptions) {
   const { projects, activeProjectId, setActiveProject } = useProjectStore();
-  const { createSession, removeSession, getSessionsForProject, getActiveSession, setActiveSession, updateSessionPermissionMode } = useSessionStore();
+  const { removeSession, getSessionsForProject, getActiveSession, setActiveSession, updateSessionPermissionMode } = useSessionStore();
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     const isMod = e.metaKey || e.ctrlKey;
@@ -117,11 +118,11 @@ export function useKeyboardShortcuts({
       return;
     }
 
-    // Ctrl/Cmd + T: New session
+    // Ctrl/Cmd + T: New session (interactive Claude Code TUI by default)
     if (isMod && !isShift && e.key.toLowerCase() === "t") {
       e.preventDefault();
       if (activeProjectId) {
-        createSession(activeProjectId);
+        createClaudeTuiSession(activeProjectId);
       }
       return;
     }
@@ -322,7 +323,6 @@ export function useKeyboardShortcuts({
     projects,
     activeProjectId,
     setActiveProject,
-    createSession,
     removeSession,
     getSessionsForProject,
     getActiveSession,

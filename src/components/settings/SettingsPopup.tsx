@@ -1016,14 +1016,14 @@ function TerminalSettings({
         </button>
       </div>
 
-      {/* ANSI Filter (Claude Code fix) */}
+      {/* ANSI Filter (legacy) */}
       <div className="flex items-center justify-between">
         <div>
           <label htmlFor="terminal-ansi-filter" className="text-sm font-medium text-text-primary">
             ANSI Sequence Filter
           </label>
           <p className="text-xs text-text-secondary">
-            Filter problematic escape sequences that cause blank lines (fixes Claude Code CLI display issues)
+            Rewrite escape sequences in terminal output. Leave off — it corrupts TUI apps like Claude Code
           </p>
         </div>
         <button
@@ -1267,7 +1267,6 @@ function AboutSection() {
           <ul className="text-text-secondary space-y-0.5">
             <li>Claude Code CLI (Anthropic)</li>
             <li>Codex CLI (OpenAI)</li>
-            <li>Gemini CLI (Google)</li>
           </ul>
         </div>
 
@@ -1307,24 +1306,15 @@ function AIProvidersTab() {
       installCommand: "npm install -g @openai/codex",
       docsUrl: "https://github.com/openai/codex-cli",
     },
-    {
-      id: "gemini" as const,
-      name: "Gemini CLI",
-      description: "Google's AI coding assistant",
-      color: "text-[#4285f4]",
-      installCommand: "npm install -g @google/gemini-cli",
-      docsUrl: "https://ai.google.dev",
-    },
   ];
 
   const checkInstalledProviders = async () => {
     setIsChecking(true);
     try {
-      const results = await invoke<{ node: string | null; npm: string | null; git: string | null; claude: string | null; codex: string | null; gemini: string | null }>("check_system_requirements");
-      const installed: ("claude" | "codex" | "gemini")[] = [];
+      const results = await invoke<{ node: string | null; npm: string | null; git: string | null; claude: string | null; codex: string | null }>("check_system_requirements");
+      const installed: ("claude" | "codex")[] = [];
       if (results.claude) installed.push("claude");
       if (results.codex) installed.push("codex");
-      if (results.gemini) installed.push("gemini");
       setInstalledProviders(installed);
     } catch (error) {
       console.error("Failed to check providers:", error);

@@ -66,7 +66,7 @@ interface SessionStore {
   claudeSessionState: Map<string, ClaudeSessionInfo>;
   sessionContextStats: Map<string, SessionContextStats>;
 
-  createSession: (projectId: string, type?: SessionType, model?: AIModel, provider?: AIProvider) => string;
+  createSession: (projectId: string, type?: SessionType, model?: AIModel, provider?: AIProvider, name?: string) => string;
   removeSession: (projectId: string, sessionId: string) => void;
   setActiveSession: (projectId: string, sessionId: string) => void;
   getSessionsForProject: (projectId: string) => Session[];
@@ -162,14 +162,15 @@ export const useSessionStore = create<SessionStore>()(
       createSession: (
         projectId: string,
         type: SessionType = "claude",
-        model: AIModel = "claude-sonnet-4-20250514",
-        provider: AIProvider = "claude"
+        model: AIModel = "claude-fable-5",
+        provider: AIProvider = "claude",
+        name?: string
       ) => {
         const sessionId = uuid();
         const session: Session = {
           id: sessionId,
           projectId,
-          name: type === "terminal" ? "Terminal" : type === "codespace" ? "Codespace" : "",
+          name: name ?? (type === "terminal" ? "Terminal" : type === "codespace" ? "Codespace" : ""),
           type,
           provider,
           model,

@@ -19,10 +19,6 @@ const providerConfig: Record<AIProvider, {
     src: "/openai-white.svg",
     label: "Codex",
   },
-  gemini: {
-    src: "/gemini-color.svg",
-    label: "Gemini",
-  },
 };
 
 export function ProviderIcon({ provider, size = 16, className }: ProviderIconProps) {

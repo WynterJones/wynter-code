@@ -72,18 +72,24 @@ export function MeditationAudioController() {
 
   const { url: directUrl, isStream, rawStreamUrl } = getAudioSource();
 
-  // Get proxied URL for streams (to bypass CSP in production)
+  // Resolve the playable URL for streams.
+  // HTTPS streams play directly: the packaged app runs on the secure tauri://
+  // origin, where the plain-http local proxy gets blocked/upgraded as mixed
+  // content by WebKit. Only plain-http stations need the local proxy.
   useEffect(() => {
     if (isStream && rawStreamUrl) {
-      invoke<string>("get_audio_proxy_url", { streamUrl: rawStreamUrl })
-        .then((proxiedUrl) => {
-          setProxiedStreamUrl(proxiedUrl);
-        })
-        .catch((err) => {
-          console.error("Failed to get proxied stream URL:", err);
-          // Fallback to direct URL (works in dev mode)
-          setProxiedStreamUrl(rawStreamUrl);
-        });
+      if (rawStreamUrl.startsWith("https://")) {
+        setProxiedStreamUrl(rawStreamUrl);
+      } else {
+        invoke<string>("get_audio_proxy_url", { streamUrl: rawStreamUrl })
+          .then((proxiedUrl) => {
+            setProxiedStreamUrl(proxiedUrl);
+          })
+          .catch((err) => {
+            console.error("Failed to get proxied stream URL:", err);
+            setProxiedStreamUrl(rawStreamUrl);
+          });
+      }
     } else {
       setProxiedStreamUrl(null);
     }

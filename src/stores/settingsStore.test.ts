@@ -24,7 +24,7 @@ const resetStore = () => {
 
   useSettingsStore.setState({
     // Default values
-    defaultModel: "claude-sonnet-4-20250514",
+    defaultModel: "claude-fable-5",
     sidebarWidth: 320,
     sidebarPosition: "right",
     sidebarCollapsed: false,
@@ -52,8 +52,7 @@ const resetStore = () => {
     userAvatar: null,
     claudeSafeMode: true,
     defaultProvider: "claude",
-    defaultCodexModel: "gpt-5.2-codex",
-    defaultGeminiModel: "gemini-2.5-flash",
+    defaultCodexModel: "gpt-5.5",
     installedProviders: ["claude"],
     audioSourceType: "nightride",
     nightrideStation: "chillsynth",
@@ -80,14 +79,14 @@ describe("settingsStore", () => {
   describe("default model settings", () => {
     it("has correct default model", () => {
       expect(useSettingsStore.getState().defaultModel).toBe(
-        "claude-sonnet-4-20250514"
+        "claude-fable-5"
       );
     });
 
     it("sets default model", () => {
-      useSettingsStore.getState().setDefaultModel("claude-opus-4-20250514");
+      useSettingsStore.getState().setDefaultModel("claude-opus-4-8");
       expect(useSettingsStore.getState().defaultModel).toBe(
-        "claude-opus-4-20250514"
+        "claude-opus-4-8"
       );
     });
   });
@@ -263,27 +262,19 @@ describe("settingsStore", () => {
     });
 
     it("sets default codex model", () => {
-      useSettingsStore.getState().setDefaultCodexModel("gpt-5.1-codex-max");
+      useSettingsStore.getState().setDefaultCodexModel("gpt-5.4");
       expect(useSettingsStore.getState().defaultCodexModel).toBe(
-        "gpt-5.1-codex-max"
-      );
-    });
-
-    it("sets default gemini model", () => {
-      useSettingsStore.getState().setDefaultGeminiModel("gemini-2.5-pro");
-      expect(useSettingsStore.getState().defaultGeminiModel).toBe(
-        "gemini-2.5-pro"
+        "gpt-5.4"
       );
     });
 
     it("sets installed providers", () => {
       useSettingsStore
         .getState()
-        .setInstalledProviders(["claude", "codex", "gemini"]);
+        .setInstalledProviders(["claude", "codex"]);
       expect(useSettingsStore.getState().installedProviders).toEqual([
         "claude",
         "codex",
-        "gemini",
       ]);
     });
   });

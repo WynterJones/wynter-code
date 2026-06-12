@@ -50,12 +50,6 @@ const optionalItems: CheckItem[] = [
     installCommand: "npm install -g @openai/codex",
     installUrl: "https://github.com/openai/codex-cli",
   },
-  {
-    key: "gemini",
-    label: "Gemini CLI (Optional)",
-    installCommand: "npm install -g @google/gemini-cli",
-    installUrl: "https://github.com/google-gemini/gemini-cli",
-  },
 ];
 
 const checkItems = [...requiredItems, ...optionalItems];
@@ -84,7 +78,6 @@ export function Step4SystemCheck({ onComplete, onPrevious }: Step4SystemCheckPro
         git: null,
         claude: null,
         codex: null,
-        gemini: null,
       });
     } finally {
       setIsCheckingSystem(false);

@@ -3,7 +3,7 @@ import { ChevronDown, Sparkles, Zap, Brain, Check, Cpu, Rocket } from "lucide-re
 import { cn } from "@/lib/utils";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSessionStore } from "@/stores/sessionStore";
-import type { ClaudeModel, CodexModel, GeminiModel, AIModel, AIProvider } from "@/types";
+import type { ClaudeModel, CodexModel, AIModel, AIProvider } from "@/types";
 
 interface ModelOption {
   value: AIModel;
@@ -15,22 +15,29 @@ interface ModelOption {
 
 const claudeModels: ModelOption[] = [
   {
-    value: "claude-opus-4-20250514",
-    label: "Opus",
-    description: "Most capable, best for complex tasks",
+    value: "claude-fable-5",
+    label: "Fable 5",
+    description: "Most capable, for the hardest long-running work",
+    icon: Rocket,
+    color: "text-accent-purple",
+  },
+  {
+    value: "claude-opus-4-8",
+    label: "Opus 4.8",
+    description: "Most capable Opus, long-horizon agentic work",
     icon: Brain,
     color: "text-accent-blue",
   },
   {
-    value: "claude-sonnet-4-20250514",
-    label: "Sonnet",
+    value: "claude-sonnet-4-6",
+    label: "Sonnet 4.6",
     description: "Best balance of speed and quality",
     icon: Sparkles,
     color: "text-accent-purple",
   },
   {
-    value: "claude-3-5-haiku-20241022",
-    label: "Haiku",
+    value: "claude-haiku-4-5",
+    label: "Haiku 4.5",
     description: "Fastest, best for simple tasks",
     icon: Zap,
     color: "text-accent-green",
@@ -39,56 +46,32 @@ const claudeModels: ModelOption[] = [
 
 const codexModels: ModelOption[] = [
   {
-    value: "gpt-5.2-codex",
-    label: "Codex",
-    description: "Latest GPT-5.2, balanced performance",
-    icon: Cpu,
+    value: "gpt-5.5",
+    label: "GPT-5.5",
+    description: "Frontier model for complex coding and research",
+    icon: Rocket,
     color: "text-[#10a37f]",
   },
   {
-    value: "gpt-5.1-codex-max",
-    label: "Codex Max",
-    description: "Maximum capability, best for complex tasks",
-    icon: Rocket,
+    value: "gpt-5.4",
+    label: "GPT-5.4",
+    description: "Strong model for everyday coding",
+    icon: Cpu,
     color: "text-accent-blue",
   },
   {
-    value: "gpt-5.1-codex-mini",
-    label: "Codex Mini",
-    description: "Fastest, best for simple tasks",
+    value: "gpt-5.4-mini",
+    label: "GPT-5.4 Mini",
+    description: "Small, fast, and cost-efficient",
     icon: Zap,
     color: "text-accent-green",
   },
-];
-
-const geminiModels: ModelOption[] = [
   {
-    value: "gemini-3-pro-preview",
-    label: "Pro 3",
-    description: "Most capable, preview model",
-    icon: Brain,
-    color: "text-[#4285f4]",
-  },
-  {
-    value: "gemini-3-flash-preview",
-    label: "Flash 3",
-    description: "Fast preview model",
+    value: "gpt-5.3-codex-spark",
+    label: "Codex Spark",
+    description: "Ultra-fast coding model",
     icon: Zap,
-    color: "text-[#4285f4]",
-  },
-  {
-    value: "gemini-2.5-flash",
-    label: "Flash 2.5",
-    description: "Fast and efficient, great for most tasks",
-    icon: Zap,
-    color: "text-[#4285f4]",
-  },
-  {
-    value: "gemini-2.5-pro",
-    label: "Pro 2.5",
-    description: "Most capable, best for complex tasks",
-    icon: Brain,
-    color: "text-[#4285f4]",
+    color: "text-accent-yellow",
   },
 ];
 
@@ -96,8 +79,6 @@ function getModelsForProvider(provider: AIProvider): ModelOption[] {
   switch (provider) {
     case "codex":
       return codexModels;
-    case "gemini":
-      return geminiModels;
     case "claude":
     default:
       return claudeModels;
@@ -109,7 +90,7 @@ interface ModelSelectorProps {
 }
 
 export function ModelSelector({ projectId }: ModelSelectorProps) {
-  const { defaultModel, defaultCodexModel, defaultGeminiModel, setDefaultModel, setDefaultCodexModel, setDefaultGeminiModel } = useSettingsStore();
+  const { defaultModel, defaultCodexModel, setDefaultModel, setDefaultCodexModel } = useSettingsStore();
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -135,9 +116,6 @@ export function ModelSelector({ projectId }: ModelSelectorProps) {
     if (currentProvider === "codex") {
       return defaultCodexModel;
     }
-    if (currentProvider === "gemini") {
-      return defaultGeminiModel;
-    }
     return defaultModel;
   };
 
@@ -147,8 +125,6 @@ export function ModelSelector({ projectId }: ModelSelectorProps) {
   const handleModelSelect = (model: AIModel) => {
     if (currentProvider === "codex") {
       setDefaultCodexModel(model as CodexModel);
-    } else if (currentProvider === "gemini") {
-      setDefaultGeminiModel(model as GeminiModel);
     } else {
       setDefaultModel(model as ClaudeModel);
     }

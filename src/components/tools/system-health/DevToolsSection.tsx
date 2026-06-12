@@ -150,11 +150,6 @@ export function DevToolsSection({ devTools }: DevToolsSectionProps) {
           version: devTools.codex,
           icon: <Terminal className="w-4 h-4 text-green-400" />,
         },
-        {
-          name: "Gemini",
-          version: devTools.gemini,
-          icon: <Terminal className="w-4 h-4 text-blue-400" />,
-        },
       ],
     },
   ];

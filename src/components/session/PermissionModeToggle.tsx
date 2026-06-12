@@ -53,11 +53,9 @@ const allModeOptions: ModeOption[] = [
 // Permission modes available per provider
 // Claude: All modes (has MCP permission server for manual mode)
 // Codex: No manual mode (no MCP permission server support)
-// Gemini: Only Manual (ask) and Auto (yolo) - Plan/Bypass have no unique behavior
 const providerModes: Record<AIProvider, PermissionMode[]> = {
   claude: ["manual", "acceptEdits", "bypassPermissions", "plan"],
   codex: ["acceptEdits", "bypassPermissions", "plan"],
-  gemini: ["manual", "acceptEdits"],
 };
 
 export function PermissionModeToggle({

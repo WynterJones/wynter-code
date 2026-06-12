@@ -38,6 +38,7 @@ import { useTerminalStore } from "@/stores/terminalStore";
 import { claudeService } from "@/services/claude";
 import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
+import { createClaudeTuiSession, createCodexTuiSession } from "@/lib/cliTuiSession";
 import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
 import type { Session } from "@/types";
@@ -349,6 +350,17 @@ export function SessionTabBar({
     setShowNewDropdown(false);
   };
 
+  // Default: interactive CLI TUIs running in a PTY (subscription auth, full TUI)
+  const handleCreateClaudeTui = () => {
+    createClaudeTuiSession(projectId);
+    setShowNewDropdown(false);
+  };
+
+  const handleCreateCodexTui = () => {
+    createCodexTuiSession(projectId);
+    setShowNewDropdown(false);
+  };
+
   const handleSessionClose = useCallback(
     async (e: React.MouseEvent, sessionId: string, sessionType: string) => {
       e.stopPropagation();
@@ -530,11 +542,25 @@ export function SessionTabBar({
             }}
           >
             <button
+              onClick={handleCreateClaudeTui}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+            >
+              <img src="/claude-color.svg" alt="" className="w-4 h-4" />
+              New Claude Code
+            </button>
+            <button
+              onClick={handleCreateCodexTui}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+            >
+              <img src="/openai-white.svg" alt="" className="w-4 h-4" />
+              New Codex
+            </button>
+            <button
               onClick={() => handleCreateSession("claude")}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
             >
               <MessageSquare className="w-4 h-4" />
-              New Session
+              New Chat Session
             </button>
             <button
               onClick={() => handleCreateSession("terminal")}

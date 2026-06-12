@@ -6,5 +6,12 @@
     <string>Wynter Code needs camera access for the floating webcam feature.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Wynter Code needs microphone access for audio features.</string>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <!-- Allow plain-http radio streams (internet radio stations) to load
+             inside the webview in the packaged app -->
+        <key>NSAllowsArbitraryLoadsInWebContent</key>
+        <true/>
+    </dict>
 </dict>
 </plist>

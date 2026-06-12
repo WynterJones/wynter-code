@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { claudeService } from "@/services/claude";
 import { codexService } from "@/services/codex";
-import { geminiService } from "@/services/gemini";
 import { farmworkBridge } from "@/services/farmworkBridge";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -60,7 +59,7 @@ export function useSessionHandlers({
   const setPendingQuestionSet = store.getState().setPendingQuestionSet;
   const updateSessionPermissionMode = store.getState().updateSessionPermissionMode;
 
-  const { claudeSafeMode, defaultModel, defaultCodexModel, defaultGeminiModel } = useSettingsStore();
+  const { claudeSafeMode, defaultModel, defaultCodexModel } = useSettingsStore();
 
   // Start a persistent AI session (Claude or Codex based on provider)
   const handleStartSession = useCallback(async () => {
@@ -78,11 +77,7 @@ export function useSessionHandlers({
       : undefined;
 
     // Get the correct model based on provider
-    const model = provider === "codex"
-      ? defaultCodexModel
-      : provider === "gemini"
-        ? defaultGeminiModel
-        : defaultModel;
+    const model = provider === "codex" ? defaultCodexModel : defaultModel;
 
 
     setClaudeSessionStarting(currentSessionId);
@@ -168,16 +163,6 @@ export function useSessionHandlers({
           permissionMode,
           claudeSafeMode
         );
-      } else if (provider === "gemini") {
-        // Start Gemini session (stateless, no resume support)
-        await geminiService.startSession(
-          projectPath,
-          currentSessionId,
-          commonCallbacks,
-          model,
-          permissionMode,
-          claudeSafeMode
-        );
       } else {
         // Start Claude session (default)
         await claudeService.startSession(
@@ -239,7 +224,6 @@ export function useSessionHandlers({
     claudeSafeMode,
     defaultModel,
     defaultCodexModel,
-    defaultGeminiModel,
     autoApprovedToolsRef,
     onSessionConflict,
   ]);
@@ -253,8 +237,6 @@ export function useSessionHandlers({
     try {
       if (provider === "codex") {
         await codexService.stopSession(currentSessionId);
-      } else if (provider === "gemini") {
-        await geminiService.stopSession(currentSessionId);
       } else {
         await claudeService.stopSession(currentSessionId);
       }
@@ -272,14 +254,10 @@ export function useSessionHandlers({
     updateSessionProvider(currentSessionId, provider);
 
     // Also update the model to the default for the new provider
-    const newModel = provider === "codex"
-      ? defaultCodexModel
-      : provider === "gemini"
-        ? defaultGeminiModel
-        : defaultModel;
+    const newModel = provider === "codex" ? defaultCodexModel : defaultModel;
     updateSessionModel(currentSessionId, newModel);
-   
-  }, [currentSessionId, defaultModel, defaultCodexModel, defaultGeminiModel]);
+
+  }, [currentSessionId, defaultModel, defaultCodexModel]);
 
   // Send prompt to active session (Claude or Codex based on provider)
   const handleSendPrompt = useCallback(
@@ -294,8 +272,6 @@ export function useSessionHandlers({
       try {
         if (provider === "codex") {
           await codexService.sendPrompt(currentSessionId, prompt);
-        } else if (provider === "gemini") {
-          await geminiService.sendPrompt(currentSessionId, prompt);
         } else {
           await claudeService.sendPrompt(currentSessionId, prompt);
         }
@@ -328,14 +304,6 @@ export function useSessionHandlers({
             mimeType: img.mediaType,
           }));
           await codexService.sendStructuredPrompt(currentSessionId, prompt.text, codexImages);
-        } else if (provider === "gemini") {
-          // Convert StructuredPrompt images to ImageAttachment format for Gemini
-          const geminiImages: ImageAttachment[] | undefined = prompt.images?.map((img, idx) => ({
-            id: `img-${idx}`,
-            data: img.base64.startsWith("data:") ? img.base64 : `data:${img.mediaType};base64,${img.base64}`,
-            mimeType: img.mediaType,
-          }));
-          await geminiService.sendStructuredPrompt(currentSessionId, prompt.text, geminiImages);
         } else {
           // Claude accepts StructuredPrompt directly
           await claudeService.sendStructuredPrompt(currentSessionId, prompt);

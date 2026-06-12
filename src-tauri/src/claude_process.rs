@@ -256,6 +256,9 @@ pub async fn start_claude_session(
         .env("PATH", &enhanced_path)
         .env("TERM", "xterm-256color")
         .env("CLAUDE_CODE_MAX_OUTPUT_TOKENS", "200000")
+        // Subscription auth: an inherited API key would override the user's
+        // Claude subscription login and bill the API instead
+        .env_remove("ANTHROPIC_API_KEY")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

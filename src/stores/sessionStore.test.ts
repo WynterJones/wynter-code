@@ -16,7 +16,7 @@ describe("sessionStore", () => {
       expect(session?.projectId).toBe("project-1");
       expect(session?.type).toBe("claude");
       expect(session?.provider).toBe("claude");
-      expect(session?.model).toBe("claude-sonnet-4-20250514");
+      expect(session?.model).toBe("claude-fable-5");
       expect(session?.permissionMode).toBe("acceptEdits");
       expect(session?.isActive).toBe(true);
     });
@@ -151,9 +151,9 @@ describe("sessionStore", () => {
       const store = useSessionStore.getState();
       const sessionId = store.createSession("project-1");
 
-      store.updateSessionModel(sessionId, "claude-opus-4-20250514");
+      store.updateSessionModel(sessionId, "claude-opus-4-8");
 
-      expect(store.getSession(sessionId)?.model).toBe("claude-opus-4-20250514");
+      expect(store.getSession(sessionId)?.model).toBe("claude-opus-4-8");
     });
 
     it("updates session name", () => {
@@ -463,14 +463,14 @@ describe("sessionStore", () => {
 
       store.setClaudeSessionStarting(sessionId);
       store.setClaudeSessionReady(sessionId, {
-        model: "claude-sonnet-4-20250514",
+        model: "claude-fable-5",
         tools: ["read_file", "write_file"],
         permissionMode: "acceptEdits",
       });
 
       const state = store.getClaudeSessionState(sessionId);
       expect(state?.status).toBe("ready");
-      expect(state?.model).toBe("claude-sonnet-4-20250514");
+      expect(state?.model).toBe("claude-fable-5");
       expect(state?.tools).toEqual(["read_file", "write_file"]);
       expect(store.isClaudeSessionActive(sessionId)).toBe(true);
     });

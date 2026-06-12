@@ -7,7 +7,6 @@ export interface SystemCheckResults {
   git: string | null;
   claude: string | null;
   codex: string | null;
-  gemini: string | null;
 }
 
 interface OnboardingStore {

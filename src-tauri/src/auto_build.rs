@@ -425,6 +425,7 @@ When done, your last message should confirm what was completed."#,
         .arg("default")
         .current_dir(&project_path)
         .env("PATH", get_enhanced_path())
+        .env_remove("ANTHROPIC_API_KEY")
         .output()
         .map_err(|e| format!("Failed to run claude: {}", e))?;
 

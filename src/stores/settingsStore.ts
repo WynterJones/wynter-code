@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { ClaudeModel, AIProvider, CodexModel, GeminiModel } from "@/types";
+import type { ClaudeModel, AIProvider, CodexModel } from "@/types";
 import type { SidebarTab } from "@/types/file";
 import type {
   AudioSourceType,
@@ -104,7 +104,7 @@ interface SettingsStore {
   terminalShell: TerminalShell;
   terminalFontSize: number;
   terminalCursorBlink: boolean;
-  terminalAnsiFilter: boolean; // Filter problematic ANSI sequences (fixes Claude Code blank lines)
+  terminalAnsiFilter: boolean; // Legacy: rewrites escape sequences in PTY output; corrupts TUI apps, keep off
   useMultiPanelLayout: boolean;
 
   // Claude safety settings
@@ -113,7 +113,6 @@ interface SettingsStore {
   // AI Provider settings
   defaultProvider: AIProvider;
   defaultCodexModel: CodexModel;
-  defaultGeminiModel: GeminiModel;
   installedProviders: AIProvider[];
 
   // Avatar
@@ -183,7 +182,6 @@ interface SettingsStore {
   // AI Provider setters
   setDefaultProvider: (provider: AIProvider) => void;
   setDefaultCodexModel: (model: CodexModel) => void;
-  setDefaultGeminiModel: (model: GeminiModel) => void;
   setInstalledProviders: (providers: AIProvider[]) => void;
 
   // Radio setters
@@ -226,7 +224,7 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set) => ({
-      defaultModel: "claude-sonnet-4-20250514",
+      defaultModel: "claude-fable-5",
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       sidebarPosition: "right",
       sidebarCollapsed: false,
@@ -250,15 +248,14 @@ export const useSettingsStore = create<SettingsStore>()(
       terminalShell: "system",
       terminalFontSize: 13,
       terminalCursorBlink: true,
-      terminalAnsiFilter: true, // Enabled by default to fix Claude Code blank lines
+      terminalAnsiFilter: false, // Off by default: rewriting \r\n corrupts TUI apps (Claude Code) in the PTY
       useMultiPanelLayout: false,
       userAvatar: null,
       claudeSafeMode: true, // Enabled by default for safety
 
       // AI Provider defaults
       defaultProvider: "claude",
-      defaultCodexModel: "gpt-5.2-codex",
-      defaultGeminiModel: "gemini-2.5-flash",
+      defaultCodexModel: "gpt-5.5",
       installedProviders: ["claude"], // Will be updated on system check
 
       // Radio defaults
@@ -411,10 +408,6 @@ export const useSettingsStore = create<SettingsStore>()(
         set({ defaultCodexModel });
       },
 
-      setDefaultGeminiModel: (defaultGeminiModel: GeminiModel) => {
-        set({ defaultGeminiModel });
-      },
-
       setInstalledProviders: (installedProviders: AIProvider[]) => {
         set({ installedProviders });
       },
@@ -522,6 +515,41 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: "wynter-code-settings",
+      version: 3,
+      migrate: (persistedState, version) => {
+        const state = persistedState as Record<string, unknown>;
+        if (version < 1) {
+          // v0 -> v1: Gemini provider support removed
+          if (state.defaultProvider === "gemini") {
+            state.defaultProvider = "claude";
+          }
+          if (Array.isArray(state.installedProviders)) {
+            state.installedProviders = state.installedProviders.filter(
+              (p) => p === "claude" || p === "codex"
+            );
+          }
+          delete state.defaultGeminiModel;
+        }
+        if (version < 2) {
+          // v1 -> v2: ANSI filter corrupts the interactive Claude Code TUI
+          // (it rewrites \r\n in PTY output); force the old default off
+          state.terminalAnsiFilter = false;
+        }
+        if (version < 3) {
+          // v2 -> v3: model catalog refresh (Claude Fable 5 / Opus 4.8 /
+          // Sonnet 4.6 / Haiku 4.5; Codex GPT-5.5 family). Old ids are
+          // retired or deprecated - reset to current defaults.
+          const claudeModels = ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"];
+          const codexModels = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex-spark"];
+          if (!claudeModels.includes(state.defaultModel as string)) {
+            state.defaultModel = "claude-fable-5";
+          }
+          if (!codexModels.includes(state.defaultCodexModel as string)) {
+            state.defaultCodexModel = "gpt-5.5";
+          }
+        }
+        return state;
+      },
     }
   )
 );

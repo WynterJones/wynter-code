@@ -6,7 +6,6 @@ mod auto_build;
 mod beads;
 mod claude_process;
 mod codex_process;
-mod gemini_process;
 mod github;
 mod commands;
 mod mobile_api;
@@ -215,7 +214,6 @@ fn main() {
         .manage(Arc::new(database_viewer::DatabaseManager::new()))
         .manage(Arc::new(claude_process::ClaudeProcessManager::new()))
         .manage(Arc::new(codex_process::CodexProcessManager::new()))
-        .manage(Arc::new(gemini_process::GeminiProcessManager::new()))
         .manage(Arc::new(mcp_permission_server::McpPermissionManager::new()))
         .manage(Arc::new(file_coordinator::FileCoordinatorManager::new()))
         .manage(Arc::new(audio_proxy::AudioProxyManager::new()))
@@ -395,12 +393,6 @@ fn main() {
             codex_process::send_codex_input,
             codex_process::is_codex_session_active,
             codex_process::list_active_codex_sessions,
-            // Gemini Process Management
-            gemini_process::start_gemini_session,
-            gemini_process::stop_gemini_session,
-            gemini_process::send_gemini_input,
-            gemini_process::is_gemini_session_active,
-            gemini_process::list_active_gemini_sessions,
             // MCP Permission Server
             mcp_permission_server::start_mcp_permission_server,
             mcp_permission_server::stop_mcp_permission_server,

@@ -13,6 +13,11 @@ interface ModelUsageChartProps {
 }
 
 const MODEL_COLORS: Record<string, string> = {
+  "claude-fable-5": "#c084fc",
+  "claude-opus-4-8": "#da7756",
+  "claude-sonnet-4-6": "#f59e0b",
+  "claude-haiku-4-5": "#10a37f",
+  // Historical ids still present in older usage logs
   "claude-opus-4-5-20251101": "#da7756",
   "claude-sonnet-4-5-20250929": "#f59e0b",
   "claude-sonnet-4-20250514": "#f59e0b",
@@ -25,9 +30,13 @@ const getModelColor = (modelId: string): string => {
 };
 
 const getModelDisplayName = (modelId: string): string => {
+  if (modelId.includes("fable")) return "Fable 5";
+  if (modelId.includes("opus-4-8")) return "Opus 4.8";
   if (modelId.includes("opus-4-5")) return "Opus 4.5";
+  if (modelId.includes("sonnet-4-6")) return "Sonnet 4.6";
   if (modelId.includes("sonnet-4-5")) return "Sonnet 4.5";
   if (modelId.includes("sonnet-4-")) return "Sonnet 4";
+  if (modelId.includes("haiku-4-5")) return "Haiku 4.5";
   if (modelId.includes("haiku")) return "Haiku 3.5";
   return modelId.split("-").slice(0, 2).join(" ");
 };
