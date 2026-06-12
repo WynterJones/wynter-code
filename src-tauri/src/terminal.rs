@@ -38,6 +38,36 @@ fn validate_shell_path(shell: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Find the byte index where an incomplete trailing UTF-8 sequence starts.
+/// PTY reads are arbitrary byte chunks, so a multi-byte character (every
+/// box-drawing glyph a TUI emits) regularly straddles a chunk boundary.
+/// Decoding each chunk independently turns both halves into U+FFFD, which
+/// desyncs diff-rendering TUIs like Claude Code. Bytes from this index on
+/// must be carried into the next chunk.
+fn utf8_incomplete_tail_start(bytes: &[u8]) -> usize {
+    let len = bytes.len();
+    for back in 1..=3.min(len) {
+        let b = bytes[len - back];
+        if b & 0b1100_0000 == 0b1100_0000 {
+            // Start byte of a multi-byte sequence
+            let need = if b >= 0xF0 {
+                4
+            } else if b >= 0xE0 {
+                3
+            } else {
+                2
+            };
+            return if back < need { len - back } else { len };
+        }
+        if b & 0b1000_0000 == 0 {
+            // ASCII byte - everything before the tail is complete
+            return len;
+        }
+        // Continuation byte - keep scanning backwards
+    }
+    len
+}
+
 /// Security: Validate that a working directory is safe.
 fn validate_cwd(cwd: &str) -> Result<(), String> {
     if cwd.is_empty() {
@@ -168,12 +198,22 @@ pub async fn create_pty(
 
     // Spawn a thread to read from the PTY and emit events
     let reader_handle = std::thread::spawn(move || {
-        let mut buf = [0u8; 4096];
+        let mut buf = [0u8; 8192];
+        // Carries an incomplete UTF-8 sequence from the end of one read
+        // into the start of the next so multi-byte chars never get split
+        let mut carry: Vec<u8> = Vec::new();
         loop {
             match reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let data = String::from_utf8_lossy(&buf[..n]).to_string();
+                    let mut bytes = std::mem::take(&mut carry);
+                    bytes.extend_from_slice(&buf[..n]);
+                    let complete = utf8_incomplete_tail_start(&bytes);
+                    carry = bytes[complete..].to_vec();
+                    if complete == 0 {
+                        continue;
+                    }
+                    let data = String::from_utf8_lossy(&bytes[..complete]).to_string();
 
                     // Debug logging for newline investigation
                     // Shows \r, \n, and escape sequences with visible markers
@@ -293,4 +333,45 @@ pub async fn close_pty(state: State<'_, Arc<PtyManager>>, pty_id: String) -> Res
 pub async fn is_pty_active(state: State<'_, Arc<PtyManager>>, pty_id: String) -> Result<bool, String> {
     let instances = state.instances.lock().expect("PTY instances mutex poisoned");
     Ok(instances.contains_key(&pty_id))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::utf8_incomplete_tail_start;
+
+    #[test]
+    fn complete_ascii_passes_through() {
+        assert_eq!(utf8_incomplete_tail_start(b"hello"), 5);
+    }
+
+    #[test]
+    fn complete_multibyte_passes_through() {
+        let s = "── ⏺ ↓".as_bytes();
+        assert_eq!(utf8_incomplete_tail_start(s), s.len());
+    }
+
+    #[test]
+    fn split_three_byte_char_is_carried() {
+        // "─" is E2 94 80; cut after 1 and 2 bytes
+        let full = "abc─".as_bytes();
+        assert_eq!(utf8_incomplete_tail_start(&full[..4]), 3); // abc + E2
+        assert_eq!(utf8_incomplete_tail_start(&full[..5]), 3); // abc + E2 94
+        assert_eq!(utf8_incomplete_tail_start(full), 6);
+    }
+
+    #[test]
+    fn split_four_byte_char_is_carried() {
+        // emoji U+1F600 is F0 9F 98 80
+        let full = "x😀".as_bytes();
+        for cut in 2..5 {
+            assert_eq!(utf8_incomplete_tail_start(&full[..cut]), 1);
+        }
+        assert_eq!(utf8_incomplete_tail_start(full), 5);
+    }
+
+    #[test]
+    fn lone_continuation_bytes_are_not_carried_forever() {
+        // Garbage continuation bytes with no start byte: nothing to wait for
+        assert_eq!(utf8_incomplete_tail_start(&[0x80, 0x80, 0x80, 0x80]), 4);
+    }
 }
