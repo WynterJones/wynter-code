@@ -1189,7 +1189,7 @@ export function ProjectTabBar({
         isOpen={showProjectTemplates}
         onClose={() => setShowProjectTemplates(false)}
         onOpenProject={(path) => {
-          addProject(path);
+          handleSelectProject(path);
           setShowProjectTemplates(false);
         }}
       />

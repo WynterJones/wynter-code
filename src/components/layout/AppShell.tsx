@@ -9,6 +9,7 @@ import { MainContent } from "./MainContent";
 import { MinimizedPopupTabs } from "./MinimizedPopupTabs";
 import { FileBrowserPopup } from "@/components/files/FileBrowserPopup";
 import { useProjectStore } from "@/stores/projectStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useMeditationStore } from "@/stores/meditationStore";
 import { useOnboardingStore } from "@/stores";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -187,6 +188,18 @@ export function AppShell() {
 
   const handleSelectProjectFromWelcome = useCallback((path: string) => {
     addProject(path);
+
+    // Link the new project to a workspace so it survives a restart. Projects are
+    // rendered filtered by their workspace's projectIds; a project that belongs to
+    // no workspace is persisted in projectStore but invisible (and looks "lost")
+    // after reload. Create a default workspace if none exists yet.
+    const newProject = useProjectStore.getState().projects.find((p) => p.path === path);
+    if (newProject) {
+      const ws = useWorkspaceStore.getState();
+      const workspaceId = ws.activeWorkspaceId ?? ws.addWorkspace("Default");
+      ws.addProjectToWorkspace(workspaceId, newProject.id);
+    }
+
     setShowProjectFileBrowser(false);
   }, [addProject]);
 

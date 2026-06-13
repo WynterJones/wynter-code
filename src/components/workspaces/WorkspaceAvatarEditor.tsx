@@ -236,7 +236,7 @@ export function WorkspaceAvatarEditor({
           )}
 
           <div className="text-xs text-text-secondary text-center">
-            PNG, JPG, or SVG (max 128x128)
+            PNG, JPG, WebP, GIF, or SVG (max 128x128)
           </div>
 
           <FileBrowserPopup

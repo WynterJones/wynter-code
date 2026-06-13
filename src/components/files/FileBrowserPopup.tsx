@@ -270,7 +270,7 @@ export function FileBrowserPopup({
       };
       reader.readAsDataURL(blob);
     } catch (error) {
-      // Ignore - best effort file read
+      console.error("[FileBrowserPopup] Failed to read selected image:", error);
     }
   }, [getSelectedFile, onSendToPrompt, onClose]);
 

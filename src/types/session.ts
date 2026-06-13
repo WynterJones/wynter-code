@@ -4,7 +4,7 @@ export type CodexModel = "gpt-5.5" | "gpt-5.4" | "gpt-5.4-mini" | "gpt-5.3-codex
 export type AIProvider = "claude" | "codex";
 export type AIModel = ClaudeModel | CodexModel;
 
-export type SessionType = "claude" | "terminal" | "codespace";
+export type SessionType = "claude" | "terminal" | "codespace" | "iframe";
 
 export interface Session {
   id: string;
@@ -18,6 +18,8 @@ export interface Session {
   createdAt: Date;
   color?: string;
   permissionMode: PermissionMode;
+  /** For "iframe" sessions: the URL loaded in the tab's iframe */
+  iframeUrl?: string;
 }
 
 export interface ImageAttachment {

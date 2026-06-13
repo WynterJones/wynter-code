@@ -5,6 +5,8 @@ dolt-access.lock
 # Runtime files
 bd.sock
 bd.sock.startlock
+daemon.lock
+daemon.pid
 sync-state.json
 last-touched
 

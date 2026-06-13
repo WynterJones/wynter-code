@@ -14,6 +14,7 @@ import {
   Search,
   Code,
   Github,
+  Globe,
 } from "lucide-react";
 import {
   DndContext,
@@ -135,6 +136,11 @@ function SortableSessionTab({
           />
         ) : session.type === "codespace" ? (
           <Code
+            className="w-3.5 h-3.5"
+            style={{ color: session.color || "currentColor" }}
+          />
+        ) : session.type === "iframe" ? (
+          <Globe
             className="w-3.5 h-3.5"
             style={{ color: session.color || "currentColor" }}
           />
@@ -345,7 +351,7 @@ export function SessionTabBar({
     setShowNewDropdown(!showNewDropdown);
   };
 
-  const handleCreateSession = (type: "claude" | "terminal" | "codespace") => {
+  const handleCreateSession = (type: "claude" | "terminal" | "codespace" | "iframe") => {
     createSession(projectId, type);
     setShowNewDropdown(false);
   };
@@ -594,6 +600,13 @@ export function SessionTabBar({
               {sessions.some((s) => s.type === "codespace") && (
                 <span className="text-[10px] text-text-secondary/50 ml-auto">(1 max)</span>
               )}
+            </button>
+            <button
+              onClick={() => handleCreateSession("iframe")}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:text-text-primary hover:bg-bg-hover rounded transition-colors"
+            >
+              <Globe className="w-4 h-4" />
+              New Web Page
             </button>
           </div>
         )}

@@ -5,6 +5,15 @@ import type { Session, Message, AIModel, AIProvider, ToolCall, StreamingStats, P
 import type { PendingQuestion, PendingQuestionSet } from "@/components/output/AskUserQuestionBlock";
 import type { CustomHandledCommand } from "@/types/slashCommandResponse";
 
+/** Derive a short tab name from an iframe URL (hostname), falling back to "Web" */
+function deriveIframeName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "") || "Web";
+  } catch {
+    return "Web";
+  }
+}
+
 /** Map update helper - clones map and sets a value */
 function mapSet<K, V>(map: Map<K, V>, key: K, value: V): Map<K, V> {
   const newMap = new Map(map);
@@ -86,6 +95,7 @@ interface SessionStore {
   updateSessionColor: (sessionId: string, color: string) => void;
   updateSessionPermissionMode: (sessionId: string, mode: PermissionMode) => void;
   updateSessionProvider: (sessionId: string, provider: AIProvider) => void;
+  updateSessionIframeUrl: (sessionId: string, iframeUrl: string) => void;
   updateProviderSessionId: (sessionId: string, providerSessionId: string) => void;
   getSession: (sessionId: string) => Session | undefined;
 
@@ -170,7 +180,7 @@ export const useSessionStore = create<SessionStore>()(
         const session: Session = {
           id: sessionId,
           projectId,
-          name: name ?? (type === "terminal" ? "Terminal" : type === "codespace" ? "Codespace" : ""),
+          name: name ?? (type === "terminal" ? "Terminal" : type === "codespace" ? "Codespace" : type === "iframe" ? "Web" : ""),
           type,
           provider,
           model,
@@ -359,6 +369,19 @@ export const useSessionStore = create<SessionStore>()(
           for (const [projectId, sessions] of newSessions) {
             const updatedSessions = sessions.map((s) =>
               s.id === sessionId ? { ...s, provider } : s
+            );
+            newSessions.set(projectId, updatedSessions);
+          }
+          return { sessions: newSessions };
+        });
+      },
+
+      updateSessionIframeUrl: (sessionId: string, iframeUrl: string) => {
+        set((state) => {
+          const newSessions = new Map(state.sessions);
+          for (const [projectId, sessions] of newSessions) {
+            const updatedSessions = sessions.map((s) =>
+              s.id === sessionId ? { ...s, iframeUrl, name: deriveIframeName(iframeUrl) } : s
             );
             newSessions.set(projectId, updatedSessions);
           }

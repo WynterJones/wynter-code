@@ -6,6 +6,7 @@ import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudePopup } from "@/components/claude";
 import { CodespaceEditor } from "@/components/codespace";
+import { IframeSession } from "@/components/iframe/IframeSession";
 import { PanelLayoutContainer } from "@/components/panels";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
@@ -143,6 +144,9 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
   const isStreaming = streamingState?.isStreaming || false;
   const isTerminalSession = currentSession?.type === "terminal";
   const isCodespaceSession = currentSession?.type === "codespace";
+  const isIframeSession = currentSession?.type === "iframe";
+
+  const updateSessionIframeUrl = useSessionStore((state) => state.updateSessionIframeUrl);
 
   const handleTerminalPtyCreated = async (sessionId: string, ptyId: string) => {
     setSessionPtyId(sessionId, ptyId);
@@ -258,24 +262,32 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
                       onPtyCreated={(ptyId) => setPanePtyId(paneId, ptyId)}
                       isVisible={isActiveSession}
                     />
-                    <Tooltip content="Close pane">
-                      <button
-                        onClick={() => handleCloseTerminalPane(session.id, paneId)}
-                        className="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-bg-secondary/80 border border-border/50 text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </Tooltip>
+                    {/* Wrap controls in an absolutely-positioned container, not the
+                        button itself: Tooltip injects a `relative inline-flex`
+                        wrapper that would otherwise become the button's positioning
+                        context and drop it below the terminal (unclickable). */}
+                    <div className="absolute top-1.5 right-1.5 z-30">
+                      <Tooltip content="Close pane">
+                        <button
+                          onClick={() => handleCloseTerminalPane(session.id, paneId)}
+                          className="p-1 rounded bg-bg-secondary/80 border border-border/50 text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </Tooltip>
+                    </div>
                   </div>
                 ))}
-                <Tooltip content="Split terminal">
-                  <button
-                    onClick={() => addSessionPane(session.id)}
-                    className="absolute bottom-1.5 right-1.5 z-10 p-1 rounded bg-bg-secondary/80 border border-border/50 text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
-                  >
-                    <Columns2 className="w-3.5 h-3.5" />
-                  </button>
-                </Tooltip>
+                <div className="absolute bottom-1.5 right-1.5 z-30">
+                  <Tooltip content="Split terminal">
+                    <button
+                      onClick={() => addSessionPane(session.id)}
+                      className="p-1 rounded bg-bg-secondary/80 border border-border/50 text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+                    >
+                      <Columns2 className="w-3.5 h-3.5" />
+                    </button>
+                  </Tooltip>
+                </div>
               </div>
             );
           })}
@@ -287,8 +299,16 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         <CodespaceEditor sessionId={currentSessionId} projectPath={project.path} />
       )}
 
+      {/* Iframe / Web Session */}
+      {isIframeSession && currentSessionId && (
+        <IframeSession
+          url={currentSession?.iframeUrl || ""}
+          onUrlChange={(url) => updateSessionIframeUrl(currentSessionId, url)}
+        />
+      )}
+
       {/* Multi-panel layout mode */}
-      {useMultiPanelLayout && !isTerminalSession && !isCodespaceSession && (
+      {useMultiPanelLayout && !isTerminalSession && !isCodespaceSession && !isIframeSession && (
         <PanelLayoutContainer projectId={project.id} projectPath={project.path} sessionId={currentSessionId} />
       )}
 
@@ -303,7 +323,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
       )}
 
       {/* Claude session content */}
-      {currentSessionId && !isTerminalSession && !isCodespaceSession && !useMultiPanelLayout && (
+      {currentSessionId && !isTerminalSession && !isCodespaceSession && !isIframeSession && !useMultiPanelLayout && (
         <MainContentBody
           projectPath={project.path}
           sessionId={currentSession?.id}
@@ -323,7 +343,7 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         />
       )}
 
-      {!isTerminalSession && !useMultiPanelLayout && (
+      {!isTerminalSession && !isIframeSession && !useMultiPanelLayout && (
         <TerminalPanel projectId={project.id} projectPath={project.path} />
       )}
 

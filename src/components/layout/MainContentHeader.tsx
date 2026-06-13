@@ -130,19 +130,21 @@ export function MainContentHeader({
             )}
           </>
         )}
-        <Tooltip content={useMultiPanelLayout ? "Exit Panel Mode" : "Panel Layout"} side="bottom">
-          <button
-            onClick={onTogglePanelLayout}
-            className={cn(
-              "p-1.5 rounded transition-colors",
-              useMultiPanelLayout
-                ? "bg-accent/20 text-accent hover:bg-accent/30"
-                : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
-            )}
-          >
-            {useMultiPanelLayout ? <Columns className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
-          </button>
-        </Tooltip>
+        {!isTerminalSession && (
+          <Tooltip content={useMultiPanelLayout ? "Exit Panel Mode" : "Panel Layout"} side="bottom">
+            <button
+              onClick={onTogglePanelLayout}
+              className={cn(
+                "p-1.5 rounded transition-colors",
+                useMultiPanelLayout
+                  ? "bg-accent/20 text-accent hover:bg-accent/30"
+                  : "hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+              )}
+            >
+              {useMultiPanelLayout ? <Columns className="w-4 h-4" /> : <LayoutGrid className="w-4 h-4" />}
+            </button>
+          </Tooltip>
+        )}
       </div>
     </div>
   );
