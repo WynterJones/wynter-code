@@ -36,3 +36,7 @@ src-tauri/icons/
 # Testing
 coverage/
 public/audio/meditation
+
+# Dolt database files (added by bd init)
+.dolt/
+*.db
