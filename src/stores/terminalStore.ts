@@ -13,6 +13,8 @@ interface TerminalStore {
   terminals: Map<string, TerminalState>;
   sessionPtyIds: Map<string, string>;
   queuedCommands: Map<string, string>; // sessionId -> command to execute when PTY ready
+  sessionPanes: Map<string, string[]>; // sessionId -> extra split-pane ids (primary pane excluded)
+  panePtyIds: Map<string, string>; // paneId -> ptyId (ephemeral)
 
   getTerminalState: (projectId: string) => TerminalState;
   toggleTerminal: (projectId: string) => void;
@@ -27,6 +29,14 @@ interface TerminalStore {
   queueCommand: (sessionId: string, command: string) => void;
   getQueuedCommand: (sessionId: string) => string | null;
   clearQueuedCommand: (sessionId: string) => void;
+
+  // Split panes
+  addSessionPane: (sessionId: string) => void;
+  removeSessionPane: (sessionId: string, paneId: string) => void;
+  /** Remove all extra panes for a session and return their PTY ids for cleanup */
+  clearSessionPanes: (sessionId: string) => string[];
+  setPanePtyId: (paneId: string, ptyId: string) => void;
+  getPanePtyId: (paneId: string) => string | null;
 
   // Reset
   reset: () => void;
@@ -45,6 +55,8 @@ export const useTerminalStore = create<TerminalStore>()(
       terminals: new Map(),
       sessionPtyIds: new Map(),
       queuedCommands: new Map(),
+      sessionPanes: new Map(),
+      panePtyIds: new Map(),
 
       getTerminalState: (projectId: string) => {
         const state = get().terminals.get(projectId);
@@ -147,11 +159,66 @@ export const useTerminalStore = create<TerminalStore>()(
         });
       },
 
+      addSessionPane: (sessionId: string) => {
+        set((state) => {
+          const sessionPanes = new Map(state.sessionPanes);
+          const panes = sessionPanes.get(sessionId) || [];
+          sessionPanes.set(sessionId, [...panes, `${sessionId}:pane:${crypto.randomUUID()}`]);
+          return { sessionPanes };
+        });
+      },
+
+      removeSessionPane: (sessionId: string, paneId: string) => {
+        set((state) => {
+          const sessionPanes = new Map(state.sessionPanes);
+          const panes = (sessionPanes.get(sessionId) || []).filter((p) => p !== paneId);
+          if (panes.length > 0) {
+            sessionPanes.set(sessionId, panes);
+          } else {
+            sessionPanes.delete(sessionId);
+          }
+          const panePtyIds = new Map(state.panePtyIds);
+          panePtyIds.delete(paneId);
+          return { sessionPanes, panePtyIds };
+        });
+      },
+
+      clearSessionPanes: (sessionId: string) => {
+        const panes = get().sessionPanes.get(sessionId) || [];
+        const ptyIds = panes
+          .map((paneId) => get().panePtyIds.get(paneId))
+          .filter((id): id is string => !!id);
+        set((state) => {
+          const sessionPanes = new Map(state.sessionPanes);
+          sessionPanes.delete(sessionId);
+          const panePtyIds = new Map(state.panePtyIds);
+          for (const paneId of panes) {
+            panePtyIds.delete(paneId);
+          }
+          return { sessionPanes, panePtyIds };
+        });
+        return ptyIds;
+      },
+
+      setPanePtyId: (paneId: string, ptyId: string) => {
+        set((state) => {
+          const panePtyIds = new Map(state.panePtyIds);
+          panePtyIds.set(paneId, ptyId);
+          return { panePtyIds };
+        });
+      },
+
+      getPanePtyId: (paneId: string) => {
+        return get().panePtyIds.get(paneId) || null;
+      },
+
       reset: () => {
         set({
           terminals: new Map(),
           sessionPtyIds: new Map(),
           queuedCommands: new Map(),
+          sessionPanes: new Map(),
+          panePtyIds: new Map(),
         });
       },
     }),
@@ -175,9 +242,11 @@ export const useTerminalStore = create<TerminalStore>()(
             state: {
               ...parsed.state,
               terminals,
-              // Don't restore session ptyIds or queued commands - they're ephemeral
+              // Don't restore session ptyIds, panes, or queued commands - they're ephemeral
               sessionPtyIds: new Map(),
               queuedCommands: new Map(),
+              sessionPanes: new Map(),
+              panePtyIds: new Map(),
             },
           };
         },
@@ -191,9 +260,11 @@ export const useTerminalStore = create<TerminalStore>()(
             state: {
               ...value.state,
               terminals,
-              // Don't persist session ptyIds or queued commands
+              // Don't persist session ptyIds, panes, or queued commands
               sessionPtyIds: [],
               queuedCommands: [],
+              sessionPanes: [],
+              panePtyIds: [],
             },
           };
           localStorage.setItem(name, JSON.stringify(serialized));

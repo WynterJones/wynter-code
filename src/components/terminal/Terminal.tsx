@@ -528,6 +528,13 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       // Debounce the fit call (Issue #3)
       debouncedFitRef.current = setTimeout(() => {
         debouncedFitRef.current = null;
+        // Never fit while the container has no dimensions (hidden tab):
+        // fitting at 0x0 shrinks the PTY to ~2 cols and the running TUI
+        // permanently reflows its history one character per line
+        const el = terminalRef.current;
+        if (!el) return;
+        const { width, height } = el.getBoundingClientRect();
+        if (width === 0 || height === 0) return;
         fitAddonRef.current?.fit();
       }, delay);
     };
@@ -583,6 +590,25 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
       return () => cancelAnimationFrame(rafId);
     }
   }, [isFocused, isReady]);
+
+  // Refit when the terminal becomes visible again (tab switch back)
+  const prevVisibleRef = useRef(isVisible);
+  useEffect(() => {
+    const wasVisible = prevVisibleRef.current;
+    prevVisibleRef.current = isVisible;
+    if (!isVisible || wasVisible) return;
+
+    const rafId = requestAnimationFrame(() => {
+      const el = terminalRef.current;
+      const term = xtermRef.current;
+      if (!el || !term || !fitAddonRef.current) return;
+      const { width, height } = el.getBoundingClientRect();
+      if (width === 0 || height === 0) return;
+      fitAddonRef.current.fit();
+      term.refresh(0, term.rows - 1);
+    });
+    return () => cancelAnimationFrame(rafId);
+  }, [isVisible]);
 
   // PTY health monitoring (Issue #5)
   useEffect(() => {

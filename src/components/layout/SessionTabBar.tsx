@@ -361,6 +361,14 @@ export function SessionTabBar({
     setShowNewDropdown(false);
   };
 
+  const closeSessionPanePtys = useCallback((sessionId: string) => {
+    // Close PTYs of any extra split panes so shells don't leak
+    const ptyIds = useTerminalStore.getState().clearSessionPanes(sessionId);
+    for (const ptyId of ptyIds) {
+      invoke("close_pty", { ptyId }).catch(() => {});
+    }
+  }, []);
+
   const handleSessionClose = useCallback(
     async (e: React.MouseEvent, sessionId: string, sessionType: string) => {
       e.stopPropagation();
@@ -387,17 +395,19 @@ export function SessionTabBar({
         }
       }
 
+      closeSessionPanePtys(sessionId);
       removeSession(projectId, sessionId);
     },
-    [getSessionPtyId, projectId, removeSession],
+    [getSessionPtyId, projectId, removeSession, closeSessionPanePtys],
   );
 
   const handleConfirmSessionClose = useCallback(() => {
     if (closeConfirmSessionId) {
+      closeSessionPanePtys(closeConfirmSessionId);
       removeSession(projectId, closeConfirmSessionId);
       setCloseConfirmSessionId(null);
     }
-  }, [closeConfirmSessionId, projectId, removeSession]);
+  }, [closeConfirmSessionId, projectId, removeSession, closeSessionPanePtys]);
 
   const handleStopClaudeSession = useCallback(
     async (e: React.MouseEvent, sessionId: string) => {

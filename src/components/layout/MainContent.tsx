@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { X, Columns2 } from "lucide-react";
+import { Tooltip } from "@/components/ui";
 import { TerminalPanel } from "@/components/terminal/TerminalPanel";
 import { Terminal } from "@/components/terminal/Terminal";
 import { ClaudePopup } from "@/components/claude";
@@ -38,7 +40,18 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     clearMessages,
     clearContextStats,
   } = useSessionStore();
-  const { toggleTerminal, getSessionPtyId, setSessionPtyId, getQueuedCommand, clearQueuedCommand } = useTerminalStore();
+  const {
+    toggleTerminal,
+    getSessionPtyId,
+    setSessionPtyId,
+    getQueuedCommand,
+    clearQueuedCommand,
+    sessionPanes,
+    addSessionPane,
+    removeSessionPane,
+    getPanePtyId,
+    setPanePtyId,
+  } = useTerminalStore();
   const { useMultiPanelLayout, setUseMultiPanelLayout, sidebarCollapsed, sidebarPosition, installedProviders } = useSettingsStore();
   const { getFiles, loadIndex } = useFileIndexStore();
   const projectFiles = getFiles(project.path);
@@ -153,6 +166,17 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
     toggleTerminal(project.id);
   }, [toggleTerminal, project.id]);
 
+  const handleCloseTerminalPane = useCallback(
+    (sessionId: string, paneId: string) => {
+      const ptyId = getPanePtyId(paneId);
+      if (ptyId) {
+        invoke("close_pty", { ptyId }).catch(() => {});
+      }
+      removeSessionPane(sessionId, paneId);
+    },
+    [getPanePtyId, removeSessionPane]
+  );
+
   const handleTogglePanelLayout = useCallback(() => {
     setUseMultiPanelLayout(!useMultiPanelLayout);
   }, [setUseMultiPanelLayout, useMultiPanelLayout]);
@@ -203,23 +227,60 @@ export function MainContent({ project, pendingImage, onImageConsumed, onRequestI
         onClearContext={handleClearContext}
       />
 
-      {/* Persistent Terminal Sessions - always mounted, hidden when not active */}
-      {terminalSessions.map((session) => (
-        <div
-          key={session.id}
-          className={cn(
-            "flex-1 overflow-hidden",
-            currentSessionId !== session.id && "hidden"
-          )}
-        >
-          <Terminal
-            projectPath={project.path}
-            ptyId={getSessionPtyId(session.id)}
-            onPtyCreated={(ptyId) => handleTerminalPtyCreated(session.id, ptyId)}
-            isVisible={currentSessionId === session.id}
-          />
+      {/* Persistent Terminal Sessions - always mounted. Inactive sessions are
+          hidden with visibility (not display:none) so their containers keep
+          real dimensions; fitting at 0x0 shrinks the PTY and permanently
+          reflows TUI history one character per line. */}
+      {terminalSessions.length > 0 && (
+        <div className={cn("flex-1 relative overflow-hidden", !isTerminalSession && "hidden")}>
+          {terminalSessions.map((session) => {
+            const isActiveSession = currentSessionId === session.id;
+            const extraPanes = sessionPanes.get(session.id) || [];
+            return (
+              <div
+                key={session.id}
+                className="absolute inset-0 flex"
+                style={{ visibility: isActiveSession ? "visible" : "hidden", zIndex: isActiveSession ? 1 : 0 }}
+              >
+                <div className="flex-1 min-w-0 relative">
+                  <Terminal
+                    projectPath={project.path}
+                    ptyId={getSessionPtyId(session.id)}
+                    onPtyCreated={(ptyId) => handleTerminalPtyCreated(session.id, ptyId)}
+                    isVisible={isActiveSession}
+                  />
+                </div>
+                {extraPanes.map((paneId) => (
+                  <div key={paneId} className="flex-1 min-w-0 relative border-l border-border">
+                    <Terminal
+                      projectPath={project.path}
+                      ptyId={getPanePtyId(paneId)}
+                      onPtyCreated={(ptyId) => setPanePtyId(paneId, ptyId)}
+                      isVisible={isActiveSession}
+                    />
+                    <Tooltip content="Close pane">
+                      <button
+                        onClick={() => handleCloseTerminalPane(session.id, paneId)}
+                        className="absolute top-1.5 right-1.5 z-10 p-1 rounded bg-bg-secondary/80 border border-border/50 text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
+                  </div>
+                ))}
+                <Tooltip content="Split terminal">
+                  <button
+                    onClick={() => addSessionPane(session.id)}
+                    className="absolute bottom-1.5 right-1.5 z-10 p-1 rounded bg-bg-secondary/80 border border-border/50 text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-colors"
+                  >
+                    <Columns2 className="w-3.5 h-3.5" />
+                  </button>
+                </Tooltip>
+              </div>
+            );
+          })}
         </div>
-      ))}
+      )}
 
       {/* Codespace Session */}
       {isCodespaceSession && currentSessionId && (
