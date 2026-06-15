@@ -8,6 +8,11 @@ import type {
   ClaudeSettings,
   ClaudeVersionInfo,
 } from "@/types";
+import {
+  areFarmworkHooksInstalled,
+  installFarmworkHooks,
+  uninstallFarmworkHooks,
+} from "@/lib/farmworkHooks";
 
 type ClaudeManagerTab = "commands" | "skills" | "subagents" | "settings";
 
@@ -32,6 +37,10 @@ interface ClaudeStore {
   // Version info
   versionInfo: ClaudeVersionInfo;
   isCheckingUpdate: boolean;
+
+  // Farmwork hooks (global ~/.claude integration for the visualization)
+  farmworkHooksInstalled: boolean;
+  isTogglingFarmworkHooks: boolean;
 
   // Loading states
   isLoading: boolean;
@@ -62,6 +71,10 @@ interface ClaudeStore {
   // Actions - Version
   getVersion: () => Promise<void>;
   checkForUpdate: () => Promise<void>;
+
+  // Actions - Farmwork hooks
+  checkFarmworkHooks: () => Promise<void>;
+  toggleFarmworkHooks: () => Promise<void>;
 }
 
 export const useClaudeStore = create<ClaudeStore>()(
@@ -89,6 +102,9 @@ export const useClaudeStore = create<ClaudeStore>()(
         lastChecked: null,
       },
       isCheckingUpdate: false,
+
+      farmworkHooksInstalled: false,
+      isTogglingFarmworkHooks: false,
 
       isLoading: false,
       error: null,
@@ -251,6 +267,34 @@ export const useClaudeStore = create<ClaudeStore>()(
         } catch (error) {
           console.error("Failed to check for updates:", error);
           set({ isCheckingUpdate: false });
+        }
+      },
+
+      // Farmwork hooks
+      checkFarmworkHooks: async () => {
+        try {
+          const installed = await areFarmworkHooksInstalled();
+          set({ farmworkHooksInstalled: installed });
+        } catch (error) {
+          console.error("Failed to check farmwork hooks:", error);
+        }
+      },
+
+      toggleFarmworkHooks: async () => {
+        if (get().isTogglingFarmworkHooks) return;
+        set({ isTogglingFarmworkHooks: true, error: null });
+        try {
+          if (get().farmworkHooksInstalled) {
+            await uninstallFarmworkHooks();
+            set({ farmworkHooksInstalled: false });
+          } else {
+            await installFarmworkHooks();
+            set({ farmworkHooksInstalled: true });
+          }
+        } catch (error) {
+          set({ error: String(error) });
+        } finally {
+          set({ isTogglingFarmworkHooks: false });
         }
       },
     }),

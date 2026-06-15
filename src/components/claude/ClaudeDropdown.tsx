@@ -1,5 +1,15 @@
 import { useEffect, useRef } from "react";
-import { Terminal, Zap, Bot, Settings, RefreshCw, ExternalLink } from "lucide-react";
+import {
+  Terminal,
+  Zap,
+  Bot,
+  Settings,
+  RefreshCw,
+  ExternalLink,
+  Tractor,
+  Check,
+  Loader2,
+} from "lucide-react";
 import { useClaudeStore } from "@/stores";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +32,10 @@ export function ClaudeDropdown({ projectPath }: ClaudeDropdownProps) {
     skills,
     subagents,
     loadAllFiles,
+    farmworkHooksInstalled,
+    isTogglingFarmworkHooks,
+    checkFarmworkHooks,
+    toggleFarmworkHooks,
   } = useClaudeStore();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -33,8 +47,9 @@ export function ClaudeDropdown({ projectPath }: ClaudeDropdownProps) {
   useEffect(() => {
     if (isDropdownOpen) {
       loadAllFiles(projectPath);
+      checkFarmworkHooks();
     }
-  }, [isDropdownOpen, projectPath, loadAllFiles]);
+  }, [isDropdownOpen, projectPath, loadAllFiles, checkFarmworkHooks]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -145,6 +160,32 @@ export function ClaudeDropdown({ projectPath }: ClaudeDropdownProps) {
             >
               <Settings className="w-4 h-4" />
               <span>Settings</span>
+            </button>
+          </div>
+
+          <div className="border-t border-border py-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFarmworkHooks();
+              }}
+              disabled={isTogglingFarmworkHooks}
+              title="Install global Claude Code hooks that drive the Farmwork visualization from any session"
+              className="w-full flex items-center justify-between px-3 py-2 text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors disabled:opacity-60"
+            >
+              <div className="flex items-center gap-2">
+                <Tractor className="w-4 h-4" />
+                <span>
+                  {farmworkHooksInstalled
+                    ? "Uninstall Farmwork Hooks"
+                    : "Install Farmwork Hooks"}
+                </span>
+              </div>
+              {isTogglingFarmworkHooks ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : farmworkHooksInstalled ? (
+                <Check className="w-3.5 h-3.5 text-accent-green" />
+              ) : null}
             </button>
           </div>
 

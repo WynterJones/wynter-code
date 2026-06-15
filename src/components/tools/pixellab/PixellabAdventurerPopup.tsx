@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Loader2, Sparkles, Pin, PinOff, Plus, Check, ExternalLink } from "lucide-react";
+import { Loader2, Sparkles, Pin, PinOff, Plus, Check, ExternalLink, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -30,7 +30,7 @@ import {
   type BalanceInfo,
 } from "@/services/pixellabClient";
 import { SpriteAnimation } from "@/components/adventurer/SpriteAnimation";
-import { saveFrames, clipSrcs } from "@/services/adventurerAssets";
+import { saveFrames, clipSrcs, baseSpriteSrc } from "@/services/adventurerAssets";
 
 interface PixellabAdventurerPopupProps {
   isOpen: boolean;
@@ -83,6 +83,7 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
   const [emoteProgress, setEmoteProgress] = useState<EmoteProgress[]>([]);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [newEmote, setNewEmote] = useState("");
+  const [regenName, setRegenName] = useState<string | null>(null);
 
   const savedAdventurer = adventurers.find((a) => a.id === savedId) ?? null;
 
@@ -240,6 +241,36 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
     }
   };
 
+  // Regenerate a single emote's frames (also repairs older broken clips).
+  const handleRegenerate = async (clip: AnimationClip) => {
+    if (!savedAdventurer) return;
+    setError(null);
+    setRegenName(clip.name);
+    try {
+      const frames = await animateAndCollect(apiKey, {
+        characterId: savedAdventurer.pixellabCharacterId,
+        action: clip.name === "idle" ? "idle breathing" : clip.name,
+      });
+      const clipId = crypto.randomUUID();
+      const framePaths =
+        frames.length > 0
+          ? await saveFrames(savedAdventurer.id, clipId, frames)
+          : savedAdventurer.baseSpritePath
+            ? [savedAdventurer.baseSpritePath]
+            : [];
+      addAnimation(savedAdventurer.id, {
+        id: clipId,
+        name: clip.name,
+        framePaths,
+        fps: clip.fps,
+      });
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setRegenName(null);
+    }
+  };
+
   const handlePin = async () => {
     if (!savedAdventurer) return;
     setPinned(savedAdventurer.id);
@@ -332,6 +363,31 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
                 Change key
               </Button>
             </div>
+
+            {adventurers.length > 0 && (
+              <div className="flex flex-col gap-2 border-t border-border pt-3">
+                <label className="text-xs text-text-secondary">Your adventurers</label>
+                <div className="flex flex-wrap gap-2">
+                  {adventurers.map((a) => (
+                    <button
+                      key={a.id}
+                      onClick={() => {
+                        setSavedId(a.id);
+                        setStep("manage");
+                      }}
+                      className="flex items-center gap-2 rounded-md border border-border bg-bg-tertiary px-2 py-1.5 hover:border-accent/50 transition-colors"
+                    >
+                      <SpriteAnimation
+                        frames={[baseSpriteSrc(a) ?? ""].filter(Boolean)}
+                        size={24}
+                      />
+                      <span className="text-xs text-text-primary">{a.name}</span>
+                      {pinnedId === a.id && <Pin className="w-3 h-3 text-accent" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -408,7 +464,18 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
         {step === "manage" && savedAdventurer && (
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-text-primary">{savedAdventurer.name}</h3>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setSavedId(null);
+                    setStep("describe");
+                  }}
+                >
+                  Back
+                </Button>
+                <h3 className="text-sm font-semibold text-text-primary">{savedAdventurer.name}</h3>
+              </div>
               {pinnedId === savedAdventurer.id ? (
                 <Button variant="secondary" onClick={handleUnpin}>
                   <PinOff className="w-4 h-4 mr-1" /> Unpin
@@ -421,15 +488,36 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
             </div>
 
             <div className="grid grid-cols-4 gap-3">
-              {savedAdventurer.animations.map((clip) => (
-                <div
-                  key={clip.id}
-                  className="flex flex-col items-center gap-1 rounded-md border border-border bg-bg-tertiary p-2"
-                >
-                  <SpriteAnimation frames={clipSrcs(clip)} fps={clip.fps} size={72} />
-                  <span className="text-xs capitalize text-text-secondary">{clip.name}</span>
-                </div>
-              ))}
+              {savedAdventurer.animations.map((clip) => {
+                const regenerating = regenName === clip.name;
+                return (
+                  <div
+                    key={clip.id}
+                    className="group relative flex flex-col items-center gap-1 rounded-md border border-border bg-bg-tertiary p-2"
+                  >
+                    <SpriteAnimation frames={clipSrcs(clip)} fps={clip.fps} size={72} />
+                    <span className="text-xs capitalize text-text-secondary">{clip.name}</span>
+                    <button
+                      onClick={() => handleRegenerate(clip)}
+                      disabled={busy || regenerating || regenName !== null}
+                      title={`Regenerate ${clip.name}`}
+                      aria-label={`Regenerate ${clip.name}`}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-bg-secondary/80 hover:bg-bg-secondary flex items-center justify-center text-text-secondary hover:text-text-primary opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity disabled:opacity-50"
+                    >
+                      {regenerating ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                    {regenerating && (
+                      <div className="absolute inset-0 rounded-md bg-bg-primary/60 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="flex flex-col gap-2 border-t border-border pt-3">

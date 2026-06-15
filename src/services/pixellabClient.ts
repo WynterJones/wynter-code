@@ -103,6 +103,53 @@ export function toDataUri(base64: string): string {
   return base64.startsWith("data:") ? base64 : `data:image/png;base64,${base64}`;
 }
 
+/** Decode a base64 string (raw, not a data URI) into bytes. */
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+/**
+ * Encode a raw RGBA pixel buffer into a PNG data URI via canvas.
+ * PixelLab's animation jobs return frames as `rgba_bytes` (raw RGBA), not PNG —
+ * these must be re-encoded before they can be used as an <img> src or saved.
+ */
+function rgbaBytesToPngDataUri(base64: string, width: number, height: number): string {
+  const bytes = base64ToBytes(base64);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new PixelLabError(0, "Canvas 2D context unavailable for frame encoding");
+  const imageData = ctx.createImageData(width, height);
+  imageData.data.set(bytes.subarray(0, imageData.data.length));
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL("image/png");
+}
+
+/** A single image as returned by PixelLab jobs. */
+interface PixelLabImage {
+  type?: string;
+  base64?: string;
+  width?: number;
+  height?: number;
+}
+
+function isFrameImage(o: unknown): o is PixelLabImage {
+  return !!o && typeof o === "object" && typeof (o as PixelLabImage).base64 === "string";
+}
+
+/** Turn one PixelLab image (PNG base64 or raw rgba_bytes) into a PNG data URI. */
+function imageToDataUri(img: PixelLabImage): string | null {
+  if (!img.base64) return null;
+  if (img.type === "rgba_bytes" && img.width && img.height) {
+    return rgbaBytesToPngDataUri(img.base64, img.width, img.height);
+  }
+  return toDataUri(img.base64);
+}
+
 // ---------------------------------------------------------------------------
 // Balance / key validation
 // ---------------------------------------------------------------------------
@@ -254,8 +301,46 @@ export interface PollOptions {
   maxAttempts?: number;
 }
 
-/** Collect every base64 image found anywhere in a completed job response. */
+/**
+ * Collect ordered animation frames from a completed job response.
+ *
+ * PixelLab animation jobs return `last_response.images` as an ordered array of
+ * `{ type: "rgba_bytes", width, height, base64 }` — raw RGBA buffers that must
+ * be re-encoded to PNG (their public `storage_urls` are not directly fetchable).
+ * Older/simple shapes carry a single PNG base64; those are walked as a fallback.
+ */
 function collectFrames(response: unknown): string[] {
+  // Preferred: an ordered `images` array of frame objects (animation jobs).
+  let imagesArray: PixelLabImage[] | null = null;
+  const findImages = (node: unknown) => {
+    if (imagesArray || !node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      if (node.length > 0 && node.every(isFrameImage)) {
+        imagesArray = node as PixelLabImage[];
+        return;
+      }
+      node.forEach(findImages);
+      return;
+    }
+    const obj = node as Record<string, unknown>;
+    if (
+      Array.isArray(obj.images) &&
+      obj.images.length > 0 &&
+      obj.images.every(isFrameImage)
+    ) {
+      imagesArray = obj.images as PixelLabImage[];
+      return;
+    }
+    Object.values(obj).forEach(findImages);
+  };
+  findImages(response);
+  if (imagesArray) {
+    return (imagesArray as PixelLabImage[])
+      .map(imageToDataUri)
+      .filter((s): s is string => !!s);
+  }
+
+  // Fallback: walk for a single base64 PNG image (non-animation shapes).
   const frames: string[] = [];
   const visit = (node: unknown) => {
     if (!node) return;

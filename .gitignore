@@ -40,3 +40,6 @@ public/audio/meditation
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+# Farmwork hook event stream (transient, fed to the visualization)
+.farmwork/

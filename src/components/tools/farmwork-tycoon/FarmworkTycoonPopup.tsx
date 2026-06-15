@@ -4,6 +4,7 @@ import { useProjectStore } from "@/stores";
 import { useSessionStore } from "@/stores/sessionStore";
 import { useTerminalStore } from "@/stores/terminalStore";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
+import { useFarmworkHookEvents } from "@/hooks/useFarmworkHookEvents";
 import { TycoonGame } from "./game/TycoonGame";
 import { StatsSidebar } from "./sidebar/StatsSidebar";
 import { IconButton } from "@/components/ui/IconButton";
@@ -68,6 +69,9 @@ export function FarmworkTycoonPopup({ isOpen, onClose, onOpenMarkdownFile }: Far
   const [containerSize, setContainerSize] = useState({ width: 600, height: 600 });
   const [farmworkStatus, setFarmworkStatus] = useState<"checking" | "installed" | "not_installed_globally" | "not_initialized_in_project">("checking");
   const [copied, setCopied] = useState(false);
+
+  // Stream Claude Code hook tool-events (any session in this project) into the farm.
+  useFarmworkHookEvents(activeProject?.path, isOpen && isInitialized);
 
   // Capture pending building selection and clear it (for mini player -> full popup flow)
   const initialBuildingRef = useRef<string | null>(null);

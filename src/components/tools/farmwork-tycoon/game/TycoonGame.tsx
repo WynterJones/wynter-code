@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Application, Sprite, Graphics, Container, Assets } from "pixi.js";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { navigationSystem } from "./navigation/NavigationSystem";
@@ -76,7 +76,12 @@ export function TycoonGame({
     setNavGraph
   );
 
-  // Initialize PixiJS app once on mount
+  // Bumped to force a full PixiJS re-init when the WebGL context is lost
+  // (WebKit can drop a context when too many live canvases exist, or on GPU reset).
+  const [remountToken, setRemountToken] = useState(0);
+
+  // Initialize PixiJS app once on mount (and again whenever remountToken changes,
+  // i.e. after a WebGL context-loss recovery).
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -84,6 +89,10 @@ export function TycoonGame({
     // This properly handles React Strict Mode's double-invoke pattern
     let cancelled = false;
     let localApp: Application | null = null;
+    // Canvas + handler captured here so cleanup can detach/recover regardless of
+    // how far async init progressed.
+    let localCanvas: HTMLCanvasElement | null = null;
+    let handleContextLost: ((e: Event) => void) | null = null;
 
     mountedRef.current = true;
 
@@ -134,6 +143,19 @@ export function TycoonGame({
       appReadyRef.current = true;
       initializedRef.current = true;
       containerRef.current?.appendChild(app.canvas);
+
+      // Recover from WebGL context loss instead of staying permanently black.
+      // Preventing the default lets the browser keep the canvas alive; we then
+      // schedule a full re-init once the GPU has had a moment to reclaim resources.
+      localCanvas = app.canvas;
+      handleContextLost = (e: Event) => {
+        e.preventDefault();
+        if (cancelled) return;
+        setTimeout(() => {
+          if (!cancelled) setRemountToken((t) => t + 1);
+        }, 250);
+      };
+      localCanvas.addEventListener("webglcontextlost", handleContextLost, false);
 
       // Load all map variants for day/night and seasonal cycling
       try {
@@ -287,6 +309,11 @@ export function TycoonGame({
       cancelled = true;
       mountedRef.current = false;
 
+      // Detach the context-loss listener before teardown.
+      if (localCanvas && handleContextLost) {
+        localCanvas.removeEventListener("webglcontextlost", handleContextLost);
+      }
+
       // Clean up the PixiJS app
       if (localApp) {
         try {
@@ -301,6 +328,16 @@ export function TycoonGame({
           if (localApp.stage) {
             localApp.stage.removeChildren();
           }
+
+          // Explicitly release the WebGL context so WebKit doesn't exhaust its
+          // limited pool of live contexts (the cause of the unrecoverable black
+          // screen after repeated open/expand/close).
+          try {
+            const gl = (localApp as unknown as {
+              renderer?: { gl?: WebGLRenderingContext };
+            }).renderer?.gl;
+            gl?.getExtension("WEBGL_lose_context")?.loseContext();
+          } catch { /* renderer already gone */ }
 
           // Remove the canvas from DOM manually
           if (localApp.canvas?.parentNode) {
@@ -341,7 +378,7 @@ export function TycoonGame({
       vehicleSpritesRef.current.clear();
       mapSpritesRef.current.clear();
     };
-  }, []);
+  }, [remountToken]);
 
   // Calculate scale based on container size
   useEffect(() => {

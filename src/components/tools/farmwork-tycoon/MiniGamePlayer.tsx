@@ -2,6 +2,8 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { TycoonGame } from "./game/TycoonGame";
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
+import { useProjectStore } from "@/stores";
+import { useFarmworkHookEvents } from "@/hooks/useFarmworkHookEvents";
 import { usePopupRegistryStore, selectHasOpenPopup } from "@/stores/popupRegistryStore";
 import { IconButton } from "@/components/ui/IconButton";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -56,6 +58,15 @@ interface Position {
 export function MiniGamePlayer({ isOpen, onClose, onExpand }: MiniGamePlayerProps) {
   const { refreshStats, isInitialized, setPendingBuildingSelection, hideForPopup, restoreAfterPopup } = useFarmworkTycoonStore();
   const hasOpenPopup = usePopupRegistryStore(selectHasOpenPopup);
+
+  const activeProjectId = useProjectStore((s) => s.activeProjectId);
+  const getProject = useProjectStore((s) => s.getProject);
+  const activeProjectPath = useMemo(
+    () => (activeProjectId ? getProject(activeProjectId)?.path : undefined),
+    [activeProjectId, getProject]
+  );
+  // Stream Claude Code hook tool-events (any session in this project) into the farm.
+  useFarmworkHookEvents(activeProjectPath, isOpen && isInitialized);
 
   // Hide mini player when any popup is open, restore when all popups close
   useEffect(() => {
