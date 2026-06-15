@@ -8443,7 +8443,7 @@ dependencies = [
 
 [[package]]
 name = "wynter-code"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "axum",
  "axum-extra",

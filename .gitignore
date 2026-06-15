@@ -43,3 +43,8 @@ public/audio/meditation
 
 # Farmwork hook event stream (transient, fed to the visualization)
 .farmwork/
+
+# Release binaries (uploaded to GitHub Releases, not committed)
+/Wynter.Code_*.dmg
+/Wynter.Code_*.app.tar.gz
+/Wynter.Code_*.app.tar.gz.sig
