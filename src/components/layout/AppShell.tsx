@@ -24,6 +24,7 @@ import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useCustomMusic } from "@/hooks/useCustomMusic";
 import { useBackupScheduler } from "@/hooks/useBackupScheduler";
 import { useAdventurerActivity } from "@/hooks/useAdventurerActivity";
+import { AdventurerCompanionOverlay } from "@/components/adventurer/AdventurerCompanionOverlay";
 import { DragGhost } from "@/components/files/DragGhost";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
@@ -330,6 +331,7 @@ export function AppShell() {
       <MeditationAudioController />
       <MiniMeditationPlayer />
       <DragGhost />
+      <AdventurerCompanionOverlay />
 
       {activeProject ? (
         <div className="flex-1 flex flex-col overflow-hidden">

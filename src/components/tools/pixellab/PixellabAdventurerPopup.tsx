@@ -8,7 +8,6 @@
  */
 
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Loader2, Sparkles, Pin, PinOff, Plus, Check, ExternalLink, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
@@ -17,8 +16,11 @@ import { ErrorBanner } from "@/components/ui/ErrorBanner";
 import {
   useAdventurerStore,
   DEFAULT_EMOTES,
+  TRIGGER_OPTIONS,
+  triggerForClipName,
   type Adventurer,
   type AnimationClip,
+  type AdventurerTrigger,
 } from "@/stores/adventurerStore";
 import {
   getBalance,
@@ -67,6 +69,7 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
   const pinnedId = useAdventurerStore((s) => s.pinnedId);
   const addAdventurer = useAdventurerStore((s) => s.addAdventurer);
   const addAnimation = useAdventurerStore((s) => s.addAnimation);
+  const setAnimationTrigger = useAdventurerStore((s) => s.setAnimationTrigger);
   const setPinned = useAdventurerStore((s) => s.setPinned);
 
   const [step, setStep] = useState<Step>("apikey");
@@ -83,6 +86,7 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
   const [emoteProgress, setEmoteProgress] = useState<EmoteProgress[]>([]);
   const [savedId, setSavedId] = useState<string | null>(null);
   const [newEmote, setNewEmote] = useState("");
+  const [newEmoteTrigger, setNewEmoteTrigger] = useState<AdventurerTrigger>("none");
   const [regenName, setRegenName] = useState<string | null>(null);
 
   const savedAdventurer = adventurers.find((a) => a.id === savedId) ?? null;
@@ -177,6 +181,7 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
             name: emote,
             framePaths,
             fps: emote === "idle" ? 4 : 6,
+            trigger: triggerForClipName(emote),
           });
           setEmoteProgress((prev) =>
             prev.map((p) => (p.name === emote ? { ...p, status: "done" } : p))
@@ -187,7 +192,13 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
           );
           // Fall back to a static frame so the emote still exists.
           const framePaths = await saveFrames(adventurerId, clipId, [sprite]);
-          animations.push({ id: clipId, name: emote, framePaths, fps: 4 });
+          animations.push({
+            id: clipId,
+            name: emote,
+            framePaths,
+            fps: 4,
+            trigger: triggerForClipName(emote),
+          });
         }
       }
 
@@ -232,8 +243,10 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
         name: action,
         framePaths,
         fps: 6,
+        trigger: newEmoteTrigger,
       });
       setNewEmote("");
+      setNewEmoteTrigger("none");
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -263,6 +276,7 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
         name: clip.name,
         framePaths,
         fps: clip.fps,
+        trigger: clip.trigger ?? triggerForClipName(clip.name),
       });
     } catch (e) {
       setError(errorMessage(e));
@@ -271,23 +285,13 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
     }
   };
 
-  const handlePin = async () => {
+  const handlePin = () => {
     if (!savedAdventurer) return;
     setPinned(savedAdventurer.id);
-    try {
-      await invoke("create_adventurer_window", { x: 200, y: 200 });
-    } catch (e) {
-      setError(errorMessage(e));
-    }
   };
 
-  const handleUnpin = async () => {
+  const handleUnpin = () => {
     setPinned(null);
-    try {
-      await invoke("close_adventurer_window");
-    } catch {
-      /* window already closed */
-    }
   };
 
   return (
@@ -497,6 +501,25 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
                   >
                     <SpriteAnimation frames={clipSrcs(clip)} fps={clip.fps} size={72} />
                     <span className="text-xs capitalize text-text-secondary">{clip.name}</span>
+                    <select
+                      value={clip.trigger ?? "none"}
+                      onChange={(e) =>
+                        setAnimationTrigger(
+                          savedAdventurer.id,
+                          clip.id,
+                          e.target.value as AdventurerTrigger
+                        )
+                      }
+                      title="Play this emote when…"
+                      aria-label={`Trigger for ${clip.name}`}
+                      className="w-full rounded border border-border bg-bg-secondary px-1 py-0.5 text-[10px] text-text-secondary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent/50"
+                    >
+                      {TRIGGER_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
                     <button
                       onClick={() => handleRegenerate(clip)}
                       disabled={busy || regenerating || regenName !== null}
@@ -530,6 +553,20 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
                   onKeyDown={(e) => e.key === "Enter" && handleAddEmote()}
                   disabled={busy}
                 />
+                <select
+                  value={newEmoteTrigger}
+                  onChange={(e) => setNewEmoteTrigger(e.target.value as AdventurerTrigger)}
+                  disabled={busy}
+                  title="Play this emote when…"
+                  aria-label="Trigger for new emote"
+                  className="shrink-0 rounded-md border border-border bg-bg-tertiary px-2 py-2 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-50"
+                >
+                  {TRIGGER_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
                 <Button variant="primary" onClick={handleAddEmote} disabled={busy || !newEmote.trim()}>
                   {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
                 </Button>

@@ -27,6 +27,8 @@ export interface AnimationClip {
   /** Legacy base64 data URIs (back-compat). */
   frames?: string[];
   fps: number;
+  /** App state that auto-plays this clip on the companion ("none" = manual). */
+  trigger?: AdventurerTrigger;
 }
 
 export interface Adventurer {
@@ -45,29 +47,90 @@ export interface Adventurer {
 /** Live companion mood, reflecting current wynter-code activity. */
 export type AdventurerMood = "idle" | "active" | "thinking" | "celebrate";
 
+/** Human-readable label for a mood, shown in the status badge. */
+export const MOOD_LABELS: Record<AdventurerMood, string> = {
+  idle: "Idle",
+  active: "Working",
+  thinking: "Thinking",
+  celebrate: "Celebrating",
+};
+
+/** An app state an emote can be tied to ("none" = play manually only). */
+export type AdventurerTrigger = "none" | AdventurerMood;
+
+/** Selectable triggers for tying an emote to an app/hook state. */
+export const TRIGGER_OPTIONS: { value: AdventurerTrigger; label: string }[] = [
+  { value: "none", label: "Manual only" },
+  { value: "idle", label: "When idle" },
+  { value: "active", label: "When working" },
+  { value: "thinking", label: "When thinking" },
+  { value: "celebrate", label: "On success" },
+];
+
 /** The four default emotes generated when a character is created. */
 export const DEFAULT_EMOTES = ["idle", "walk", "wave", "cheer"] as const;
 
-/** Map a mood to the animation clip name it should play. */
+/** Map a mood to the animation clip name it should play (name-based fallback). */
 export const MOOD_TO_CLIP: Record<AdventurerMood, string> = {
   idle: "idle",
-  active: "walk",
-  thinking: "wave",
+  active: "wave",
+  thinking: "walk",
   celebrate: "cheer",
 };
+
+/** Default trigger for a clip given its name (keeps default emotes wired up). */
+export function triggerForClipName(name: string): AdventurerTrigger {
+  const mood = (Object.keys(MOOD_TO_CLIP) as AdventurerMood[]).find(
+    (m) => MOOD_TO_CLIP[m] === name
+  );
+  return mood ?? "none";
+}
+
+/**
+ * Resolve which clip the companion should play for a mood. Prefers a clip
+ * explicitly tied to the mood via its `trigger`, then falls back to the
+ * name-based MOOD_TO_CLIP map, then idle, then the first available clip.
+ */
+export function getClipForMood(
+  adventurer: Adventurer,
+  mood: AdventurerMood
+): AnimationClip | null {
+  const byTrigger = adventurer.animations.find((c) => c.trigger === mood);
+  if (byTrigger) return byTrigger;
+  const wanted = MOOD_TO_CLIP[mood] ?? "idle";
+  return (
+    adventurer.animations.find((c) => c.name === wanted) ??
+    adventurer.animations.find((c) => c.name === "idle") ??
+    adventurer.animations[0] ??
+    null
+  );
+}
 
 interface AdventurerState {
   apiKey: string;
   adventurers: Adventurer[];
   pinnedId: string | null;
   mood: AdventurerMood;
+  /** Companion preferences (persisted). */
+  companionFlipped: boolean;
+  companionShowStatus: boolean;
+  /** Last on-screen position of the in-app companion overlay (null = default). */
+  companionPos: { x: number; y: number } | null;
 
   setApiKey: (key: string) => void;
   addAdventurer: (adventurer: Adventurer) => void;
   addAnimation: (adventurerId: string, clip: AnimationClip) => void;
+  setAnimationTrigger: (
+    adventurerId: string,
+    clipId: string,
+    trigger: AdventurerTrigger
+  ) => void;
   removeAdventurer: (adventurerId: string) => void;
   setPinned: (id: string | null) => void;
   setMood: (mood: AdventurerMood) => void;
+  setCompanionFlipped: (flipped: boolean) => void;
+  setCompanionShowStatus: (show: boolean) => void;
+  setCompanionPos: (pos: { x: number; y: number }) => void;
 }
 
 export const useAdventurerStore = create<AdventurerState>()(
@@ -77,6 +140,9 @@ export const useAdventurerStore = create<AdventurerState>()(
       adventurers: [],
       pinnedId: null,
       mood: "idle",
+      companionFlipped: false,
+      companionShowStatus: false,
+      companionPos: null,
 
       setApiKey: (apiKey) => set({ apiKey }),
 
@@ -98,6 +164,20 @@ export const useAdventurerStore = create<AdventurerState>()(
           ),
         })),
 
+      setAnimationTrigger: (adventurerId, clipId, trigger) =>
+        set((state) => ({
+          adventurers: state.adventurers.map((a) =>
+            a.id === adventurerId
+              ? {
+                  ...a,
+                  animations: a.animations.map((c) =>
+                    c.id === clipId ? { ...c, trigger } : c
+                  ),
+                }
+              : a
+          ),
+        })),
+
       removeAdventurer: (adventurerId) => {
         void deleteAdventurerAssets(adventurerId);
         set((state) => ({
@@ -109,6 +189,12 @@ export const useAdventurerStore = create<AdventurerState>()(
       setPinned: (pinnedId) => set({ pinnedId }),
 
       setMood: (mood) => set({ mood }),
+
+      setCompanionFlipped: (companionFlipped) => set({ companionFlipped }),
+
+      setCompanionShowStatus: (companionShowStatus) => set({ companionShowStatus }),
+
+      setCompanionPos: (companionPos) => set({ companionPos }),
     }),
     {
       name: "wynter-code-adventurer",
@@ -118,6 +204,9 @@ export const useAdventurerStore = create<AdventurerState>()(
         apiKey: state.apiKey,
         adventurers: state.adventurers,
         pinnedId: state.pinnedId,
+        companionFlipped: state.companionFlipped,
+        companionShowStatus: state.companionShowStatus,
+        companionPos: state.companionPos,
       }),
     }
   )

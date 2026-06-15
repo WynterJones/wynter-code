@@ -11,14 +11,12 @@
  *     a brief "celebrate",
  *   - otherwise settles to "idle".
  *
- * Each mood change is written to the store and broadcast over the Tauri
- * `adventurer-mood` event so the separate companion webview reacts.
+ * Each mood change is written to the store; the in-app companion overlay reads
+ * it directly from there.
  */
 
 import { useEffect, useRef } from "react";
 import { readTextFile } from "@tauri-apps/plugin-fs";
-import { emit } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
 import { useAdventurerStore, type AdventurerMood } from "@/stores/adventurerStore";
 import { useProjectStore } from "@/stores/projectStore";
 import { useSessionStore } from "@/stores/sessionStore";
@@ -45,17 +43,6 @@ export function useAdventurerActivity(): void {
     prevProjectRef.current = undefined;
     prevSessionRef.current = undefined;
     let cancelled = false;
-
-    // Ensure the floating companion window exists for the pinned adventurer
-    // (e.g. after an app restart). The Rust command is idempotent — it just
-    // reveals an existing window.
-    invoke("is_adventurer_open")
-      .then((open) => {
-        if (!open && !cancelled) {
-          invoke("create_adventurer_window", { x: 200, y: 200 }).catch(() => {});
-        }
-      })
-      .catch(() => {});
 
     const isSessionBusy = (): boolean => {
       const projectId = useProjectStore.getState().activeProjectId;
@@ -131,7 +118,6 @@ export function useAdventurerActivity(): void {
       if (mood !== lastMoodRef.current) {
         lastMoodRef.current = mood;
         useAdventurerStore.getState().setMood(mood);
-        emit("adventurer-mood", mood).catch(() => {});
       }
     };
 
