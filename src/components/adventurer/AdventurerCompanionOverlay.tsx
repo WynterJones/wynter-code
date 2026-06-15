@@ -1,18 +1,20 @@
 /**
  * AdventurerCompanionOverlay
  *
- * Floating pixel-art companion rendered *inside* the main app window (not a
- * separate OS window). Pinned via the adventurer store; reads live "mood"
- * straight from the store. Draggable anywhere within the window (position is
- * persisted), settles to a static frame after a short idle spell, and exposes
- * hover controls to flip direction, toggle a status label, and unpin.
+ * Floating pixel-art companions rendered *inside* the main app window (not a
+ * separate OS window). Any number of characters can be pinned via the adventurer
+ * store; each gets its own draggable, persisted instance. Companions always
+ * animate (idle loops continuously — no static freeze). When several are pinned,
+ * the activity hook picks one at random to play the live "mood" while the rest
+ * keep idling. Each instance exposes hover controls to flip, toggle a status
+ * label, and unpin.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { X, FlipHorizontal2, MessageSquare } from "lucide-react";
 import {
   useAdventurerStore,
-  getPinnedAdventurer,
+  getAdventurerById,
   getClipForMood,
   MOOD_LABELS,
   type AdventurerMood,
@@ -20,7 +22,6 @@ import {
 import { SpriteAnimation } from "./SpriteAnimation";
 import { clipSrcs, baseSpriteSrc } from "@/services/adventurerAssets";
 
-const IDLE_STATIC_AFTER_MS = 9000;
 const SIZE = 160;
 const MARGIN = 24;
 
@@ -35,36 +36,50 @@ const MOOD_DOT: Record<AdventurerMood, string> = {
 const clamp = (v: number, min: number, max: number) =>
   Math.min(Math.max(v, min), max);
 
+/** Renders every pinned companion. */
 export function AdventurerCompanionOverlay() {
-  const adventurers = useAdventurerStore((s) => s.adventurers);
-  const pinnedId = useAdventurerStore((s) => s.pinnedId);
-  const adventurer = useMemo(
-    () => getPinnedAdventurer({ adventurers, pinnedId }),
-    [adventurers, pinnedId]
+  const pinnedIds = useAdventurerStore((s) => s.pinnedIds);
+  if (pinnedIds.length === 0) return null;
+  return (
+    <>
+      {pinnedIds.map((id, index) => (
+        <CompanionInstance key={id} id={id} index={index} />
+      ))}
+    </>
   );
+}
 
+function CompanionInstance({ id, index }: { id: string; index: number }) {
+  const adventurer = useAdventurerStore((s) =>
+    getAdventurerById(s.adventurers, id)
+  );
+  const prefs = useAdventurerStore((s) => s.companions[id]);
   const mood = useAdventurerStore((s) => s.mood);
-  const flipped = useAdventurerStore((s) => s.companionFlipped);
-  const showStatus = useAdventurerStore((s) => s.companionShowStatus);
-  const storedPos = useAdventurerStore((s) => s.companionPos);
+  const emoteTargetId = useAdventurerStore((s) => s.emoteTargetId);
   const setCompanionFlipped = useAdventurerStore((s) => s.setCompanionFlipped);
   const setCompanionShowStatus = useAdventurerStore((s) => s.setCompanionShowStatus);
   const setCompanionPos = useAdventurerStore((s) => s.setCompanionPos);
-  const setPinned = useAdventurerStore((s) => s.setPinned);
+  const togglePin = useAdventurerStore((s) => s.togglePin);
 
-  const [idleStatic, setIdleStatic] = useState(false);
+  const flipped = prefs?.flipped ?? false;
+  const showStatus = prefs?.showStatus ?? false;
+  const storedPos = prefs?.pos ?? null;
+
+  // This companion only plays the live mood when it's the chosen emote target;
+  // otherwise it idles. A single pinned character is effectively always chosen.
+  const effectiveMood: AdventurerMood = emoteTargetId === id ? mood : "idle";
+
   const [hovered, setHovered] = useState(false);
   const [pos, setPos] = useState(storedPos);
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragRef = useRef<{ dx: number; dy: number } | null>(null);
 
-  // Seed a sensible default position (bottom-right) the first time.
+  // Seed a sensible default position (bottom-right, staggered per companion).
   useEffect(() => {
     if (storedPos) return;
-    const x = Math.max(0, window.innerWidth - SIZE - MARGIN);
+    const x = Math.max(0, window.innerWidth - SIZE - MARGIN - index * (SIZE - 24));
     const y = Math.max(0, window.innerHeight - SIZE - MARGIN);
-    setCompanionPos({ x, y });
-  }, [storedPos, setCompanionPos]);
+    setCompanionPos(id, { x, y });
+  }, [storedPos, setCompanionPos, id, index]);
 
   // Mirror the persisted position into local state when not mid-drag.
   useEffect(() => {
@@ -80,31 +95,17 @@ export function AdventurerCompanionOverlay() {
           x: clamp(p.x, 0, window.innerWidth - SIZE),
           y: clamp(p.y, 0, window.innerHeight - SIZE),
         };
-        if (next.x !== p.x || next.y !== p.y) setCompanionPos(next);
+        if (next.x !== p.x || next.y !== p.y) setCompanionPos(id, next);
         return next;
       });
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [setCompanionPos]);
-
-  // While idle, animate briefly then freeze on a static frame.
-  useEffect(() => {
-    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    if (mood !== "idle") {
-      setIdleStatic(false);
-      return;
-    }
-    setIdleStatic(false);
-    idleTimerRef.current = setTimeout(() => setIdleStatic(true), IDLE_STATIC_AFTER_MS);
-    return () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-    };
-  }, [mood]);
+  }, [setCompanionPos, id]);
 
   const activeClip = useMemo(
-    () => (adventurer ? getClipForMood(adventurer, mood) : null),
-    [adventurer, mood]
+    () => (adventurer ? getClipForMood(adventurer, effectiveMood) : null),
+    [adventurer, effectiveMood]
   );
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -126,7 +127,7 @@ export function AdventurerCompanionOverlay() {
     if (!dragRef.current) return;
     dragRef.current = null;
     e.currentTarget.releasePointerCapture(e.pointerId);
-    if (pos) setCompanionPos(pos);
+    if (pos) setCompanionPos(id, pos);
   };
 
   if (!adventurer) return null;
@@ -148,7 +149,7 @@ export function AdventurerCompanionOverlay() {
           className="pointer-events-none"
           style={{ transform: flipped ? "scaleX(-1)" : undefined }}
         >
-          {activeClip && !idleStatic ? (
+          {activeClip ? (
             <SpriteAnimation frames={clipSrcs(activeClip)} fps={activeClip.fps} size={128} />
           ) : (
             <SpriteAnimation
@@ -161,8 +162,8 @@ export function AdventurerCompanionOverlay() {
         {/* Persistent status badge (toggled via the controls). */}
         {showStatus && (
           <div className="absolute top-1 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/70 text-white text-[9px] font-medium whitespace-nowrap pointer-events-none">
-            <span className={`w-1.5 h-1.5 rounded-full ${MOOD_DOT[mood]}`} />
-            {MOOD_LABELS[mood]}
+            <span className={`w-1.5 h-1.5 rounded-full ${MOOD_DOT[effectiveMood]}`} />
+            {MOOD_LABELS[effectiveMood]}
           </div>
         )}
 
@@ -173,7 +174,7 @@ export function AdventurerCompanionOverlay() {
             onPointerDown={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setCompanionFlipped(!flipped)}
+              onClick={() => setCompanionFlipped(id, !flipped)}
               className="w-5 h-5 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white"
               aria-label="Flip direction"
               title="Flip direction"
@@ -181,7 +182,7 @@ export function AdventurerCompanionOverlay() {
               <FlipHorizontal2 className="w-3 h-3" />
             </button>
             <button
-              onClick={() => setCompanionShowStatus(!showStatus)}
+              onClick={() => setCompanionShowStatus(id, !showStatus)}
               className={`w-5 h-5 rounded-full flex items-center justify-center text-white ${
                 showStatus ? "bg-accent/80 hover:bg-accent" : "bg-black/50 hover:bg-black/70"
               }`}
@@ -192,7 +193,7 @@ export function AdventurerCompanionOverlay() {
               <MessageSquare className="w-3 h-3" />
             </button>
             <button
-              onClick={() => setPinned(null)}
+              onClick={() => togglePin(id)}
               className="w-5 h-5 rounded-full bg-black/50 hover:bg-black/70 flex items-center justify-center text-white"
               aria-label="Unpin companion"
               title="Unpin"

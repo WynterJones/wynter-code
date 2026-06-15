@@ -66,11 +66,11 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
   const apiKey = useAdventurerStore((s) => s.apiKey);
   const setApiKey = useAdventurerStore((s) => s.setApiKey);
   const adventurers = useAdventurerStore((s) => s.adventurers);
-  const pinnedId = useAdventurerStore((s) => s.pinnedId);
+  const pinnedIds = useAdventurerStore((s) => s.pinnedIds);
   const addAdventurer = useAdventurerStore((s) => s.addAdventurer);
   const addAnimation = useAdventurerStore((s) => s.addAnimation);
   const setAnimationTrigger = useAdventurerStore((s) => s.setAnimationTrigger);
-  const setPinned = useAdventurerStore((s) => s.setPinned);
+  const togglePin = useAdventurerStore((s) => s.togglePin);
 
   const [step, setStep] = useState<Step>("apikey");
   const [keyDraft, setKeyDraft] = useState(apiKey);
@@ -285,13 +285,9 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
     }
   };
 
-  const handlePin = () => {
+  const handleTogglePin = () => {
     if (!savedAdventurer) return;
-    setPinned(savedAdventurer.id);
-  };
-
-  const handleUnpin = () => {
-    setPinned(null);
+    togglePin(savedAdventurer.id);
   };
 
   return (
@@ -386,7 +382,7 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
                         size={24}
                       />
                       <span className="text-xs text-text-primary">{a.name}</span>
-                      {pinnedId === a.id && <Pin className="w-3 h-3 text-accent" />}
+                      {pinnedIds.includes(a.id) && <Pin className="w-3 h-3 text-accent" />}
                     </button>
                   ))}
                 </div>
@@ -480,12 +476,12 @@ export function PixellabAdventurerPopup({ isOpen, onClose }: PixellabAdventurerP
                 </Button>
                 <h3 className="text-sm font-semibold text-text-primary">{savedAdventurer.name}</h3>
               </div>
-              {pinnedId === savedAdventurer.id ? (
-                <Button variant="secondary" onClick={handleUnpin}>
+              {pinnedIds.includes(savedAdventurer.id) ? (
+                <Button variant="secondary" onClick={handleTogglePin}>
                   <PinOff className="w-4 h-4 mr-1" /> Unpin
                 </Button>
               ) : (
-                <Button variant="primary" onClick={handlePin}>
+                <Button variant="primary" onClick={handleTogglePin}>
                   <Pin className="w-4 h-4 mr-1" /> Pin to desktop
                 </Button>
               )}

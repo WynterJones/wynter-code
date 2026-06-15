@@ -1,8 +1,8 @@
 /**
  * useAdventurerActivity
  *
- * Drives the pinned adventurer companion's "mood" from live wynter-code
- * activity. Only runs while a companion is pinned. It:
+ * Drives the pinned adventurer companions' "mood" from live wynter-code
+ * activity. Only runs while at least one companion is pinned. It:
  *   - polls the hook event stream (`.farmwork/events.jsonl`, the same source as
  *     useFarmworkHookEvents) and flips to "active" briefly on each tool event,
  *   - reads the active session's streaming state and shows "thinking" while a
@@ -12,7 +12,9 @@
  *   - otherwise settles to "idle".
  *
  * Each mood change is written to the store; the in-app companion overlay reads
- * it directly from there.
+ * it directly from there. When several companions are pinned, each fresh
+ * non-idle "burst" picks one pinned character at random as the emote target so
+ * a single companion reacts while the rest keep idling.
  */
 
 import { useEffect, useRef } from "react";
@@ -26,7 +28,9 @@ const ACTIVE_DECAY_MS = 1500;
 const UI_EVENT_DECAY_MS = 2500;
 
 export function useAdventurerActivity(): void {
-  const pinnedId = useAdventurerStore((s) => s.pinnedId);
+  // Re-run the effect whenever the set of pinned characters changes.
+  const pinnedKey = useAdventurerStore((s) => s.pinnedIds.join(","));
+  const hasPinned = pinnedKey.length > 0;
   const lastToolAtRef = useRef(0);
   const lastUiAtRef = useRef(0);
   const consumedRef = useRef(0);
@@ -36,7 +40,7 @@ export function useAdventurerActivity(): void {
   const prevSessionRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    if (!pinnedId) return;
+    if (!hasPinned) return;
 
     consumedRef.current = 0;
     seekedRef.current = false;
@@ -116,8 +120,21 @@ export function useAdventurerActivity(): void {
       detectNavigation();
       const mood = computeMood();
       if (mood !== lastMoodRef.current) {
+        const store = useAdventurerStore.getState();
+        // A fresh non-idle burst: pick a random pinned character to react. Keep
+        // the same target while the burst lasts; clear it once back to idle.
+        if (mood !== "idle" && lastMoodRef.current === "idle") {
+          const pinned = store.pinnedIds;
+          const target =
+            pinned.length > 0
+              ? pinned[Math.floor(Math.random() * pinned.length)]
+              : null;
+          store.setEmoteTarget(target);
+        } else if (mood === "idle") {
+          store.setEmoteTarget(null);
+        }
         lastMoodRef.current = mood;
-        useAdventurerStore.getState().setMood(mood);
+        store.setMood(mood);
       }
     };
 
@@ -128,5 +145,5 @@ export function useAdventurerActivity(): void {
       cancelled = true;
       clearInterval(interval);
     };
-  }, [pinnedId]);
+  }, [pinnedKey, hasPinned]);
 }

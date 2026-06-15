@@ -100,7 +100,7 @@ export function TerminalSwitcherButton() {
         >
           <Terminal className={cn("w-4 h-4", total > 0 && "text-cyan-500")} />
           {total > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 flex items-center justify-center rounded-full bg-cyan-500 text-white text-[9px] font-semibold leading-none">
+            <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] px-0.5 flex items-center justify-center rounded-full bg-gradient-to-br from-cyan-300 to-cyan-500 border border-cyan-200/80 text-cyan-950 text-[9px] font-bold leading-none shadow-sm">
               {total}
             </span>
           )}

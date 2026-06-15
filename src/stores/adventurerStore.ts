@@ -2,11 +2,13 @@
  * adventurerStore
  *
  * Persisted state for the PixelLab Adventurer feature: the API key, created
- * characters (with their animation clips as base64 frames), and which character
- * is currently pinned as the floating desktop companion.
+ * characters (with their animation clips as base64 frames), and which characters
+ * are currently pinned as floating desktop companions. Multiple characters can
+ * be pinned at once; each keeps its own on-screen position, flip, and status
+ * preferences in `companions`.
  *
- * `mood` is live runtime state driven by wynter-code activity and is excluded
- * from persistence (see `partialize`).
+ * `mood` and `emoteTargetId` are live runtime state driven by wynter-code
+ * activity and are excluded from persistence (see `partialize`).
  */
 
 import { create } from "zustand";
@@ -106,16 +108,28 @@ export function getClipForMood(
   );
 }
 
+/** Per-companion overlay preferences, keyed by adventurer id. */
+export interface CompanionPrefs {
+  /** Last on-screen position of this companion's overlay (null = default). */
+  pos?: { x: number; y: number } | null;
+  flipped?: boolean;
+  showStatus?: boolean;
+}
+
 interface AdventurerState {
   apiKey: string;
   adventurers: Adventurer[];
-  pinnedId: string | null;
+  /** Ids of every character currently pinned to the desktop. */
+  pinnedIds: string[];
+  /** Per-companion overlay preferences (position, flip, status badge). */
+  companions: Record<string, CompanionPrefs>;
   mood: AdventurerMood;
-  /** Companion preferences (persisted). */
-  companionFlipped: boolean;
-  companionShowStatus: boolean;
-  /** Last on-screen position of the in-app companion overlay (null = default). */
-  companionPos: { x: number; y: number } | null;
+  /**
+   * Which pinned companion currently plays the active mood. When several
+   * characters are pinned, one is chosen at random per "burst" so a single
+   * companion emotes while the rest keep idling. `null` = everyone idles.
+   */
+  emoteTargetId: string | null;
 
   setApiKey: (key: string) => void;
   addAdventurer: (adventurer: Adventurer) => void;
@@ -126,11 +140,24 @@ interface AdventurerState {
     trigger: AdventurerTrigger
   ) => void;
   removeAdventurer: (adventurerId: string) => void;
+  /** Add or remove a character from the pinned set. */
+  togglePin: (id: string) => void;
+  /** Pin a single character, or unpin everything when passed null. */
   setPinned: (id: string | null) => void;
   setMood: (mood: AdventurerMood) => void;
-  setCompanionFlipped: (flipped: boolean) => void;
-  setCompanionShowStatus: (show: boolean) => void;
-  setCompanionPos: (pos: { x: number; y: number }) => void;
+  setEmoteTarget: (id: string | null) => void;
+  setCompanionFlipped: (id: string, flipped: boolean) => void;
+  setCompanionShowStatus: (id: string, show: boolean) => void;
+  setCompanionPos: (id: string, pos: { x: number; y: number }) => void;
+}
+
+/** Merge a partial preference patch into a companion's prefs map. */
+function patchCompanion(
+  companions: Record<string, CompanionPrefs>,
+  id: string,
+  patch: CompanionPrefs
+): Record<string, CompanionPrefs> {
+  return { ...companions, [id]: { ...companions[id], ...patch } };
 }
 
 export const useAdventurerStore = create<AdventurerState>()(
@@ -138,11 +165,10 @@ export const useAdventurerStore = create<AdventurerState>()(
     (set) => ({
       apiKey: "",
       adventurers: [],
-      pinnedId: null,
+      pinnedIds: [],
+      companions: {},
       mood: "idle",
-      companionFlipped: false,
-      companionShowStatus: false,
-      companionPos: null,
+      emoteTargetId: null,
 
       setApiKey: (apiKey) => set({ apiKey }),
 
@@ -180,43 +206,113 @@ export const useAdventurerStore = create<AdventurerState>()(
 
       removeAdventurer: (adventurerId) => {
         void deleteAdventurerAssets(adventurerId);
-        set((state) => ({
-          adventurers: state.adventurers.filter((a) => a.id !== adventurerId),
-          pinnedId: state.pinnedId === adventurerId ? null : state.pinnedId,
-        }));
+        set((state) => {
+          const companions = { ...state.companions };
+          delete companions[adventurerId];
+          return {
+            adventurers: state.adventurers.filter((a) => a.id !== adventurerId),
+            pinnedIds: state.pinnedIds.filter((id) => id !== adventurerId),
+            companions,
+            emoteTargetId:
+              state.emoteTargetId === adventurerId ? null : state.emoteTargetId,
+          };
+        });
       },
 
-      setPinned: (pinnedId) => set({ pinnedId }),
+      togglePin: (id) =>
+        set((state) => {
+          const pinned = state.pinnedIds.includes(id);
+          return {
+            pinnedIds: pinned
+              ? state.pinnedIds.filter((p) => p !== id)
+              : [...state.pinnedIds, id],
+            companions: pinned
+              ? state.companions
+              : { ...state.companions, [id]: state.companions[id] ?? {} },
+            emoteTargetId:
+              pinned && state.emoteTargetId === id ? null : state.emoteTargetId,
+          };
+        }),
+
+      setPinned: (id) =>
+        set((state) => ({
+          pinnedIds: id ? [id] : [],
+          companions: id
+            ? { ...state.companions, [id]: state.companions[id] ?? {} }
+            : state.companions,
+          emoteTargetId: id === state.emoteTargetId ? state.emoteTargetId : null,
+        })),
 
       setMood: (mood) => set({ mood }),
 
-      setCompanionFlipped: (companionFlipped) => set({ companionFlipped }),
+      setEmoteTarget: (emoteTargetId) => set({ emoteTargetId }),
 
-      setCompanionShowStatus: (companionShowStatus) => set({ companionShowStatus }),
+      setCompanionFlipped: (id, flipped) =>
+        set((state) => ({
+          companions: patchCompanion(state.companions, id, { flipped }),
+        })),
 
-      setCompanionPos: (companionPos) => set({ companionPos }),
+      setCompanionShowStatus: (id, showStatus) =>
+        set((state) => ({
+          companions: patchCompanion(state.companions, id, { showStatus }),
+        })),
+
+      setCompanionPos: (id, pos) =>
+        set((state) => ({
+          companions: patchCompanion(state.companions, id, { pos }),
+        })),
     }),
     {
       name: "wynter-code-adventurer",
-      version: 1,
-      // `mood` is live-only; never persist it.
+      version: 2,
+      // `mood` and `emoteTargetId` are live-only; never persist them.
       partialize: (state) => ({
         apiKey: state.apiKey,
         adventurers: state.adventurers,
-        pinnedId: state.pinnedId,
-        companionFlipped: state.companionFlipped,
-        companionShowStatus: state.companionShowStatus,
-        companionPos: state.companionPos,
+        pinnedIds: state.pinnedIds,
+        companions: state.companions,
       }),
+      // v1 stored a single pinnedId + flat companion prefs. Fan them out into
+      // the multi-companion shape.
+      migrate: (persisted, version) => {
+        type Persisted = Pick<
+          AdventurerState,
+          "apiKey" | "adventurers" | "pinnedIds" | "companions"
+        >;
+        if (version >= 2) return persisted as Persisted;
+        const old = (persisted ?? {}) as {
+          apiKey?: string;
+          adventurers?: Adventurer[];
+          pinnedId?: string | null;
+          companionPos?: { x: number; y: number } | null;
+          companionFlipped?: boolean;
+          companionShowStatus?: boolean;
+        };
+        const pinnedIds = old.pinnedId ? [old.pinnedId] : [];
+        const companions: Record<string, CompanionPrefs> = {};
+        if (old.pinnedId) {
+          companions[old.pinnedId] = {
+            pos: old.companionPos ?? null,
+            flipped: old.companionFlipped ?? false,
+            showStatus: old.companionShowStatus ?? false,
+          };
+        }
+        return {
+          apiKey: old.apiKey ?? "",
+          adventurers: old.adventurers ?? [],
+          pinnedIds,
+          companions,
+        };
+      },
     }
   )
 );
 
-/** Resolve the pinned adventurer object (or null). */
-export function getPinnedAdventurer(state: {
-  adventurers: Adventurer[];
-  pinnedId: string | null;
-}): Adventurer | null {
-  if (!state.pinnedId) return null;
-  return state.adventurers.find((a) => a.id === state.pinnedId) ?? null;
+/** Resolve a single adventurer object by id (or null). */
+export function getAdventurerById(
+  adventurers: Adventurer[],
+  id: string | null
+): Adventurer | null {
+  if (!id) return null;
+  return adventurers.find((a) => a.id === id) ?? null;
 }
