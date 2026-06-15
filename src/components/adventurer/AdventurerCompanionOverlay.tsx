@@ -108,6 +108,16 @@ function CompanionInstance({ id, index }: { id: string; index: number }) {
     [adventurer, effectiveMood]
   );
 
+  // Resolve the renderable frame srcs once per clip. `clipSrcs` builds a fresh
+  // array each call, and SpriteAnimation resets to frame 0 whenever its `frames`
+  // reference changes — so without memoizing, any re-render snapped the idle
+  // loop back to a single static frame.
+  const frames = useMemo(() => {
+    if (activeClip) return clipSrcs(activeClip);
+    const base = adventurer ? baseSpriteSrc(adventurer) : undefined;
+    return base ? [base] : [];
+  }, [activeClip, adventurer]);
+
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     const start = pos ?? storedPos ?? { x: 0, y: 0 };
@@ -149,14 +159,11 @@ function CompanionInstance({ id, index }: { id: string; index: number }) {
           className="pointer-events-none"
           style={{ transform: flipped ? "scaleX(-1)" : undefined }}
         >
-          {activeClip ? (
-            <SpriteAnimation frames={clipSrcs(activeClip)} fps={activeClip.fps} size={128} />
-          ) : (
-            <SpriteAnimation
-              frames={[baseSpriteSrc(adventurer) ?? ""].filter(Boolean)}
-              size={128}
-            />
-          )}
+          <SpriteAnimation
+            frames={frames}
+            fps={activeClip?.fps ?? 6}
+            size={128}
+          />
         </div>
 
         {/* Persistent status badge (toggled via the controls). */}
