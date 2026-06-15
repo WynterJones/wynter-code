@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { createClaudeTuiSession, createCodexTuiSession } from "@/lib/cliTuiSession";
 import { useFarmworkDetection } from "@/hooks/useFarmworkDetection";
 import { useAutoBuildStore } from "@/stores/autoBuildStore";
+import { TerminalSwitcherButton } from "./TerminalSwitcherButton";
 import type { Session } from "@/types";
 
 interface DropdownPosition {
@@ -614,6 +615,9 @@ export function SessionTabBar({
 
       {/* Toolbar buttons */}
       <div className="flex items-center h-full border-l border-border gap-1 px-2">
+        {/* Open Terminals switcher */}
+        <TerminalSwitcherButton />
+
         {/* Farmwork */}
         <Tooltip content="Farmwork Tycoon">
           <button
