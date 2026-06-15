@@ -28,6 +28,7 @@ mod tunnel;
 mod vibrancy;
 mod watcher;
 mod webcam_window;
+mod adventurer_window;
 mod camera_permission;
 mod process_registry;
 mod rate_limiter;
@@ -411,6 +412,11 @@ fn main() {
             webcam_window::update_floating_webcam_size,
             webcam_window::get_floating_webcam_state,
             webcam_window::is_floating_webcam_open,
+            // Adventurer Companion Window
+            adventurer_window::create_adventurer_window,
+            adventurer_window::close_adventurer_window,
+            adventurer_window::update_adventurer_position,
+            adventurer_window::is_adventurer_open,
             // Cost Popup (Screen Recording Invisible)
             cost_popup::create_cost_popup,
             cost_popup::close_cost_popup,

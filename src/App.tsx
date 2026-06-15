@@ -1,5 +1,6 @@
 import { LauncherWindow } from "@/components/launcher";
 import { BrowserToolbar } from "@/components/browser-dock";
+import { AdventurerCompanion } from "@/components/adventurer/AdventurerCompanion";
 import { useEffect, lazy, Suspense } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAppFont } from "@/hooks/useAppFont";
@@ -13,13 +14,14 @@ const AppShell = lazy(() =>
   import("@/components/layout/AppShell").then((m) => ({ default: m.AppShell }))
 );
 
-type WindowType = "main" | "launcher" | "browser-toolbar";
+type WindowType = "main" | "launcher" | "browser-toolbar" | "adventurer-companion";
 
 // Determine window type synchronously to avoid flash
 const getWindowType = (): WindowType => {
   const pathname = window.location.pathname;
   if (pathname === "/launcher") return "launcher";
   if (pathname === "/browser-toolbar") return "browser-toolbar";
+  if (pathname === "/adventurer-companion") return "adventurer-companion";
   return "main";
 };
 
@@ -125,6 +127,11 @@ function App() {
         <BrowserToolbar />
       </ScreenReaderAnnouncerProvider>
     );
+  }
+
+  // Render floating adventurer companion window (lightweight, transparent)
+  if (windowType === "adventurer-companion") {
+    return <AdventurerCompanion />;
   }
 
   // Render main app with lazy-loaded AppShell

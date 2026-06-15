@@ -41,6 +41,7 @@ interface ToolsDropdownProps {
   onOpenBookmarks: () => void;
   onOpenMeditation: () => void;
   onOpenDatabaseViewer: () => void;
+  onOpenAdventurer: () => void;
   onOpenProjectTemplates: () => void;
   onOpenFileFinder: () => void;
   onOpenSubscriptions: () => void;
@@ -82,6 +83,7 @@ export function ToolsDropdown({
   onOpenBookmarks,
   onOpenMeditation,
   onOpenDatabaseViewer,
+  onOpenAdventurer,
   onOpenProjectTemplates,
   onOpenFileFinder,
   onOpenSubscriptions,
@@ -123,6 +125,7 @@ export function ToolsDropdown({
     openBookmarks: onOpenBookmarks,
     openMeditation: onOpenMeditation,
     openDatabaseViewer: onOpenDatabaseViewer,
+    openAdventurer: onOpenAdventurer,
     openProjectTemplates: onOpenProjectTemplates,
     openFileFinder: onOpenFileFinder,
     openSubscriptions: onOpenSubscriptions,
@@ -142,7 +145,7 @@ export function ToolsDropdown({
     onOpenOverwatch, onOpenMcpManager, onOpenFaviconGenerator, onOpenDevToolkit,
     onOpenClaudeCodeStats, onOpenLimitsMonitor, onOpenDomainTools, onOpenSeoTools,
     onOpenNetlifyFtp, onOpenBookmarks, onOpenMeditation, onOpenDatabaseViewer,
-    onOpenProjectTemplates, onOpenFileFinder, onOpenSubscriptions, onOpenFarmwork,
+    onOpenAdventurer, onOpenProjectTemplates, onOpenFileFinder, onOpenSubscriptions, onOpenFarmwork,
     onOpenJustCommandManager, onOpenUniversalViewer, onOpenDesignerTool,
     onOpenGitHubManager, onOpenScratchpad, onOpenWebBackup, onOpenKanbanBoard,
   ]);

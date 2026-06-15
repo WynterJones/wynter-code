@@ -23,6 +23,7 @@ import { Tooltip } from "@/components/ui";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useCustomMusic } from "@/hooks/useCustomMusic";
 import { useBackupScheduler } from "@/hooks/useBackupScheduler";
+import { useAdventurerActivity } from "@/hooks/useAdventurerActivity";
 import { DragGhost } from "@/components/files/DragGhost";
 import type { ImageAttachment } from "@/components/files/FileBrowserPopup";
 
@@ -74,6 +75,9 @@ export function AppShell() {
 
   // Initialize custom music loading
   useCustomMusic();
+
+  // Drive the pinned adventurer companion's mood from live activity
+  useAdventurerActivity();
 
   // Initialize backup scheduler
   useBackupScheduler({

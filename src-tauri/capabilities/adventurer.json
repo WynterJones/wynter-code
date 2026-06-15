@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "adventurer",
+  "description": "Capabilities for the floating adventurer companion window",
+  "windows": ["adventurer-companion"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-position",
+    "core:event:allow-listen",
+    "core:event:allow-emit"
+  ]
+}

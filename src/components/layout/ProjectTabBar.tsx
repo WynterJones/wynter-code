@@ -15,6 +15,7 @@ import {
   CloudUpload,
   CheckSquare,
   Globe,
+  User,
 } from "lucide-react";
 import * as LucideIcons from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -75,6 +76,7 @@ const ApiTesterPopup = lazy(() => import("@/components/tools/api-tester/ApiTeste
 const SeoToolsPopup = lazy(() => import("@/components/tools/seo-tools/SeoToolsPopup").then(m => ({ default: m.SeoToolsPopup })));
 import { useFarmworkTycoonStore } from "@/stores/farmworkTycoonStore";
 import { McpManagerPopup } from "@/components/tools/mcp-manager";
+import { PixellabAdventurerPopup } from "@/components/tools/pixellab/PixellabAdventurerPopup";
 import { DevToolkitPopup } from "@/components/tools/dev-toolkit";
 import { ClaudeCodeStatsPopup } from "@/components/tools/claude-code-stats";
 import { LimitsMonitorPopup } from "@/components/tools/limits-monitor";
@@ -424,6 +426,7 @@ export function ProjectTabBar({
   const [seoToolsInitialTool, setSeoToolsInitialTool] = useState<string | undefined>();
   const [showNetlifyFtp, setShowNetlifyFtp] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
+  const [showAdventurer, setShowAdventurer] = useState(false);
   const [showProjectSearch, setShowProjectSearch] = useState(false);
   const [showJustCommandManager, setShowJustCommandManager] = useState(false);
   const [showUniversalViewer, setShowUniversalViewer] = useState(false);
@@ -598,6 +601,9 @@ export function ProjectTabBar({
           break;
         case "openDatabaseViewer":
           setShowDatabaseViewer(true);
+          break;
+        case "openAdventurer":
+          setShowAdventurer(true);
           break;
         case "openFileFinder":
           handleBrowseFiles();
@@ -985,6 +991,15 @@ export function ProjectTabBar({
         </Tooltip>
       </div>
 
+      {/* Adventurer (PixelLab companion) */}
+      <div className="border-l border-border px-2 h-full flex items-center">
+        <Tooltip content="Adventurer">
+          <IconButton size="sm" onClick={() => setShowAdventurer(true)} aria-label="Open adventurer creator">
+            <User className="w-4 h-4" />
+          </IconButton>
+        </Tooltip>
+      </div>
+
       {/* Tools Dropdown */}
       <div className="border-l border-border px-2 h-full flex items-center">
         <ToolsDropdown
@@ -1014,6 +1029,7 @@ export function ProjectTabBar({
           onOpenProjectSearch={() => setShowProjectSearch(true)}
           onOpenMeditation={() => setMeditationActive(true)}
           onOpenDatabaseViewer={() => setShowDatabaseViewer(true)}
+          onOpenAdventurer={() => setShowAdventurer(true)}
           onOpenProjectTemplates={() => setShowProjectTemplates(true)}
           onOpenFileFinder={handleBrowseFiles}
           onOpenSubscriptions={() => onOpenSubscriptions?.()}
@@ -1101,6 +1117,12 @@ export function ProjectTabBar({
         mode={fileBrowserMode}
         onSelectProject={handleSelectProject}
         onSendToPrompt={onSendToPrompt}
+      />
+
+      {/* Adventurer Popup */}
+      <PixellabAdventurerPopup
+        isOpen={showAdventurer}
+        onClose={() => setShowAdventurer(false)}
       />
 
       {/* Port Manager Popup */}

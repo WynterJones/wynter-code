@@ -157,6 +157,10 @@ tool-tunnel:
 tool-health:
     @echo "System Health:" && echo "  Components: src/components/tools/system-health/" && ls -1 src/components/tools/system-health/*.tsx | sed 's|src/components/tools/system-health/||' | sed 's|^|    - |' && echo "  Commands:   check_system_requirements, get_system_resources"
 
+# Adventurer (PixelLab companion) tool files
+tool-adventurer:
+    @echo "Adventurer (PixelLab):" && echo "  Modal:     src/components/tools/pixellab/PixellabAdventurerPopup.tsx" && echo "  Companion: src/components/adventurer/AdventurerCompanion.tsx (+ SpriteAnimation.tsx)" && echo "  Client:    src/services/pixellabClient.ts" && echo "  Store:     src/stores/adventurerStore.ts" && echo "  Activity:  src/hooks/useAdventurerActivity.ts" && echo "  Backend:   src-tauri/src/adventurer_window.rs" && echo "  Commands:  create_adventurer_window, close_adventurer_window, update_adventurer_position, is_adventurer_open"
+
 # Tools dropdown (where all tools are registered)
 tool-dropdown:
     @echo "Tools Dropdown:" && echo "  Component: src/components/tools/ToolsDropdown.tsx" && echo "  Mounted:   src/components/layout/ProjectTabBar.tsx"

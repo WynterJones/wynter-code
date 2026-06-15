@@ -69,6 +69,7 @@ import {
   Paintbrush,
   Github,
   StickyNote,
+  User,
   type LucideIcon,
 } from "lucide-react";
 
@@ -119,6 +120,15 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     icon: Database,
     actionKey: "openDatabaseViewer",
     category: "code",
+    hiddenInDropdown: true,
+  },
+  {
+    id: "adventurer",
+    name: "Adventurer",
+    description: "Create & pin a pixel-art companion",
+    icon: User,
+    actionKey: "openAdventurer",
+    category: "design",
     hiddenInDropdown: true,
   },
   {
