@@ -53,10 +53,13 @@ export function useFarmworkHookEvents(
 
       const lines = text.split("\n").filter((l) => l.trim().length > 0);
 
-      // File was truncated/rotated (e.g. SessionStart) — restart from the top.
+      // File was truncated (the SessionStart hook resets it once it grows
+      // large). Restart from the top, but DO keep consuming live — events
+      // appended after a truncation are genuinely new, so they must not be
+      // skipped as history. Skipping them here is what froze cars when a
+      // second concurrent session truncated the shared stream mid-work.
       if (lines.length < consumedRef.current) {
         consumedRef.current = 0;
-        seekedRef.current = false;
       }
 
       // On first read after opening, skip existing history — only react to

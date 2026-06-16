@@ -591,23 +591,55 @@ export function Terminal({ projectPath, ptyId, onPtyCreated, onPtyClosed, isVisi
     }
   }, [isFocused, isReady]);
 
-  // Refit when the terminal becomes visible again (tab switch back)
+  // Refit and force a full repaint when the terminal becomes visible again
+  // (workspace/tab switch back). The WebGL renderer caches glyphs in a GPU
+  // texture atlas; after the container was hidden via visibility:hidden, a
+  // plain refresh() marks rows dirty but does NOT re-rasterize those glyphs,
+  // so the screen paints blank until the running TUI (e.g. Claude Code) emits
+  // a fresh redraw (which is why pressing Enter "fixes" it). clearTextureAtlas()
+  // forces the atlas to rebuild so the existing buffer paints immediately.
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {
     const wasVisible = prevVisibleRef.current;
     prevVisibleRef.current = isVisible;
     if (!isVisible || wasVisible) return;
 
-    const rafId = requestAnimationFrame(() => {
+    let rafId: number | null = null;
+    let attempts = 0;
+
+    const repaint = () => {
       const el = terminalRef.current;
       const term = xtermRef.current;
       if (!el || !term || !fitAddonRef.current) return;
+
       const { width, height } = el.getBoundingClientRect();
-      if (width === 0 || height === 0) return;
+      // Container may not have composited yet on the first frame after the
+      // visibility flip — retry a few frames before giving up rather than
+      // silently leaving the terminal blank.
+      if (width === 0 || height === 0) {
+        if (attempts++ < 5) {
+          rafId = requestAnimationFrame(repaint);
+        }
+        return;
+      }
+
       fitAddonRef.current.fit();
+      // Rebuild the glyph atlas so cached cells re-rasterize on show. Applies to
+      // whichever GPU renderer is active (WebGL, or Canvas after a context-loss
+      // fallback) — both cache glyphs and paint blank otherwise.
+      try {
+        webglAddonRef.current?.clearTextureAtlas();
+        canvasAddonRef.current?.clearTextureAtlas();
+      } catch {
+        // Ignore — atlas rebuild is best-effort
+      }
       term.refresh(0, term.rows - 1);
-    });
-    return () => cancelAnimationFrame(rafId);
+    };
+
+    rafId = requestAnimationFrame(repaint);
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
   }, [isVisible]);
 
   // PTY health monitoring (Issue #5)
