@@ -53,7 +53,7 @@ echo -e "Created ${TARBALL_NAME}\n"
 
 # Step 4: Sign the tarball (this is what the updater uses)
 echo -e "${GREEN}[4/6] Signing tarball for updater...${NC}"
-SIGNATURE=$(pnpm tauri signer sign "$TARBALL_NAME" -k "$(cat ~/.tauri/wynter-code.key)" 2>&1 | grep "^dW50cnVzdGVk" || true)
+SIGNATURE=$(pnpm tauri signer sign "$TARBALL_NAME" -k "$(cat ~/.tauri/wynter-code.key)" -p "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" 2>&1 | grep "^dW50cnVzdGVk" || true)
 
 if [ -z "$SIGNATURE" ]; then
   # Try reading from .sig file
